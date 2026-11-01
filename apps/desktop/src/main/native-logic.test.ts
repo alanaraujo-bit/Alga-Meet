@@ -138,7 +138,7 @@ describe('badge', () => {
     expect(px.length).toBe(16 * 16 * 4)
     const at = (x: number, y: number) => [...px.subarray((y * 16 + x) * 4, (y * 16 + x) * 4 + 4)]
     expect(at(0, 0)[3]).toBe(0)
-    expect(at(1, 8)).toEqual([0x59, 0x5d, 0xf7, 255])
+    expect(at(1, 8)).toEqual([0x44, 0x44, 0xc0, 255])
     let white = 0
     for (let i = 0; i < px.length; i += 4) if (px[i] === 255 && px[i + 1] === 255 && px[i + 2] === 255) white++
     expect(white).toBeGreaterThan(8)
