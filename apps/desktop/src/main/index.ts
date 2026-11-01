@@ -22,7 +22,12 @@ import { createMainWindow, registerWindowIpc, setQuitting, showMainWindow } from
 
 // Dev multi-instance: `--profile=bob` isolates userData (and the single-instance lock) per profile.
 const profile = process.argv.find((a) => a.startsWith('--profile='))?.split('=')[1] ?? 'default'
-if (profile !== 'default') app.setPath('userData', join(app.getPath('appData'), 'Alga Meet', 'profiles', profile))
+// Unpackaged (dev) builds get their own data root so they never share a session token — or the single-instance
+// lock — with an installed Alga Meet on the same machine.
+const dataRoot = join(app.getPath('appData'), app.isPackaged ? 'Alga Meet' : 'Alga Meet Dev')
+if (!app.isPackaged || profile !== 'default') {
+  app.setPath('userData', profile === 'default' ? dataRoot : join(dataRoot, 'profiles', profile))
+}
 
 initLog()
 app.setAppUserModelId('com.alga.meet') // must match electron-builder appId (toasts, taskbar grouping)

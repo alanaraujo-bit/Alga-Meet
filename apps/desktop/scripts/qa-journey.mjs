@@ -149,7 +149,7 @@ const MIC = { A: MEDIA.tone, B: MEDIA.speech, C: MEDIA.silence }
 // ── app instances ────────────────────────────────────────────
 const electronPath = createRequire(join(Q.appDir, 'package.json'))('electron')
 const apps = new Map()
-const profileDir = (k) => join(process.env.APPDATA ?? '', 'Alga Meet', 'profiles', PROFILE[k])
+const profileDir = (k) => join(process.env.APPDATA ?? '', 'Alga Meet Dev', 'profiles', PROFILE[k])
 const appEnv = () => {
   const env = { ...process.env, ALGA_API_URL: Q.API, ALGA_E2E: '1' }
   delete env.ELECTRON_RENDERER_URL

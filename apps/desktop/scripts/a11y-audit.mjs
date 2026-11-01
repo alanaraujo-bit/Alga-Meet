@@ -154,7 +154,7 @@ function micWav() {
   return f
 }
 async function launch(k, { x, y, w, h }) {
-  rmSync(join(process.env.APPDATA ?? '', 'Alga Meet', 'profiles', PROFILE[k]), { recursive: true, force: true })
+  rmSync(join(process.env.APPDATA ?? '', 'Alga Meet Dev', 'profiles', PROFILE[k]), { recursive: true, force: true })
   const env = { ...process.env, ALGA_API_URL: Q.API, ALGA_E2E: '1' }
   delete env.ELECTRON_RENDERER_URL
   const bg = ['--disable-features=CalculateNativeWinOcclusion', '--disable-renderer-backgrounding', '--disable-background-timer-throttling']

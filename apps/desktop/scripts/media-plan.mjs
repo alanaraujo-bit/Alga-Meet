@@ -580,7 +580,7 @@ const MEDIA_FLAGS = (wav) => ['--use-fake-ui-for-media-stream', '--use-fake-devi
 async function launchApp(profile, wav, size = [1320, 840]) {
   const { _electron } = await import('playwright')
   const electronPath = (await import('electron')).default
-  rmSync(join(process.env.APPDATA ?? '', 'Alga Meet', 'profiles', profile), { recursive: true, force: true })
+  rmSync(join(process.env.APPDATA ?? '', 'Alga Meet Dev', 'profiles', profile), { recursive: true, force: true })
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'ELECTRON_RENDERER_URL'))
   env.ALGA_API_URL = API
   const app = await _electron.launch({ executablePath: electronPath, args: [desktop, `--profile=${profile}`, ...MEDIA_FLAGS(wav)], cwd: desktop, env })

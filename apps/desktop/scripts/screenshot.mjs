@@ -339,7 +339,7 @@ const electronPath = require('electron')
 
 async function launch({ width = 1320, height = 840, scale, keepProfile, apiUrl, profile = PROFILE, extra = [] } = {}) {
   // Fresh profile by default: no stored token, no persisted window bounds.
-  const profileDir = join(process.env.APPDATA ?? '', 'Alga Meet', 'profiles', profile)
+  const profileDir = join(process.env.APPDATA ?? '', 'Alga Meet Dev', 'profiles', profile)
   if (!keepProfile) rmSync(profileDir, { recursive: true, force: true })
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'ELECTRON_RENDERER_URL'))
   if (apiUrl) env.ALGA_API_URL = apiUrl
