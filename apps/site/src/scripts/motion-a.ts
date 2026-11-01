@@ -56,11 +56,15 @@ export function initTierA() {
     });
   }
 
-  // Frase que acende palavra por palavra com a rolagem.
+  // Frase que acende palavra por palavra com a rolagem. Em tela larga ela fica presa no meio enquanto acende:
+  // um capítulo, uma ideia. No celular só acompanha a rolagem, sem prender.
+  const wide = matchMedia('(min-width: 900px) and (min-height: 600px)').matches;
   for (const lit of document.querySelectorAll<HTMLElement>('[data-lit]')) {
     gsap.fromTo(lit.querySelectorAll('.w'), { opacity: 0.18 }, {
       opacity: 1, ease: 'none', stagger: 0.12,
-      scrollTrigger: { trigger: lit, start: 'top 78%', end: 'bottom 42%', scrub: true },
+      scrollTrigger: wide
+        ? { trigger: lit, start: 'center 52%', end: '+=85%', pin: true, scrub: 0.4 }
+        : { trigger: lit, start: 'top 78%', end: 'bottom 42%', scrub: true },
     });
   }
 
@@ -105,5 +109,8 @@ export function initTierA() {
     gsap.fromTo(el, { yPercent: amt }, { yPercent: -amt, ease: 'none', scrollTrigger: { trigger: el, start: 'top bottom', end: 'bottom top', scrub: true } });
   }
 
-  addEventListener('load', () => ScrollTrigger.refresh());
+  // A pinagem empurra o que vem depois: recalcula tudo agora e de novo quando imagens e fonte terminarem.
+  ScrollTrigger.refresh();
+  if (document.readyState !== 'complete') addEventListener('load', () => ScrollTrigger.refresh(), { once: true });
+  document.fonts?.ready.then(() => ScrollTrigger.refresh());
 }

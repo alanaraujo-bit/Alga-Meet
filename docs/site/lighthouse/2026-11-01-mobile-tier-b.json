@@ -1,0 +1,23 @@
+{
+  "url": "http://localhost:3102/?tier=b",
+  "form": "mobile",
+  "tier": "b",
+  "performance": 98,
+  "accessibility": 100,
+  "bestPractices": 100,
+  "seo": 100,
+  "fcp": "0.8 s",
+  "lcp": "2.0 s",
+  "tbt": "150 ms",
+  "cls": "0",
+  "si": "1.2 s",
+  "bytes": "189 KiB",
+  "a11y": [],
+  "failed": [
+    "max-potential-fid",
+    "mainthread-work-breakdown",
+    "forced-reflow-insight",
+    "image-delivery-insight",
+    "network-dependency-tree-insight"
+  ]
+}

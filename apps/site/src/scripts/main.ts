@@ -20,6 +20,15 @@ function initNav() {
   const update = () => { queued = false; nav.classList.toggle('scrolled', scrollY > 8); };
   addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
   update();
+  // Link da seção visível fica marcado (aria-current), para quem lê e para quem usa leitor de tela.
+  const links = new Map([...nav.querySelectorAll<HTMLAnchorElement>('nav a[href^="#"]')].map((a) => [a.hash.slice(1), a]));
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      links.forEach((a, id) => (id === e.target.id ? a.setAttribute('aria-current', 'true') : a.removeAttribute('aria-current')));
+    }
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  links.forEach((_, id) => { const s = document.getElementById(id); if (s) io.observe(s); });
 }
 
 function initInvite() {

@@ -1,0 +1,21 @@
+{
+  "url": "http://localhost:3102/",
+  "form": "desktop",
+  "tier": "auto",
+  "performance": 100,
+  "accessibility": 100,
+  "bestPractices": 100,
+  "seo": 100,
+  "fcp": "0.3 s",
+  "lcp": "0.4 s",
+  "tbt": "0 ms",
+  "cls": "0",
+  "si": "0.3 s",
+  "bytes": "254 KiB",
+  "a11y": [],
+  "failed": [
+    "unused-javascript",
+    "forced-reflow-insight",
+    "network-dependency-tree-insight"
+  ]
+}
