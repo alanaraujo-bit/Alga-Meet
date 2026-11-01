@@ -1,9 +1,99 @@
-import { contextBridge, ipcRenderer } from 'electron'
-import type { AlgaBridge, AppConfig } from '../shared/bridge'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import type { AlgaBridge, AppConfig, HotkeyBinding, Unsubscribe } from '../shared/bridge'
+import { IPC } from '../shared/ipc'
 
-const config = ipcRenderer.sendSync('alga:config') as AppConfig
+// Every argument is rebuilt as plain data here (no prototypes, functions or DOM objects cross);
+// main validates each payload again and checks the sender frame.
 
-// Skeleton: only config is wired; the desktop-native work fills in the rest of AlgaBridge.
-const bridge: Partial<AlgaBridge> = { config }
+const config = ipcRenderer.sendSync(IPC.config) as AppConfig
+
+function subscribe<T>(channel: string, cb: (value: T) => void): Unsubscribe {
+  if (typeof cb !== 'function') throw new TypeError('callback must be a function')
+  const listener = (_e: IpcRendererEvent, value: T) => cb(value)
+  ipcRenderer.on(channel, listener)
+  return () => {
+    ipcRenderer.removeListener(channel, listener)
+  }
+}
+
+const nums = (v: unknown): number[] => (Array.isArray(v) ? v.map(Number) : [])
+const chord = (b: Pick<HotkeyBinding, 'keys' | 'mouseButtons'>) => ({ keys: nums(b?.keys), mouseButtons: nums(b?.mouseButtons) })
+
+const bridge: AlgaBridge = {
+  config,
+
+  auth: {
+    getToken: () => ipcRenderer.invoke(IPC.authGetToken),
+    setToken: (token) => ipcRenderer.invoke(IPC.authSetToken, token === null ? null : String(token)),
+  },
+
+  window: {
+    minimize: () => ipcRenderer.send(IPC.winMinimize),
+    toggleMaximize: () => ipcRenderer.send(IPC.winToggleMaximize),
+    close: () => ipcRenderer.send(IPC.winClose),
+    isMaximized: () => ipcRenderer.invoke(IPC.winIsMaximized),
+    onMaximizedChange: (cb) => subscribe(IPC.winMaximizedChanged, cb),
+    onFocusChange: (cb) => subscribe(IPC.winFocusChanged, cb),
+    setBadge: (count) => ipcRenderer.send(IPC.winSetBadge, Math.min(1_000_000, Math.max(0, Math.floor(Number(count) || 0)))),
+    flashFrame: () => ipcRenderer.send(IPC.winFlashFrame),
+  },
+
+  screen: {
+    getSources: (types) => ipcRenderer.invoke(IPC.screenGetSources, Array.isArray(types) ? types.map(String) : []),
+    select: (sourceId, opts) => ipcRenderer.invoke(IPC.screenSelect, String(sourceId), { audio: opts?.audio === true }),
+  },
+
+  hotkeys: {
+    set: (bindings) =>
+      ipcRenderer.invoke(
+        IPC.hotkeysSet,
+        (Array.isArray(bindings) ? bindings : []).map((b) => ({ action: String(b?.action), ...chord(b) })),
+      ),
+    record: () => ipcRenderer.invoke(IPC.hotkeysRecord),
+    onEvent: (cb) => subscribe(IPC.hotkeysEvent, cb),
+    label: (binding) => ipcRenderer.invoke(IPC.hotkeysLabel, chord(binding)),
+  },
+
+  notify: (opts) =>
+    ipcRenderer.send(IPC.notify, {
+      title: String(opts?.title ?? ''),
+      body: String(opts?.body ?? ''),
+      ...(opts?.tag === undefined ? {} : { tag: String(opts.tag) }),
+      silent: opts?.silent === true,
+    }),
+  onNotificationClick: (cb) => subscribe(IPC.notificationClick, cb),
+
+  tray: {
+    setVoiceState: (s) =>
+      ipcRenderer.send(IPC.traySetVoiceState, {
+        connected: s?.connected === true,
+        muted: s?.muted === true,
+        deafened: s?.deafened === true,
+        ...(s?.channelName === undefined ? {} : { channelName: String(s.channelName) }),
+      }),
+    onAction: (cb) => subscribe(IPC.trayAction, cb),
+  },
+
+  power: {
+    onSuspend: (cb) => subscribe(IPC.powerSuspend, () => cb()),
+    onResume: (cb) => subscribe(IPC.powerResume, () => cb()),
+  },
+
+  updates: {
+    check: () => ipcRenderer.invoke(IPC.updatesCheck),
+    onStatus: (cb) => subscribe(IPC.updatesStatus, cb),
+    install: () => ipcRenderer.send(IPC.updatesInstall),
+  },
+
+  app: {
+    getStartAtLogin: () => ipcRenderer.invoke(IPC.appGetStartAtLogin),
+    setStartAtLogin: (enabled) => ipcRenderer.invoke(IPC.appSetStartAtLogin, enabled === true),
+    getCloseToTray: () => ipcRenderer.invoke(IPC.appGetCloseToTray),
+    setCloseToTray: (enabled) => ipcRenderer.invoke(IPC.appSetCloseToTray, enabled === true),
+    openExternal: (url) => ipcRenderer.invoke(IPC.appOpenExternal, String(url)),
+    openLogs: () => ipcRenderer.invoke(IPC.appOpenLogs),
+    quit: () => ipcRenderer.send(IPC.appQuit),
+  },
+}
 
 contextBridge.exposeInMainWorld('alga', bridge)

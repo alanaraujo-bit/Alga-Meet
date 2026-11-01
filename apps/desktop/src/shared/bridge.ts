@@ -80,7 +80,11 @@ export interface AlgaBridge {
     getSources(types: Array<'screen' | 'window'>): Promise<CaptureSource[]>
     /**
      * Pre-select what the next getDisplayMedia() call returns. Must be followed by
-     * getDisplayMedia() within a few seconds. audio=true captures system audio (loopback).
+     * getDisplayMedia() within 10 s; the selection is consumed by that one call (no selection = denied).
+     * audio=true captures system audio (loopback). Always request it as
+     * `getDisplayMedia({ video, audio: { restrictOwnAudio: true } })`: that excludes Alga Meet's own
+     * output (the voice call) from the loopback, otherwise viewers hear the call echoed back.
+     * See docs/decisions/0002-screen-audio-capture.md.
      */
     select(sourceId: string, opts: { audio: boolean }): Promise<void>
   }

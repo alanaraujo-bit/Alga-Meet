@@ -1,11 +1,27 @@
 import './chromium-flags'
 import { join } from 'node:path'
-import { BrowserWindow, app, ipcMain, shell } from 'electron'
+import { app, ipcMain, shell } from 'electron'
 import type { AppConfig } from '../shared/bridge'
+import { IPC } from '../shared/ipc'
+import { initCapture } from './capture'
+import { registerHotkeyIpc, stopHotkeys } from './hotkeys'
+import { bool, handle, isTrustedSender, on, str } from './ipc'
+import { initLog, log, logDir } from './log'
+import { registerNotificationIpc } from './notifications'
+import { initPower } from './power'
+import { getToken, setToken } from './secure-store'
+import { applySecurity, isExternalWebUrl } from './security'
+import { getSettings, updateSettings } from './settings'
+import { createTray, destroyTray, registerTrayIpc, trayState } from './tray'
+import { initUpdater } from './updater'
+import { createMainWindow, registerWindowIpc, setQuitting, showMainWindow } from './window'
 
 // Dev multi-instance: `--profile=bob` isolates userData (and the single-instance lock) per profile.
 const profile = process.argv.find((a) => a.startsWith('--profile='))?.split('=')[1] ?? 'default'
 if (profile !== 'default') app.setPath('userData', join(app.getPath('appData'), 'Alga Meet', 'profiles', profile))
+
+initLog()
+app.setAppUserModelId('com.alga.meet') // must match electron-builder appId (toasts, taskbar grouping)
 
 const apiUrl = process.env.ALGA_API_URL ?? import.meta.env.MAIN_VITE_API_URL ?? 'http://localhost:4000'
 
@@ -18,45 +34,55 @@ const config: AppConfig = {
   isPackaged: app.isPackaged,
 }
 
-let win: BrowserWindow | null = null
+// Started by the login item: come up in the tray only.
+const startHidden = process.argv.includes('--hidden')
+const loginArgs = app.isPackaged ? ['--hidden'] : [app.getAppPath(), '--hidden']
 
-function createWindow(): void {
-  win = new BrowserWindow({
-    width: 1320,
-    height: 840,
-    minWidth: 960,
-    minHeight: 600,
-    show: false,
-    title: profile === 'default' ? 'Alga Meet' : `Alga Meet (${profile})`,
-    backgroundColor: '#0c0d10',
-    titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#00000000', symbolColor: '#a8adb7', height: 40 },
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: true,
-      contextIsolation: true,
-      nodeIntegration: false,
-      spellcheck: true,
-    },
+function registerAppIpc(): void {
+  ipcMain.on(IPC.config, (e) => {
+    e.returnValue = isTrustedSender(e) ? config : null
   })
-  win.once('ready-to-show', () => win?.show())
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//.test(url)) void shell.openExternal(url)
-    return { action: 'deny' }
+  handle(IPC.authGetToken, () => getToken())
+  handle(IPC.authSetToken, (t) => setToken(t === null ? null : str(t, 8192)))
+  handle(IPC.appGetStartAtLogin, () => app.getLoginItemSettings({ args: loginArgs }).openAtLogin)
+  handle(IPC.appSetStartAtLogin, (v) => app.setLoginItemSettings({ openAtLogin: bool(v), args: loginArgs }))
+  handle(IPC.appGetCloseToTray, () => getSettings().closeToTray)
+  handle(IPC.appSetCloseToTray, (v) => updateSettings({ closeToTray: bool(v) }))
+  handle(IPC.appOpenExternal, async (u) => {
+    const url = str(u, 4096)
+    if (!isExternalWebUrl(url)) throw new TypeError('only http(s) URLs')
+    await shell.openExternal(url)
   })
-  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL)
-  else void win.loadFile(join(__dirname, '../renderer/index.html'))
+  handle(IPC.appOpenLogs, async () => {
+    const err = await shell.openPath(logDir())
+    if (err) log.warn('openLogs failed', err)
+  })
+  on(IPC.appQuit, () => app.quit())
+  registerWindowIpc()
+  registerTrayIpc()
+  registerHotkeyIpc()
+  registerNotificationIpc()
 }
 
 if (!app.requestSingleInstanceLock()) app.quit()
 else {
-  app.on('second-instance', () => {
-    if (!win) return
-    if (win.isMinimized()) win.restore()
-    win.show()
-    win.focus()
+  app.on('second-instance', showMainWindow)
+  registerAppIpc()
+  app.whenReady().then(() => {
+    applySecurity()
+    initCapture()
+    createMainWindow(profile === 'default' ? 'Alga Meet' : `Alga Meet (${profile})`, startHidden)
+    createTray()
+    initPower()
+    initUpdater()
   })
-  ipcMain.on('alga:config', (e) => (e.returnValue = config))
-  app.whenReady().then(createWindow)
+  app.on('before-quit', setQuitting)
+  app.on('will-quit', () => {
+    stopHotkeys() // the hook thread would otherwise keep the process alive
+    destroyTray()
+    log.info('quit')
+  })
   app.on('window-all-closed', () => app.quit())
+  // E2E hook for scripts/verify-native.mjs (Playwright electronApp.evaluate); absent in normal runs.
+  if (process.env.ALGA_E2E === '1') Object.assign(globalThis, { __alga: { trayState, require } })
 }
