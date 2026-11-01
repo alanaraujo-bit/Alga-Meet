@@ -34,6 +34,7 @@ export const t = {
     yours: 'Sua mensagem',
     moderation: 'Moderação',
     more: 'Mais ações',
+    menu: 'Ações da mensagem',
   },
   reactionLabel: (emoji: string, n: number, me: boolean) => `${emoji}: ${n} ${n === 1 ? 'reação' : 'reações'}${me ? ', incluindo a sua' : ''}`,
   deleteTitle: 'Excluir mensagem?',

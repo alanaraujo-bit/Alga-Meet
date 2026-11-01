@@ -23,6 +23,7 @@ import { ReportHost } from '../trust/Report'
 import { CallStage } from '../voice/CallStage'
 import { IncomingCall } from '../voice/IncomingCall'
 import { MiniPlayer } from '../voice/MiniPlayer'
+import { VoiceAnnouncer } from '../voice/VoiceAnnouncer'
 import { ScreenPicker } from '../voice/ScreenPicker'
 import { startVoiceSync } from '../voice/voice'
 import { MemberList } from './MemberList'
@@ -96,6 +97,7 @@ export function Shell() {
       <QuickSwitcher />
       <ScreenPicker />
       <IncomingCall />
+      <VoiceAnnouncer />
       <MiniPlayer />
       <Suspense fallback={null}>
         {settings && <SettingsOverlay />}

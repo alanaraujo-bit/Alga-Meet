@@ -294,6 +294,23 @@ Também da rodada: uma marca só (as frondes, Marca v1), presente do ícone do W
 | Renovação e reembolso em 7 dias ditos antes do clique | Letra miúda depois do pagamento, "para sempre", contagem regressiva |
 | Cosmético que se move uma vez, ao abrir, com repouso = movimento reduzido | Animação contínua em lista, no chat ou fora da tela |
 
+## 6b. Acessibilidade: teclado, leitor de tela, alto contraste
+
+Verificado no app real por `apps/desktop/scripts/a11y-audit.mjs` (regras no DOM + jornadas só de teclado + forced colors + movimento reduzido). Relatório e pendências: `docs/accessibility/2026-11-01-audit.md`.
+
+- **Todo controle tem nome.** `IconButton` sempre com `label`; ícone é `aria-hidden`. `aria-label` só vale em elemento com papel: num `div`/`span` sem `role` o leitor ignora (a lista de membros é `role="complementary"` "Membros").
+- **Sem `tabindex` positivo.** A ordem de Tab é a do DOM.
+- **Foco visível.** Anel `:focus-visible` de 2 px em acento. Quem tira o outline (input dentro de uma caixa) mostra o foco na caixa (`:focus-within`). Em alto contraste o outline volta em `Highlight`. Exceção aceita: a busca do "Ir para" (único controle do diálogo, sempre focada; o cursor é o indicador).
+- **Lista = uma parada de Tab + setas.** Rail e lista de canais/conversas: ↑ ↓ Home End movem (`arrowFocus` + `data-arrow-nav`, `ui/floating.ts`); um gatilho de menu dentro dessas listas abre com Enter/Espaço e ↓ continua andando. Histórico: uma parada (a mensagem itinerante), ↑ ↓ PageUp PageDown Home End andam entre mensagens, Tab percorre os controles da mensagem focada e depois sai da lista. Rádios (fontes do seletor de tela, segmented, abas): uma parada, setas escolhem.
+- **Menu de contexto pelo teclado.** Shift+F10 e a tecla Menu abrem o mesmo menu do clique direito (também numa mensagem focada), com o 1º item ativo. Todo menu tem nome (`label`, senão o `aria-label` do gatilho). Painel flutuante só recebe foco depois de posicionado: com `visibility: hidden` o `focus()` falha em silêncio (era o caso de `Menu` e `Popover`).
+- **Diálogo:** `role="dialog"` + `aria-modal="true"` + nome; Esc fecha só o de cima; o foco volta ao gatilho. Gatilho que muda de estado durante o diálogo continua sendo o mesmo elemento (Compartilhar tela → Parar transmissão: `MenuButton off`). Popover fechado por uma escolha (emoji, status) devolve o foco ao gatilho.
+- **O foco nunca cai no `<body>`.** Edição inline encerrada → composer. Sair da chamada → composer ou canal atual (ou o botão Entrar do palco). Escolher um canal (Enter ou clique) → composer, mesmo se ele já está aberto.
+- **Região viva existe antes do texto.** Uma `role="status"` criada já com o texto costuma não ser lida (NVDA/Narrador). Toasts: região `aria-live="polite"` permanente, erro = `role="alert"`; "digitando" e "nova mensagem" idem; quem entra e sai da chamada em que você está: `VoiceAnnouncer` (uma `role="status"` fixa no shell). O histórico (`role="log"`) fica `aria-live="off"`: linhas montam ao rolar.
+- **Toast pausa no hover e no foco** (WCAG 2.2.1).
+- **Contraste** sobre o fundo composto real: texto ≥ 4,5:1, ≥ 3:1 a partir de 24 px (ou 18,66 px em negrito). `--text-disabled` só em desabilitado. Placeholder global = `--text-tertiary` (o cinza padrão do Chromium dá 2,9:1 no overlay).
+- **Movimento reduzido** (SO ou "Reduzir animações"): `--speak` só 0/1 (indicador estático de quem fala), luz da sala desligada, nenhuma animação em execução (`document.getAnimations()`).
+- **Alto contraste (`forced-colors`).** Fundos viram Canvas e sombras somem, então estado desenhado como tinta ou anel ganha cor de sistema (`base.css`): página atual, selecionado, pressionado, rádio escolhido e item ativo de menu = `Highlight`/`HighlightText` com `!important` (sem ele a regra do componente, mais específica, devolve a tinta quase branca sobre Canvas); switch ganha borda e trilho; menus, diálogos, tooltips e toasts ganham borda `CanvasText`; tile ganha borda e a fala vira contorno `Highlight` com opacidade `--speak`. Cor nova de estado = conferir no passe forced do script.
+
 ## 7. Telas (versões mais recentes)
 
 ### Rodada 3 (crítica r2)

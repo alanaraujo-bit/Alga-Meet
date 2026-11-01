@@ -142,6 +142,14 @@ export const t = {
     waiting: (name: string) => `Chamando ${name}…`,
   },
 
+  /** Screen-reader announcements (VoiceAnnouncer): who came and went in the call you are in. */
+  announce: {
+    connected: (where: string) => `Você entrou na chamada em ${where}`,
+    disconnected: 'Você saiu da chamada',
+    joined: (name: string) => `${name} entrou na chamada`,
+    left: (name: string) => `${name} saiu da chamada`,
+  },
+
   picker: {
     title: 'Compartilhar tela',
     description: 'Só o que você escolher aqui é transmitido, e só para quem clicar em Assistir. Você pode parar a qualquer momento.',

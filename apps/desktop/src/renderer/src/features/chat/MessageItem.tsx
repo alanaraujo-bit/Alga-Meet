@@ -105,7 +105,7 @@ export const MessageItem = memo(function MessageItem({
       ref={row}
       className={`${s.msg} ${head ? s.head : ''} ${irc ? s.irc : ''} ${mentioned ? s.mentioned : ''} ${editing ? s.editingRow : ''}`}
       data-message-id={m.id}
-      onContextMenu={contextMenuHandler(menu)}
+      onContextMenu={contextMenuHandler(menu, t.actions.menu)}
     >
       {profileAt && <AuthorPopover userId={m.author.id} spaceId={spaceId} name={name} anchor={profileAt} onClose={() => setProfileAt(null)} />}
       {m.replyToId && <ReplyPreview channelId={m.channelId} replyToId={m.replyToId} spaceId={spaceId} onJump={onJump} />}
@@ -190,7 +190,7 @@ export const MessageItem = memo(function MessageItem({
         )}
       </div>
       {!pending && !editing && (
-        <div className={s.toolbar} role="toolbar" aria-label="Ações da mensagem">
+        <div className={s.toolbar} role="toolbar" aria-label={t.actions.menu}>
           {QUICK_EMOJI.map((e) => (
             <Tooltip key={e} content={t.actions.react(e)}>
               <button type="button" className={s.toolEmoji} aria-label={t.actions.react(e)} onClick={() => toggleReaction(m, e)}>

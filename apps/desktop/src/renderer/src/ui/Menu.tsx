@@ -57,7 +57,8 @@ export function contextMenuHandler(items: () => MenuEntry[], label?: string) {
     e.stopPropagation()
     const list = items()
     if (list.length === 0) return
-    const keyboard = e.clientX === 0 && e.clientY === 0
+    // Shift+F10 / the Menu key: Chromium reports button -1 (a right click is 2) and the focused element's position.
+    const keyboard = e.button !== 2
     const r = e.currentTarget.getBoundingClientRect()
     openMenu({
       items: list,
@@ -82,12 +83,15 @@ export function MenuButton({
   side = 'bottom',
   align = 'start',
   label,
+  off,
 }: {
   items: () => MenuEntry[]
   children: ReactElement<TriggerProps>
   side?: Side
   align?: Align
   label?: string
+  /** No menu right now: the child renders as is and stays the same element, so its focus survives the switch. */
+  off?: boolean
 }) {
   const open = useMenuStore((st) => st.open)
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
@@ -98,6 +102,7 @@ export function MenuButton({
     openMenu({ items: items(), anchor: el.getBoundingClientRect(), side, align, keyboard, label })
   }
   const p = children.props
+  if (off) return <>{children}</>
   return (
     <>
       {cloneElement(children, {
@@ -110,7 +115,8 @@ export function MenuButton({
         },
         onKeyDown: (e) => {
           p.onKeyDown?.(e)
-          if (e.key === 'ArrowDown') {
+          // In an arrow-key list (rail) ↓ moves to the next control; Enter/Space still open the menu.
+          if (e.key === 'ArrowDown' && !e.currentTarget.closest('[data-arrow-nav]')) {
             e.preventDefault()
             show(e.currentTarget, true)
           }
@@ -139,8 +145,12 @@ function MenuPanel({ menu }: { menu: OpenMenu }) {
     const el = ref.current
     if (!el) return
     setPos(place(menu.anchor, { width: el.offsetWidth, height: el.offsetHeight }, menu.side, menu.align, menu.anchor.width ? 4 : 2))
-    el.focus()
   }, [menu])
+  // Focus once placed: while still hidden (visibility) the panel cannot take focus and the arrows would go nowhere.
+  const placed = pos !== null
+  useLayoutEffect(() => {
+    if (placed) ref.current?.focus()
+  }, [placed])
 
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
@@ -210,7 +220,7 @@ function MenuPanel({ menu }: { menu: OpenMenu }) {
     <div
       ref={ref}
       role="menu"
-      aria-label={menu.label}
+      aria-label={menu.label ?? menu.returnFocus?.getAttribute('aria-label') ?? undefined}
       tabIndex={-1}
       className={s.menu}
       // A dropdown from a wide trigger (sidebar header, device picker) is at least as wide as it, edges aligned.

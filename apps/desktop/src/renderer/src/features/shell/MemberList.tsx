@@ -49,7 +49,7 @@ export function MemberList({ spaceId }: { spaceId: string }) {
 
   const label = { voice: t.members.voice, online: t.members.online, offline: t.members.offline }
   return (
-    <ScrollArea className={`${s.members} ${stale ? s.membersStale : ''}`} aria-label="Membros">
+    <ScrollArea className={`${s.members} ${stale ? s.membersStale : ''}`} role="complementary" aria-label="Membros">
       {(['voice', 'online', 'offline'] as const).map((k) =>
         groups[k].length === 0 ? null : (
           <section key={k} aria-label={label[k](groups[k].length)}>

@@ -1,5 +1,5 @@
 import { ArrowDown, Hash, Phone } from 'lucide-react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
 import { buildRows } from '@/lib/grouping'
 import { mentionedIds, toPlainText } from '@/lib/markdown'
 import { ackLatest, loadMessages } from '@/store/actions'
@@ -7,6 +7,7 @@ import { useData } from '@/store/data'
 import { displayName } from '@/store/selectors'
 import { useUi } from '@/store/ui'
 import { Avatar, Button, Divider, Fronds, Icon, Skeleton } from '@/ui'
+import { focusables } from '@/ui/floating'
 import { errorText } from '@/lib/errors'
 import { t as tv } from '../voice/strings'
 import { joinVoice } from '../voice/voice'
@@ -289,8 +290,38 @@ export function MessageList({ channelId, spaceId, unreadAfter, title, isDm }: { 
     else sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' })
   }
 
+  /**
+   * The history is ONE tab stop (the roving message): keyboard focus arriving from outside lands on that message,
+   * not on a control of whichever message comes first; Tab walks the focused message's controls, then leaves the list.
+   */
+  const onFocus = (e: FocusEvent<HTMLDivElement>) => {
+    const el = e.target as HTMLElement
+    const row = el.closest<HTMLElement>('[data-key]')
+    const fromOutside = !e.currentTarget.contains(e.relatedTarget as Node | null)
+    // Not the inline editor's field: that one is focused on purpose (↑ in the composer).
+    if (fromOutside && row && el !== row && el.matches(':focus-visible') && !el.matches('input, textarea')) {
+      const stop = e.currentTarget.querySelector<HTMLElement>('[role="article"][tabindex="0"]')
+      if (stop) return stop.focus()
+    }
+    focused.current = row?.dataset.key ?? null
+  }
+  const tabOut = (e: KeyboardEvent<HTMLDivElement>) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>('[role="article"]')
+    if (!row) return
+    const own = [row, ...focusables(row)]
+    const i = own.indexOf(e.target as HTMLElement)
+    if (e.shiftKey ? i > 0 : i < own.length - 1) return
+    const sc = e.currentTarget
+    const rest = focusables(document.body).filter((f) => !sc.contains(f) && !!(sc.compareDocumentPosition(f) & (e.shiftKey ? Node.DOCUMENT_POSITION_PRECEDING : Node.DOCUMENT_POSITION_FOLLOWING)))
+    const to = e.shiftKey ? rest[rest.length - 1] : rest[0]
+    if (!to) return
+    e.preventDefault()
+    to.focus()
+  }
+
   /** Message rows: ↑/↓ and PageUp/PageDown move between messages, Home/End to the oldest/newest loaded. */
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Tab') return tabOut(e)
     const row = e.target as HTMLElement
     const key = row.getAttribute('role') === 'article' ? row.dataset.key : undefined
     const its = layout.current.items
@@ -323,7 +354,14 @@ export function MessageList({ channelId, spaceId, unreadAfter, title, isDm }: { 
         className={s.scroller}
         onScroll={onScroll}
         onKeyDown={onKeyDown}
-        onFocus={(e) => (focused.current = (e.target as HTMLElement).closest<HTMLElement>('[data-key]')?.dataset.key ?? null)}
+        onFocus={onFocus}
+        onContextMenu={(e) => {
+          // Shift+F10 / Menu key on the focused row: the message's own menu lives on the row's child.
+          const row = e.target as HTMLElement
+          if (row.getAttribute('role') !== 'article') return
+          e.preventDefault()
+          row.firstElementChild?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: -1 }))
+        }}
         onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && (focused.current = null)}
         role="log"
         // Rows mount while scrolling: never announce them (new messages go through the status below).

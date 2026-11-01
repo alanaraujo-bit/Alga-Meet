@@ -116,6 +116,13 @@ export function Composer({
   useEffect(() => {
     if (replyToId) ref.current?.focus()
   }, [replyToId])
+  // An inline edit that ends (saved or Esc) unmounts its field: the keyboard comes back here, not to <body>.
+  const editing = useUi((st) => st.editing[channelId])
+  const wasEditing = useRef(editing)
+  useEffect(() => {
+    if (wasEditing.current && !editing && document.activeElement === document.body) ref.current?.focus()
+    wasEditing.current = editing
+  }, [editing])
 
   const over = value.length - MAX_LEN
   const remaining = MAX_LEN - value.length
@@ -280,6 +287,7 @@ export function Composer({
           />
           <textarea
             ref={setRefs}
+            data-composer
             className={s.input}
             rows={1}
             value={value}

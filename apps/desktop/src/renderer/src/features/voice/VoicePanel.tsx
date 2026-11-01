@@ -50,13 +50,15 @@ export function VoicePanel() {
           </span>
           <span className={`${s.panelSub} tnum`}>{sub}</span>
         </button>
-        {conn.state === 'connected' &&
-          (sharing ? (
-            <IconButton icon={MonitorOff} label={t.dock.stopShare} onClick={() => void media.stopScreenShare()} />
-          ) : (
-            <IconButton icon={MonitorUp} label={t.dock.share} onClick={() => useVoice.setState({ picker: true })} />
-          ))}
-        {down ? <IconButton icon={X} label={t.leave} onClick={leaveVoice} /> : <IconButton icon={PhoneOff} label={t.leave} danger onClick={leaveVoice} />}
+        {/* One button per action whatever the state: the focus stays put when sharing starts/stops. */}
+        {conn.state === 'connected' && (
+          <IconButton
+            icon={sharing ? MonitorOff : MonitorUp}
+            label={sharing ? t.dock.stopShare : t.dock.share}
+            onClick={() => (sharing ? void media.stopScreenShare() : useVoice.setState({ picker: true }))}
+          />
+        )}
+        <IconButton icon={down ? X : PhoneOff} label={t.leave} danger={!down} onClick={leave} />
       </div>
     </div>
   )
@@ -73,4 +75,21 @@ function LinkBars({ bars, detail }: { bars: number; detail: string }) {
       </span>
     </Tooltip>
   )
+}
+
+/** The panel goes away with the call (async): then the keyboard lands where you are looking, not on <body>. */
+function leave() {
+  leaveVoice()
+  const land = () =>
+    requestAnimationFrame(() => {
+      if (document.activeElement !== document.body) return
+      ;(document.querySelector<HTMLElement>('[data-composer]') ?? document.querySelector<HTMLElement>('aside [aria-current="page"]'))?.focus()
+    })
+  const gone = () => ['idle', 'disconnected'].includes(useMedia.getState().connection.state)
+  if (gone()) return land()
+  const off = useMedia.subscribe(() => {
+    if (!gone()) return
+    off()
+    land()
+  })
 }

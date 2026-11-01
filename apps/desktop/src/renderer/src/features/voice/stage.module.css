@@ -101,6 +101,17 @@
   pointer-events: none;
   z-index: 3;
 }
+/* High contrast: the tile needs an edge, and speaking keeps its outline (box-shadow is dropped in forced colors). */
+@media (forced-colors: active) {
+  .tile {
+    border: 1px solid CanvasText;
+  }
+  .tile::after {
+    forced-color-adjust: none;
+    box-shadow: none;
+    border: 3px solid Highlight;
+  }
+}
 .tileBody {
   position: relative;
   display: grid;
@@ -619,6 +630,13 @@
   box-shadow: 0 0 0 2px var(--accent);
   opacity: min(1, calc(var(--speak, 0) * 2.5));
   pointer-events: none;
+}
+@media (forced-colors: active) {
+  .ctlMeter {
+    forced-color-adjust: none;
+    box-shadow: none;
+    border: 2px solid Highlight;
+  }
 }
 .dockJoin {
   composes: dock;

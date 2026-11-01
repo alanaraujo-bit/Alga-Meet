@@ -6,6 +6,7 @@ import { homeBadge, spaceUnread } from '@/store/selectors'
 import { useUi } from '@/store/ui'
 import { Badge, contextMenuHandler, Fronds, Icon, MenuButton, Tooltip, tintFor } from '@/ui'
 import { initials } from '@/ui/Avatar'
+import { arrowFocus } from '@/ui/floating'
 import { roomLevelNow } from '../voice/levels'
 import { spaceMenu } from '../spaces/spaceMenu'
 import { openStaff } from '../staff/store'
@@ -25,7 +26,7 @@ export function SpaceRail() {
 
   return (
     <nav className={s.rail} aria-label="Espaços">
-      <div className={s.railScroll}>
+      <div className={s.railScroll} data-arrow-nav onKeyDown={arrowFocus}>
         <div className={s.railItem}>
           <span className={`${s.pill} ${view.kind !== 'space' ? s.pillActive : ''}`} />
           <Tooltip content={t.rail.home} side="right">

@@ -769,6 +769,9 @@ button.replyBody:hover {
 .emojiSearch input:focus-visible {
   outline: none;
 }
+.emojiSearch:focus-within {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
 .emojiGrid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);

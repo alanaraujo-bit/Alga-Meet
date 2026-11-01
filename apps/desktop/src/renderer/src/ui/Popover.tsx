@@ -64,8 +64,16 @@ function PopoverPanel({
     const el = ref.current
     if (!el) return
     setPos(place(anchor.getBoundingClientRect(), { width: el.offsetWidth, height: el.offsetHeight }, side, align, gap))
-    ;(focusables(el)[0] ?? el).focus()
   }, [anchor, side, align, gap])
+  // Focus once placed: a panel still hidden (visibility) cannot take focus.
+  const placed = pos !== null
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (placed && el) (focusables(el)[0] ?? el).focus()
+  }, [placed])
+
+  // Closed by a pick (emoji, status): its focused control is gone, so the keyboard goes back to the anchor.
+  useEffect(() => () => void (document.activeElement === document.body && anchor.isConnected && anchor.focus()), [anchor])
 
   useEffect(() => {
     const onDown = (e: PointerEvent) => {

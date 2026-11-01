@@ -95,7 +95,7 @@
   align-self: end;
   margin: var(--s-6) 0 calc(-1 * var(--s-4));
   text-align: center;
-  color: var(--text-disabled);
+  color: var(--text-tertiary);
   font: var(--type-meta);
 }
 

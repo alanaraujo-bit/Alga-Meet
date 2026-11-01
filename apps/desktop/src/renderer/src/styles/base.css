@@ -73,6 +73,12 @@ textarea,
   cursor: auto;
 }
 
+/* Inputs without their own ::placeholder get the token, not Chromium's gray (2.9:1 on the overlay). */
+::placeholder {
+  color: var(--text-tertiary);
+  opacity: 1;
+}
+
 ::selection {
   background: var(--selection-bg);
   color: var(--text-primary);
@@ -85,6 +91,53 @@ textarea,
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/*
+ * Windows high contrast (forced colors): backgrounds flatten to Canvas and box-shadows disappear, so every state the
+ * app draws with a tint or a ring gets a system-color stand-in. Checked in a11y-audit.mjs (forced pass + PNGs).
+ */
+@media (forced-colors: active) {
+  /* Inputs and panels that draw their focus as a box-shadow (or none) get the one indicator that survives. */
+  :focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px;
+  }
+  /* Where you are and what is on: current page, selected tab/option, pressed toggle, chosen radio, active menu item.
+     !important: the components' own state rules are more specific, and with forced-color-adjust: none their tints
+     would come back as near-white on Canvas. */
+  [aria-current='page'],
+  [aria-selected='true'],
+  [aria-pressed='true'],
+  [role='radio'][aria-checked='true'],
+  [role^='menuitem'][data-active='true'] {
+    forced-color-adjust: none;
+    background: Highlight !important;
+    color: HighlightText !important;
+  }
+  /* Switch: track and thumb were only fills. */
+  [role='switch'] {
+    border: 1px solid ButtonText;
+  }
+  [role='switch'] > * {
+    forced-color-adjust: none;
+    background: ButtonText !important;
+  }
+  [role='switch'][aria-checked='true'] {
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Highlight !important;
+  }
+  [role='switch'][aria-checked='true'] > * {
+    background: HighlightText !important;
+  }
+  /* Floating layers were separated from the page by shadow and luminance only. */
+  [role='menu'],
+  [role='dialog'],
+  [role='tooltip'],
+  [role='region'][aria-label='Notificações'] > * {
+    border: 1px solid CanvasText;
+  }
 }
 
 /*

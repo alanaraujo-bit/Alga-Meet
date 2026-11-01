@@ -1,3 +1,5 @@
+import type { KeyboardEvent } from 'react'
+
 export type Side = 'top' | 'bottom' | 'left' | 'right'
 export type Align = 'start' | 'center' | 'end'
 
@@ -66,3 +68,18 @@ const FOCUSABLE =
 
 export const focusables = (root: HTMLElement): HTMLElement[] =>
   Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.offsetParent !== null || el === document.activeElement)
+
+/**
+ * Arrow keys in a list of controls (rail, channel list): ↑/↓ move the focus to the previous/next control, Home/End
+ * to the first/last. Put it on the container's onKeyDown and mark the container `data-arrow-nav` (menu triggers inside
+ * then keep ↓ for moving instead of opening).
+ */
+export function arrowFocus(e: KeyboardEvent<HTMLElement>): void {
+  if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return
+  const items = focusables(e.currentTarget)
+  const i = items.indexOf(document.activeElement as HTMLElement)
+  if (i < 0) return
+  e.preventDefault()
+  const to = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : Math.max(0, Math.min(items.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))
+  items[to]!.focus()
+}

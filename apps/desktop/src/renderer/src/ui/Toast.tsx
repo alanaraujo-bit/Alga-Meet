@@ -38,7 +38,9 @@ const ICON = { info: Info, success: CheckCircle2, error: AlertCircle }
 export function ToastHost() {
   const items = useToasts((st) => st.items)
   return (
-    <div className={s.toasts} role="region" aria-label="Notificações">
+    // The live region exists before any toast: text inserted into it is announced (a role=status born with its text
+    // is often skipped by NVDA/Narrator). Errors stay role=alert (announced on insertion, assertive).
+    <div className={s.toasts} role="region" aria-label="Notificações" aria-live="polite">
       <AnimatePresence initial={false}>
         {items.map((t) => (
           <ToastView key={t.id} t={t} />
@@ -63,13 +65,16 @@ function ToastView({ t }: { t: ToastItem }) {
   return (
     <motion.div
       layout
-      role={t.kind === 'error' ? 'alert' : 'status'}
+      role={t.kind === 'error' ? 'alert' : undefined}
       className={`${s.toast} ${t.kind === 'success' ? s.toastSuccess : t.kind === 'error' ? s.toastError : ''}`}
       initial={{ opacity: 0, y: 8, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.22, ease: EASE_OUT_QUART } }}
       exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.14, ease: EASE_IN } }}
       onPointerEnter={stop}
       onPointerLeave={start}
+      // Keyboard users get the same pause as the pointer (WCAG 2.2.1).
+      onFocus={stop}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && start()}
     >
       <span className={s.toastIcon}>
         <Icon icon={ICON[t.kind]} size={16} />

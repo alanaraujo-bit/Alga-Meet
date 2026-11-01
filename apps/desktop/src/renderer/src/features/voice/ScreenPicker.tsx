@@ -108,12 +108,28 @@ function PickerBody({ onDone }: { onDone: () => void }) {
         />
         {/* One source: no grid, the preview is the choice. */}
         {list.length > 1 && (
-          <div className={s.grid} role="radiogroup" aria-label={kind === 'screen' ? t.picker.screens : t.picker.windows}>
+          <div
+            className={s.grid}
+            role="radiogroup"
+            aria-label={kind === 'screen' ? t.picker.screens : t.picker.windows}
+            // Radio pattern: one tab stop (the chosen source), arrows move and choose.
+            onKeyDown={(e) => {
+              const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0
+              if (!d) return
+              e.preventDefault()
+              const at = list.findIndex((x) => x.id === chosen?.id)
+              const next = list[(at + d + list.length) % list.length]!
+              setPicked(next.id)
+              e.currentTarget.querySelector<HTMLElement>(`[data-source="${CSS.escape(next.id)}"]`)?.focus()
+            }}
+          >
             {list.map((src) => (
               <button
                 key={src.id}
                 type="button"
                 role="radio"
+                data-source={src.id}
+                tabIndex={src.id === chosen?.id ? 0 : -1}
                 aria-checked={src.id === chosen?.id}
                 className={s.source}
                 onClick={() => setPicked(src.id)}

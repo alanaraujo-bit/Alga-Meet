@@ -1,0 +1,648 @@
+{
+  "label": "before",
+  "app": "node_modules\\.alga-a11y-before",
+  "at": "2026-11-01T12:27:05.520Z",
+  "audit": {
+    "entrar": {
+      "name": [],
+      "genericLabel": [],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [],
+      "img": [],
+      "contrast": [
+        {
+          "rule": "contrast",
+          "fg": "#636a6e",
+          "bg": "#080b0c",
+          "ratio": 3.59,
+          "min": 4.5,
+          "size": 12,
+          "weight": 400,
+          "count": 2,
+          "samples": [
+            "\"v\" @ p.version \"v0.1.0\"",
+            "\"0.1.0\" @ p.version \"v0.1.0\""
+          ]
+        }
+      ]
+    },
+    "chat": {
+      "name": [],
+      "genericLabel": [
+        "div.scroll \"Membros\""
+      ],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [],
+      "img": [],
+      "contrast": []
+    },
+    "menu-mensagem": {
+      "name": [],
+      "genericLabel": [
+        "div.scroll \"Membros\""
+      ],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [
+        "div.menu[role=menu] \"Adicionar reaçãoResponderCopiarCopiar textoModer\" sem nome",
+        "div.menu[role=menu] \"Adicionar reaçãoResponderCopiarCopiar textoModer\" aberto sem foco dentro"
+      ],
+      "img": [],
+      "contrast": []
+    },
+    "emoji": {
+      "name": [],
+      "genericLabel": [
+        "div.scroll \"Membros\""
+      ],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [],
+      "img": [],
+      "contrast": [
+        {
+          "rule": "contrast",
+          "fg": "#757575",
+          "bg": "#2a2f31",
+          "ratio": 2.93,
+          "min": 4.5,
+          "size": 13,
+          "weight": 400,
+          "count": 1,
+          "samples": [
+            "placeholder \"Buscar emoji\" @ input \"Buscar emoji\""
+          ]
+        }
+      ]
+    },
+    "perfil": {
+      "name": [],
+      "genericLabel": [
+        "div.scroll \"Membros\""
+      ],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [],
+      "img": [],
+      "contrast": []
+    },
+    "ir-para": {
+      "name": [],
+      "genericLabel": [
+        "div.scroll \"Membros\""
+      ],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [],
+      "img": [],
+      "contrast": []
+    },
+    "denuncia": {
+      "name": [],
+      "genericLabel": [
+        "div.scroll \"Membros\""
+      ],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [],
+      "img": [],
+      "contrast": []
+    },
+    "config-conta": {
+      "name": [],
+      "genericLabel": [
+        "div.scroll \"Membros\""
+      ],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [],
+      "img": [],
+      "contrast": []
+    },
+    "config-voz": {
+      "name": [],
+      "genericLabel": [
+        "div.scroll \"Membros\""
+      ],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [],
+      "img": [],
+      "contrast": []
+    },
+    "config-aparencia": {
+      "name": [],
+      "genericLabel": [
+        "div.scroll \"Membros\""
+      ],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [],
+      "img": [],
+      "contrast": []
+    },
+    "equipe": {
+      "name": [],
+      "genericLabel": [
+        "div.scroll \"Membros\""
+      ],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [],
+      "img": [],
+      "contrast": []
+    },
+    "amigos": {
+      "name": [],
+      "genericLabel": [],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [],
+      "img": [],
+      "contrast": [
+        {
+          "rule": "contrast",
+          "fg": "#757575",
+          "bg": "#1b1e20",
+          "ratio": 3.63,
+          "min": 4.5,
+          "size": 13,
+          "weight": 400,
+          "count": 1,
+          "samples": [
+            "placeholder \"Buscar\" @ input \"Buscar\""
+          ]
+        }
+      ]
+    },
+    "chamada": {
+      "name": [],
+      "genericLabel": [],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [],
+      "img": [],
+      "contrast": []
+    },
+    "seletor-tela": {
+      "name": [],
+      "genericLabel": [],
+      "tabindex": [],
+      "hiddenFocus": [],
+      "dialog": [],
+      "menu": [],
+      "img": [],
+      "contrast": []
+    }
+  },
+  "focus": {
+    "entrar": {
+      "tabbed": 6,
+      "invisible": [],
+      "noFocusVisible": []
+    },
+    "chat": {
+      "tabbed": 31,
+      "invisible": [],
+      "noFocusVisible": []
+    },
+    "ir-para": {
+      "tabbed": 1,
+      "invisible": [
+        "input.input[role=combobox]"
+      ],
+      "noFocusVisible": []
+    },
+    "config-aparencia": {
+      "tabbed": 18,
+      "invisible": [],
+      "noFocusVisible": []
+    },
+    "chamada": {
+      "tabbed": 23,
+      "invisible": [],
+      "noFocusVisible": []
+    },
+    "seletor-tela": {
+      "tabbed": 8,
+      "invisible": [],
+      "noFocusVisible": []
+    }
+  },
+  "journeys": [
+    {
+      "id": "J1",
+      "title": "Entrar só com o teclado",
+      "steps": [
+        {
+          "text": "foco inicial no campo de login",
+          "ok": true,
+          "detail": "textbox \"E-mail ou nome de usuário\""
+        },
+        {
+          "text": "Tab vai para a senha",
+          "ok": true,
+          "detail": "1 Tab"
+        },
+        {
+          "text": "Enter entra no app",
+          "ok": true,
+          "detail": "navegação \"Espaços\" visível"
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "J2",
+      "title": "Rail e lista de canais com setas, abrir um canal",
+      "steps": [
+        {
+          "text": "Tab chega ao rail",
+          "ok": true,
+          "detail": "1 Tab até button \"Clube A11y\""
+        },
+        {
+          "text": "falhou",
+          "ok": false,
+          "detail": "↓ não moveu o foco (button \"Clube A11y\" → button \"Clube A11y\")"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "id": "J3",
+      "title": "Escrever, enviar, editar (↑), responder e reagir",
+      "steps": [
+        {
+          "text": "Enter envia",
+          "ok": true,
+          "detail": "Teste de teclado d2b7"
+        },
+        {
+          "text": "↑ no composer vazio edita a última mensagem",
+          "ok": true,
+          "detail": "textbox \"Editar\""
+        },
+        {
+          "text": "falhou",
+          "ok": false,
+          "detail": "timeout: foco de volta no composer"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "id": "J4",
+      "title": "Seletor de emoji e autocomplete de menção",
+      "steps": [
+        {
+          "text": "@ abre a lista de menções",
+          "ok": true,
+          "detail": "Bruno Costa@a11y.bruno.4c96"
+        },
+        {
+          "text": "Enter escolhe a menção",
+          "ok": true,
+          "detail": "Oi @Bruno Costa "
+        },
+        {
+          "text": "falhou",
+          "ok": false,
+          "detail": "timeout: busca de emoji focada"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "id": "J5",
+      "title": "Ctrl+K: ir para um canal, Esc devolve o foco",
+      "steps": [
+        {
+          "text": "Ctrl+K abre \"Ir para\" com a busca focada",
+          "ok": true,
+          "detail": "combobox \"Para onde vamos? Canais, conversas, amigos, espaço\""
+        },
+        {
+          "text": "Enter vai ao destino",
+          "ok": true,
+          "detail": "textbox \"Mensagem para #geral\""
+        },
+        {
+          "text": "Esc fecha e o foco volta para onde estava",
+          "ok": true,
+          "detail": "textbox \"Mensagem para #geral\""
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "J6",
+      "title": "Voz: entrar, mudo/ensurdecer, escolher tela, transmitir e parar",
+      "steps": [
+        {
+          "text": "Shift+Tab chega à lista e ↓ ao canal de voz",
+          "ok": true,
+          "detail": "button \"Entrar em Geral\""
+        },
+        {
+          "text": "Enter entra na chamada",
+          "ok": true,
+          "detail": "button \"Geral\""
+        },
+        {
+          "text": "Tab chega aos controles; Enter silencia (aria-pressed)",
+          "ok": true,
+          "detail": "button \"Ativar microfone\" (true)"
+        },
+        {
+          "text": "Enter de novo reativa; Tab + Enter ensurdece e volta",
+          "ok": true,
+          "detail": "button \"Ativar áudio\" (true)"
+        },
+        {
+          "text": "Compartilhar tela abre o seletor com o foco dentro",
+          "ok": true,
+          "detail": "dialog \"Compartilhar tela\""
+        },
+        {
+          "text": "falhou",
+          "ok": false,
+          "detail": "→ não escolheu outra janela (foco em radio \"A11Y-Share-1\" (true))"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "id": "J7",
+      "title": "Configurações: abrir, mudar uma opção, Esc volta",
+      "steps": [
+        {
+          "text": "Tab chega a Configurações e Enter abre",
+          "ok": true,
+          "detail": "button \"Minha conta\""
+        },
+        {
+          "text": "chega a Aparência pelo teclado",
+          "ok": true,
+          "detail": "button \"Aparência\""
+        },
+        {
+          "text": "Espaço liga \"Reduzir animações\"",
+          "ok": true,
+          "detail": "switch \"Reduzir animações\" (false)"
+        },
+        {
+          "text": "Esc fecha e o foco volta ao botão Configurações",
+          "ok": true,
+          "detail": "button \"Configurações\""
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "J8",
+      "title": "Menu de contexto pelo teclado (Shift+F10 / tecla Menu)",
+      "steps": [
+        {
+          "text": "falhou",
+          "ok": false,
+          "detail": "locator.waitFor: Timeout 2000ms exceeded."
+        }
+      ],
+      "ok": false
+    },
+    {
+      "id": "J9",
+      "title": "Denúncia e painel da equipe, Esc devolve o foco",
+      "steps": [
+        {
+          "text": "falhou",
+          "ok": false,
+          "detail": "locator.waitFor: Timeout 2000ms exceeded."
+        }
+      ],
+      "ok": false
+    },
+    {
+      "id": "J10",
+      "title": "Esc fecha tudo e sai da chamada",
+      "steps": [
+        {
+          "text": "falhou",
+          "ok": false,
+          "detail": "o foco caiu no <body> ao sair da chamada"
+        }
+      ],
+      "ok": false
+    }
+  ],
+  "live": [
+    {
+      "what": "digitando",
+      "ok": true,
+      "detail": "anunciado: \"Bruno Costa está digitando…\" em div.typing \"Bruno Costa está digitando…\""
+    },
+    {
+      "what": "nova mensagem",
+      "ok": true,
+      "detail": "anunciado: \"Bruno Costa: Mensagem nova do Bruno\" em div.sr-only[role=status] \"Bruno Costa: Mensagem nova do Bruno\""
+    },
+    {
+      "what": "toast",
+      "ok": false,
+      "detail": "inserido junto com a região (não anunciado): \"Copiado\" em div.toast[role=status] \"Copiado\""
+    },
+    {
+      "what": "entrou na voz",
+      "ok": false,
+      "detail": "nenhuma região viva recebeu o texto"
+    },
+    {
+      "what": "saiu da voz",
+      "ok": false,
+      "detail": "nenhuma região viva recebeu o texto"
+    }
+  ],
+  "motion": {
+    "normal": {
+      "speak": {
+        "elements": 10,
+        "distinct": 69,
+        "intermediate": 469,
+        "sample": [
+          "0.986",
+          "0.992",
+          "0.995",
+          "0.997",
+          "0.998",
+          "0.999",
+          "1.000",
+          "0.976"
+        ]
+      },
+      "animations": 0,
+      "animationSamples": [],
+      "roomGlow": "block,block,block"
+    },
+    "prefers-reduced-motion": {
+      "speak": {
+        "elements": 10,
+        "distinct": 2,
+        "intermediate": 0,
+        "sample": [
+          "1.000",
+          "0"
+        ]
+      },
+      "animations": 0,
+      "animationSamples": [],
+      "roomGlow": "none,block,block"
+    },
+    "reduzir-animacoes": {
+      "speak": {
+        "elements": 10,
+        "distinct": 2,
+        "intermediate": 0,
+        "sample": [
+          "0",
+          "1.000"
+        ]
+      },
+      "animations": 0,
+      "animationSamples": [],
+      "roomGlow": "none,block,block"
+    }
+  },
+  "forced": {
+    "shots": [
+      "docs/accessibility/2026-11-01/before-forced-chat.png",
+      "docs/accessibility/2026-11-01/before-forced-chamada.png",
+      "docs/accessibility/2026-11-01/before-forced-seletor-tela.png",
+      "docs/accessibility/2026-11-01/before-forced-config-aparencia.png"
+    ],
+    "focus": {
+      "chat": {
+        "tabbed": 30,
+        "noOutline": []
+      },
+      "chamada": {
+        "tabbed": 23,
+        "noOutline": []
+      },
+      "config-aparencia": {
+        "tabbed": 18,
+        "noOutline": []
+      }
+    },
+    "states": {
+      "chat": [
+        "button.spaceBtn \"Clube A11y, pessoas em voz agora\" igual a um item não selecionado"
+      ],
+      "chamada": [
+        "button.spaceBtn \"Clube A11y, pessoas em voz agora\" igual a um item não selecionado"
+      ],
+      "seletor-tela": [
+        "button.spaceBtn \"Clube A11y, pessoas em voz agora\" igual a um item não selecionado",
+        "button.tab[role=tab] \"Janelas\" igual a um item não selecionado",
+        "button.source[role=radio] \"A11Y-Share-1\" igual a um item não selecionado",
+        "button.segment[role=radio] \"720p\" igual a um item não selecionado",
+        "button.segment[role=radio] \"60 fps\" igual a um item não selecionado",
+        "button.segment[role=radio] \"Jogo ou vídeo\" igual a um item não selecionado"
+      ],
+      "config-aparencia": [
+        "button.spaceBtn \"Clube A11y, pessoas em voz agora\" igual a um item não selecionado",
+        "button.navItem \"Aparência\" igual a um item não selecionado",
+        "button.segment[role=radio] \"15\" igual a um item não selecionado",
+        "button.segment[role=radio] \"Confortável\" igual a um item não selecionado"
+      ]
+    }
+  },
+  "contrastStats": {
+    "entrar": {
+      "checked": 12,
+      "gradientOrMedia": 0
+    },
+    "chat": {
+      "checked": 42,
+      "gradientOrMedia": 2
+    },
+    "menu-mensagem": {
+      "checked": 50,
+      "gradientOrMedia": 2
+    },
+    "emoji": {
+      "checked": 115,
+      "gradientOrMedia": 2
+    },
+    "perfil": {
+      "checked": 47,
+      "gradientOrMedia": 2
+    },
+    "ir-para": {
+      "checked": 59,
+      "gradientOrMedia": 2
+    },
+    "denuncia": {
+      "checked": 62,
+      "gradientOrMedia": 2
+    },
+    "config-conta": {
+      "checked": 70,
+      "gradientOrMedia": 2
+    },
+    "config-voz": {
+      "checked": 75,
+      "gradientOrMedia": 2
+    },
+    "config-aparencia": {
+      "checked": 75,
+      "gradientOrMedia": 2
+    },
+    "equipe": {
+      "checked": 60,
+      "gradientOrMedia": 2
+    },
+    "amigos": {
+      "checked": 25,
+      "gradientOrMedia": 0
+    },
+    "chamada": {
+      "checked": 23,
+      "gradientOrMedia": 0
+    },
+    "seletor-tela": {
+      "checked": 42,
+      "gradientOrMedia": 0
+    }
+  },
+  "totals": {
+    "name": 0,
+    "genericLabel": 10,
+    "tabindex": 0,
+    "hiddenFocus": 0,
+    "dialog": 0,
+    "menu": 2,
+    "img": 0,
+    "contrast": 3,
+    "focus": 1,
+    "live": 3,
+    "forcedFocus": 0,
+    "forcedState": 12
+  },
+  "journeyPass": 3
+}

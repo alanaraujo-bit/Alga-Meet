@@ -70,22 +70,24 @@ export function ControlsDock({ channel: _channel }: { channel: Channel }) {
         onClick={() => void media.toggleDeafen()}
       />
       <span className={s.dockSep} />
-      {sharing ? (
-        <MenuButton
-          side="top"
-          align="center"
-          label={t.dock.stopShare}
-          items={() => [
-            { label: t.dock.switchSource, icon: ArrowLeftRight, onSelect: () => useVoice.setState({ picker: true }) },
-            // Stopping a stream destroys nothing: no red (red is Desconectar's).
-            { label: t.dock.stopShare, icon: Square, onSelect: () => void media.stopScreenShare() },
-          ]}
-        >
+      {/* One button for both states (the menu only while live): the focus stays on it when the share starts or stops. */}
+      <MenuButton
+        off={!sharing}
+        side="top"
+        align="center"
+        label={t.dock.stopShare}
+        items={() => [
+          { label: t.dock.switchSource, icon: ArrowLeftRight, onSelect: () => useVoice.setState({ picker: true }) },
+          // Stopping a stream destroys nothing: no red (red is Desconectar's).
+          { label: t.dock.stopShare, icon: Square, onSelect: () => void media.stopScreenShare() },
+        ]}
+      >
+        {sharing ? (
           <CallButton icon={MonitorUp} label={t.dock.stopShare} pressed on />
-        </MenuButton>
-      ) : (
-        <CallButton icon={MonitorUp} label={t.dock.share} disabled={!connected} onClick={() => useVoice.setState({ picker: true })} />
-      )}
+        ) : (
+          <CallButton icon={MonitorUp} label={t.dock.share} disabled={!connected} onClick={() => useVoice.setState({ picker: true })} />
+        )}
+      </MenuButton>
       <CallButton icon={Settings2} label={t.dock.settings} onClick={() => openSettings('voice')} />
       <span className={s.dockSep} />
       <CallButton icon={PhoneOff} label={t.dock.leave} leave onClick={leaveVoice} />

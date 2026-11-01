@@ -9,6 +9,7 @@ import { useUi } from '@/store/ui'
 import { Avatar, Badge, contextMenuHandler, Fronds, Icon, IconButton, MenuButton, ScrollArea, toast, Tooltip, useSpeakingGlow } from '@/ui'
 import { leaveGroupDm, markSpaceRead } from '@/store/actions'
 import { errorText } from '@/lib/errors'
+import { arrowFocus } from '@/ui/floating'
 import { VerifyStrip } from '../auth/VerifyEmail'
 import { spaceMenu } from '../spaces/spaceMenu'
 import { LiveNow } from '../voice/LiveNow'
@@ -28,6 +29,13 @@ export function Sidebar() {
   )
 }
 
+/** Choosing a conversation (Enter or click) puts you in its composer, also when it is already the open one. */
+function openChat(view: { kind: 'dm'; channelId: string } | { kind: 'space'; spaceId: string; channelId: string }) {
+  useUi.getState().go(view)
+  // A new chat focuses its own composer on mount; the same chat (or the space's default one) needs the nudge.
+  requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-composer]')?.focus())
+}
+
 // ── Home ──────────────────────────────────────────────
 
 function HomeSidebar() {
@@ -44,7 +52,7 @@ function HomeSidebar() {
           {t.home.find}
         </button>
       </div>
-      <ScrollArea className={s.list}>
+      <ScrollArea className={s.list} data-arrow-nav onKeyDown={arrowFocus}>
         <VerifyStrip />
         <LiveNow />
         <button
@@ -95,7 +103,7 @@ function DmRow({ channel, active }: { channel: Channel; active: boolean }) {
       type="button"
       className={`${s.row} ${s.rowTall} ${unread && !active ? s.rowUnread : ''}`}
       aria-current={active ? 'page' : undefined}
-      onClick={() => useUi.getState().go({ kind: 'dm', channelId: channel.id })}
+      onClick={() => openChat({ kind: 'dm', channelId: channel.id })}
       onContextMenu={
         channel.type === 'group_dm'
           ? contextMenuHandler(() => [
@@ -150,7 +158,7 @@ function SpaceSidebar({ spaceId }: { spaceId: string }) {
           </button>
         </MenuButton>
       </div>
-      <ScrollArea className={s.list} onContextMenu={contextMenuHandler(() => spaceMenu(spaceId), space.name)}>
+      <ScrollArea className={s.list} data-arrow-nav onKeyDown={arrowFocus} onContextMenu={contextMenuHandler(() => spaceMenu(spaceId), space.name)}>
         <div className={s.section}>
           <span className={s.sectionLabel}>{t.space.text}</span>
           {manage && <IconButton icon={Plus} label={t.space.createText} size="sm" onClick={() => create('text')} />}
@@ -178,8 +186,8 @@ function TextChannelRow({ channel, active }: { channel: Channel; active: boolean
       type="button"
       className={`${s.row} ${unread && !active ? s.rowUnread : ''}`}
       aria-current={active ? 'page' : undefined}
-      onClick={() => useUi.getState().go({ kind: 'space', spaceId: channel.spaceId!, channelId: channel.id })}
-      onContextMenu={contextMenuHandler(() => [{ label: t.space.markRead, onSelect: () => markSpaceRead(channel.spaceId!) }])}
+      onClick={() => openChat({ kind: 'space', spaceId: channel.spaceId!, channelId: channel.id })}
+      onContextMenu={contextMenuHandler(() => [{ label: t.space.markRead, onSelect: () => markSpaceRead(channel.spaceId!) }], channel.name)}
     >
       <span className={s.rowIcon}>
         <Icon icon={Hash} size={16} />

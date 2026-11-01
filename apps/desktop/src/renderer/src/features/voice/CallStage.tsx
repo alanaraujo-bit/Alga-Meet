@@ -148,8 +148,13 @@ function Notice({ title, children, action, dismiss }: { title: string; children:
 // ── Not in the room ───────────────────────────────────────────
 
 function PreJoin({ channel, people, streaming, joining, variant }: { channel: Channel; people: string[]; streaming: string[]; joining: boolean; variant: 'channel' | 'dm' }) {
+  // Leaving by keyboard (Desconectar) removes the focused dock: the keyboard lands here instead of on <body>.
+  const joinRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (document.activeElement === document.body) joinRef.current?.focus()
+  }, [])
   const join = (
-    <Button variant="primary" size="lg" icon={Volume2} loading={joining} onClick={() => void joinVoice(channel.id)}>
+    <Button ref={joinRef} variant="primary" size="lg" icon={Volume2} loading={joining} onClick={() => void joinVoice(channel.id)}>
       {variant === 'dm' ? t.call.join : t.join(channel.name)}
     </Button>
   )
