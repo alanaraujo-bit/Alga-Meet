@@ -1,0 +1,734 @@
+{
+  "steps": {
+    "0": {
+      "id": 0,
+      "title": "Preparação: conta de equipe (grant-staff.ts no banco do QA)",
+      "at": "2026-11-01T11:01:36.954Z",
+      "checks": [
+        {
+          "name": "API e LiveKit do QA no ar",
+          "ok": true,
+          "detail": "http://127.0.0.1:4340, ws://127.0.0.1:7940",
+          "ms": 18
+        },
+        {
+          "name": "grant-staff.ts moderator no banco do QA",
+          "ok": true,
+          "detail": "qa.staff.f261 (01a196c5-a273-7287-a846-4297b8b090e9): staff role = moderator",
+          "ms": 5311
+        }
+      ],
+      "notes": []
+    },
+    "1": {
+      "id": 1,
+      "title": "Cadastro (idade + termos), verificação de e-mail, logout/login, senha errada, sessão após reiniciar",
+      "at": "2026-11-01T11:01:42.341Z",
+      "checks": [
+        {
+          "name": "A: cria conta no app com data de nascimento e aceite dos termos",
+          "ok": true,
+          "detail": "id 01a196c5-c197-7216-9992-36f45cd0171d, ageBracket=adult",
+          "ms": 570
+        },
+        {
+          "name": "B: cria conta no app com data de nascimento e aceite dos termos",
+          "ok": true,
+          "detail": "id 01a196c5-c4fd-7ee9-a8f5-e61cea22bad5, ageBracket=adult",
+          "ms": 538
+        },
+        {
+          "name": "C: cria conta no app com data de nascimento e aceite dos termos",
+          "ok": true,
+          "detail": "id 01a196c5-c88b-724f-9b82-8fc37fc5fbde, ageBracket=adult",
+          "ms": 600
+        },
+        {
+          "name": "A: confirma o e-mail colando o link do e-mail no app",
+          "ok": true,
+          "detail": "",
+          "ms": 394
+        },
+        {
+          "name": "B: confirma o e-mail pelo deep link algameet:// (segunda instância)",
+          "ok": true,
+          "detail": "segunda instância saiu com 0",
+          "ms": 170
+        },
+        {
+          "name": "C: confirma o e-mail colando só o código",
+          "ok": true,
+          "detail": "",
+          "ms": 873
+        },
+        {
+          "name": "A: sai da conta pelo painel do usuário e a sessão é revogada no servidor",
+          "ok": true,
+          "detail": "",
+          "ms": 264
+        },
+        {
+          "name": "A: senha errada mostra erro e não entra",
+          "ok": true,
+          "detail": "",
+          "ms": 61
+        },
+        {
+          "name": "A: entra de novo com o e-mail (verificado) e a senha certa",
+          "ok": true,
+          "detail": "",
+          "ms": 65
+        },
+        {
+          "name": "A: sessão continua depois de reiniciar o app (sem tela de login)",
+          "ok": true,
+          "detail": "",
+          "ms": 797
+        }
+      ],
+      "notes": []
+    },
+    "2": {
+      "id": 2,
+      "title": "Amigos: pedido por username, aceitar, bloqueio (C ↛ B), presença",
+      "at": "2026-11-01T11:01:50.035Z",
+      "checks": [
+        {
+          "name": "A envia pedido de amizade para B pelo nome de usuário",
+          "ok": true,
+          "detail": "",
+          "ms": 108
+        },
+        {
+          "name": "B recebe o pedido ao vivo (badge) e aceita em Pendentes",
+          "ok": true,
+          "detail": "",
+          "ms": 138
+        },
+        {
+          "name": "A vê B como amigo (aba Todos) sem recarregar",
+          "ok": true,
+          "detail": "",
+          "ms": 18
+        },
+        {
+          "name": "C pede amizade a B; B bloqueia C pelo menu do pedido",
+          "ok": true,
+          "detail": "",
+          "ms": 480
+        },
+        {
+          "name": "C não consegue pedir amizade de novo a B (app mostra erro)",
+          "ok": true,
+          "detail": "mensagem: \"Não foi possível enviar o pedido de amizade.\"",
+          "ms": 93
+        },
+        {
+          "name": "C não consegue abrir DM com B nem mandar mensagem (API)",
+          "ok": true,
+          "detail": "POST /users/@me/channels → 403 forbidden",
+          "ms": 15
+        },
+        {
+          "name": "C não aparece mais para B em Pendentes (vai para Bloqueados)",
+          "ok": true,
+          "detail": "",
+          "ms": 21
+        },
+        {
+          "name": "presença: A muda para \"Ausente\" e B vê \"Ausente\"",
+          "ok": true,
+          "detail": "269 ms",
+          "ms": 508
+        },
+        {
+          "name": "presença: A muda para \"Não perturbe\" e B vê \"Não perturbe\"",
+          "ok": true,
+          "detail": "268 ms",
+          "ms": 558
+        },
+        {
+          "name": "presença: A muda para \"Invisível\" e B vê \"Offline\"",
+          "ok": true,
+          "detail": "253 ms",
+          "ms": 466
+        },
+        {
+          "name": "presença: A muda para \"Online\" e B vê \"Online\"",
+          "ok": true,
+          "detail": "255 ms",
+          "ms": 582
+        }
+      ],
+      "notes": []
+    },
+    "3": {
+      "id": 3,
+      "title": "DM A↔B: enviar, editar, excluir, reações, resposta, menção, anexos, digitando, não lidas, notificação",
+      "at": "2026-11-01T11:01:55.458Z",
+      "checks": [
+        {
+          "name": "A abre a DM com B pelo botão Mensagem da lista de amigos",
+          "ok": true,
+          "detail": "",
+          "ms": 134
+        },
+        {
+          "name": "typing: B vê \"Ana está digitando\" enquanto A digita",
+          "ok": true,
+          "detail": "",
+          "ms": 1327
+        },
+        {
+          "name": "A envia mensagem; B recebe ao vivo; DM fica não lida para B (lista + rail)",
+          "ok": true,
+          "detail": "badge Conversas: \"1\"",
+          "ms": 302
+        },
+        {
+          "name": "B abre a DM: mensagem aparece e o estado não lida some (ack no servidor)",
+          "ok": true,
+          "detail": "",
+          "ms": 27
+        },
+        {
+          "name": "A edita a mensagem pela barra de ações; B vê o texto novo e \"(editado)\"",
+          "ok": true,
+          "detail": "",
+          "ms": 100
+        },
+        {
+          "name": "B reage com 👍; A vê a reação com contagem 1",
+          "ok": true,
+          "detail": "",
+          "ms": 94
+        },
+        {
+          "name": "B responde à mensagem; A vê a resposta ligada à original",
+          "ok": true,
+          "detail": "",
+          "ms": 110
+        },
+        {
+          "name": "A menciona B com @ pelo autocomplete e continua digitando (6 vezes); a mensagem leva <@id> e o texto na ordem",
+          "ok": false,
+          "detail": "texto digitado logo depois de escolher a menção saiu fora de ordem em 3/6: \"valeu <@B> té mais 1a\" | \"valeu <@B> té mais 4a\" | \"valeu <@B> té mais 6a\"",
+          "evidence": [
+            "s3-a-menciona-b-com-pelo-autocomplete-e-continua-di-qa-a.png"
+          ],
+          "ms": 4890
+        },
+        {
+          "name": "A envia imagem + arquivo (.txt) pelo botão de anexar; B vê a imagem carregada e o arquivo",
+          "ok": true,
+          "detail": "foto-praia.jpg image/jpeg, regras-do-clube.txt application/octet-stream",
+          "ms": 165
+        },
+        {
+          "name": "A exclui uma mensagem (com confirmação); some para B",
+          "ok": true,
+          "detail": "",
+          "ms": 432
+        },
+        {
+          "name": "notificação: B minimizado recebe aviso do Windows da DM de A",
+          "ok": true,
+          "detail": "hasFocus=false; toast \"Ana Souza: tá aí? 🔔\"",
+          "ms": 1103
+        },
+        {
+          "name": "badge da barra de tarefas: B com DM não lida",
+          "ok": true,
+          "detail": "",
+          "ms": 10322
+        }
+      ],
+      "notes": []
+    },
+    "4": {
+      "id": 4,
+      "title": "Espaço: criar, convite (link + deep link), cargos (Mod com MANAGE_MESSAGES), excluir mensagens, expulsar/banir",
+      "at": "2026-11-01T11:02:16.105Z",
+      "checks": [
+        {
+          "name": "A cria o espaço \"Clube QA\" pelo rail",
+          "ok": true,
+          "detail": "canais: text:geral, voice:Geral",
+          "ms": 892
+        },
+        {
+          "name": "A gera convite em \"Convidar pessoas\" e o link aparece",
+          "ok": true,
+          "detail": "código MZQNWsEG",
+          "ms": 606
+        },
+        {
+          "name": "B entra pelo deep link algameet://invite/<código> (segunda instância)",
+          "ok": true,
+          "detail": "",
+          "ms": 550
+        },
+        {
+          "name": "C entra colando o link de convite em \"Entrar com convite\"",
+          "ok": true,
+          "detail": "",
+          "ms": 1096
+        },
+        {
+          "name": "mensagens no #geral: A, B e C conversam",
+          "ok": true,
+          "detail": "",
+          "ms": 146
+        },
+        {
+          "name": "A cria o cargo \"Mod\" com Gerenciar mensagens",
+          "ok": true,
+          "detail": "permissions=512",
+          "ms": 2258
+        },
+        {
+          "name": "A dá o cargo Mod para B em Membros",
+          "ok": true,
+          "detail": "",
+          "ms": 1275
+        },
+        {
+          "name": "B (cargo Mod, Gerenciar mensagens) apaga a mensagem de A pelo app",
+          "ok": false,
+          "detail": "o app não oferece \"Excluir\" para o Mod (barra de ações: 0, menu de contexto: 0); o mesmo DELETE pela API com a sessão de B → 204 e a mensagem some para todos",
+          "evidence": [
+            "s4-b-cargo-mod-gerenciar-mensagens-apaga-a-mensagem-qa-b.png"
+          ],
+          "ms": 898
+        },
+        {
+          "name": "A (dono do espaço) apaga a mensagem de C pelo app",
+          "ok": false,
+          "detail": "nem o dono vê \"Excluir\" na mensagem de outra pessoa (barra: 0, menu: 0); DELETE pela API com a sessão de A → 204",
+          "evidence": [
+            "s4-a-dono-do-espaco-apaga-a-mensagem-de-c-pelo-app-qa-a.png"
+          ],
+          "ms": 906
+        },
+        {
+          "name": "C (sem cargo) não tem \"Excluir\" na mensagem de A e a API recusa (403)",
+          "ok": true,
+          "detail": "DELETE → 403",
+          "ms": 357
+        },
+        {
+          "name": "A expulsa C; o espaço some do app de C ao vivo",
+          "ok": true,
+          "detail": "",
+          "ms": 1961
+        },
+        {
+          "name": "C expulso pode voltar com o convite (comportamento documentado)",
+          "ok": true,
+          "detail": "",
+          "ms": 25
+        },
+        {
+          "name": "A bane C (com motivo); C perde o espaço e aparece em Banimentos",
+          "ok": true,
+          "detail": "",
+          "ms": 2105
+        },
+        {
+          "name": "depois do ban, as mensagens antigas de C continuam assinadas com o nome dele (visão de A)",
+          "ok": true,
+          "detail": "CP Caio Prado 08:02",
+          "ms": 17
+        },
+        {
+          "name": "C banido não consegue voltar pelo convite (app mostra o motivo)",
+          "ok": true,
+          "detail": "API 403 \"Você foi banido deste espaço.\"; app: \"Link ou código do convite Você foi banido deste espaço.\"",
+          "ms": 1200
+        }
+      ],
+      "notes": []
+    },
+    "5": {
+      "id": 5,
+      "title": "Voz: entrar, fala, mute/deafen, volume por pessoa, trocar de canal, reinício do LiveKit, queda de 5 s, desconectar",
+      "at": "2026-11-01T11:02:33.233Z",
+      "checks": [
+        {
+          "name": "A e B entram no canal de voz \"Geral\" com um clique",
+          "ok": true,
+          "detail": "A 886 ms, B 764 ms; SFU: 2 participantes com 1/1 faixa(s) de microfone",
+          "ms": 1740
+        },
+        {
+          "name": "indicador de fala: A vê o brilho de B (voz real do arquivo) e B vê o de A",
+          "ok": true,
+          "detail": "--speak B em A=0.46, A em B=0.54",
+          "ms": 427
+        },
+        {
+          "name": "A desativa o microfone: B vê o ícone no tile de A, o SFU marca a faixa como muda e o estado de voz diz selfMute",
+          "ok": true,
+          "detail": "faixa muted=true no SFU",
+          "ms": 181
+        },
+        {
+          "name": "A desativa o áudio: B vê \"Áudio desativado\"; o estado de voz diz selfDeaf",
+          "ok": true,
+          "detail": "",
+          "ms": 1383
+        },
+        {
+          "name": "A reativa o áudio e o microfone: os ícones somem para B e o brilho de A volta",
+          "ok": true,
+          "detail": "ao reativar o áudio o microfone continuou mudo (como no Discord)",
+          "ms": 1266
+        },
+        {
+          "name": "volume por pessoa: A põe B em 50% pelo menu do tile; vale e fica salvo",
+          "ok": true,
+          "detail": "prefs volumes[B]=0.5; <audio>.volume = [0.00]",
+          "ms": 70
+        },
+        {
+          "name": "A troca para \"Sala 2\" com um clique; servidor, SFU e B veem A na Sala 2",
+          "ok": true,
+          "detail": "266 ms; Geral=1, Sala 2=1",
+          "ms": 363
+        },
+        {
+          "name": "A volta para \"Geral\" e o volume de B continua 50%",
+          "ok": true,
+          "detail": "",
+          "ms": 998
+        },
+        {
+          "name": "reinício do LiveKit: A e B mostram \"Reconectando\" e voltam sozinhos com áudio",
+          "ok": true,
+          "detail": "\"Reconectando\" visível 1321 ms após matar o SFU; \"Voz conectada\" 1856 ms e áudio de B de volta 1858 ms depois do SFU voltar",
+          "ms": 3493
+        },
+        {
+          "name": "queda de 5 s do SFU (processo morto 5 s): volta sozinho com áudio",
+          "ok": true,
+          "detail": "\"Reconectando\" visível 3900 ms após matar o SFU; \"Voz conectada\" 1863 ms e áudio de B de volta 1864 ms depois do SFU voltar",
+          "ms": 7151
+        },
+        {
+          "name": "A sai pelo botão Desconectar: some para B, do SFU e do estado de voz",
+          "ok": true,
+          "detail": "",
+          "ms": 410
+        }
+      ],
+      "notes": []
+    },
+    "6": {
+      "id": 6,
+      "title": "Tela: transmitir janela de teste, assistir, trocar qualidade, mini-player, parar; janela pequena; limite do grátis; upgrade sandbox, cancelar, retomar",
+      "at": "2026-11-01T11:02:53.090Z",
+      "checks": [
+        {
+          "name": "grátis: o seletor oferece até 1080p30 e mostra 1080p60+ bloqueados como Alga Plus",
+          "ok": true,
+          "detail": "oferece [720p 30 fps, 720p 60 fps, 1080p 30 fps], bloqueados [1080p 60 fps]",
+          "ms": 1088
+        },
+        {
+          "name": "só a janela de teste aparece como fonte (nenhuma tela real do dono)",
+          "ok": true,
+          "detail": "telas: nenhuma; janelas: só a QA-Share-Window (prévia direta, sem grade)",
+          "ms": 81
+        },
+        {
+          "name": "A transmite a janela em 720p30; B clica em Assistir e recebe o vídeo",
+          "ok": true,
+          "detail": "captura real da janela (window) 960×540 a 29 fps na origem; B recebe 640×360 a 29 fps com \"Original\" marcado; Resolução 640×360 Quadros/s 29 Taxa 384 kb/s Codec H265 Decodificador ExternalDecoder (D3D11VideoDecoder) (por hardware) Perda 0.0% Congelamentos 0",
+          "ms": 16149
+        },
+        {
+          "name": "A troca a qualidade para 720p60 sem parar; B continua recebendo (e mais fluido)",
+          "ok": false,
+          "detail": "B continua a 30 fps (antes 29) embora a origem tenha subido de 29 para 47 fps; B recebe 640×360 com \"Original\" marcado; Resolução 640×360 Quadros/s 30 Taxa 440 kb/s Codec H265 Decodificador ExternalDecoder (D3D11VideoDecoder) (por hardware) Perda 0.0% Congelamentos 1",
+          "evidence": [
+            "s6-a-troca-a-qualidade-para-720p60-sem-parar-b-cont-qa-b.png"
+          ],
+          "ms": 13733
+        },
+        {
+          "name": "mini-player: B sai da chamada para a DM e a transmissão continua em miniatura; \"Voltar\" volta ao palco",
+          "ok": true,
+          "detail": "",
+          "ms": 545
+        },
+        {
+          "name": "A para a transmissão: some para B e do SFU",
+          "ok": true,
+          "detail": "",
+          "ms": 526
+        },
+        {
+          "name": "janela pequena (640×360, como um player ou terminal): B recebe imagem",
+          "ok": false,
+          "detail": "B não recebe imagem (fica em \"Carregando a transmissão…\"): origem 640x360@29; estatísticas de B: Resolução 0×0 Quadros/s 0 Taxa 2.0 Mb/s Codec H265 Decodificador NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder)) (por software) Perda 0.0% Congelamentos 0",
+          "evidence": [
+            "s6-janela-pequena-estatisticas-qa-b.png"
+          ],
+          "ms": 19831
+        },
+        {
+          "name": "upgrade pelo sandbox: A assina o Plus no app, paga na página de teste e o plano chega ao vivo",
+          "ok": true,
+          "detail": "plano=plus, assinatura=active",
+          "ms": 998
+        },
+        {
+          "name": "Plus: o seletor libera 1080p60; A transmite em 1080p60 e o SFU não muta a faixa",
+          "ok": true,
+          "detail": "oferece [720p 30 fps, 720p 60 fps, 1080p 30 fps, 1080p 60 fps]; camadas no SFU 240x135/480x270/960x540",
+          "ms": 14253
+        },
+        {
+          "name": "cancelar a renovação: aviso honesto e a API marca cancelAtPeriodEnd",
+          "ok": true,
+          "detail": "",
+          "ms": 1964
+        },
+        {
+          "name": "retomar a renovação: volta a \"renova em\" e a API desfaz o cancelamento",
+          "ok": true,
+          "detail": "",
+          "ms": 896
+        }
+      ],
+      "notes": []
+    },
+    "7": {
+      "id": 7,
+      "title": "Configurações que persistem ao reiniciar: dispositivos, gravação do atalho de push-to-talk, densidade, reduzir animações",
+      "at": "2026-11-01T11:07:30.018Z",
+      "checks": [
+        {
+          "name": "B escolhe microfone e saída de áudio (dispositivos falsos do Chromium) e o modo Aperte para falar",
+          "ok": true,
+          "detail": "entrada \"Fake Audio Input 2\", saída \"Fake Audio Output 2\"",
+          "ms": 619
+        },
+        {
+          "name": "B grava o atalho de push-to-talk (F13 pelo hook global)",
+          "ok": true,
+          "detail": "F13 gravado; evento [{\"action\":\"pushToTalk\",\"phase\":\"down\"},{\"action\":\"pushToTalk\",\"phase\":\"up\"}]",
+          "ms": 463
+        },
+        {
+          "name": "B muda a densidade para Compacta e liga Reduzir animações",
+          "ok": true,
+          "detail": "",
+          "ms": 439
+        },
+        {
+          "name": "depois de reiniciar: dispositivos e modo de entrada continuam",
+          "ok": true,
+          "detail": "Microfone: Fake Audio Input 2; Saída de áudio: Fake Audio Output 2",
+          "ms": 500
+        },
+        {
+          "name": "depois de reiniciar: o atalho F13 continua na tela e o main volta a reagir a ele sem abrir Configurações",
+          "ok": true,
+          "detail": "[{\"action\":\"pushToTalk\",\"phase\":\"down\"},{\"action\":\"pushToTalk\",\"phase\":\"up\"}]",
+          "ms": 679
+        },
+        {
+          "name": "depois de reiniciar: densidade Compacta e Reduzir animações continuam",
+          "ok": true,
+          "detail": "",
+          "ms": 437
+        }
+      ],
+      "notes": [
+        "localStorage antes do reinício: {\"media\":{\"inputDeviceId\":\"4130166369986cf5ede049b644d604a9de672a10649c637a586fd3df68f78828\",\"outputDeviceId\":\"d9e0d262ea73ac94bc2cab8cb18747640cf40b80d4bfee877c17407ffcef49a1\",\"processing\":\"standard\",\"inputMode\":\"ptt\",\"sensitivityDb\":null,\"pttReleaseMs\":150,\"volumes\":{},\"streamVolumes\":{},\"screenPreset\":\"1080p60\",\"contentType\":\"motion\",\"codec\":null,\"encoderSustain\":{},\"sounds\":true},\"ui\":{\"reducedMotion\":true,\"density\":\"compact\",\"notifyMessages\":true,\"notifyCalls\":true,\"taskbarBadge\":true,\"memb"
+      ]
+    },
+    "8": {
+      "id": 8,
+      "title": "Trust & Safety: denúncia, suspensão pela equipe, tela restrita, recurso, exportação de dados, exclusão de conta (carência)",
+      "at": "2026-11-01T11:04:23.387Z",
+      "checks": [
+        {
+          "name": "B denuncia a mensagem de C (menu da mensagem → motivo → enviar)",
+          "ok": true,
+          "detail": "denúncia 01a196c8-32ee-7106-82a9-0952278e150d na fila da equipe",
+          "ms": 256
+        },
+        {
+          "name": "equipe suspende C; o app aberto de C sai e mostra a medida",
+          "ok": true,
+          "detail": "Alga Meet qa-c Entrar no Alga Meet Que bom te ver de novo. A equipe do Alga Meet aplicou uma medida na sua conta. Entre de novo para ver o motivo e como contest",
+          "ms": 55
+        },
+        {
+          "name": "C entra de novo e vê a tela \"Sua conta está suspensa\" com a regra e o prazo",
+          "ok": true,
+          "detail": "Alga Meet qa-c Sua conta está suspensa Até 4 de novembro de 2026 às 08:04. Depois disso, ela volta sozinha. Regra Assédio Contestar a decisão Você pode contestar até 1 de dezembro de 2026. Uma pessoa ",
+          "ms": 75
+        },
+        {
+          "name": "C envia um recurso pela tela restrita; a equipe recebe",
+          "ok": true,
+          "detail": "",
+          "ms": 373
+        },
+        {
+          "name": "B pede a exportação dos dados em Privacidade; fica pronta e o link chega por e-mail",
+          "ok": true,
+          "detail": "pronta em 15 s; a tela mudou sozinha para \"Pronta\"; e-mail 2026-11-01T11-04-26-121Z-data_export-43ff9f.eml",
+          "ms": 15927
+        },
+        {
+          "name": "B exclui a conta (senha) → sai na hora, a sessão morre no servidor e a tela avisa a carência",
+          "ok": true,
+          "detail": "Sua conta será excluída em 8 de novembro de 2026.",
+          "ms": 532
+        },
+        {
+          "name": "carência: B entra de novo dentro dos 7 dias e a exclusão é cancelada",
+          "ok": true,
+          "detail": "",
+          "ms": 72
+        }
+      ],
+      "notes": []
+    },
+    "9": {
+      "id": 9,
+      "title": "Janela: minimizar, restaurar, fechar para a bandeja, 960×600",
+      "at": "2026-11-01T11:04:42.319Z",
+      "checks": [
+        {
+          "name": "minimizar: a janela minimiza e o ícone da bandeja continua",
+          "ok": true,
+          "detail": "",
+          "ms": 13
+        },
+        {
+          "name": "restaurar (abrir o app de novo, como pelo atalho/bandeja): volta ao normal",
+          "ok": true,
+          "detail": "",
+          "ms": 244
+        },
+        {
+          "name": "fechar (X) com \"Fechar para a bandeja\": some da tela, processo e sessão continuam",
+          "ok": true,
+          "detail": "",
+          "ms": 841
+        },
+        {
+          "name": "abrir de novo pela segunda instância: a janela volta",
+          "ok": true,
+          "detail": "",
+          "ms": 312
+        },
+        {
+          "name": "depois de reiniciar o app, as mensagens de C (banido do espaço) mostram o nome do autor",
+          "ok": false,
+          "detail": "autor exibido: \"CP Usuário desconhecido 08:02\"",
+          "evidence": [
+            "s9-depois-de-reiniciar-o-app-as-mensagens-de-c-bani-qa-a.png"
+          ],
+          "ms": 424
+        },
+        {
+          "name": "960×600 (mínimo): sem rolagem horizontal; rail, canais e campo de mensagem visíveis",
+          "ok": true,
+          "detail": "960×600, evidência s9-960x600-qa-a.png",
+          "ms": 933
+        },
+        {
+          "name": "abaixo do mínimo: a janela não encolhe além de 960×600",
+          "ok": true,
+          "detail": "960×600",
+          "ms": 515
+        }
+      ],
+      "notes": []
+    },
+    "10": {
+      "id": 10,
+      "title": "Repetição: janela pequena (640×360) transmitida 6 vezes; o espectador recebe imagem?",
+      "at": "2026-11-01T11:04:46.976Z",
+      "checks": [
+        {
+          "name": "tentativa 1: janela 640×360 com borda (642×392) → B recebe imagem",
+          "ok": false,
+          "detail": "B sem imagem: origem 642x392@29; Resolução 0×0 Quadros/s 0 Taxa 2.0 Mb/s Codec H265 Decodificador NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder)) (por software) Perda 0.0% Congelamentos 0",
+          "evidence": [
+            "s10-tentativa1-642x392-estatisticas-qa-b.png",
+            "s10-tentativa1-transmissor-qa-a.png"
+          ],
+          "ms": 18750
+        },
+        {
+          "name": "tentativa 2: janela 640×360 sem borda → B recebe imagem",
+          "ok": false,
+          "detail": "B sem imagem: origem 640x360@29; Resolução 0×0 Quadros/s 0 Taxa 1.9 Mb/s Codec H265 Decodificador NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder)) (por software) Perda 0.0% Congelamentos 0",
+          "evidence": [
+            "s10-tentativa2-640x360-estatisticas-qa-b.png"
+          ],
+          "ms": 18298
+        },
+        {
+          "name": "tentativa 3: janela 640×360 com borda (642×392) → B recebe imagem",
+          "ok": false,
+          "detail": "B sem imagem: origem 642x392@29; Resolução 0×0 Quadros/s 0 Taxa 2.0 Mb/s Codec H265 Decodificador NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder)) (por software) Perda 0.0% Congelamentos 0",
+          "evidence": [],
+          "ms": 18115
+        },
+        {
+          "name": "tentativa 4: janela 640×360 sem borda → B recebe imagem",
+          "ok": false,
+          "detail": "B sem imagem: origem 640x360@29; Resolução 0×0 Quadros/s 0 Taxa 2.0 Mb/s Codec H265 Decodificador NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder)) (por software) Perda 0.0% Congelamentos 0",
+          "evidence": [],
+          "ms": 18011
+        },
+        {
+          "name": "tentativa 5: janela 640×360 com borda (642×392) → B recebe imagem",
+          "ok": false,
+          "detail": "B sem imagem: origem 642x392@29; Resolução 0×0 Quadros/s 0 Taxa 2.0 Mb/s Codec H265 Decodificador NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder)) (por software) Perda 0.0% Congelamentos 0",
+          "evidence": [],
+          "ms": 18038
+        },
+        {
+          "name": "tentativa 6: janela 640×360 sem borda → B recebe imagem",
+          "ok": false,
+          "detail": "B sem imagem: origem 640x360@29; Resolução 0×0 Quadros/s 0 Taxa 2.0 Mb/s Codec H265 Decodificador NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder)) (por software) Perda 0.0% Congelamentos 0",
+          "evidence": [],
+          "ms": 18128
+        }
+      ],
+      "notes": []
+    },
+    "11": {
+      "id": 11,
+      "title": "Repetição: imagem recebida de uma janela 960×540 em 720p30, e \"Original\" no espectador",
+      "at": "2026-11-01T11:06:42.468Z",
+      "checks": [
+        {
+          "name": "720p30 sem nenhuma troca: o quadro que B recebe mostra a janela inteira (sem faixas pretas)",
+          "ok": true,
+          "detail": "640×360, imagem 1×1",
+          "ms": 6185
+        },
+        {
+          "name": "\"Original\" no espectador entrega a resolução da origem (960×540)",
+          "ok": false,
+          "detail": "com \"Original\" marcado B recebe 640×360 a 29 fps (origem 960×540); transmissor mostra \"640×360 · 29 fps · 313 kb/s · por hardware\"; Resolução 640×360 Quadros/s 30 Taxa 423 kb/s Codec H265 Decodificador ExternalDecoder (D3D11VideoDecoder) (por hardware) Perda 0.0% Congelamentos 0",
+          "evidence": [
+            "s11-original-no-espectador-entrega-a-resolucao-da-or-qa-b.png"
+          ],
+          "ms": 9283
+        }
+      ],
+      "notes": []
+    }
+  }
+}
