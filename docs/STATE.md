@@ -8,7 +8,7 @@ API pública `https://api-staging-b3ea.up.railway.app` + Postgres + bucket — v
 ## Servidor de voz em casa (decisão do dono 2026-11-01: custo zero, servidor Ubuntu próprio)
 - **Sem CGNAT (confirmado):** WAN do roteador (Huawei IGD, via UPnP) = `203.0.113.10` = IP público visto de fora. IPv6 público também (provedor local).
 - Upload medido pelo dono: **220 Mbps** (download 429, ping 2 ms) → folga para ~20+ espectadores de 1080p60.
-- Servidor encontrado na LAN: `192.168.1.110`, OpenSSH 9.6p1 Ubuntu-3ubuntu13.20 (Ubuntu 24.04). Acesso SSH por chave **ainda não autorizado** pelo dono.
+- Servidor `home-server` (`192.168.1.110`): Ubuntu 24.04.5, Xeon E5-2650 v2 ×16, 15 GB RAM, 64 GB livres, Docker 29.9 + Compose v5.6. **Acesso SSH por chave autorizado** (`~/.ssh/alga_homeserver` deste PC, usuário `alanaraujo`, grupo `docker`; `sudo` exige senha → Maestro não usa sudo). ufw **ativo** → stack em modo bridge com portas publicadas (DNAT do Docker contorna o ufw, como o Minecraft já faz). Serviços existentes a preservar: Minecraft (25565, 8100), alga-connect/aionix-connect (UDP 7441-7442, postgres, redis). Livres: 80, 443, 7880-7882, 3478, 5349.
 - Kit de instalação: `infra/home-sfu/` (em preparação).
 
 ## Versão executável
