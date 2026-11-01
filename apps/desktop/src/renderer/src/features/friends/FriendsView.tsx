@@ -63,16 +63,17 @@ function FriendList({ tab, q }: { tab: Exclude<FriendsTab, 'add'>; q: string }) 
   const relationships = useData((st) => st.relationships)
   const presences = useData((st) => st.presences)
   const me = useData((st) => st.me)
+  const voiceStates = useData((st) => st.voiceStates)
   const all = useMemo(() => {
     const list = Object.values(relationships).filter((r) =>
-      tab === 'online' ? r.type === 'friend' && presenceOf({ presences, me }, r.user.id) !== 'offline'
+      tab === 'online' ? r.type === 'friend' && presenceOf({ presences, me, voiceStates }, r.user.id) !== 'offline'
       : tab === 'all' ? r.type === 'friend'
       : tab === 'pending' ? r.type === 'incoming' || r.type === 'outgoing'
       : r.type === 'blocked',
     )
     // Incoming requests first (they need you), then by name.
     return list.sort((a, b) => (a.type === 'incoming' ? -1 : 0) - (b.type === 'incoming' ? -1 : 0) || a.user.displayName.localeCompare(b.user.displayName, 'pt-BR'))
-  }, [relationships, presences, me, tab])
+  }, [relationships, presences, me, voiceStates, tab])
   const shown = q ? all.filter((r) => fold(`${r.user.displayName} ${r.user.username}`).includes(fold(q))) : all
 
   if (all.length === 0) {

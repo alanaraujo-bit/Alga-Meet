@@ -37,15 +37,16 @@ export function SpaceRail() {
               onClick={() => useUi.getState().go({ kind: 'home' })}
             >
               <Icon icon={MessageCircle} size={20} />
-              {home > 0 ? (
+              {home > 0 && (
                 <span className={s.railBadge}>
                   <Badge count={home} />
                 </span>
-              ) : dmCall ? (
+              )}
+              {dmCall && (
                 <span className={s.railVoice}>
                   <Fronds size={12} breathing />
                 </span>
-              ) : null}
+              )}
             </button>
           </Tooltip>
         </div>
@@ -110,15 +111,17 @@ function SpaceIcon({ spaceId, active }: { spaceId: string; active: boolean }) {
           onContextMenu={contextMenuHandler(() => spaceMenu(spaceId), space.name)}
         >
           {space.iconUrl ? <img src={space.iconUrl} alt="" draggable={false} /> : initials(space.name)}
-          {mentions > 0 ? (
+          {/* Separate corners: a mention never hides "people are talking there" (fronds bottom, count top). */}
+          {mentions > 0 && (
             <span className={s.railBadge}>
               <Badge count={mentions} mention />
             </span>
-          ) : voice ? (
+          )}
+          {voice && (
             <span className={s.railVoice}>
               <Fronds size={12} breathing={!mine} getLevel={mine ? roomLevelNow : undefined} />
             </span>
-          ) : null}
+          )}
         </button>
       </Tooltip>
     </div>

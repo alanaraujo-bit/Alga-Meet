@@ -171,5 +171,8 @@ export const PERMISSION_GROUPS: Array<{ title: string; items: Array<{ key: Permi
   },
 ]
 
-/** Role colors: the avatar hue ring plus warm signals, readable as name color on the dark surfaces. */
-export const ROLE_COLORS = ['#4ddcdc', '#5fb8f5', '#8f9cff', '#c08cf5', '#ef87c4', '#f28b6b', '#f2c25c', '#7fd88f', '#a7b0b4'] as const
+/**
+ * Role colors: OKLCH L .80 C .09 at H 250 · 280 · 310 · 340 · 10 · 40 · 70 · 115. The band H 140–215 is left out
+ * (online green, the accent) and the chroma stays far below the warning amber, so a name color never reads as a state.
+ */
+export const ROLE_COLORS = ['#91c3f6', '#b2b8f7', '#d0aeea', '#e6a7d0', '#f1a6b0', '#f1aa92', '#e3b47d', '#bbc581'] as const

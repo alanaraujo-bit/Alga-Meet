@@ -138,6 +138,35 @@
   margin-top: var(--density-head, var(--s-4));
   padding-top: 2px;
 }
+/* Compact density: 20 px lines come from the tokens; rows lose their 1 px of air. */
+:global(.density-compact) .msg {
+  padding-block: 0;
+}
+:global(.density-compact) .head {
+  padding-top: 0;
+}
+/* Compact without avatars (IRC-like): time in a narrow gutter, then name and text on the same line. */
+.irc {
+  grid-template-columns: 40px minmax(0, 1fr);
+  column-gap: var(--s-2);
+}
+.irc.head {
+  margin-top: var(--s-1);
+}
+.irc .gutter {
+  justify-content: flex-end;
+  padding-top: 0;
+}
+.irc.head .hoverTime {
+  visibility: visible;
+}
+.irc .meta {
+  display: inline;
+  margin-right: var(--s-2);
+}
+.irc .content {
+  display: inline;
+}
 .msg:hover,
 .msg:focus-within {
   background: rgba(255, 255, 255, 0.018);
@@ -186,13 +215,23 @@
   height: 20px;
 }
 .author {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: left;
   color: var(--text-primary);
   font: var(--type-ui-lg);
   font-weight: var(--w-semibold);
   letter-spacing: var(--track-ui-lg);
+}
+button.author:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.face {
+  display: grid;
+  border-radius: var(--r-full);
 }
 .time {
   flex-shrink: 0;
@@ -391,31 +430,35 @@
   background: var(--danger-tint) !important;
 }
 
+/* Reply: one quiet 12/510 line above the message ("↩ Carlinha · Só achei que…") and a straight 2 px stem in the
+   avatar column. No curved connector: the thread reads as a vertical rhythm, not a hook. */
 .reply {
   grid-column: 1 / -1;
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  column-gap: var(--s-3);
   align-items: center;
-  height: 22px;
-  padding-left: 20px;
+  height: 20px;
 }
 .replyLine {
-  flex-shrink: 0;
-  width: 30px;
+  justify-self: center;
+  align-self: end;
+  width: 2px;
   height: 10px;
-  margin-top: 8px;
-  border-top-left-radius: 6px;
-  border-top: 2px solid var(--border-strong);
-  border-left: 2px solid var(--border-strong);
+  border-radius: 1px 1px 0 0;
+  background: rgba(255, 255, 255, 0.14);
 }
 .replyBody {
   display: flex;
   align-items: center;
-  gap: var(--s-1_5);
+  gap: var(--s-1);
   min-width: 0;
-  padding: 0 var(--s-1);
+  justify-self: start;
+  max-width: 100%;
   border-radius: var(--r-xs);
   color: var(--text-tertiary);
   font: var(--type-meta);
+  font-weight: var(--w-medium);
   text-align: left;
 }
 button.replyBody:hover {
@@ -424,7 +467,6 @@ button.replyBody:hover {
 .replyName {
   flex-shrink: 0;
   color: var(--text-secondary);
-  font-weight: var(--w-semibold);
 }
 .replyText {
   overflow: hidden;
@@ -1010,7 +1052,8 @@ button.replyBody:hover {
   z-index: var(--z-modal);
   display: grid;
   grid-template-rows: 48px minmax(0, 1fr);
-  background: rgba(4, 6, 7, 0.94);
+  /* Opaque: the picture is the only thing on screen (the chat behind it is noise, not context). */
+  background: var(--bg-app);
 }
 .lightbox:focus-visible {
   outline: none;

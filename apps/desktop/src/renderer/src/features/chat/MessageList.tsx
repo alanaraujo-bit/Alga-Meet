@@ -6,8 +6,9 @@ import { ackLatest, loadMessages } from '@/store/actions'
 import { useData } from '@/store/data'
 import { displayName } from '@/store/selectors'
 import { useUi } from '@/store/ui'
-import { Avatar, Button, Divider, Icon, Skeleton } from '@/ui'
+import { Avatar, Button, Divider, Fronds, Icon, Skeleton } from '@/ui'
 import { errorText } from '@/lib/errors'
+import { t as tv } from '../voice/strings'
 import { joinVoice } from '../voice/voice'
 import { attachmentSummary } from './Attachments'
 import { authorName } from './author'
@@ -397,6 +398,7 @@ export function MessageList({ channelId, spaceId, unreadAfter, title, isDm }: { 
 }
 
 function Intro({ title, isDm, channelId }: { title: string; isDm: boolean; channelId: string }) {
+  const callOn = useData((st) => Object.values(st.voiceStates).some((v) => v.channelId === channelId))
   const peer = useData((st) => {
     const c = st.channels[channelId]
     const id = c?.recipientIds?.find((x) => x !== st.me?.id)
@@ -409,9 +411,17 @@ function Intro({ title, isDm, channelId }: { title: string; isDm: boolean; chann
       <p className={s.introBody}>{isDm ? t.intro.dmBody(peer?.displayName.split(' ')[0] ?? title) : t.intro.channelBody(title)}</p>
       {isDm && (
         <div className={s.introActions}>
-          <Button icon={Phone} onClick={() => void joinVoice(channelId)}>
-            {t.intro.call}
-          </Button>
+          {/* The call is already on screen above: the intro says so instead of offering to start another. */}
+          {callOn ? (
+            <span className={s.callChip}>
+              <Fronds size={12} breathing />
+              {tv.call.inCall}
+            </span>
+          ) : (
+            <Button icon={Phone} onClick={() => void joinVoice(channelId)}>
+              {t.intro.call}
+            </Button>
+          )}
         </div>
       )}
     </div>

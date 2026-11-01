@@ -8,9 +8,10 @@ import { clock, fullDate } from '@/lib/format'
 import { toPlainText } from '@/lib/markdown'
 import { deleteMessage, discardSend, editMessage, react, retrySend } from '@/store/actions'
 import { useData } from '@/store/data'
-import { displayName, roleColor } from '@/store/selectors'
+import { displayName, presenceOf, roleColor } from '@/store/selectors'
 import { useUi } from '@/store/ui'
 import { Avatar, Button, contextMenuHandler, Icon, IconButton, Kbd, MenuButton, Modal, Tooltip, toast, type MenuEntry } from '@/ui'
+import { PersonPopover } from '../shell/MemberList'
 import { messageReportEntries } from '../trust/Report'
 import { Attachments, attachmentSummary } from './Attachments'
 import { authorFace, authorName, isRemovedAuthor } from './author'
@@ -62,9 +63,15 @@ export const MessageItem = memo(function MessageItem({
   const pending = m.nonce === m.id
   const name = useData((st) => authorName(m.author.id, (id) => displayName(st, id, spaceId)))
   const color = useData((st) => (spaceId && !isRemovedAuthor(m.author.id) ? roleColor(st, spaceId, m.author.id) : null))
+  // Compact without avatars (Aparência): IRC-like line, the time takes the avatar's place.
+  const irc = useUi((st) => st.density === 'compact' && !st.compactAvatars)
   const at = new Date(m.createdAt)
   const row = useRef<HTMLDivElement>(null)
   const [pickerAt, setPickerAt] = useState<HTMLElement | null>(null)
+  // Click the author (name or face) for their card: the same profile and ways to reach them as the member list.
+  const [profileAt, setProfileAt] = useState<HTMLElement | null>(null)
+  const removed = isRemovedAuthor(m.author.id)
+  const openProfile = removed ? undefined : (e: { currentTarget: HTMLElement }) => setProfileAt(profileAt ? null : e.currentTarget)
 
   // Grouped by label, not by lines; only actions that really exist (no fake "Fixar"/"Denunciar" without a backend).
   const menu = (): MenuEntry[] => {
@@ -93,14 +100,17 @@ export const MessageItem = memo(function MessageItem({
   return (
     <div
       ref={row}
-      className={`${s.msg} ${head ? s.head : ''} ${mentioned ? s.mentioned : ''} ${editing ? s.editingRow : ''}`}
+      className={`${s.msg} ${head ? s.head : ''} ${irc ? s.irc : ''} ${mentioned ? s.mentioned : ''} ${editing ? s.editingRow : ''}`}
       data-message-id={m.id}
       onContextMenu={contextMenuHandler(menu)}
     >
+      {profileAt && <AuthorPopover userId={m.author.id} spaceId={spaceId} name={name} anchor={profileAt} onClose={() => setProfileAt(null)} />}
       {m.replyToId && <ReplyPreview channelId={m.channelId} replyToId={m.replyToId} spaceId={spaceId} onJump={onJump} />}
       <div className={s.gutter}>
-        {head ? (
-          <Avatar user={authorFace(m.author)} size={36} decorative />
+        {head && !irc ? (
+          <button type="button" className={s.face} tabIndex={-1} aria-hidden onClick={openProfile}>
+            <Avatar user={authorFace(m.author)} size={36} decorative />
+          </button>
         ) : (
           <Tooltip content={fullDate(at)}>
             <time className={`${s.hoverTime} tnum`} dateTime={m.createdAt}>
@@ -112,14 +122,16 @@ export const MessageItem = memo(function MessageItem({
       <div className={s.body}>
         {head && (
           <div className={s.meta}>
-            <span className={s.author} style={color ? { color } : undefined}>
+            <button type="button" className={s.author} style={color ? { color } : undefined} aria-haspopup="dialog" aria-expanded={!!profileAt} onClick={openProfile} disabled={removed}>
               {name}
-            </span>
-            <Tooltip content={fullDate(at)}>
-              <time className={`${s.time} tnum`} dateTime={m.createdAt}>
-                {clock(at)}
-              </time>
-            </Tooltip>
+            </button>
+            {!irc && (
+              <Tooltip content={fullDate(at)}>
+                <time className={`${s.time} tnum`} dateTime={m.createdAt}>
+                  {clock(at)}
+                </time>
+              </Tooltip>
+            )}
           </div>
         )}
         {editing ? (
@@ -206,6 +218,13 @@ export const MessageItem = memo(function MessageItem({
   )
 })
 
+function AuthorPopover({ userId, spaceId, name, anchor, onClose }: { userId: string; spaceId: string | null; name: string; anchor: HTMLElement; onClose: () => void }) {
+  const user = useData((st) => st.users[userId])
+  const presence = useData((st) => presenceOf(st, userId))
+  if (!user) return null
+  return <PersonPopover user={user} spaceId={spaceId} name={name} presence={presence} anchor={anchor} onClose={onClose} side="right" />
+}
+
 function ReplyPreview({ channelId, replyToId, spaceId, onJump }: { channelId: string; replyToId: string; spaceId: string | null; onJump: (id: string) => void }) {
   const target = useData((st) => st.messages[channelId]?.byId[replyToId])
   const name = useData((st) => (target ? authorName(target.author.id, (id) => displayName(st, id, spaceId)) : ''))
@@ -215,8 +234,9 @@ function ReplyPreview({ channelId, replyToId, spaceId, onJump }: { channelId: st
       <span className={s.replyLine} aria-hidden />
       {target ? (
         <button type="button" className={s.replyBody} onClick={jump}>
-          <Avatar user={authorFace(target.author)} size={16} decorative />
+          <Icon icon={CornerUpLeft} size={12} />
           <span className={s.replyName}>{name}</span>
+          <span aria-hidden>·</span>
           <span className={s.replyText}>{target.content ? toPlainText(target.content, (id) => displayName(useData.getState(), id, spaceId)) : attachmentSummary(target)}</span>
         </button>
       ) : (

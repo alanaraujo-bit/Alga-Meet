@@ -71,12 +71,17 @@ export function displayName(s: Pick<S, 'users' | 'members'>, userId: string, spa
   return nick || s.users[userId]?.displayName || 'Usuário desconhecido'
 }
 
-export function presenceOf(s: Pick<S, 'presences' | 'me'>, userId: string): PresenceStatus {
+/**
+ * Effective presence: someone with a voice state is in a room right now, so they are never shown as offline
+ * (the UI never lies). Idle / do-not-disturb stay as chosen.
+ */
+export function presenceOf(s: Pick<S, 'presences' | 'me'> & Partial<Pick<S, 'voiceStates'>>, userId: string): PresenceStatus {
+  let p: PresenceStatus
   if (userId === s.me?.id) {
     const pref = s.me.statusPreference
-    return pref === 'invisible' ? 'offline' : pref
-  }
-  return s.presences[userId] ?? 'offline'
+    p = pref === 'invisible' ? 'offline' : pref
+  } else p = s.presences[userId] ?? 'offline'
+  return p === 'offline' && s.voiceStates?.[userId] ? 'online' : p
 }
 
 export function spacePermissions(s: Pick<S, 'me' | 'spaces' | 'members' | 'roles'>, spaceId: string): number {

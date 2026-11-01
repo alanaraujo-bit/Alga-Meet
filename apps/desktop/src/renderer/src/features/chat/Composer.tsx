@@ -246,7 +246,7 @@ export function Composer({
           <div className={s.replyBar}>
             <span>
               {t.replyingTo} <strong>{replyName}</strong>
-              <span className={s.replyBarText}> {reply.content ? toPlainText(reply.content, (id) => users[id]?.displayName ?? t.unknownUser) : attachmentSummary(reply)}</span>
+              <span className={s.replyBarText}> · {reply.content ? toPlainText(reply.content, (id) => users[id]?.displayName ?? t.unknownUser) : attachmentSummary(reply)}</span>
             </span>
             <IconButton icon={X} label={t.cancelReply} shortcut="Esc" size="sm" onClick={() => useUi.getState().setReplyTo(channelId, undefined)} />
           </div>
