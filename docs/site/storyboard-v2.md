@@ -42,7 +42,7 @@ Regras de A: DPR ≤ 1,75 (água a 0,5× — é luz difusa, não precisa de niti
 - **Vê:** uma janela de transmissão com um **jogo que a gente mesmo gera**: voo baixo por um canal entre prédios na hora azul, janelas acendendo, HUD fino com nomes do grupo. A imagem está em **720p** (o grátis de lá). Onde o cursor passa, **uma lente de vidro mostra o mesmo quadro em 1080p** (o grátis daqui), com borda refrativa.
 - **Faz:** passa a lente pelo HUD e pelos letreiros: fora, borrado; dentro, nítido. No toque, arrasta a lente.
 - **Técnica:** cena renderizada uma vez em resolução cheia (prédios instanciados + névoa + HUD em textura 2D) → reduzida a 2/3 da resolução (a proporção exata 720/1080) para fora da lente; lente composta no mesmo passe. Honesto: só resolução, legenda diz que é simulação.
-- **B:** vídeo do jogo + comparação parada 720/1080 com a lente fixa. **C:** quadro com a lente fixa sobre o HUD.
+- **B:** as duas fotos do mesmo quadro (1080p e 720p, exportadas do WebGL) com a lente em CSS seguindo o ponteiro. **C:** idem, sem passeio automático.
 
 ### 6. "Leve como uma alga"
 - **Vê:** a água fica mais clara. Uma esfera escura e densa — **808 MB, 6 processos** — afunda pesada e levanta sedimento ao bater no fundo; uma bolha de vidro com a fronde índigo dentro — **230 MB** — **sobe flutuando** e balança até a superfície. Área proporcional à memória.
@@ -57,7 +57,11 @@ Regras de A: DPR ≤ 1,75 (água a 0,5× — é luz difusa, não precisa de niti
 - **A água é a transição:** a profundidade, a cor e os raios mudam com a rolagem, então não há corte seco.
 - **Luz do cursor** (A, mouse): segue com atraso, deixa anéis na água.
 - **Botões magnéticos** (A, mouse) e **texto que nasce da luz** (títulos dos capítulos: palavras saem do desfoque com brilho índigo).
-- **Bordas líquidas:** a borda superior das seções de conteúdo ondula com a velocidade da rolagem.
+- **Gota entre capítulos:** o fim do app afunda no escuro e a sala começa com uma gota de luz; a sala devolve o escuro para a água com um degradê, sem borda seca.
+- **Velocidade da rolagem** entorta de leve os raios e as frondes (a corrente).
 
 ## Texto (tom)
 Curto, quente, confiante. Uma ideia por tela. Números só de `src/data/facts.ts`.
+
+## Estado (2026-11-01)
+Os 7 momentos estão no ar no nível A; B e C usam vídeos e quadros gravados do próprio WebGL (`apps/site/scripts/tier-media.mjs`). Medições e capturas: `apps/site/README.md` e `docs/site/v2/`.
