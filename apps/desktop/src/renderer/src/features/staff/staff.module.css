@@ -5,8 +5,7 @@
   z-index: var(--z-modal);
   display: grid;
   grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
-  background: var(--bg-content);
-  border-top-left-radius: var(--r-lg);
+  background: var(--bg-app);
   overflow: hidden;
 }
 .root:focus-visible {
@@ -19,7 +18,6 @@
   flex-direction: column;
   min-height: 0;
   background: var(--bg-sidebar);
-  box-shadow: inset -1px 0 0 var(--border-subtle);
 }
 .queueHead {
   display: grid;
@@ -34,6 +32,7 @@
 .title {
   color: var(--text-primary);
   font: var(--type-title-sm);
+  font-variation-settings: var(--opsz-display);
   letter-spacing: var(--track-title);
 }
 .list {
@@ -134,20 +133,26 @@
   font: var(--type-badge);
 }
 .tierCsam {
-  background: rgba(253, 190, 69, 0.16);
+  background: rgba(230, 180, 99, 0.16);
   color: var(--warning);
 }
 .tierUrgent {
-  background: rgba(253, 190, 69, 0.08);
+  background: rgba(230, 180, 99, 0.08);
   color: var(--warning);
 }
 
 /* ── Detail ── */
+/* The item is the inset panel of the inverted L, like the shell and settings. */
 .detail {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  margin: 0 var(--s-2) var(--s-2) 0;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: var(--bg-content);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), inset 0 0 0 1px var(--border-subtle);
 }
 .detailBar {
   display: flex;
@@ -195,6 +200,7 @@
 .headTitle {
   color: var(--text-primary);
   font: var(--type-title);
+  font-variation-settings: var(--opsz-display);
   letter-spacing: var(--track-title);
 }
 .headSub {
@@ -207,8 +213,8 @@
   margin-bottom: var(--s-5);
   padding: var(--s-3) var(--s-4);
   border-radius: var(--r-lg);
-  background: rgba(253, 190, 69, 0.07);
-  box-shadow: inset 0 0 0 1px rgba(253, 190, 69, 0.18);
+  background: rgba(230, 180, 99, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(230, 180, 99, 0.18);
   color: var(--text-secondary);
   font: var(--type-ui);
   text-wrap: pretty;
@@ -241,6 +247,7 @@
   padding: var(--s-3) var(--s-4);
   border-radius: var(--r-lg);
   background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
 }
 .quoteHead {
   display: flex;
@@ -283,7 +290,7 @@
   white-space: nowrap;
 }
 .chipWarn {
-  background: rgba(253, 190, 69, 0.1);
+  background: rgba(230, 180, 99, 0.1);
   color: var(--warning);
 }
 .files {

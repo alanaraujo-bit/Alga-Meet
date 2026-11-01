@@ -49,25 +49,24 @@
   gap: var(--s-1);
   padding: var(--s-8) var(--s-4) var(--s-4) var(--s-4);
 }
-/* The splash's atmosphere at the start of every conversation: a soft light, no box. */
+/* The start of every conversation: a quiet tile, the same family as the empty states. */
 .introIcon {
   display: grid;
   place-items: center;
   width: 56px;
   height: 56px;
   margin-bottom: var(--s-3);
-  border-radius: var(--r-full);
-  background: radial-gradient(closest-side, rgba(33, 201, 202, 0.16), rgba(33, 201, 202, 0.04) 70%, transparent);
-  color: var(--accent);
-}
-.intro {
-  background: radial-gradient(240px 160px at 44px 40%, rgba(33, 201, 202, 0.06), transparent 70%);
+  border-radius: var(--r-xl);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
 }
 .introActions {
   margin-top: var(--s-3);
 }
 .introTitle {
   font: var(--type-title-lg);
+  font-variation-settings: var(--opsz-display);
   letter-spacing: -0.015em;
   color: var(--text-primary);
 }
@@ -86,7 +85,7 @@
   justify-content: flex-end;
   height: 0;
   margin: var(--s-3) var(--s-4) var(--s-1);
-  border-top: 1px solid rgba(77, 220, 220, 0.45);
+  border-top: 1px solid rgba(139, 142, 247, 0.42);
 }
 /* The label "punches through" the line instead of sitting on a filled pill. */
 .unreadLine span {
@@ -169,14 +168,14 @@
 }
 .msg:hover,
 .msg:focus-within {
-  background: rgba(255, 255, 255, 0.018);
+  background: rgba(255, 255, 255, 0.02);
 }
 .mentioned {
-  background: color-mix(in srgb, var(--accent), transparent 94%);
-  box-shadow: inset 2px 0 0 var(--accent);
+  background: rgba(139, 142, 247, 0.06);
+  box-shadow: inset 2px 0 0 rgba(139, 142, 247, 0.7);
 }
 .mentioned:hover {
-  background: color-mix(in srgb, var(--accent), transparent 91%);
+  background: rgba(139, 142, 247, 0.085);
 }
 .editingRow {
   background: var(--state-hover);
@@ -347,20 +346,29 @@ button.author:hover {
   height: 24px;
   padding: 0 var(--s-2) 0 6px;
   border-radius: var(--r-full);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px var(--border-default);
   color: var(--text-secondary);
   font: var(--type-meta);
-  font-weight: var(--w-semibold);
+  font-weight: var(--w-medium);
+  font-variant-numeric: tabular-nums;
+  transition:
+    background-color var(--dur-hover-out) var(--ease-out-quad),
+    box-shadow var(--dur-hover-out) var(--ease-out-quad);
 }
 .reaction:hover {
-  background: rgba(255, 255, 255, 0.09);
+  transition-duration: 0ms;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
 }
 .reactionMe {
   background: var(--accent-tint);
-  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.32);
+  color: var(--accent-hover);
 }
 .reactionMe:hover {
   background: var(--accent-tint-strong);
+  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.45);
 }
 .reactionAdd {
   width: 28px;
@@ -389,7 +397,9 @@ button.author:hover {
   gap: 2px;
   padding: 2px;
   border-radius: var(--r-md);
-  background: var(--bg-overlay);
+  background: var(--bg-glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-default);
 }
 .msg:hover .toolbar,
@@ -514,15 +524,15 @@ button.replyBody:hover {
   height: 28px;
   padding: 0 var(--s-3);
   border-radius: var(--r-full);
-  background: var(--accent-fill);
+  background: var(--accent-sheen), var(--accent-fill);
   color: var(--on-accent);
   font: var(--type-ui);
-  font-weight: var(--w-semibold);
-  box-shadow: var(--elev-overlay);
+  font-weight: var(--w-medium);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), var(--elev-overlay);
   animation: jumpIn var(--dur-pop) var(--ease-out-quart);
 }
 .jump:hover {
-  background: var(--accent-fill-hover);
+  background: var(--accent-sheen), var(--accent-fill-hover);
 }
 @keyframes jumpIn {
   from {
@@ -542,10 +552,12 @@ button.replyBody:hover {
 .composer {
   border-radius: var(--r-lg);
   background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle), inset 0 1px 0 rgba(255, 255, 255, 0.025);
   transition: box-shadow var(--dur-hover-out) var(--ease-out-quad);
 }
 .composer:focus-within {
-  box-shadow: inset 0 0 0 1px var(--border-strong);
+  transition-duration: var(--dur-fast);
+  box-shadow: inset 0 0 0 1px var(--border-strong), inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 .composerOver,
 .composerOver:focus-within {
@@ -858,6 +870,7 @@ button.replyBody:hover {
   padding: var(--s-3);
   border-radius: var(--r-md);
   background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
   color: var(--text-tertiary);
   font: var(--type-meta);
   text-align: center;
@@ -878,6 +891,7 @@ button.replyBody:hover {
   padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
   border-radius: var(--r-md);
   background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
 }
 .fileTop {
   display: flex;
@@ -1029,6 +1043,7 @@ button.replyBody:hover {
 .dropZone strong {
   color: var(--text-primary);
   font: var(--type-title-sm);
+  font-variation-settings: var(--opsz-display);
 }
 .dropIcon {
   display: grid;

@@ -131,8 +131,8 @@
   flex-shrink: 0;
   padding: 0 5px;
   border-radius: var(--r-xs);
-  background: var(--accent-fill);
-  color: var(--on-accent);
+  background: var(--live-fill);
+  color: var(--on-live);
   font: var(--type-badge);
 }
 .stack {
@@ -197,7 +197,7 @@
   padding: var(--s-4);
   border-radius: var(--r-xl);
   background: var(--bg-overlay);
-  box-shadow: var(--elev-overlay);
+  box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-default);
 }
 .ringActions {
   display: flex;

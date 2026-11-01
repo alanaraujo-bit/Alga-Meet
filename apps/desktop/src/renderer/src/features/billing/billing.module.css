@@ -9,6 +9,7 @@
   padding: var(--s-2) var(--s-3);
   border-radius: var(--r-md);
   background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
   color: var(--text-secondary);
   font: var(--type-meta);
 }
@@ -41,10 +42,12 @@
   overflow: hidden;
   border-radius: var(--r-lg);
   background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
 }
+/* Plus: the card is lit from above in indigo, a lit top edge, nothing louder. */
 .planPlus {
-  background: linear-gradient(180deg, rgba(77, 220, 220, 0.06), transparent 70%), var(--bg-raised);
-  box-shadow: inset 0 1px 0 rgba(77, 220, 220, 0.3);
+  background: radial-gradient(120% 140% at 50% -40%, rgba(139, 142, 247, 0.12), transparent 60%), var(--bg-raised);
+  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.16), inset 0 1px 0 rgba(162, 168, 252, 0.35);
 }
 .planText {
   display: grid;
@@ -55,6 +58,7 @@
 .planName {
   color: var(--text-primary);
   font: var(--type-title-sm);
+  font-variation-settings: var(--opsz-display);
   letter-spacing: var(--track-title);
 }
 .planLine {
@@ -72,8 +76,8 @@
 }
 
 /*
- * The confirmation moment: once, when the provider's confirmation lands while you look at it. A band of light
- * crosses the card (like bioluminescence passing) and the status line says what happened. Reduced motion: the band
+ * The confirmation moment: once, when the provider's confirmation lands while you look at it. A band of soft indigo
+ * light crosses the card and the status line says what happened. Reduced motion: the band
  * is skipped (its last frame is off-card), the line stays.
  */
 .arrived::after {
@@ -81,7 +85,7 @@
   position: absolute;
   inset: 0;
   width: 45%;
-  background: linear-gradient(100deg, transparent 10%, rgba(120, 236, 232, 0.16) 50%, transparent 90%);
+  background: linear-gradient(100deg, transparent 10%, rgba(162, 168, 252, 0.16) 50%, transparent 90%);
   transform: translateX(260%);
   animation: sweep 1.1s var(--ease-out-quart) both;
   pointer-events: none;
@@ -180,15 +184,30 @@
   font-weight: var(--w-semibold);
 }
 
-/* ── Subscribe ── */
+/* ── Subscribe: the upgrade card earns the one gradient — an indigo hairline that fades along the edge and a low
+   light in the corner the CTA sits in. ── */
 .subscribe {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: var(--s-4);
   padding: var(--s-4) var(--s-5);
   border-radius: var(--r-lg);
-  background: var(--bg-raised);
+  background:
+    radial-gradient(70% 120% at 100% 0%, rgba(139, 142, 247, 0.1), transparent 70%),
+    var(--bg-raised);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+.subscribe::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(139, 142, 247, 0.5), rgba(139, 142, 247, 0.08) 45%, rgba(255, 255, 255, 0.06));
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
 }
 .priceBlock {
   display: grid;
@@ -199,6 +218,7 @@
   margin-top: var(--s-2);
   color: var(--text-primary);
   font: var(--type-title-lg);
+  font-variation-settings: var(--opsz-display);
   letter-spacing: var(--track-title);
 }
 .per {
@@ -328,6 +348,7 @@
   aspect-ratio: 16 / 9;
   border-radius: var(--r-lg);
   background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
 }
 .sampleLabel {
   position: absolute;
@@ -361,6 +382,7 @@
 .detailName {
   color: var(--text-primary);
   font: var(--type-title-sm);
+  font-variation-settings: var(--opsz-display);
   letter-spacing: var(--track-title);
 }
 .detailDesc {
@@ -413,6 +435,7 @@
   overflow: hidden;
   border-radius: var(--r-md);
   background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
 }
 .thumb > span:only-child {
   width: 100%;
@@ -453,6 +476,7 @@
   padding: 0 var(--s-2);
   border-radius: var(--r-sm);
   background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
   color: var(--text-secondary);
   font: var(--type-meta);
   font-weight: var(--w-medium);

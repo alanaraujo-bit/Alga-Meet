@@ -7,14 +7,12 @@
   overflow: auto;
   padding: var(--s-8) var(--s-4);
 }
-/* Bioluminescence: one soft light in the deep, nothing more. */
+/* One soft indigo dawn above the card, nothing more. */
 .screen::before {
   content: '';
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(640px 360px at 50% -8%, rgba(33, 201, 202, 0.1), transparent 70%),
-    radial-gradient(420px 260px at 85% 110%, rgba(33, 201, 202, 0.04), transparent 70%);
+  background: radial-gradient(720px 380px at 50% -12%, rgba(139, 142, 247, 0.09), transparent 70%);
   pointer-events: none;
 }
 
@@ -26,8 +24,8 @@
   max-width: 400px;
   padding: var(--s-8);
   border-radius: var(--r-xl);
-  background: rgba(18, 21, 23, 0.94);
-  box-shadow: var(--elev-modal), inset 0 0 0 1px var(--border-subtle);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 120px), rgba(15, 16, 17, 0.94);
+  box-shadow: var(--elev-modal), inset 0 0 0 1px var(--border-default);
 }
 
 .mark {
@@ -37,11 +35,10 @@
   height: 44px;
   margin-bottom: var(--s-5);
   margin-left: -8px;
-  background: radial-gradient(closest-side, rgba(33, 201, 202, 0.18), transparent);
-  filter: drop-shadow(0 0 12px rgba(33, 201, 202, 0.35));
 }
 .title {
   font: var(--type-title-lg);
+  font-variation-settings: var(--opsz-display);
   letter-spacing: -0.015em;
   color: var(--text-primary);
   text-wrap: balance;

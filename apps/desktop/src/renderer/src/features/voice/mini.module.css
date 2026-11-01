@@ -40,7 +40,7 @@
   gap: 2px;
   padding: 2px;
   border-radius: var(--r-md);
-  background: rgba(16, 19, 20, 0.86);
+  background: rgba(15, 16, 17, 0.88);
   opacity: 0;
   transition: opacity var(--dur-hover-out) var(--ease-out-quad);
 }
@@ -76,8 +76,8 @@
   height: 16px;
   padding: 0 5px;
   border-radius: var(--r-full);
-  background: var(--accent-fill);
-  color: var(--on-accent);
+  background: var(--live-fill);
+  color: var(--on-live);
   font: var(--type-badge);
   letter-spacing: 0.02em;
 }

@@ -7,8 +7,10 @@
   overflow: hidden;
   border-radius: var(--r-xl);
   background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
   color: var(--text-secondary);
   font: var(--type-title);
+  font-variation-settings: var(--opsz-display);
 }
 .tile img {
   width: 100%;
@@ -207,6 +209,7 @@
   white-space: nowrap;
   color: var(--text-primary);
   font: var(--type-title-sm);
+  font-variation-settings: var(--opsz-display);
   letter-spacing: var(--track-title);
 }
 .notice {

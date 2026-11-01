@@ -1,6 +1,6 @@
 /*
- * Cosmetics. Colors here are the items' own palette (each one is a piece of art, not UI state), kept muted:
- * sea greens, coral, deep indigo with sodium-light windows. No continuous animation anywhere: things move once when a
+ * Cosmetics. Colors here are the items' own palette (each one is a piece of art, not UI state), tuned to Direção B:
+ * low chroma, cool, indigo-leaning — sage kelp, dusty coral, deep indigo with sodium-light windows, indigo tides. No continuous animation anywhere: things move once when a
  * profile opens (.play) or while a list row is hovered, with transform/opacity only. Reduced motion (global CSS)
  * collapses every animation to its last frame, so the last frame is always the resting look.
  */
@@ -83,7 +83,7 @@
 .plate[data-plate='nameplate_cardume'] {
   /* Room on the right for the school; the name never has fish over it. */
   padding-right: 34px;
-  background: linear-gradient(90deg, rgba(38, 86, 112, 0.62), rgba(28, 58, 86, 0.34));
+  background: linear-gradient(90deg, rgba(58, 64, 128, 0.6), rgba(40, 44, 96, 0.3));
 }
 .school {
   position: absolute;
@@ -93,7 +93,7 @@
 .fish {
   position: absolute;
   height: auto;
-  fill: rgba(200, 236, 246, 0.55);
+  fill: rgba(214, 218, 255, 0.55);
   transform: translateY(-50%);
 }
 .play .fish {
@@ -116,7 +116,7 @@
 }
 
 .plate[data-plate='nameplate_plus_correnteza'] {
-  background: linear-gradient(90deg, rgba(33, 201, 202, 0.2), rgba(33, 201, 202, 0.06));
+  background: linear-gradient(90deg, rgba(139, 142, 247, 0.24), rgba(139, 142, 247, 0.06));
 }
 /* The current: one soft band crossing the plate. */
 .plate[data-plate='nameplate_plus_correnteza']::before {
@@ -124,7 +124,7 @@
   position: absolute;
   inset: 0;
   width: 60%;
-  background: linear-gradient(100deg, transparent 15%, rgba(140, 236, 232, 0.2) 50%, transparent 85%);
+  background: linear-gradient(100deg, transparent 15%, rgba(196, 199, 255, 0.22) 50%, transparent 85%);
   transform: translateX(-110%);
 }
 .play[data-plate='nameplate_plus_correnteza']::before {
@@ -177,12 +177,12 @@
     linear-gradient(180deg, #1c2150, #12162f 70%);
 }
 .card[data-theme='theme_plus_mare'] {
-  --card-tint: rgba(33, 120, 122, 0.1);
+  --card-tint: rgba(97, 99, 208, 0.09);
 }
 .card[data-theme='theme_plus_mare'] .banner {
   background:
-    radial-gradient(80% 120% at 12% -10%, rgba(120, 230, 222, 0.2), transparent 60%),
-    linear-gradient(165deg, #1f5c5d 0%, #143e43 48%, #0f272c 100%);
+    radial-gradient(80% 120% at 12% -10%, rgba(162, 168, 252, 0.22), transparent 60%),
+    linear-gradient(165deg, #2e3175 0%, #1d1f4c 48%, #111229 100%);
 }
 
 .avatarSlot {
@@ -209,6 +209,7 @@
   min-width: 0;
   color: var(--text-primary);
   font: var(--type-title-sm);
+  font-variation-settings: var(--opsz-display);
   letter-spacing: var(--track-title);
 }
 .username {
@@ -223,7 +224,7 @@
   overflow-wrap: anywhere;
 }
 
-/* ── Effect: bioluminescent motes rise once and settle as a faint glow ── */
+/* ── Effect: pale indigo motes rise once and settle as a faint glow ── */
 .motes {
   position: absolute;
   inset: 0 0 auto;
@@ -234,8 +235,8 @@
 .mote {
   position: absolute;
   border-radius: var(--r-full);
-  background: #a8f4ee;
-  box-shadow: 0 0 8px 1px rgba(77, 220, 220, 0.6);
+  background: #dcdeff;
+  box-shadow: 0 0 6px 1px rgba(139, 142, 247, 0.5);
   opacity: 0.55;
   animation: rise 2.2s var(--ease-out-quart) both;
 }

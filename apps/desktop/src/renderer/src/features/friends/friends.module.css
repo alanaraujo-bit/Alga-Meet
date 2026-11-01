@@ -117,6 +117,7 @@
 }
 .addTitle {
   font: var(--type-title-sm);
+  font-variation-settings: var(--opsz-display);
   letter-spacing: var(--track-title);
   color: var(--text-primary);
 }
