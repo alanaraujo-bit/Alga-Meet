@@ -1,0 +1,72 @@
+# Alga Meet — Windows installer (NSIS, per-user, assisted). See docs/decisions/0003-distribution-signing-updates.md.
+appId: com.alga.meet # must match app.setAppUserModelId in src/main/index.ts
+productName: Alga Meet
+copyright: Copyright © 2026 Alga
+
+# npm workspaces hoist electron to the repo root, where electron-builder can't read its version.
+# Package the exact binary we dev/test with (no download). Keep electronVersion = installed electron.
+electronVersion: 45.2.1
+electronDist: ../../node_modules/electron/dist
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - out/**
+  - package.json
+  - "!**/*.map"
+  # uiohook-napi ships sources and every OS's prebuilds; keep only the Windows binaries.
+  - "!**/node_modules/uiohook-napi/{libuiohook,src,binding.gyp}"
+  - "!**/node_modules/uiohook-napi/prebuilds/{darwin-*,linux-*}/**"
+asarUnpack:
+  - "**/node_modules/uiohook-napi/prebuilds/win32-*/*.node"
+extraResources:
+  # Tray/notification images as real files (resources/assets), see src/main/assets.ts.
+  - from: build/runtime
+    to: assets
+# Chromium UI strings for pt-BR plus the en-US fallback; the other ~50 locales are dead weight.
+electronLanguages: [pt-BR, en-US]
+# uiohook-napi is N-API with prebuilt binaries: nothing to rebuild against Electron's ABI.
+npmRebuild: false
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  # Code signing is automatic when CSC_LINK + CSC_KEY_PASSWORD are set (PFX/OV/EV via signtool); unsigned otherwise.
+  # Azure Trusted Signing: add the block below once the account exists (see ADR 0003), or pass it with -c.win.azureSignOptions.*
+  # azureSignOptions:
+  #   publisherName: "<CN of the certificate profile>"
+  #   endpoint: https://eus.codesigning.azure.net
+  #   codeSigningAccountName: "<account>"
+  #   certificateProfileName: "<profile>"
+
+nsis:
+  oneClick: false
+  perMachine: false # per-user install in %LOCALAPPDATA%\Programs, no admin/UAC
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Alga Meet
+  uninstallDisplayName: Alga Meet
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerSidebar: build/installer-sidebar.bmp
+  uninstallerSidebar: build/installer-sidebar.bmp
+  installerHeader: build/installer-header.bmp
+  include: build/installer.nsh # asks on uninstall whether to remove personal data (default: keep)
+  # One bundled language = pt-BR UI with no language prompt (multiLanguageInstaller: false would force en_US).
+  installerLanguages: [pt_BR]
+  language: "1046"
+  deleteAppDataOnUninstall: false
+  runAfterFinish: true
+  artifactName: AlgaMeet-Setup-${version}.${ext}
+
+publish:
+  provider: github
+  owner: alanaraujo-bit
+  repo: alga-meet
+  releaseType: release
