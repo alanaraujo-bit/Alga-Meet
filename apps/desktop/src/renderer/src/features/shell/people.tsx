@@ -1,5 +1,5 @@
 import type { PublicUser } from '@alga/shared'
-import { Ban, Check, Clock, Copy, MessageCircle, MoreHorizontal, Phone, Shield, UserMinus, UserPlus, UserRound, VolumeX, X } from 'lucide-react'
+import { Ban, Check, Clock, Copy, MessageCircle, MoreHorizontal, Phone, Shield, UserMinus, UserPlus, UserRound, VolumeX, X } from '@/ui/icons'
 import { copyText } from '@/lib/clipboard'
 import { errorText } from '@/lib/errors'
 import { media, useMedia } from '@/media'

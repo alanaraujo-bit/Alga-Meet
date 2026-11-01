@@ -1,5 +1,5 @@
 import { MIN_AGE, MIN_PASSWORD_LENGTH, ageOn } from '@alga/shared'
-import { AlertCircle, CheckCircle2, Info } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Info } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { ApiRequestError } from '@/lib/api'

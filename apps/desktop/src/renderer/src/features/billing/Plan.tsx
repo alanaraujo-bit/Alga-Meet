@@ -1,5 +1,5 @@
 import { STREAM_PRESETS, type BillingCatalog, type BillingMe, type OrderStatus, type PlanSummary, type Product, type StreamPreset, type SubscriptionStatus } from '@alga/shared'
-import { Check, CircleCheck, Clock, ExternalLink, FlaskConical, Lock, Minus } from 'lucide-react'
+import { Check, CircleCheck, Clock, ExternalLink, FlaskConical, Lock, Minus } from '@/ui/icons'
 import { useEffect, useState } from 'react'
 import { errorText } from '@/lib/errors'
 import { useData } from '@/store/data'

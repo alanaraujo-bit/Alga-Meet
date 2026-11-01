@@ -1,4 +1,4 @@
-import { Phone, PhoneOff } from 'lucide-react'
+import { Phone, PhoneOff } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useData } from '@/store/data'
 import { channelTitle, displayName } from '@/store/selectors'

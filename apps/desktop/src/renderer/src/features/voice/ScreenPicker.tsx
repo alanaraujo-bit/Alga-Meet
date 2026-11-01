@@ -1,4 +1,4 @@
-import { Check, Lock, Monitor, AppWindow } from 'lucide-react'
+import { Check, Lock, Monitor, AppWindow } from '@/ui/icons'
 import { motion } from 'motion/react'
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react'
 import { useShallow } from 'zustand/react/shallow'

@@ -1,4 +1,4 @@
-import { Check, type LucideIcon } from 'lucide-react'
+import { Check, type Glyph } from './icons'
 import { cloneElement, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
@@ -10,7 +10,7 @@ export type MenuEntry =
   | {
       kind?: 'item'
       label: string
-      icon?: LucideIcon
+      icon?: Glyph
       onSelect: () => void
       danger?: boolean
       disabled?: boolean

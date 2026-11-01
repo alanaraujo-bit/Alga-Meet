@@ -1,4 +1,4 @@
-import { Maximize2, X } from 'lucide-react'
+import { Maximize2, X } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { media, useMedia } from '@/media'

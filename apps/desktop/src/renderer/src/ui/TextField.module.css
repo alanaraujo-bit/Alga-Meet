@@ -19,18 +19,23 @@
   align-items: center;
   height: var(--h-control-lg);
   border-radius: var(--r-md);
-  background: var(--bg-raised);
+  background: rgba(255, 255, 255, 0.025);
   box-shadow: inset 0 0 0 1px var(--border-default);
-  transition: box-shadow var(--dur-hover-out) var(--ease-out-quad);
+  transition:
+    box-shadow var(--dur-hover-out) var(--ease-out-quad),
+    background-color var(--dur-hover-out) var(--ease-out-quad);
 }
 .control:hover {
   transition-duration: 0ms;
   box-shadow: inset 0 0 0 1px var(--border-strong);
 }
+/* Focus: the edge turns indigo and a soft 3 px halo opens around it (no hard 2 px ring inside a field). */
 .control:focus-within {
+  transition-duration: var(--dur-fast);
+  background: rgba(255, 255, 255, 0.035);
   box-shadow:
-    inset 0 0 0 1px var(--accent),
-    0 0 0 3px var(--accent-tint);
+    inset 0 0 0 1px rgba(139, 142, 247, 0.75),
+    0 0 0 3px rgba(139, 142, 247, 0.16);
 }
 .invalid,
 .invalid:hover {

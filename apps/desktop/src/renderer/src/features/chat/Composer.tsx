@@ -1,5 +1,5 @@
 import type { PublicUser } from '@alga/shared'
-import { Paperclip, SendHorizontal, Smile, X } from 'lucide-react'
+import { Paperclip, SendHorizontal, Smile, X } from '@/ui/icons'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type Ref } from 'react'
 import { fold } from '@/lib/fuzzy'
 import { toPlainText } from '@/lib/markdown'

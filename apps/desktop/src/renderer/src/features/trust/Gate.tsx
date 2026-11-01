@@ -1,5 +1,5 @@
 import type { Me } from '@alga/shared'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiRequestError } from '@/lib/api'

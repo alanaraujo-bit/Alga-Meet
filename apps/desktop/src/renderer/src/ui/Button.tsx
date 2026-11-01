@@ -1,4 +1,4 @@
-import type { LucideIcon } from 'lucide-react'
+import type { Glyph } from './icons'
 import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 import { Icon } from './Icon'
 import { Spinner } from './Spinner'
@@ -15,7 +15,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
   size?: 'sm' | 'md' | 'lg'
   loading?: boolean
-  icon?: LucideIcon
+  icon?: Glyph
   full?: boolean
   ref?: Ref<HTMLButtonElement>
   children?: ReactNode
@@ -44,7 +44,7 @@ export function Button({ variant = 'secondary', size = 'md', loading, icon, full
 }
 
 export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
-  icon: LucideIcon
+  icon: Glyph
   /** Accessible name, also shown as tooltip. */
   label: string
   shortcut?: string
@@ -81,7 +81,8 @@ export function IconButton({
         className={cx(s.icon, size === 'sm' && s.iconSm, size === 'lg' && s.iconLg, danger && s.iconDanger, className)}
         style={unavailable ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
       >
-        <Icon icon={icon} size={size === 'sm' ? 14 : size === 'lg' ? 18 : 16} />
+        {/* A pressed toggle draws its glyph solid (mute, deafen, members): "it is on" at a glance. */}
+        <Icon icon={icon} size={size === 'sm' ? 14 : size === 'lg' ? 18 : 16} filled={rest['aria-pressed'] === true || rest['aria-pressed'] === 'true'} />
       </button>
     </Tooltip>
   )

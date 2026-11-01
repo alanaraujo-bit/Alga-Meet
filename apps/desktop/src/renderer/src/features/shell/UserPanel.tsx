@@ -1,5 +1,5 @@
 import type { StatusPreference } from '@alga/shared'
-import { Check, Copy, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Settings } from 'lucide-react'
+import { Check, Copy, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Settings } from '@/ui/icons'
 import { useRef, useState } from 'react'
 import { media, useMedia } from '@/media'
 import { setStatus } from '@/store/actions'

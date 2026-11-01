@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react'
+import { Search } from '@/ui/icons'
 import { media, useMedia } from '@/media'
 import { useSession } from '@/store/session'
 import { Icon, Kbd } from '@/ui'

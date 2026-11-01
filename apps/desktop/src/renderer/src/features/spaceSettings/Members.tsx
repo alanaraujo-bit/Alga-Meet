@@ -1,5 +1,5 @@
 import { Permission, type Member, type Role } from '@alga/shared'
-import { Crown, Gavel, MoreHorizontal, Pencil, Plus, Search, UserMinus, X } from 'lucide-react'
+import { Crown, Gavel, MoreHorizontal, Pencil, Plus, Search, UserMinus, X } from '@/ui/icons'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { errorText } from '@/lib/errors'

@@ -6,9 +6,10 @@
   gap: var(--s-1_5);
   height: var(--h-control);
   padding: 0 var(--s-3);
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
   font: var(--type-ui);
   font-weight: var(--w-medium);
+  letter-spacing: var(--track-ui);
   white-space: nowrap;
   /* Highlight enters instantly, leaves softly (study §10). */
   transition:
@@ -37,6 +38,7 @@
 .lg {
   height: var(--h-control-lg);
   padding: 0 var(--s-4);
+  border-radius: var(--r-md);
   font: var(--type-ui-lg);
   letter-spacing: var(--track-ui-lg);
 }
@@ -44,29 +46,32 @@
   width: 100%;
 }
 
+/* Primary: the one place indigo fills. A faint top sheen and a lit top edge make it feel pressed from light, not
+   painted; the text never sits on the sheen (it fades out above the middle), so white stays ≥ 4.5:1. */
 .primary {
-  background: var(--accent-fill);
+  background: var(--accent-sheen), var(--accent-fill);
   color: var(--on-accent);
-  font-weight: var(--w-semibold);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.2), var(--elev-low);
 }
 .primary:hover:not(:disabled) {
-  background: var(--accent-fill-hover);
+  background: var(--accent-sheen), var(--accent-fill-hover);
 }
 .primary:active:not(:disabled) {
   background: var(--accent-pressed);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.2);
 }
 
 .secondary {
-  background: var(--bg-raised);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
-  box-shadow: inset 0 0 0 1px var(--border-default);
+  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 .secondary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--bg-raised), white 5%);
-  box-shadow: inset 0 0 0 1px var(--border-strong);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px var(--border-strong), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 .secondary:active:not(:disabled) {
-  background: color-mix(in srgb, var(--bg-raised), white 8%);
+  background: rgba(255, 255, 255, 0.09);
 }
 /* Destructive action at rest (outside a confirmation): red text only, the red fill waits for the modal. */
 .secondary-danger {
@@ -89,12 +94,13 @@
 }
 
 .danger {
-  background: var(--danger);
+  background: var(--accent-sheen), var(--danger-fill);
   color: var(--on-danger);
-  font-weight: var(--w-semibold);
+  font-weight: var(--w-medium);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), var(--elev-low);
 }
 .danger:hover:not(:disabled) {
-  background: var(--danger-hover);
+  background: var(--accent-sheen), var(--danger-fill-hover);
 }
 
 .label {

@@ -1,4 +1,4 @@
-import { Crown } from 'lucide-react'
+import { Crown } from '@/ui/icons'
 import type { Member, PresenceStatus, PublicUser } from '@alga/shared'
 import { useMemo, useRef, useState } from 'react'
 import { useMedia } from '@/media'

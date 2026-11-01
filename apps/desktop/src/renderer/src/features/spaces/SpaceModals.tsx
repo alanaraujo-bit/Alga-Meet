@@ -1,5 +1,5 @@
 import type { Invite } from '@alga/shared'
-import { Check, Copy, Hash, Users, Volume2 } from 'lucide-react'
+import { Check, Copy, Hash, Users, Volume2 } from '@/ui/icons'
 import { useEffect, useState, type FormEvent } from 'react'
 import { ApiRequestError } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'

@@ -100,17 +100,17 @@ export function Decoration({ id, small }: { id: CosmeticId; small?: boolean }) {
       <svg className={`${s.deco} ${s.kelp} ${small ? s.small : ''}`} viewBox="-60 -60 120 120" aria-hidden>
         <defs>
           <linearGradient id={grad} gradientUnits="userSpaceOnUse" x1="-30" y1="50" x2="20" y2="-60">
-            <stop offset="0" stopColor="#2c6b55" />
-            <stop offset="0.55" stopColor="#4f957a" />
-            <stop offset="1" stopColor="#9ccfb0" />
+            <stop offset="0" stopColor="#2f5a50" />
+            <stop offset="0.55" stopColor="#56877b" />
+            <stop offset="1" stopColor="#abcdbf" />
           </linearGradient>
         </defs>
-        {!small && <path d={arc(R + 1.2, 100, 312)} fill="none" stroke="#86bfa0" strokeOpacity="0.34" strokeWidth="0.9" />}
+        {!small && <path d={arc(R + 1.2, 100, 312)} fill="none" stroke="#8fb2a5" strokeOpacity="0.34" strokeWidth="0.9" />}
         <g className={s.sway}>
           {(small ? KELP_SMALL : KELP).map((l, i) => (
             <g key={i}>
               <path d={l.blade} fill={`url(#${grad})`} fillOpacity={i % 2 ? 0.86 : 0.97} />
-              {!small && <path d={l.rib} fill="none" stroke="#c9ead6" strokeOpacity="0.32" strokeWidth="0.6" strokeLinecap="round" />}
+              {!small && <path d={l.rib} fill="none" stroke="#d3e6de" strokeOpacity="0.32" strokeWidth="0.6" strokeLinecap="round" />}
             </g>
           ))}
         </g>
@@ -121,16 +121,16 @@ export function Decoration({ id, small }: { id: CosmeticId; small?: boolean }) {
     const reef: ReadonlyArray<readonly [number, number, boolean]> = small ? CORAL_SMALL : CORAL
     return (
       <svg className={`${s.deco} ${s.coral} ${small ? s.small : ''}`} viewBox="-60 -60 120 120" aria-hidden>
-        {!small && <path d={arc(R + 1.2, 214, 292)} fill="none" stroke="#d99484" strokeOpacity="0.3" strokeWidth="0.9" />}
-        <path d={arc(R + 1.4, 104, 214)} fill="none" stroke="#b86e60" strokeWidth={small ? 5 : 3.4} strokeLinecap="round" />
+        {!small && <path d={arc(R + 1.2, 214, 292)} fill="none" stroke="#cf968c" strokeOpacity="0.3" strokeWidth="0.9" />}
+        <path d={arc(R + 1.4, 104, 214)} fill="none" stroke="#a96c63" strokeWidth={small ? 5 : 3.4} strokeLinecap="round" />
         <g className={s.sway}>
           {reef.map(([a, k, flip], i) => (
             <g key={i} transform={`rotate(${a}) translate(${R + 0.6} 0) scale(${k} ${flip ? -k : k})`}>
               {tree.paths.map(([d, w], j) => (
-                <path key={j} d={d} fill="none" stroke={j === 0 ? '#c47a6b' : '#d99484'} strokeWidth={w} strokeLinecap="round" />
+                <path key={j} d={d} fill="none" stroke={j === 0 ? '#b5776d' : '#cf968c'} strokeWidth={w} strokeLinecap="round" />
               ))}
               {tree.tips.map(([x, y], j) => (
-                <circle key={j} cx={x} cy={y} r={small ? 2.4 : 1.25} fill="#f0c2b4" />
+                <circle key={j} cx={x} cy={y} r={small ? 2.4 : 1.25} fill="#e9c3ba" />
               ))}
             </g>
           ))}
@@ -219,8 +219,8 @@ function ThemeArt({ id }: { id?: CosmeticId }) {
   if (id === 'theme_plus_mare')
     return (
       <svg className={s.art} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-        <path d="M 0 62 C 18 52 32 72 50 62 S 82 52 100 60" fill="none" stroke="#aaf0eb" strokeOpacity="0.14" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
-        <path d="M 0 78 C 20 70 36 88 54 78 S 84 70 100 77" fill="none" stroke="#aaf0eb" strokeOpacity="0.09" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
+        <path d="M 0 62 C 18 52 32 72 50 62 S 82 52 100 60" fill="none" stroke="#c5c8ff" strokeOpacity="0.16" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
+        <path d="M 0 78 C 20 70 36 88 54 78 S 84 70 100 77" fill="none" stroke="#c5c8ff" strokeOpacity="0.1" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
       </svg>
     )
   return null
@@ -270,7 +270,7 @@ export function ProfileCard({
   presence?: PresenceStatus
   children?: ReactNode
 }) {
-  const hueBanner = user.accentColor ?? `oklch(0.5 0.07 ${hueFor(user.id)})`
+  const hueBanner = user.accentColor ?? `oklch(0.45 0.05 ${hueFor(user.id)})`
   return (
     <div className={s.card} data-theme={look.theme} style={{ ['--banner' as string]: hueBanner }}>
       <div className={s.banner}>

@@ -1,6 +1,6 @@
 import type { Attachment, Message } from '@alga/shared'
 import { DEFAULT_MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS } from '@alga/shared'
-import { Download, File, FileArchive, FileAudio, FileCode, FileSpreadsheet, FileText, ImageOff, X, type LucideIcon } from 'lucide-react'
+import { Download, File, FileArchive, FileAudio, FileCode, FileSpreadsheet, FileText, ImageOff, X, type Glyph } from '@/ui/icons'
 import { useState } from 'react'
 import { errorText } from '@/lib/errors'
 import { attachmentKind, fitBox, formatBytes, gridRows, localKind } from '@/lib/files'
@@ -156,7 +156,7 @@ function FileCard({ message: m, a }: { message: Message; a: Attachment }) {
   )
 }
 
-function FileMeta({ a, icon }: { a: Attachment; icon: LucideIcon }) {
+function FileMeta({ a, icon }: { a: Attachment; icon: Glyph }) {
   return (
     <>
       <span className={s.fileIcon}>
@@ -177,13 +177,13 @@ function DownloadButton({ message: m, a }: { message: Message; a: Attachment }) 
   return <IconButton icon={Download} label={t.files.download(a.filename)} onClick={() => void saveAttachment(m.channelId, m.id, a.id)} />
 }
 
-const EXT: Array<[RegExp, LucideIcon]> = [
+const EXT: Array<[RegExp, Glyph]> = [
   [/\.(zip|rar|7z|tar|gz|bz2|xz)$/i, FileArchive],
   [/\.(csv|xlsx?|ods|tsv)$/i, FileSpreadsheet],
   [/\.(js|ts|tsx|jsx|json|py|rs|go|java|c|cpp|h|cs|rb|php|sh|ps1|html|css|xml|ya?ml|toml|sql)$/i, FileCode],
   [/\.(txt|md|pdf|docx?|odt|rtf)$/i, FileText],
 ]
-const fileIcon = (name: string): LucideIcon => EXT.find(([re]) => re.test(name))?.[1] ?? File
+const fileIcon = (name: string): Glyph => EXT.find(([re]) => re.test(name))?.[1] ?? File
 
 /**
  * Saves a file through the OS "Salvar como" (blob URL + download attribute; a cross-origin link would just

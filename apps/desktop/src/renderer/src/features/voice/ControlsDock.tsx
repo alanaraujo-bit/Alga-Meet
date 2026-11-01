@@ -1,6 +1,6 @@
 import type { Channel } from '@alga/shared'
-import type { LucideIcon } from 'lucide-react'
-import { ArrowLeftRight, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, Settings2, Square } from 'lucide-react'
+import type { Glyph } from '@/ui/icons'
+import { ArrowLeftRight, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, Settings2, Square } from '@/ui/icons'
 import { useCallback, useLayoutEffect, useRef, type ButtonHTMLAttributes, type ReactNode, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
@@ -108,7 +108,7 @@ function CallButton({
   children,
   ...rest
 }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
-  icon: LucideIcon
+  icon: Glyph
   label: string
   hint?: string
   pressed?: boolean

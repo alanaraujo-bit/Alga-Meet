@@ -6,15 +6,15 @@
   align-items: center;
   gap: var(--s-2);
   max-width: 280px;
-  padding: 5px var(--s-2);
+  padding: 4px var(--s-2);
   border-radius: var(--r-sm);
   background: var(--bg-overlay);
   box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-default);
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font: var(--type-meta);
   font-weight: var(--w-medium);
   pointer-events: none;
-  animation: pop var(--dur-pop) var(--ease-out-quart);
+  animation: pop var(--dur-fast) var(--ease-out-quad);
 }
 @keyframes pop {
   from {
@@ -111,12 +111,14 @@
   width: 48px;
   height: 48px;
   margin-bottom: var(--s-2);
-  border-radius: var(--r-full);
-  background: radial-gradient(closest-side, rgba(33, 201, 202, 0.12), rgba(33, 201, 202, 0.03) 70%, transparent);
-  color: var(--text-secondary);
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: var(--text-tertiary);
 }
 .emptyTitle {
   font: var(--type-title-sm);
+  font-variation-settings: var(--opsz-display);
   letter-spacing: var(--track-title);
   color: var(--text-primary);
 }
@@ -142,7 +144,8 @@
   transition: background-color var(--dur-base) var(--ease-out-quad);
 }
 .switch[aria-checked='true'] {
-  background: var(--accent-fill);
+  background: var(--accent-sheen), var(--accent-fill);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 .switch:disabled {
   opacity: 0.5;
@@ -155,13 +158,12 @@
   width: 14px;
   height: 14px;
   border-radius: var(--r-full);
-  background: var(--text-primary);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
   transition: transform var(--dur-base) var(--ease-out-quart);
 }
 .switch[aria-checked='true'] .thumb {
   transform: translateX(14px);
-  background: var(--on-accent);
 }
 
 /* ── Segmented control / Tabs ────────────── */
@@ -170,7 +172,7 @@
   gap: 2px;
   padding: 2px;
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(0, 0, 0, 0.2);
   box-shadow: inset 0 0 0 1px var(--border-subtle);
 }
 .segment {
@@ -192,8 +194,8 @@
   position: absolute;
   inset: 0;
   border-radius: var(--r-sm);
-  background: var(--state-selected);
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgba(255, 255, 255, 0.05), var(--elev-low);
 }
 .segmentLabel {
   position: relative;
@@ -207,28 +209,33 @@
   align-items: center;
   gap: var(--s-0_5);
 }
+/* Linear's view pills: rounded, a hairline edge at rest, the chosen one steps up in luminance. */
 .tab {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--s-1_5);
   height: var(--h-row);
-  padding: 0 10px;
-  border-radius: var(--r-sm);
+  padding: 0 var(--s-3);
+  border-radius: var(--r-full);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
   color: var(--text-tertiary);
   font: var(--type-ui);
   font-weight: var(--w-medium);
   transition:
     background-color var(--dur-hover-out) var(--ease-out-quad),
-    color var(--dur-hover-out) var(--ease-out-quad);
+    color var(--dur-hover-out) var(--ease-out-quad),
+    box-shadow var(--dur-hover-out) var(--ease-out-quad);
 }
 .tab:hover {
   transition-duration: 0ms;
   background: var(--state-hover);
+  box-shadow: inset 0 0 0 1px var(--border-default);
   color: var(--text-secondary);
 }
 .tab[aria-selected='true'] {
-  background: var(--state-selected);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px var(--border-strong), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
 }
 
@@ -240,13 +247,13 @@
   height: 16px;
   padding: 0 5px;
   border-radius: var(--r-full);
-  background: rgba(255, 255, 255, 0.14);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
   font: var(--type-badge);
   font-variant-numeric: tabular-nums;
 }
 .badgeMention {
-  background: var(--danger);
+  background: var(--danger-fill);
   color: var(--on-danger);
 }
 
@@ -275,6 +282,10 @@
 /* Live: each frond's height rides the envelope, the tallest one the most. */
 .frondsLive i {
   transform: scaleY(calc(0.42 + 0.58 * var(--speak)));
+}
+/* Marca v2: every bar shows its slice of one 5u gradient centered on the group (outer bars are 3u, centered). */
+.frondsBrand i {
+  background: linear-gradient(180deg, #ffffff, #9a9df9) center / 100% calc(var(--u) * 5);
 }
 .frondsBreathing i {
   animation: frond 1.6s var(--ease-in-out-cubic) infinite;

@@ -10,13 +10,14 @@ import s from './misc.module.css'
  * - `breathing`: slow idle motion for "people are here right now" when no level is known (other rooms).
  * - neither: still bars (static "voice" icon).
  */
-export function Fronds({ size = 16, getLevel, breathing, className, label }: { size?: number; getLevel?: () => number; breathing?: boolean; className?: string; label?: string }) {
+/** `brand`: the logo's lit bars (white fading into the indigo, one gradient across the group: Marca v2). */
+export function Fronds({ size = 16, getLevel, breathing, brand, className, label }: { size?: number; getLevel?: () => number; breathing?: boolean; brand?: boolean; className?: string; label?: string }) {
   const ref = useRef<HTMLSpanElement>(null)
   useEnvelope(ref, getLevel ?? null)
   return (
     <span
       ref={ref}
-      className={`${s.fronds} ${breathing && !getLevel ? s.frondsBreathing : ''} ${getLevel ? s.frondsLive : ''} ${className ?? ''}`}
+      className={`${s.fronds} ${breathing && !getLevel ? s.frondsBreathing : ''} ${getLevel ? s.frondsLive : ''} ${brand ? s.frondsBrand : ''} ${className ?? ''}`}
       style={{ width: size, height: size, ['--u' as string]: `${Math.max(2, Math.round(size / 7))}px` }}
       role={label ? 'img' : undefined}
       aria-label={label}

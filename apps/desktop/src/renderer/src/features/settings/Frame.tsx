@@ -1,4 +1,4 @@
-import { X, type LucideIcon } from 'lucide-react'
+import { X, type Glyph } from '@/ui/icons'
 import { motion } from 'motion/react'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Icon, IconButton, Kbd } from '@/ui'
@@ -8,7 +8,7 @@ import s from './settings.module.css'
 
 export interface FrameNav<Id extends string> {
   group: string
-  items: Array<{ id: Id; label: string; icon: LucideIcon }>
+  items: Array<{ id: Id; label: string; icon: Glyph }>
 }
 
 /**
@@ -98,7 +98,7 @@ export function SettingsFrame<Id extends string>({
               <div className={s.navGroupLabel}>{g.group}</div>
               {g.items.map((it) => (
                 <button key={it.id} type="button" className={s.navItem} aria-current={section === it.id ? 'page' : undefined} onClick={() => onSelect(it.id)}>
-                  <Icon icon={it.icon} size={16} />
+                  <Icon icon={it.icon} size={16} filled={section === it.id} />
                   {it.label}
                 </button>
               ))}

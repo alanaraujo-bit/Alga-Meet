@@ -13,8 +13,9 @@ export const PRESENCE_LABEL: Record<PresenceStatus, string> = {
   offline: 'Offline',
 }
 
-/** 8 clean hues (OKLCH H 150–340): skips the 40–110 band that turns muddy brown on the deep-water neutrals. */
-const HUES = [150, 175, 200, 228, 255, 282, 310, 338] as const
+/** 8 hues for the whisper of tint on initials avatars and space tiles: cool-to-warm around the indigo, no teal/cyan
+ *  (H 160–220 is gone with the old accent) and no 40–110 band, which reads as mud. */
+const HUES = [140, 235, 255, 275, 295, 315, 340, 15] as const
 
 /** Stable hue per id so initials avatars are recognizable without being loud. */
 export function hueFor(id: string): number {
@@ -23,8 +24,8 @@ export function hueFor(id: string): number {
   return HUES[h % HUES.length]!
 }
 
-/** Same hash as a 12% tint over the raised surface (space tiles without an icon). */
-export const tintFor = (id: string): string => `color-mix(in srgb, oklch(0.5 0.07 ${hueFor(id)}) 12%, var(--bg-raised))`
+/** Same hash as an 8% tint over the raised surface (space tiles without an icon): near-neutral, still tellable apart. */
+export const tintFor = (id: string): string => `color-mix(in srgb, oklch(0.5 0.07 ${hueFor(id)}) 8%, var(--bg-raised))`
 
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -95,8 +96,9 @@ export function Avatar({
       <span
         className={s.face}
         style={{
-          background: user.accentColor ?? `oklch(0.5 0.07 ${hue})`,
-          color: user.accentColor ? '#fff' : `oklch(0.96 0.02 ${hue})`,
+          // Neutral #26272b-like disc with a whisper of the person's hue (C .02): calm, still recognizable.
+          background: user.accentColor ?? `oklch(0.29 0.02 ${hue})`,
+          color: user.accentColor ? '#fff' : `oklch(0.86 0.03 ${hue})`,
           fontSize: Math.max(8, Math.round(size * 0.38)),
         }}
       >

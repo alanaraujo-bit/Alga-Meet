@@ -1,5 +1,5 @@
 import { Permission } from '@alga/shared'
-import { ArrowRightLeft, HeadphoneOff, Headphones, Mic, MicOff, PhoneOff } from 'lucide-react'
+import { ArrowRightLeft, HeadphoneOff, Headphones, Mic, MicOff, PhoneOff } from '@/ui/icons'
 import { errorText } from '@/lib/errors'
 import { moderateVoice } from '@/store/actions'
 import { useData } from '@/store/data'

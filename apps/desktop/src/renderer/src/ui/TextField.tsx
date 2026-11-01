@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowBigUp, Eye, EyeOff, type LucideIcon } from 'lucide-react'
+import { AlertCircle, ArrowBigUp, Eye, EyeOff, type Glyph } from './icons'
 import { useId, useState, type InputHTMLAttributes, type ReactNode, type Ref } from 'react'
 import { IconButton } from './Button'
 import { Icon } from './Icon'
@@ -11,7 +11,7 @@ export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   hint?: ReactNode
   error?: string | null
   optional?: boolean
-  leadingIcon?: LucideIcon
+  leadingIcon?: Glyph
   trailing?: ReactNode
   size?: 'sm' | 'md'
   ref?: Ref<HTMLInputElement>

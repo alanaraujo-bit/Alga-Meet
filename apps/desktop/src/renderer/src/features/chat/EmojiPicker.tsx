@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react'
+import { Search } from '@/ui/icons'
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Icon, Popover } from '@/ui'
 import { searchEmoji } from './emoji'

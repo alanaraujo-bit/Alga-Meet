@@ -1,5 +1,5 @@
 import type { LegalInfo } from '@alga/shared'
-import { AlertCircle, ExternalLink } from 'lucide-react'
+import { AlertCircle, ExternalLink } from '@/ui/icons'
 import { useEffect, useId } from 'react'
 import { create } from 'zustand'
 import { api } from '@/lib/api'

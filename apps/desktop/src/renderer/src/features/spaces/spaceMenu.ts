@@ -1,5 +1,5 @@
 import { Permission } from '@alga/shared'
-import { CheckCheck, Flag, Hash, LogOut, Settings, UserPlus, Volume2 } from 'lucide-react'
+import { CheckCheck, Flag, Hash, LogOut, Settings, UserPlus, Volume2 } from '@/ui/icons'
 import { markSpaceRead } from '@/store/actions'
 import { useData } from '@/store/data'
 import { can, spacePermissions } from '@/store/selectors'

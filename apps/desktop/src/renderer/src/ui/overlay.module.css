@@ -37,6 +37,7 @@
 }
 .modalTitle {
   font: var(--type-title);
+  font-variation-settings: var(--opsz-display);
   letter-spacing: var(--track-title);
   color: var(--text-primary);
   padding-top: 2px;
@@ -60,18 +61,23 @@
   justify-content: flex-end;
   gap: var(--s-2);
   padding: var(--s-4) var(--s-6);
-  background: rgba(0, 0, 0, 0.14);
+  background: rgba(0, 0, 0, 0.12);
   box-shadow: inset 0 1px 0 var(--border-subtle);
 }
 
 /* ── Popover / Menu surface ──────────────── */
+/* Menus and popovers are glass: translucent surface over a blur, hairline edge, lit top edge, one wide shadow
+   (Linear's menus). Small overlays only — never a full-screen blur over video. */
 .floating {
   position: fixed;
   z-index: var(--z-popover);
   border-radius: var(--r-lg);
-  background: var(--bg-overlay);
+  background: var(--bg-glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-default);
   animation: popIn var(--dur-pop) var(--ease-out-quart);
+  transform-origin: var(--origin, top center);
 }
 .floating:focus-visible {
   outline: none;
@@ -79,7 +85,7 @@
 @keyframes popIn {
   from {
     opacity: 0;
-    transform: scale(0.97);
+    transform: scale(0.97) translateY(-2px);
   }
 }
 
@@ -88,7 +94,8 @@
   z-index: var(--z-context-menu);
   min-width: 200px;
   max-width: 300px;
-  padding: var(--s-1_5);
+  padding: var(--s-1);
+  border-radius: 10px; /* concentric: item 6 + padding 4 */
 }
 .menuItem {
   display: flex;
@@ -108,7 +115,7 @@
 }
 .menuItem[data-active='true'] {
   transition-duration: 0ms;
-  background: var(--state-selected);
+  background: rgba(255, 255, 255, 0.07);
   color: var(--text-primary);
 }
 .menuItem:disabled,
@@ -143,11 +150,11 @@
   font: var(--type-meta);
 }
 .menuCheck {
-  color: var(--accent) !important;
+  color: var(--text-secondary) !important;
 }
 .menuSep {
   height: 1px;
-  margin: var(--s-1_5) calc(var(--s-1_5) * -1);
+  margin: var(--s-1) calc(var(--s-1) * -1);
   background: var(--border-subtle);
 }
 .menuGroup {
@@ -179,7 +186,9 @@
   max-width: 380px;
   padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
   border-radius: var(--r-lg);
-  background: var(--bg-overlay);
+  background: var(--bg-glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-default);
   color: var(--text-primary);
   font: var(--type-ui);

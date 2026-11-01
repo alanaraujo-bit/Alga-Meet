@@ -1,5 +1,5 @@
 import { EXPORT_DOWNLOAD_TTL_MINUTES, type AccountAction, type AccountDeletionScheduled, type AppealView, type DataExport, type DataExportDownload } from '@alga/shared'
-import { AlertCircle, Ban, CheckCircle2, Clock, Download, EyeOff, Info, PauseCircle, RotateCcw, ShieldCheck, Trash2, UserX, type LucideIcon } from 'lucide-react'
+import { AlertCircle, Ban, CheckCircle2, Clock, Download, EyeOff, Info, PauseCircle, RotateCcw, ShieldCheck, Trash2, UserX, type Glyph } from '@/ui/icons'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiRequestError } from '@/lib/api'
 import { errorText } from '@/lib/errors'
@@ -52,7 +52,7 @@ function TeenProtections() {
   )
 }
 
-function IconLabel({ icon, text, quiet }: { icon: LucideIcon; text: string; quiet?: boolean }) {
+function IconLabel({ icon, text, quiet }: { icon: Glyph; text: string; quiet?: boolean }) {
   return (
     <span className={`${s.iconLabel} ${quiet ? s.iconQuiet : ''}`}>
       <Icon icon={icon} size={14} />
@@ -150,7 +150,7 @@ function ActionsGroup() {
   )
 }
 
-const ACTION_ICON: Record<AccountAction['type'], LucideIcon> = { warn: Info, suspend: PauseCircle, ban: Ban, lift: RotateCcw }
+const ACTION_ICON: Record<AccountAction['type'], Glyph> = { warn: Info, suspend: PauseCircle, ban: Ban, lift: RotateCcw }
 
 const actionLabel = (x: AccountAction) =>
   x.type === 'suspend' && x.until ? `${t.privacy.action.suspend} ${t.privacy.untilLine(longDate(x.until))}` : t.privacy.action[x.type]

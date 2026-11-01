@@ -1,4 +1,4 @@
-import { MailCheck } from 'lucide-react'
+import { MailCheck } from '@/ui/icons'
 import { useEffect, useState, type FormEvent } from 'react'
 import { create } from 'zustand'
 import { ApiRequestError } from '@/lib/api'

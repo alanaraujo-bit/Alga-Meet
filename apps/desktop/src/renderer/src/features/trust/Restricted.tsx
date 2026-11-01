@@ -1,5 +1,5 @@
 import type { AccountRestriction, AppealView } from '@alga/shared'
-import { AlertCircle, CheckCircle2, Clock } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Clock } from '@/ui/icons'
 import { motion } from 'motion/react'
 import { useState, type FormEvent } from 'react'
 import { api, ApiRequestError } from '@/lib/api'

@@ -1,4 +1,4 @@
-import { MessageCircle, Plus, ShieldCheck } from 'lucide-react'
+import { MessageCircle, Plus, ShieldCheck } from '@/ui/icons'
 import { useMemo } from 'react'
 import { useMedia } from '@/media'
 import { useData } from '@/store/data'
@@ -37,7 +37,7 @@ export function SpaceRail() {
               aria-label={t.rail.home}
               onClick={() => useUi.getState().go({ kind: 'home' })}
             >
-              <Icon icon={MessageCircle} size={20} />
+              <Icon icon={MessageCircle} size={20} filled={view.kind !== 'space'} />
               {home > 0 && (
                 <span className={s.railBadge}>
                   <Badge count={home} />

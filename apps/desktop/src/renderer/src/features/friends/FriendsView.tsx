@@ -1,5 +1,5 @@
 import type { Relationship } from '@alga/shared'
-import { Ban, Check, Copy, MessageCircle, MoreHorizontal, Search, UserMinus, UserPlus, Users, X, type LucideIcon } from 'lucide-react'
+import { Ban, Check, Copy, MessageCircle, MoreHorizontal, Search, UserMinus, UserPlus, Users, X, type Glyph } from '@/ui/icons'
 import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { ApiRequestError } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
@@ -159,7 +159,7 @@ function FriendRow({ rel }: { rel: Relationship }) {
     : rel.type === 'outgoing' ? t.outgoing
     : rel.type === 'blocked' ? t.blockedLabel
     : PRESENCE_LABEL[presence]
-  const quick: Array<{ icon: LucideIcon; label: string; run: () => void }> =
+  const quick: Array<{ icon: Glyph; label: string; run: () => void }> =
     rel.type === 'friend' ? [{ icon: MessageCircle, label: t.actions.message, run: () => void message(u.id) }]
     : rel.type === 'incoming' ? [{ icon: X, label: t.actions.decline, run: () => void run(removeRelationship(u.id)) }]
     : rel.type === 'outgoing' ? [{ icon: X, label: t.actions.cancel, run: () => void run(removeRelationship(u.id)) }]

@@ -1,5 +1,5 @@
 import { Permission, type Channel } from '@alga/shared'
-import { ChevronDown, Hash, HeadphoneOff, LogOut, MicOff, Plus, Search, ShieldOff, Users, Volume2 } from 'lucide-react'
+import { ChevronDown, Hash, HeadphoneOff, LogOut, MicOff, Plus, Search, ShieldOff, Users, Volume2 } from '@/ui/icons'
 import { useMemo, useRef } from 'react'
 import { useMedia } from '@/media'
 import { useShallow } from 'zustand/react/shallow'
@@ -62,7 +62,7 @@ function HomeSidebar() {
           onClick={() => useUi.getState().go({ kind: 'home' })}
         >
           <span className={s.rowIcon}>
-            <Icon icon={Users} size={16} />
+            <Icon icon={Users} size={16} filled={view.kind === 'home'} />
           </span>
           <span className={s.rowName}>{t.home.friends}</span>
           <Badge count={incoming} label={`${incoming} pedidos de amizade`} />
@@ -190,7 +190,7 @@ function TextChannelRow({ channel, active }: { channel: Channel; active: boolean
       onContextMenu={contextMenuHandler(() => [{ label: t.space.markRead, onSelect: () => markSpaceRead(channel.spaceId!) }], channel.name)}
     >
       <span className={s.rowIcon}>
-        <Icon icon={Hash} size={16} />
+        <Icon icon={Hash} size={16} filled={active} />
       </span>
       <span className={s.rowName}>{channel.name}</span>
       <Badge count={mentions} mention />
@@ -217,7 +217,7 @@ function VoiceChannelRow({ channel, active }: { channel: Channel; active: boolea
         aria-label={here ? channel.name : `${t.space.joinVoice(channel.name)}${people.length ? `, ${people.length}` : ''}`}
       >
         <span className={s.rowIcon}>
-          {people.length ? <Fronds size={16} breathing={!here} getLevel={here ? roomLevelNow : undefined} /> : <Icon icon={Volume2} size={16} />}
+          {people.length ? <Fronds size={16} breathing={!here} getLevel={here ? roomLevelNow : undefined} /> : <Icon icon={Volume2} size={16} filled={active} />}
         </span>
         <span className={s.rowName}>{channel.name}</span>
         {!!channel.userLimit && <span className={s.rowMeta}>{t.space.users(people.length, channel.userLimit)}</span>}

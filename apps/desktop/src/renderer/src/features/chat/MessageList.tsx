@@ -1,4 +1,4 @@
-import { ArrowDown, Hash, Phone } from 'lucide-react'
+import { ArrowDown, Hash, Phone } from '@/ui/icons'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
 import { buildRows } from '@/lib/grouping'
 import { mentionedIds, toPlainText } from '@/lib/markdown'

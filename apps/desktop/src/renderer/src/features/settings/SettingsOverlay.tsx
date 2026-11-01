@@ -1,5 +1,5 @@
 import type { Session } from '@alga/shared'
-import { Bell, ChevronsUpDown, CreditCard, Gem, Keyboard, LogOut, Mic, Minus, Monitor, Palette, Plus, Power, Shield, User, Wrench, X, type LucideIcon } from 'lucide-react'
+import { Bell, ChevronsUpDown, CreditCard, Gem, Keyboard, LogOut, Mic, Minus, Monitor, Palette, Plus, Power, Shield, User, Wrench, X, type Glyph } from '@/ui/icons'
 import { AnimatePresence } from 'motion/react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -29,7 +29,7 @@ import { closeSettings, openSettings, useSettings, type SettingsSection } from '
 import { t } from './strings'
 import s from './settings.module.css'
 
-const NAV: Array<{ group: string; items: Array<{ id: SettingsSection; icon: LucideIcon }> }> = [
+const NAV: Array<{ group: string; items: Array<{ id: SettingsSection; icon: Glyph }> }> = [
   {
     group: t.groups.user,
     items: [
@@ -97,7 +97,8 @@ function Panel({ section }: { section: SettingsSection }) {
 
 // ── Minha conta ────────────────────────────────────────────────
 
-const ACCENTS = ['#2f8f8f', '#3f7fbf', '#6b6fd1', '#9a62c4', '#c25d8f', '#c9694a', '#a08a3a', '#4f9a5f']
+// Profile colors (avatar disc, banner): OKLCH L .50 C .085, white initials ≥ 5.8:1. Indigo first, graphite last, no teal.
+const ACCENTS = ['#595e93', '#3b6692', '#6f568a', '#834f72', '#8d4e4f', '#86572d', '#486f40', '#62636a']
 
 function Account() {
   const me = useData((st) => st.me)

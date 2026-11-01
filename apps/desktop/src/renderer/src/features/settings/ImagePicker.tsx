@@ -1,5 +1,5 @@
 import { AVATAR_CONTENT_TYPES } from '@alga/shared'
-import { ImageUp, Trash2, ZoomIn, ZoomOut } from 'lucide-react'
+import { ImageUp, Trash2, ZoomIn, ZoomOut } from '@/ui/icons'
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { errorText } from '@/lib/errors'
 import { checkAvatar, clampPan, cropRect } from '@/lib/files'

@@ -1,5 +1,5 @@
 import { Permission, type Role } from '@alga/shared'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Lock, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Lock, Plus, Trash2 } from '@/ui/icons'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { errorText } from '@/lib/errors'

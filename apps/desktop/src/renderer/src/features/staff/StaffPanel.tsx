@@ -1,5 +1,5 @@
 import type { AdminAppeal, AdminReport, PatchAppealBody, PublicUser, QuarantinedFile } from '@alga/shared'
-import { AlertTriangle, CheckCircle2, Eye, FileLock2, FileText, RefreshCw, ScrollText, ShieldAlert, X, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Eye, FileLock2, FileText, RefreshCw, ScrollText, ShieldAlert, X, type Glyph } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -464,7 +464,7 @@ function QuarantineRow({ q, selected, onSelect }: { q: QuarantinedFile; selected
 
 // ── details ────────────────────────────────────────────────────
 
-function Section({ title, icon, children }: { title: string; icon?: LucideIcon; children: ReactNode }) {
+function Section({ title, icon, children }: { title: string; icon?: Glyph; children: ReactNode }) {
   return (
     <section className={s.section}>
       <h3 className={s.sectionTitle}>

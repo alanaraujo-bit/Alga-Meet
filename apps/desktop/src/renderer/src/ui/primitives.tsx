@@ -1,4 +1,4 @@
-import type { LucideIcon } from 'lucide-react'
+import type { Glyph } from './icons'
 import type { CSSProperties, ReactNode } from 'react'
 import { Icon } from './Icon'
 import s from './misc.module.css'
@@ -23,7 +23,7 @@ export function EmptyState({
   children,
   actions,
 }: {
-  icon?: LucideIcon
+  icon?: Glyph
   title: string
   children?: ReactNode
   actions?: ReactNode
@@ -32,7 +32,7 @@ export function EmptyState({
     <div className={s.empty}>
       {icon && (
         <div className={s.emptyIcon}>
-          <Icon icon={icon} size={24} />
+          <Icon icon={icon} size={24} duotone />
         </div>
       )}
       <h2 className={s.emptyTitle}>{title}</h2>

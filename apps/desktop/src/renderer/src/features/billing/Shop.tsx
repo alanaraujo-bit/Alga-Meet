@@ -1,5 +1,5 @@
 import type { BillingCatalog, BillingMe, Product } from '@alga/shared'
-import { CircleCheck } from 'lucide-react'
+import { CircleCheck } from '@/ui/icons'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ApiRequestError } from '@/lib/api'
 import { errorText } from '@/lib/errors'

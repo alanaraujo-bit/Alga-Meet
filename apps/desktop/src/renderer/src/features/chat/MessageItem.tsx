@@ -1,5 +1,5 @@
 import type { Message } from '@alga/shared'
-import { Copy, CornerUpLeft, MoreHorizontal, Pencil, SmilePlus, Trash2, AlertCircle } from 'lucide-react'
+import { Copy, CornerUpLeft, MoreHorizontal, Pencil, SmilePlus, Trash2, AlertCircle } from '@/ui/icons'
 import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { create } from 'zustand'
 import { copyText } from '@/lib/clipboard'

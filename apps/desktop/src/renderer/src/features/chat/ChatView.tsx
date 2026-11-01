@@ -1,5 +1,5 @@
 import { DEFAULT_MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, Permission } from '@alga/shared'
-import { Ban, FileUp, Hash, Phone, PhoneIncoming, Users } from 'lucide-react'
+import { Ban, FileUp, Hash, Phone, PhoneIncoming, Users } from '@/ui/icons'
 import { lazy, Suspense, useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { formatBytes } from '@/lib/files'
 import { useMedia } from '@/media'

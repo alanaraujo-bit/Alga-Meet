@@ -1,5 +1,5 @@
 import type { Channel } from '@alga/shared'
-import { ArrowLeftRight, BarChart3, HeadphoneOff, Minimize, MicOff, MonitorUp, MoreHorizontal, PictureInPicture2, Scan, ShieldOff, Square, Volume2, WifiOff, X, Signal } from 'lucide-react'
+import { ArrowLeftRight, BarChart3, HeadphoneOff, Minimize, MicOff, MonitorUp, MoreHorizontal, PictureInPicture2, Scan, ShieldOff, Square, Volume2, WifiOff, X, Signal } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
@@ -83,7 +83,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
   return (
     <section className={`${s.stage} ${variant === 'dm' ? s.dm : ''} ${live ? '' : s.idle}`} aria-label={channel.name}>
       {header}
-      <Room stale={conn.state !== 'connected' && here} breathe={live && conn.state === 'connected'}>
+      <Room stale={conn.state !== 'connected' && here}>
         {live ? (
           <LiveRoom channel={channel} people={people.map((p) => p.userId)} meId={meId} />
         ) : (
@@ -107,18 +107,9 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
   )
 }
 
-/**
- * The room breathes with the conversation: a low teal light from below follows the loudest voice (one envelope on
- * the area; the light is a composited layer whose opacity is --speak, never over video, no blur).
- */
-function Room({ stale, breathe, children }: { stale: boolean; breathe: boolean; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEnvelope(ref, breathe ? roomLevelNow : null)
-  return (
-    <div ref={ref} className={`${s.area} ${stale ? s.stale : ''}`}>
-      {children}
-    </div>
-  )
+/** The stage area. Direção B dropped the room light: speaking lives on the faces only (calm, never ambient). */
+function Room({ stale, children }: { stale: boolean; children: ReactNode }) {
+  return <div className={`${s.area} ${stale ? s.stale : ''}`}>{children}</div>
 }
 
 function Notice({ title, children, action, dismiss }: { title: string; children: ReactNode; action?: ReactNode; dismiss?: () => void }) {

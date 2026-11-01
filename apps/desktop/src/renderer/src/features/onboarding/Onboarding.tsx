@@ -1,4 +1,4 @@
-import { ArrowRight, Link2, Plus, UserPlus, type LucideIcon } from 'lucide-react'
+import { ArrowRight, Link2, Plus, UserPlus, type Glyph } from '@/ui/icons'
 import { motion } from 'motion/react'
 import { useData } from '@/store/data'
 import { useUi } from '@/store/ui'
@@ -36,7 +36,7 @@ export function finishOnboarding(): void {
 export function Onboarding() {
   const me = useData((st) => st.me)
   const ui = useUi.getState()
-  const choices: Array<{ key: string; icon: LucideIcon; title: string; body: string; run: () => void; primary?: boolean }> = [
+  const choices: Array<{ key: string; icon: Glyph; title: string; body: string; run: () => void; primary?: boolean }> = [
     { key: 'create', icon: Plus, ...t.create, primary: true, run: () => ui.openModal({ kind: 'createSpace' }) },
     { key: 'join', icon: Link2, ...t.join, run: () => ui.openModal({ kind: 'joinSpace' }) },
     {

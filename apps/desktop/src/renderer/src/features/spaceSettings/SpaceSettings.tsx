@@ -1,5 +1,5 @@
 import { Permission, type Ban, type Invite } from '@alga/shared'
-import { Check, Copy, Gavel, LayoutGrid, Link, Shield, Trash2, Users } from 'lucide-react'
+import { Check, Copy, Gavel, LayoutGrid, Link, Shield, Trash2, Users } from '@/ui/icons'
 import { AnimatePresence } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'

@@ -1,4 +1,4 @@
-import { CornerDownLeft, Hash, Search, Volume2 } from 'lucide-react'
+import { CornerDownLeft, Hash, Search, Volume2 } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'

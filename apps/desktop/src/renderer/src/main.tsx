@@ -14,7 +14,7 @@ createRoot(document.getElementById('root')!).render(
     </Suspense>
   ) : (
     <StrictMode>
-      <Suspense fallback={<div style={{ height: '100vh', background: '#080b0c' }} />}>
+      <Suspense fallback={<div style={{ height: '100vh', background: '#0b0b0c' }} />}>
         <App />
       </Suspense>
     </StrictMode>

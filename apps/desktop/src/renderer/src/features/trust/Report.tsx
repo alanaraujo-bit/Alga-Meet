@@ -1,5 +1,5 @@
 import { REMOVED_USER_ID, type Message, type PublicUser, type ReportReason, type ReportReceipt } from '@alga/shared'
-import { AlertCircle, CheckCircle2, ChevronDown, Flag, LifeBuoy, ShieldAlert } from 'lucide-react'
+import { AlertCircle, CheckCircle2, ChevronDown, Flag, LifeBuoy, ShieldAlert } from '@/ui/icons'
 import { useState } from 'react'
 import { create } from 'zustand'
 import { api, ApiRequestError } from '@/lib/api'

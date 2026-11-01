@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Info, X } from './icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useRef } from 'react'
 import { create } from 'zustand'

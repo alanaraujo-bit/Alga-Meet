@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, X } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'

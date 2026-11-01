@@ -1,4 +1,4 @@
-import { MonitorOff, MonitorUp, PhoneOff, X } from 'lucide-react'
+import { MonitorOff, MonitorUp, PhoneOff, X } from '@/ui/icons'
 import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
 import { useData } from '@/store/data'
