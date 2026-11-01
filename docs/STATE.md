@@ -39,7 +39,9 @@
 | E2EE fase 0: spike OpenMLS→WASM, medições n=2/10/25/99, go/no-go | `native/mls`, `src/main/mls` | em andamento |
 | Servidor: downgrade de plano no meio da live (8f1854d, 2e3a0aa; 168 testes) | `apps/server`, `infra/livekit` | **feito** — atributo atualizado na hora; reverificação em 10 s muta transmissão acima do plano. Timeout de camada do LiveKit **mantido em 2 s** (1–1,5 s causou oscilação de camadas; detalhes em `infra/livekit/README.md`) |
 | Mídia: republicar a transmissão no downgrade (LiveKit mantém as camadas declaradas; sem isso o servidor muta cliente obediente) | `media/` | em andamento |
-| Crítica de design rodada 2 + QA independente da jornada completa | `docs/design`, `docs/qa` | em andamento |
+| Crítica de design rodada 2 (`docs/design/critique-2026-11-01-r2.md`) | docs | **feito**: **6,5/10** (antes 5) — shell 6,5 · chat 7 · chamada 7 · transmissão 6 · configurações 7 · billing 8 / loja 5 · T&S 8 · consistência 5,5; identidade ainda é sobretudo a cor |
+| UI onda 7 (correções r2, marca única de 3 barras, identidade além da cor) | renderer, `build/` | em andamento |
+| QA independente da jornada completa (3 instâncias) | `docs/qa` | em andamento |
 | Servidor: cosméticos equipáveis/públicos, eventos de convite, retomar renovação, observabilidade | `apps/server` | **feito** — ver Validado |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Crítica de design independente | `docs/design/critique-2026-11-01.md` | **feito**: nota 5/10 vs Linear (tela de chamada ausente, layout clone do Discord, excesso de vermelho e bordas) → corrigindo na UI onda 2 |
