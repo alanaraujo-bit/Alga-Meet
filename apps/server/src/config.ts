@@ -73,6 +73,14 @@ const EnvSchema = z
     RESEND_API_KEY: z.string().min(1).optional(),
     /** Base of the links in e-mails: `<base>/verify-email?token=…`, `<base>/reset-password?token=…`. */
     EMAIL_LINK_URL: z.url().default('algameet://auth'),
+    /** none = payments off (checkout 503). Default: sandbox in development/test, none in production. sandbox is refused in production. */
+    BILLING_PROVIDER: z.enum(['none', 'sandbox', 'mercadopago']).optional(),
+    MP_ACCESS_TOKEN: z.string().min(1).optional(),
+    /** "Assinatura secreta" of the webhook (Suas integrações > Webhooks): HMAC key of `x-signature`. */
+    MP_WEBHOOK_SECRET: z.string().min(1).optional(),
+    MP_API_URL: z.url().default('https://api.mercadopago.com'),
+    /** Page the provider sends the buyer back to after paying (https; e.g. a site page that opens algameet://). */
+    BILLING_RETURN_URL: z.url().optional(),
   })
   .superRefine((env, ctx) => {
     const devMode = env.ALGA_ALLOW_DEV_SECRETS || (env.NODE_ENV !== 'production' && LOOPBACK.has(env.HOST))
@@ -100,6 +108,18 @@ const EnvSchema = z
         if (!env[k]) ctx.addIssue({ code: 'custom', path: [k], message: 'required with EMAIL_DRIVER=resend' })
       }
     }
+    // Fail closed, no escape hatch: the sandbox grants perks without money changing hands.
+    if (env.NODE_ENV === 'production' && env.BILLING_PROVIDER === 'sandbox') {
+      ctx.addIssue({ code: 'custom', path: ['BILLING_PROVIDER'], message: 'sandbox is for development/test only; use mercadopago (with test credentials on staging) or none' })
+    }
+    if (env.BILLING_PROVIDER === 'mercadopago') {
+      for (const k of ['MP_ACCESS_TOKEN', 'MP_WEBHOOK_SECRET', 'BILLING_RETURN_URL'] as const) {
+        if (!env[k]) ctx.addIssue({ code: 'custom', path: [k], message: 'required with BILLING_PROVIDER=mercadopago' })
+      }
+      if (env.BILLING_RETURN_URL && !env.BILLING_RETURN_URL.startsWith('https://')) {
+        ctx.addIssue({ code: 'custom', path: ['BILLING_RETURN_URL'], message: 'must be https://' })
+      }
+    }
     if (env.STORAGE_DRIVER === 's3') {
       for (const k of ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const) {
         if (!env[k]) ctx.addIssue({ code: 'custom', path: [k], message: 'required with STORAGE_DRIVER=s3' })
@@ -125,6 +145,16 @@ export interface Config {
   files: { secret: string; urlTtlSeconds: number; maxAttachmentBytes: number }
   storage: StorageConfig
   email: EmailConfig
+  billing: BillingConfig
+}
+
+export interface BillingConfig {
+  provider: 'none' | 'sandbox' | 'mercadopago'
+  /** HMAC key of sandbox webhooks and checkout links; random per process (dev/test only). */
+  sandboxSecret: string
+  /** mercadopago only. */
+  returnUrl: string
+  mercadopago?: { accessToken: string; webhookSecret: string; apiUrl: string }
 }
 
 export type EmailConfig = { linkUrl: string; from: string } & (
@@ -179,6 +209,14 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       ...(e.EMAIL_DRIVER === 'resend'
         ? { driver: 'resend' as const, apiKey: e.RESEND_API_KEY!, from: e.EMAIL_FROM! }
         : { driver: 'console' as const, outboxDir: e.EMAIL_OUTBOX_DIR, from: e.EMAIL_FROM ?? 'Alga Meet <nao-responda@alga.localhost>' }),
+    },
+    billing: {
+      provider: e.BILLING_PROVIDER ?? (e.NODE_ENV === 'production' ? 'none' : 'sandbox'),
+      sandboxSecret: randomBytes(32).toString('hex'),
+      returnUrl: e.BILLING_RETURN_URL ?? 'https://algameet.com.br/billing/return',
+      ...(e.BILLING_PROVIDER === 'mercadopago'
+        ? { mercadopago: { accessToken: e.MP_ACCESS_TOKEN!, webhookSecret: e.MP_WEBHOOK_SECRET!, apiUrl: e.MP_API_URL.replace(/\/+$/, '') } }
+        : {}),
     },
   }
 }

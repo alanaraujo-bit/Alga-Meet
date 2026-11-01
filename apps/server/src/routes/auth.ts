@@ -80,7 +80,7 @@ export function authPublicRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { token } = await createSession(db, user!.id, req.headers['user-agent'] ?? '')
     sendVerification(ctx, user!)
     reply.code(201)
-    return { token, user: meView(user!) }
+    return { token, user: meView(user!, ctx.config.files.maxAttachmentBytes) }
   })
 
   app.post('/auth/login', { config: authLimit }, async (req): Promise<AuthResponse> => {
@@ -100,7 +100,7 @@ export function authPublicRoutes(app: FastifyInstance, ctx: Ctx): void {
       throw new HttpError('unauthorized', 'Login ou senha inválidos.')
     }
     const { token } = await createSession(db, user.id, req.headers['user-agent'] ?? '')
-    return { token, user: meView(user) }
+    return { token, user: meView(user, ctx.config.files.maxAttachmentBytes) }
   })
 
   // No auth: the link may be opened on another device or after logging out; the token is the proof.
@@ -117,7 +117,7 @@ export function authPublicRoutes(app: FastifyInstance, ctx: Ctx): void {
       if (isUniqueViolation(err)) throw conflict('Este e-mail já foi confirmado em outra conta.')
       throw err
     }
-    if (row) hub.dispatch([row.id], 'ME_UPDATE', meView(row))
+    if (row) hub.dispatch([row.id], 'ME_UPDATE', meView(row, ctx.config.files.maxAttachmentBytes))
     return reply.code(204).send()
   })
 

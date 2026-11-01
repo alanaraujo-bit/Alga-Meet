@@ -11,6 +11,7 @@ import type { Ctx } from '../app.js'
 import type { Db } from '../db/index.js'
 import { attachments, channels, messages, reactions, readStates, type MessageRow } from '../db/schema.js'
 import { HttpError, badRequest, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
+import { planSummary } from '../billing/catalog.js'
 import { MAX_ATTACHMENT_SIDE, canScrub, inspect, safeFilename, scrubImage, spool, tooLarge, type Spooled } from '../files.js'
 import { messageFor, messageViews, type FileUrl } from '../views.js'
 
@@ -48,13 +49,14 @@ function checkEmoji(emoji: string, strict = true): string {
 
 export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
   const { db, hub, files } = ctx
-  const maxBytes = ctx.config.files.maxAttachmentBytes
   const fileUrl: FileUrl = (id, uid) => files.url(id, uid)
   // Every stored file counts, across messages and channels.
   const uploadLimit = app.createRateLimit({ max: 30, timeWindow: '10 minutes', keyGenerator: (req) => `upload:${req.auth.user.id}` })
 
   /** Multipart send: `payload_json` + up to MAX_ATTACHMENTS files spooled to temp files (removed by the caller). */
   async function readUpload(req: FastifyRequest): Promise<{ payload: unknown; spooled: Spooled[] }> {
+    // Per-file cap of the sender's plan (Me.plan.maxAttachmentBytes).
+    const maxBytes = planSummary(req.auth.user.plan, ctx.config.files.maxAttachmentBytes).maxAttachmentBytes
     if (Number(req.headers['content-length']) > MAX_ATTACHMENTS * maxBytes + 1024 * 1024) throw tooLarge(maxBytes)
     const spooled: Spooled[] = []
     let payload: unknown

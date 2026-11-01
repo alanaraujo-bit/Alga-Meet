@@ -29,13 +29,17 @@ Ver `.env.example` (copie para `.env`; é carregado automaticamente). Validaçã
 `ALGA_ALLOW_DEV_SECRETS`, `CORS_ORIGINS`, `HEARTBEAT_INTERVAL_MS`, `PUBLIC_URL`, `FILES_SECRET`, `FILE_URL_TTL_SECONDS`,
 `MAX_ATTACHMENT_BYTES`, `STORAGE_DRIVER` (`local` | `s3`), `UPLOADS_DIR`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`,
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_URL_STYLE` (`virtual` | `path`), `EMAIL_DRIVER` (`console` | `resend`),
-`ALGA_ALLOW_CONSOLE_EMAIL`, `EMAIL_OUTBOX_DIR`, `EMAIL_FROM`, `RESEND_API_KEY`, `EMAIL_LINK_URL`.
+`ALGA_ALLOW_CONSOLE_EMAIL`, `EMAIL_OUTBOX_DIR`, `EMAIL_FROM`, `RESEND_API_KEY`, `EMAIL_LINK_URL`, `BILLING_PROVIDER`
+(`none` | `sandbox` | `mercadopago`), `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `MP_API_URL`, `BILLING_RETURN_URL`.
 
 Falha fechada:
 - **Sem `NODE_ENV` o servidor é produção**: exige `DATABASE_URL`, `CORS_ORIGINS`, `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET`
   reais, `PUBLIC_URL` https, `FILES_SECRET`, `STORAGE_DRIVER` explícito (`s3` exige as 4 variáveis `S3_*`) e
   `EMAIL_DRIVER` explícito (`resend` exige `RESEND_API_KEY` e `EMAIL_FROM`; `console` só com
   `ALGA_ALLOW_CONSOLE_EMAIL=1`). O banco precisa ser UTF8 (a subida falha caso contrário). `npm run dev` passa `--dev`.
+- **Pagamentos**: em produção o padrão é `BILLING_PROVIDER=none` (checkout 503). `sandbox` é **recusado em produção**,
+  sem válvula de escape (nem `ALGA_ALLOW_DEV_SECRETS`); staging usa `mercadopago` com credenciais de teste do MP.
+  `mercadopago` exige `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` e `BILLING_RETURN_URL` (https).
 - A chave `devkey` e o segredo de `infra/livekit/livekit.dev.yaml` (públicos) só são aceitos com `NODE_ENV=development`
   ou `test` **e** `HOST` loopback, ou com `ALGA_ALLOW_DEV_SECRETS=1` (ex. teste em LAN com `HOST=0.0.0.0`).
 - `TRUST_PROXY`: `false` (padrão), IPs/CIDRs do proxy (`10.0.0.0/8,100.64.0.0/10`) ou número de saltos (`1`; só é
@@ -60,7 +64,8 @@ Falha fechada:
 | `src/files.ts` | spool do multipart em arquivo temporário, tipo real (`file-type`) e dimensões (`image-size`), re-encode de imagens (`sharp`, sem metadados), nome sanitizado, URL assinada (HMAC), cabeçalhos dos arquivos, fila `storage_deletions` + `sweep` |
 | `src/gateway/` | conexões, fan-out, presença, `Throttle`; handshake, heartbeat, limites, READY, ops `presence`/`voice_state` |
 | `src/voice.ts` | tokens/grants LiveKit, webhook (assinatura + dedupe), `VoiceState` autoritativo, limite de usuários, moderação no SFU |
-| `src/routes/` | `auth` (inclui verificação de e-mail e redefinição de senha), `users` (perfil, relacionamentos, DMs), `spaces` (espaços, membros, canais, convites), `roles` (cargos, apelidos), `moderation` (bans, voz), `messages` (inclui envio multipart), `files` (download assinado, avatares/ícones), `voice` |
+| `src/billing/` | `catalog.ts` (planos, preços, cosméticos; versionado), `billing.ts` (motor: checkout, webhooks idempotentes, recompute de direitos, job de expiração), `provider.ts` (interface `PaymentProvider` + `SandboxProvider`), `mercadopago.ts` (Checkout Pro + preapproval, `x-signature`) |
+| `src/routes/` | `auth` (inclui verificação de e-mail e redefinição de senha), `users` (perfil, relacionamentos, DMs), `spaces` (espaços, membros, canais, convites, listar/revogar convites), `roles` (cargos, apelidos), `moderation` (bans, voz), `messages` (inclui envio multipart), `files` (download assinado, avatares/ícones), `voice`, `billing` |
 
 ## Regras principais
 
@@ -147,6 +152,42 @@ Falha fechada:
   fila em caso de sucesso. Falha fica com `attempts`/`last_error`, backoff de 1 min a 1 dia e `warn` no log (`error`
   a partir de 10 tentativas). Uploads entram na fila 1 h adiante antes de ir ao bucket e saem dela na transação que os
   referencia: uma queda no meio do caminho também é limpa.
+- **Convites**: `GET /spaces/:id/invites` lista os utilizáveis (com `MANAGE_SPACE` todos; sem, só os seus);
+  `DELETE /invites/:code` revoga (quem criou ou `MANAGE_SPACE`; fora do espaço = 404, como código inexistente).
+- **Pagamentos e direitos** (`src/billing/`; estratégia em `docs/business/monetization.md`; contrato em
+  `packages/shared/src/billing.ts`):
+  - Catálogo em `catalog.ts` (`CATALOG_VERSION`), copiado para `products` a cada subida (SKU removido fica inativo).
+    Planos: `free` (720p30/720p60/1080p30, anexo = `MAX_ATTACHMENT_BYTES`) e `plus` (+1080p60/1440p60/4K30, anexo
+    100 MiB, coleção Plus). Voz igual para todos (D12).
+  - `POST /billing/checkout` cria `subscriptions`/`orders` **pendentes** e devolve a página do provedor; nada é
+    concedido aqui. Só `POST /billing/webhooks/:provider` com assinatura válida muda estado. Cada evento entra em
+    `billing_events` (único por provedor + id do evento, SHA-256 do corpo, sem dado de cartão) na mesma transação que
+    aplica o estado: repetido = 200 ignorado; transação que falha não deixa linha, então a retentativa do provedor
+    reprocessa. Atualização com `occurredAt` mais velho que o último aplicado é ignorada (fora de ordem). Valor abaixo
+    do preço não concede. Reembolso/chargeback (`revoked`) é terminal.
+  - `recompute` (na mesma transação, com `FOR UPDATE` no usuário) reconstrói `entitlements` e o cache `users.plan` a
+    partir das assinaturas vivas e pedidos pagos; depois `ENTITLEMENTS_UPDATE` (+ `ME_UPDATE` e atributo LiveKit se o
+    plano mudou). Renovação automática e `past_due` têm 3 dias de carência após `current_period_end`; cancelada
+    (`cancel_at_period_end`) termina no fim do período. Em produção linhas `sandbox` nunca concedem nada.
+  - Job a cada minuto (`Billing.sweep`): expira assinaturas vencidas e checkouts pendentes há 24 h.
+  - Cancelamento: `POST /billing/subscription/cancel` para a renovação no provedor e marca `cancel_at_period_end`.
+  - **Imposição (D11)**: o token LiveKit leva o atributo `alga.stream_presets` (sem `canUpdateOwnMetadata`, o
+    cliente não muda); `VoiceJoinResponse.streamPresets` traz o mesmo. O motor de mídia deve limitar a camada topo
+    a um preset (`STREAM_PRESETS`: lado curto ≤ `height`, fps ≤ `fps`, bitrate ≤ `maxBitrateKbps`) e reagir a
+    `ENTITLEMENTS_UPDATE`. No `track_published` de `SCREEN_SHARE` o servidor compara o lado curto e o bitrate das
+    camadas (com 10% de folga) com o maior preset do plano e **muta a faixa no SFU** se passar. O teto de anexo por
+    plano vale no upload (413).
+  - **Sandbox** (padrão em dev/test): o checkout aponta para `GET /billing/sandbox/checkout/:ref?sig=` (link HMAC;
+    `&outcome=decline` recusa), que faz o papel da página do provedor; webhooks assinados com
+    `x-alga-sandbox-signature: t=<unix>,v1=<HMAC-SHA256(segredo, "t.corpo")>` (±5 min; segredo aleatório por processo,
+    `config.billing.sandboxSecret`). Respostas trazem `sandbox: true`.
+  - **Mercado Pago** (`mercadopago.ts`): plano = preapproval `status: pending` (link `init_point`, cartão recorrente),
+    cosmético = preferência do Checkout Pro (`notification_url` = nosso webhook). `external_reference` = `s_<id>` /
+    `o_<id>`. Webhook: `x-signature` = HMAC-SHA256(`MP_WEBHOOK_SECRET`, `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`),
+    `data.id` da query (minúsculo se alfanumérico) e obrigatório; o estado é **re-buscado na API**
+    (`/v1/payments`, `/preapproval`, `/authorized_payments`), o corpo não é confiável. No painel do MP: URL
+    `<PUBLIC_URL>/api/v1/billing/webhooks/mercadopago`, tópicos `payment`, `subscription_preapproval`,
+    `subscription_authorized_payment`.
 - **Sessões** expiram após 30 dias sem uso ou 90 dias do login; `POST /auth/password` revoga as outras;
   `DELETE /auth/sessions` revoga todas menos a atual; sem sessão o usuário sai da voz e o token LiveKit antigo não
   reentra.
@@ -163,7 +204,7 @@ Falha fechada:
 - Tokens LiveKit sem `canPublishData`. Webhooks repetidos (mesmo `id`) são ignorados por 10 min.
 - Logs: sem corpo, sem `authorization`, sem parâmetros SQL nem `detail` do Postgres, código de convite redigido.
 
-## Testes (`test/`, 120 casos)
+## Testes (`test/`, 138 casos)
 
 `npm test` roda em PGlite; `npm run test:pg` roda os mesmos casos num PostgreSQL 18 real (`test/pg-setup.ts`: um
 cluster UTF8 descartável por execução, um banco por `startServer`). Os dois passam.
@@ -184,7 +225,13 @@ produção. `uploads.test.ts` (18): anexos
 URL adulterada/expirada, `Range`, remoção (mensagem, espaço, falha do bucket com retentativa), avatar/ícone e o driver
 S3 contra um S3 falso que confere SigV4 e o SHA-256 do corpo, e privacidade das imagens (JPEG de celular com GPS/ICC/orientação
 6 sai sem metadados e em pé, GIF animado mantido, redução acima de 8192 px, avatar WebP ≤ 1024 px, bomba de 400 MP e
-GIF de 501 quadros recusados sem gravar nada).
+GIF de 501 quadros recusados sem gravar nada). `billing.test.ts` (15): catálogo público e `Me.plan`, checkout (e-mail
+verificado, produto vendável, nada concedido, 409), página sandbox assinada, assinatura de webhook (ausente, errada,
+vencida, corpo adulterado, provedor não configurado), idempotência, eventos fora de ordem, valor abaixo do preço,
+cancelamento no fim do período → expiração pelo job (com `ENTITLEMENTS_UPDATE`/`ME_UPDATE`), carência, recompute
+(reembolso, cosmético próprio × coleção do plano), teto de anexo por plano, atributo de presets no token e mute de
+tela acima do plano, sandbox recusado em produção, e o adaptador Mercado Pago contra uma API simulada (`x-signature`,
+re-busca, `past_due`, cancelamento, compra avulsa). `spaces.test.ts` inclui listar/revogar convites (authz).
 
 ## Smoke com LiveKit real (server mute)
 
@@ -211,3 +258,12 @@ na sala com `livekit-client` e publica o microfone; o dono chama `PATCH /spaces/
   comuns é pequena (escrita à mão); HIBP k-anon não é consultado (exigiria rede na hora do cadastro).
 - As cotas de e-mail por endereço também ficam em memória (mesma ressalva do Redis acima).
 - Contadores de menção não diminuem quando a mensagem é apagada.
+- **Mercado Pago nunca rodou contra a API real** (sem credenciais): lista do que falta conferir em
+  `docs/business/monetization.md` §8. Sem reembolso self-service (CDC art. 49): hoje é estorno manual no painel →
+  webhook revoga. Sem Pix na assinatura (só cartão recorrente). USD não é cobrado (MP é só BRL).
+- O mute de tela acima do plano usa as dimensões/bitrates que o SDK do cliente declara ao publicar: um cliente
+  modificado pode declarar menos (medição real exigiria estatísticas do SFU). Mudança de plano no meio de uma
+  transmissão só vale na próxima publicação (o atributo LiveKit é atualizado na hora).
+- Dois checkouts de plano pagos ao mesmo tempo não são bloqueados: o recompute usa o melhor e o outro precisa de
+  estorno manual. Pagamento duplo de um pedido é logado como erro (estorno manual).
+- Downloads de anexo passam pela API: o anexo de 100 MiB do Plus custa egress do Railway (ver lacuna acima).

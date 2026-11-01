@@ -3,6 +3,7 @@ import type {
   Attachment, Channel, Me, Member, Message, PublicUser, Relationship, Role, Space, SpaceSnapshot,
 } from '@alga/shared'
 import { and, asc, eq, inArray } from 'drizzle-orm'
+import { planSummary } from './billing/catalog.js'
 import type { Db } from './db/index.js'
 import {
   attachments, channelRecipients, channels, memberRoles, reactions, relationships, roles, spaceMembers, spaces, users,
@@ -18,12 +19,14 @@ export const publicUser = (u: UserRow): PublicUser => ({
   bio: u.bio,
 })
 
-export const meView = (u: UserRow): Me => ({
+/** `defaultAttachmentBytes` = config.files.maxAttachmentBytes (the free plan's cap). */
+export const meView = (u: UserRow, defaultAttachmentBytes: number): Me => ({
   ...publicUser(u),
   email: u.email,
   emailVerified: u.emailVerifiedAt !== null,
   statusPreference: u.statusPreference,
   createdAt: u.createdAt.toISOString(),
+  plan: planSummary(u.plan, defaultAttachmentBytes),
 })
 
 export const spaceView = (s: SpaceRow): Space => ({

@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import { NO_MODERATION, assertDmNotBlocked, requireChannel, voiceModeration } from '../access.js'
 import type { Ctx } from '../app.js'
 import { HttpError, badRequest, forbidden, parse } from '../errors.js'
+import { PLANS } from '../billing/catalog.js'
 import { roomName } from '../voice.js'
 
 export function voiceRoutes(app: FastifyInstance, { db, voice, config }: Ctx): void {
@@ -18,12 +19,14 @@ export function voiceRoutes(app: FastifyInstance, { db, voice, config }: Ctx): v
       const others = voice.inChannel(channel.id).filter((s) => s.userId !== me.id).length
       if (others >= limit) throw forbidden('Este canal de voz está cheio.')
     }
+    const streamPresets = [...PLANS[me.plan].streamPresets]
     return {
       url: config.livekit.publicUrl,
       token: await voice.mintToken(me, channel.id, permissions,
-        channel.spaceId ? await voiceModeration(db, channel.spaceId, me.id) : NO_MODERATION),
+        channel.spaceId ? await voiceModeration(db, channel.spaceId, me.id) : NO_MODERATION, streamPresets),
       room: roomName(channel.id),
       bitrateKbps: channel.bitrateKbps ?? 64,
+      streamPresets,
     }
   })
 }

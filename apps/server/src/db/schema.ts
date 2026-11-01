@@ -20,6 +20,8 @@ export const users = pgTable('users', {
   createdAt: ts('created_at').notNull().defaultNow(),
   /** Set by the verification link or a password reset. Until then `email` is only claimed (B5: never refused). */
   emailVerifiedAt: ts('email_verified_at'),
+  /** Cache of the plan entitlement (hot paths read it with the session), written only by Billing.recompute. */
+  plan: text('plan', { enum: ['free', 'plus'] }).notNull().default('free'),
 }, (t) => [
   // An address belongs to at most one verified account; unverified accounts may claim a taken one.
   uniqueIndex('users_verified_email_key').on(t.email).where(sql`${t.emailVerifiedAt} is not null`),
@@ -212,3 +214,91 @@ export const storageDeletions = pgTable('storage_deletions', {
 }, (t) => [index('storage_deletions_not_before_idx').on(t.notBefore)])
 
 export type AttachmentRow = typeof attachments.$inferSelect
+
+// ---- billing (src/billing/) ---------------------------------------------------------------------------------------
+
+/** Mirror of src/billing/catalog.ts, upserted at startup. Rows are never deleted (orders reference them): dropped SKUs go inactive. */
+export const products = pgTable('products', {
+  id: text('id').primaryKey(),
+  kind: text('kind', { enum: ['plan', 'cosmetic'] }).notNull(),
+  planId: text('plan_id'),
+  interval: text('interval', { enum: ['month', 'year'] }),
+  cosmeticType: text('cosmetic_type'),
+  name: text('name').notNull(),
+  priceBrlCents: integer('price_brl_cents').notNull(),
+  priceUsdCents: integer('price_usd_cents').notNull(),
+  active: boolean('active').notNull().default(true),
+  catalogVersion: integer('catalog_version').notNull(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+
+const providerCol = (name: string) => text(name, { enum: ['sandbox', 'mercadopago'] })
+const currencyCol = (name: string) => text(name, { enum: ['BRL', 'USD'] })
+
+export const subscriptions = pgTable('subscriptions', {
+  id: uuid('id').primaryKey(),
+  // restrict: payment records are kept for accounting (an account deletion must anonymize, not delete).
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  productId: text('product_id').notNull().references(() => products.id),
+  planId: text('plan_id').notNull(),
+  status: text('status', { enum: ['pending', 'active', 'past_due', 'canceled', 'expired'] }).notNull(),
+  currentPeriodEnd: ts('current_period_end'),
+  cancelAtPeriodEnd: boolean('cancel_at_period_end').notNull().default(false),
+  amountCents: integer('amount_cents').notNull(),
+  currency: currencyCol('currency').notNull(),
+  provider: providerCol('provider').notNull(),
+  providerSubscriptionId: text('provider_subscription_id'),
+  /** Provider-side time of the last applied state: older events are ignored (out-of-order delivery). */
+  providerUpdatedAt: ts('provider_updated_at'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+}, (t) => [
+  index('subscriptions_user_id_idx').on(t.userId),
+  index('subscriptions_status_period_idx').on(t.status, t.currentPeriodEnd),
+  uniqueIndex('subscriptions_provider_ref_key').on(t.provider, t.providerSubscriptionId),
+])
+
+/** One-time purchases (cosmetics). */
+export const orders = pgTable('orders', {
+  id: uuid('id').primaryKey(),
+  // restrict: payment records are kept for accounting (an account deletion must anonymize, not delete).
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  productId: text('product_id').notNull().references(() => products.id),
+  status: text('status', { enum: ['pending', 'paid', 'refunded', 'canceled', 'expired'] }).notNull(),
+  amountCents: integer('amount_cents').notNull(),
+  currency: currencyCol('currency').notNull(),
+  provider: providerCol('provider').notNull(),
+  /** The provider's payment id, known once it reports one. */
+  providerPaymentId: text('provider_payment_id'),
+  providerUpdatedAt: ts('provider_updated_at'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+}, (t) => [
+  index('orders_user_id_idx').on(t.userId),
+  index('orders_status_created_idx').on(t.status, t.createdAt),
+  uniqueIndex('orders_provider_ref_key').on(t.provider, t.providerPaymentId),
+])
+
+/** What each user can use now, rebuilt by Billing.recompute from subscriptions + paid orders. Never written elsewhere. */
+export const entitlements = pgTable('entitlements', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sku: text('sku').notNull(),
+  kind: text('kind', { enum: ['plan', 'cosmetic'] }).notNull(),
+  source: text('source', { enum: ['subscription', 'order'] }).notNull(),
+  sourceId: uuid('source_id').notNull(),
+  expiresAt: ts('expires_at'),
+}, (t) => [primaryKey({ columns: [t.userId, t.sku] })])
+
+/** Append-only log of verified provider events; the unique key makes delivery idempotent. No card data, only a hash of the payload. */
+export const billingEvents = pgTable('billing_events', {
+  id: uuid('id').primaryKey(),
+  provider: providerCol('provider').notNull(),
+  providerEventId: text('provider_event_id').notNull(),
+  type: text('type').notNull(),
+  payloadSha256: text('payload_sha256').notNull(),
+  receivedAt: ts('received_at').notNull().defaultNow(),
+}, (t) => [uniqueIndex('billing_events_provider_event_key').on(t.provider, t.providerEventId)])
+
+export type SubscriptionRow = typeof subscriptions.$inferSelect
+export type OrderRow = typeof orders.$inferSelect
+export type EntitlementRow = typeof entitlements.$inferSelect

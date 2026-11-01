@@ -4,6 +4,8 @@ import rateLimit from '@fastify/rate-limit'
 import websocket from '@fastify/websocket'
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify'
 import { authenticate, type AuthContext } from './auth.js'
+import { Billing } from './billing/billing.js'
+import { maxPlanAttachmentBytes } from './billing/catalog.js'
 import type { Config } from './config.js'
 import { openDatabase, type Db } from './db/index.js'
 import { Mailer, createEmailSender } from './email.js'
@@ -12,6 +14,7 @@ import { Files } from './files.js'
 import { Hub } from './gateway/hub.js'
 import { gatewayRoute } from './gateway/socket.js'
 import { authPublicRoutes, authRoutes } from './routes/auth.js'
+import { billingPublicRoutes, billingRoutes } from './routes/billing.js'
 import { filePublicRoutes, fileRoutes } from './routes/files.js'
 import { messageRoutes } from './routes/messages.js'
 import { moderationRoutes } from './routes/moderation.js'
@@ -30,6 +33,7 @@ export interface Ctx {
   voice: Voice
   files: Files
   mail: Mailer
+  billing: Billing
   log: FastifyBaseLogger
 }
 
@@ -61,9 +65,14 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   const hub = new Hub()
   const files = new Files(config, database.db, createStorage(config.storage), app.log)
   const mail = new Mailer(createEmailSender(config.email, app.log, config.env === 'production'), app.log, config.email.linkUrl)
-  const ctx: Ctx = { config, db: database.db, hub, voice: new Voice(config, database.db, hub, app.log), files, mail, log: app.log }
+  const voice = new Voice(config, database.db, hub, app.log)
+  const billing = new Billing(config, database.db, hub, voice, app.log)
+  await billing.syncCatalog()
+  const ctx: Ctx = { config, db: database.db, hub, voice, files, mail, billing, log: app.log }
   app.decorate('ctx', ctx)
   files.start()
+  billing.start()
+  app.log.info({ provider: config.billing.provider }, 'billing ready')
 
   // preClose runs before @fastify/websocket's own client shutdown, so socket close handlers see hub.closing.
   app.addHook('preClose', async () => {
@@ -72,6 +81,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   })
   app.addHook('onClose', async () => {
     await files.stop()
+    await billing.stop()
     await database.close()
   })
 
@@ -98,7 +108,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   await app.register(websocket, { options: { maxPayload: 16 * 1024 } })
   // Upload routes pass their own per-request limits; these are the ceilings for any multipart body.
   await app.register(multipart, {
-    limits: { fileSize: config.files.maxAttachmentBytes, files: 1, fields: 4, fieldSize: 64 * 1024, parts: 16, headerPairs: 64 },
+    limits: { fileSize: maxPlanAttachmentBytes(config.files.maxAttachmentBytes), files: 1, fields: 4, fieldSize: 64 * 1024, parts: 16, headerPairs: 64 },
   })
 
   const health = async () => ({ ok: true as const, version: config.version })
@@ -112,6 +122,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     invitePublicRoutes(api, ctx)
     await livekitWebhookRoute(api, ctx)
     filePublicRoutes(api, ctx)
+    await billingPublicRoutes(api, ctx)
 
     await api.register(async (authed) => {
       authed.addHook('onRequest', authenticate(ctx.db))
@@ -123,6 +134,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       messageRoutes(authed, ctx)
       voiceRoutes(authed, ctx)
       fileRoutes(authed, ctx)
+      billingRoutes(authed, ctx)
     })
   }, { prefix: '/api/v1' })
 

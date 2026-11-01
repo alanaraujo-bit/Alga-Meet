@@ -3,16 +3,22 @@
  * Who is in a room comes only from LiveKit (webhooks + startup reconcile); clients only toggle their own flags.
  * Moderation (server mute/deafen, role changes) is enforced at the SFU through participant permissions.
  */
-import { Permission, hasPermission, type VoiceDisconnectReason, type VoiceState } from '@alga/shared'
+import {
+  Permission, STREAM_PRESETS, STREAM_PRESETS_ATTRIBUTE, hasPermission,
+  type PlanId, type StreamPreset, type VoiceDisconnectReason, type VoiceState,
+} from '@alga/shared'
+import { eq } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
-import { AccessToken, RoomServiceClient, TrackSource, WebhookReceiver, type WebhookEvent } from 'livekit-server-sdk'
+import { AccessToken, RoomServiceClient, TrackSource, WebhookReceiver, type TrackInfo, type WebhookEvent } from 'livekit-server-sdk'
 import {
   NO_MODERATION, PRIVATE_CHANNEL_PERMISSIONS, channelAudience, memberPermissions, spaceMemberIds, voiceModeration,
   type VoiceModeration,
 } from './access.js'
 import { hasSession } from './auth.js'
+import { PLANS } from './billing/catalog.js'
 import type { Config } from './config.js'
 import type { Db } from './db/index.js'
+import { users } from './db/schema.js'
 import type { Hub } from './gateway/hub.js'
 import { loadChannel } from './views.js'
 
@@ -81,12 +87,19 @@ export class Voice {
     return this.all().filter((s) => s.channelId === channelId)
   }
 
-  /** Access token for `ch_<channelId>` with `voiceGrants`. */
-  async mintToken(user: { id: string; displayName: string }, channelId: string, permissions: number, mod = NO_MODERATION): Promise<string> {
+  /**
+   * Access token for `ch_<channelId>` with `voiceGrants` and the plan's screen-share presets as a participant
+   * attribute (no canUpdateOwnMetadata grant, so the client cannot change it).
+   */
+  async mintToken(
+    user: { id: string; displayName: string }, channelId: string, permissions: number, mod = NO_MODERATION,
+    streamPresets: StreamPreset[] = PLANS.free.streamPresets,
+  ): Promise<string> {
     const at = new AccessToken(this.config.livekit.apiKey, this.config.livekit.apiSecret, {
       identity: user.id,
       name: user.displayName,
       ttl: 60 * 60,
+      attributes: { [STREAM_PRESETS_ATTRIBUTE]: streamPresets.join(',') },
     })
     at.addGrant({ roomJoin: true, room: roomName(channelId), ...voiceGrants(permissions, mod) })
     return at.toJwt()
@@ -118,6 +131,9 @@ export class Voice {
         break
       case 'room_finished':
         for (const s of this.inChannel(channelId)) await this.remove(s)
+        break
+      case 'track_published':
+        await this.checkScreenShare(channelId, identity, ev.track)
         break
       default:
         break
@@ -320,6 +336,35 @@ export class Voice {
     } catch (err) {
       this.log.warn({ err: (err as Error).message, channelId: s.channelId, userId: s.userId }, 'voice: could not apply grants on LiveKit')
     }
+  }
+
+  /** Plan changed: refresh the presets attribute of a user in voice (the client also gets ENTITLEMENTS_UPDATE). */
+  async setStreamPresets(userId: string, presets: StreamPreset[]): Promise<void> {
+    const s = this.states.get(userId)
+    if (!s) return
+    await this.rooms.updateParticipant(roomName(s.channelId), userId, { attributes: { [STREAM_PRESETS_ATTRIBUTE]: presets.join(',') } })
+      .catch((err: unknown) => this.log.warn({ err: (err as Error).message, userId }, 'voice: could not update stream presets on LiveKit'))
+  }
+
+  /**
+   * Server-side check of D11: a screen share above the user's plan is muted at the SFU. Uses the dimensions/bitrates
+   * of the simulcast layers as LiveKit reports them at publish time (declared by the client SDK; a modified client
+   * could under-declare, see README). Short side vs preset height, so ultrawide/portrait screens are fine.
+   */
+  private async checkScreenShare(channelId: string, userId: string, track: TrackInfo | undefined): Promise<void> {
+    if (track?.source !== TrackSource.SCREEN_SHARE || !UUID_RE.test(userId)) return
+    const [u] = await this.db.select({ plan: users.plan }).from(users).where(eq(users.id, userId))
+    const presets = PLANS[(u?.plan ?? 'free') as PlanId].streamPresets.map((p) => STREAM_PRESETS[p])
+    const maxSide = Math.max(...presets.map((p) => p.height))
+    const maxBps = Math.max(...presets.map((p) => p.maxBitrateKbps)) * 1000 * 1.1 // 10% encoder slack
+    const layers = [...track.layers, ...track.codecs.flatMap((c) => c.layers)]
+    const dims = layers.length ? layers : [track]
+    const side = Math.max(...dims.map((l) => Math.min(l.width, l.height)))
+    const bps = Math.max(0, ...layers.map((l) => l.bitrate))
+    if (side <= maxSide && bps <= maxBps) return
+    this.log.warn({ channelId, userId, side, bps, plan: u?.plan }, 'voice: screen share above the plan, muting it')
+    await this.rooms.mutePublishedTrack(roomName(channelId), userId, track.sid, true)
+      .catch((err: unknown) => this.log.warn({ err: (err as Error).message, userId }, 'voice: could not mute screen share'))
   }
 
   private async permissionsOf(s: VoiceState): Promise<number> {

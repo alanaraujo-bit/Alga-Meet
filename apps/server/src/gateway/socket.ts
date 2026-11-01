@@ -55,7 +55,7 @@ export async function buildReady(ctx: Ctx, user: UserRow): Promise<ReadyPayload>
   const spaceSet = new Set(spaceIds)
   const privateSet = new Set(privateChannels.map((c) => c.id))
   return {
-    user: meView(user),
+    user: meView(user, ctx.config.files.maxAttachmentBytes),
     spaces,
     privateChannels,
     relationships,

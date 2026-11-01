@@ -158,7 +158,7 @@ export function fileRoutes(app: FastifyInstance, ctx: Ctx): void {
       return { result: row!, previous: cur?.url ?? null }
     })
     await afterMeUpdate(ctx, req.auth.user, after)
-    return meView(after)
+    return meView(after, ctx.config.files.maxAttachmentBytes)
   })
 
   app.put<{ Params: { id: string } }>('/spaces/:id/icon', { config: perMinute(5) }, async (req): Promise<Space> => {

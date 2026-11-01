@@ -21,7 +21,7 @@ export const perMinute = (max: number) => ({ rateLimit: { max, timeWindow: '1 mi
 /** Fan-out after the current user's row changed (PATCH /users/@me or gateway `presence`). */
 export async function afterMeUpdate(ctx: Ctx, before: UserRow, after: UserRow): Promise<void> {
   const { db, hub } = ctx
-  hub.dispatch([after.id], 'ME_UPDATE', meView(after))
+  hub.dispatch([after.id], 'ME_UPDATE', meView(after, ctx.config.files.maxAttachmentBytes))
   const pub = publicUser(after)
   if (JSON.stringify(pub) !== JSON.stringify(publicUser(before))) {
     hub.dispatch(await profileAudience(db, after.id), 'USER_UPDATE', pub)
@@ -91,13 +91,13 @@ async function userById(db: Db, id: string): Promise<UserRow> {
 export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
   const { db, hub } = ctx
 
-  app.get('/users/@me', async (req): Promise<Me> => meView(req.auth.user))
+  app.get('/users/@me', async (req): Promise<Me> => meView(req.auth.user, ctx.config.files.maxAttachmentBytes))
 
   // Each change fans out USER_UPDATE to everyone who knows this user.
   app.patch('/users/@me', { config: perMinute(10) }, async (req): Promise<Me> => {
     const body = parse(PatchMeBody, req.body)
     const before = req.auth.user
-    if (!Object.keys(body).length) return meView(before)
+    if (!Object.keys(body).length) return meView(before, ctx.config.files.maxAttachmentBytes)
     // M9: only our own uploads (no third-party URL that would log every viewer's IP), or null.
     if (body.avatarUrl && !ctx.files.imageKey('avatars', before.id, body.avatarUrl)) {
       throw invalid({ avatarUrl: 'Envie a imagem pelo upload de avatar.' })
@@ -115,7 +115,7 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
     }
     if (after!.avatarUrl !== before.avatarUrl) await swapImageKeys(ctx, 'avatars', before.id, before.avatarUrl, after!.avatarUrl)
     await afterMeUpdate(ctx, before, after!)
-    return meView(after!)
+    return meView(after!, ctx.config.files.maxAttachmentBytes)
   })
 
   app.get<{ Params: { id: string } }>('/users/:id', async (req): Promise<PublicUser> =>
