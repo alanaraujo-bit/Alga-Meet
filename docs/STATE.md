@@ -22,7 +22,7 @@
 | Mídia onda 2 (vazamento, unmute, rede degradada) | `media/` | **feito** — ver Qualidade |
 | Mídia onda 3 (gating por plano, 720p60, palco, congelamento, DTX, telemetria) | `media/`, `features/voice` | **feito** — ver Qualidade |
 | Desempenho da UI (e5f1359) | `features/chat`, config Vite | **feito** — ver Qualidade |
-| UI onda 6 (cosméticos equipáveis/de outros, convites ao vivo, retomar renovação, interruptor de telemetria, exportação com senha, mini-player no Shell, painel de staff) | renderer (exceto `media/`, `features/chat`) | em andamento |
+| UI onda 6 (64317dd, 121 testes) | renderer | **feito** — cosméticos equipáveis e de outros ao vivo, convites ao vivo (~30 ms), retomar renovação, interruptor de telemetria, exportação com senha (zip real), mini-player no Shell, painel de staff (csam primeiro, mídia nunca exibida) |
 | Motor de mídia onda 1 | `apps/desktop/src/renderer/src/media` | **feito** — ver Validado e Qualidade |
 | Backend onda 3 (anexos/avatares, Postgres real, pacote de deploy) | `apps/server`, `infra/` | **feito** — ver Validado |
 | Backend onda 4 (EXIF/GPS, verificação de e-mail, reset de senha) | `apps/server` | **feito** — ver Validado |
@@ -141,7 +141,7 @@ Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não d
 
 ## Próximos passos (fila do Maestro, em ordem)
 1. **Aguardando agentes:** mídia onda 3, desempenho da UI e Trust & Safety/LGPD no servidor.
-2. **UI onda 6:** equipar cosméticos (`PUT /users/@me/cosmetics`) e renderizar cosméticos dos outros (`PublicUser.cosmetics` via `USER_UPDATE`), `INVITE_CREATE/DELETE` na lista de convites (tirar o polling), botão "retomar renovação", interruptor de telemetria (`PATCH telemetryOptIn`), "Denunciar" no menu das mensagens, painel de staff.
+2. **Servidor (fila):** expor papel de staff em `Me`; `staffId` em `AdminAppeal`; eventos de gateway para denúncias/apelações/exportações/usos de convite; visualizador seguro de quarentena; campos de protocolo/recibo CSAM; tela de logs de acesso (staff admin).
 3. **Pendências de mídia/servidor:** servidor só checa o preset da transmissão na publicação (downgrade no meio da live depende do cliente) → reavaliar faixas ativas quando `ENTITLEMENTS_UPDATE`; timeout de camada de tela menor na config do LiveKit; repetir o caso DTX num LiveKit mais novo; expor classe de CPU (intel/amd/outra) no bridge para a telemetria; montar o mini-player no `Shell.tsx` (hoje dentro de `IncomingCall`); toasts sobrepõem o botão Desconectar do dock.
 4. **Depois do agente de desempenho:** "Denunciar" no menu de contexto das mensagens (`features/chat`). Painel de staff (hoje só API), visualizador seguro de quarentena.
 5. **E2EE de mídia** (paridade com DAVE): desenho + protótipo com LiveKit insertable streams; distribuição de chaves sem o servidor conhecer a chave.
