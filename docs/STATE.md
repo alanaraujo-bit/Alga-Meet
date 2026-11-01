@@ -19,7 +19,9 @@
 | Desktop nativo onda 1 | `apps/desktop/src/main`, `preload`, instalador | **feito** — ver Validado |
 | Backend onda 2 (segurança + cargos/banimento/moderação) | `apps/server`, `packages/shared` | **feito** — ver Validado |
 | UI onda 2 (chamada, transmissão, configurações, correções da crítica) | `apps/desktop/src/renderer` | **feito** — ver Validado |
-| Mídia onda 2 (vazamento de memória, pedidos da UI, rede degradada) | `media/` | em andamento |
+| Mídia onda 2 (vazamento, unmute, rede degradada) | `media/` | **feito** — ver Qualidade |
+| Mídia onda 3 (gating por plano, 720p60, palco: grade/destaque/mini-player/toque, congelamento em 3 Mbit/s, DTX ao reentrar) | `media/`, `features/voice` | em andamento |
+| Desempenho da UI (virtualização, bundle, tamanhos de janela, ociosidade) | `features/chat`, config Vite | em andamento |
 | Motor de mídia onda 1 | `apps/desktop/src/renderer/src/media` | **feito** — ver Validado e Qualidade |
 | Backend onda 3 (anexos/avatares, Postgres real, pacote de deploy) | `apps/server`, `infra/` | **feito** — ver Validado |
 | Backend onda 4 (EXIF/GPS, verificação de e-mail, reset de senha) | `apps/server` | **feito** — ver Validado |
@@ -68,6 +70,19 @@ Medições [MEDIDO] em `docs/benchmarks/media-baseline.md` — **localhost, duas
 | 4K30 | HEVC sustenta 30 fps; H.264 cai para 1440p por CPU | — | — |
 | Opus | mono, DTX, FEC, RED negociado, 64 kbps; mic em silêncio cai para 0,1 kbps | Opus estéreo até 96 kbps | — |
 
+**Rede degradada** (proxy UDP local `scripts/netem/udp-impair.mjs` — aproxima, não substitui rede real; `docs/benchmarks/media-network.md`):
+| Cenário | Resultado |
+|---|---|
+| Voz, 0–10 % perda, RTT 50/150/300 ms ± 30 ms | ≤ 0,5 % ocultado; jitter buffer 82–137 ms |
+| Voz, 20 % perda | 0,9–1,4 % ocultado |
+| Voz a 10 % perda: RED+FEC / só RED / só FEC / nada | 0,4–1,0 / 0,7–1,2 / 6,0 / 6,3 % ocultado → **RED+FEC+DTX mantidos** (RED dobra a banda de voz 38→76 kbps) |
+| Tela 1080p30/60 limpa | 29/50 fps em 1920×1080, sem congelar |
+| Tela com RTT 150 ms + 2 % perda | espectador cai para 720p30/360p15 |
+| Tela com uplink 3 Mbit/s | 20–23 fps, um congelamento de 3,7–4,5 s (aberto) |
+| Tela após queda de 3 s | volta em 0,4–1,6 s |
+
+**Vazamento de memória corrigido:** transceivers do Chromium mantinham encoders vivos após parar a transmissão. Crescimento por ciclo: padrão 20,3 → 1,7 MB, VP9 172 → 0,1 MB (tolerância ≤ 2 MB/ciclo; resíduo ~1,3 MB/ciclo no processo de GPU com HEVC). Também corrigido: HEVC não engatava em janelas menores que o preset (caía para VP8 descartado pelo SFU). Unmute pós-moderação volta em ~1,06 s.
+
 Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não decodifica HEVC (backup **ainda não exercitado**); H.264 por hardware não engata no Electron 45 (sempre OpenH264). Decisão em `docs/decisions/0001-media-engine.md`.
 
 ## Problemas conhecidos
@@ -76,7 +91,7 @@ Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não d
 - PGlite aceita um processo por diretório: dois servidores no mesmo `PGLITE_DIR` travam (`postmaster.pid`). Aconteceu em 2026-11-01 com um servidor órfão de agente — Maestro matou o órfão e removeu o lock.
 - E-mail sem retry (falha do provedor só aparece no log); HEIC/TIFF mantêm EXIF; contas não verificadas nunca são limpas.
 - Downloads de anexos passam pela API → egress do Railway (US$ 0,05/GB); buckets do Railway não têm backup; uploads > 5 min são cortados pelo Railway.
-- **Memória do renderer cresceu com transmissões repetidas no mesmo processo (143 → 889 MB com VP8/VP9/AV1)** — investigar vazamento antes de liberar para usuários.
+- Reentrar na mesma sala sem pausa às vezes volta sem DTX (não reproduzido isoladamente); janelas de tamanho ímpar (ex. 1366×705) caem para H.264.
 - Pendências de mídia sem evidência: rede real (perda, NAT/TURN, FEC/RED sob perda), máquinas separadas, GPUs AMD/Intel, CPUs fracas, fallback H.264, latência de hardware de áudio, 1440p60 real, teste de escuta prolongado do RNNoise, desconexão física de dispositivo, PTT via hotkey global em chamada.
 - Lista de mensagens sem virtualização (históricos muito longos ficam lentos); sem autocomplete de menção nem seletor de emoji; DMs não podem ser fechadas.
 - Domínio do link de convite (`https://alga.meet/i/`) é provisório — precisa de domínio real.
@@ -105,7 +120,7 @@ Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não d
 | Segunda máquina independente | Validar voz/tela entre dispositivos reais e NATs diferentes | Instalar o build em outro PC e entrar num canal | Só temos medições em localhost |
 
 ## Próximos passos (fila do Maestro, em ordem)
-1. **Aguardando agentes:** mídia onda 2 (vazamento de memória, unmute pós-moderação, rede degradada via proxy UDP) e Trust & Safety/LGPD no servidor.
+1. **Aguardando agentes:** mídia onda 3, desempenho da UI e Trust & Safety/LGPD no servidor.
 2. **Servidor (depois do T&S):** `PUT /users/@me/cosmetics` (equipar), cosméticos em `PublicUser`, eventos de convite no gateway, retomar renovação após cancelar.
 3. **Mídia onda 3:** `ScreenPicker` bloquear presets fora de `VoiceJoinResponse.streamPresets` (dica Alga Plus → `openSettings('plan')`), re-limitar camada publicada quando o plano muda em chamada, preset `720p60` (grátis), apelidos no `CallStage.tsx:167` (`displayName(st, id, spaceId)`), grade de 3 tiles, destaque da transmissão, mini-player ao sair do palco, som de toque. Depois: **E2EE** (paridade com DAVE do Discord) — desenho + protótipo.
 4. **UI onda 5:** telas de T&S/LGPD (data de nascimento no cadastro, denunciar mensagem/usuário/espaço, aviso de suspensão + apelação, excluir conta, exportar dados, aceite de termos), virtualização da lista de mensagens, divisão do bundle, checar 960×600 e 1920×1080@125% das telas novas.
