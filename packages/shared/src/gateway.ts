@@ -4,6 +4,7 @@ import type {
 } from './models.js'
 import type { Entitlements, Gift, SpaceUpgradeState } from './billing.js'
 import type { E2eeClientFrame, E2eeCommit, E2eeEpoch, E2eeProposals, E2eeResyncRequired, E2eeWelcome } from './e2ee.js'
+import type { RsvpStatus, SpaceEvent } from './events.js'
 
 /**
  * Realtime gateway: WebSocket at /gateway, JSON frames.
@@ -140,6 +141,30 @@ export type Dispatch =
    * INVITE_CREATE. Invites that expire or run out of uses are not announced: drop them by expiresAt/maxUses.
    */
   | { t: 'INVITE_DELETE'; d: { code: string; spaceId: string } }
+  /**
+   * Space events (events.ts). CREATE/UPDATE/DELETE go to the space's members who can view channels; the payload is the
+   * same for all (no caller fields: keep your own EventView.myRsvp / emailReminder from REST and EVENT_RSVP_UPDATE).
+   * Counts and `next` are as of sending; recompute `next` locally with currentOccurrence() as time passes. Not in READY:
+   * fetch GET /events after it.
+   */
+  | { t: 'EVENT_CREATE'; d: SpaceEvent }
+  | { t: 'EVENT_UPDATE'; d: SpaceEvent }
+  | { t: 'EVENT_DELETE'; d: { id: string; spaceId: string } }
+  /**
+   * Someone's answer changed; status null = removed (DELETE /events/:id/rsvp). Same audience. A member leaving the space
+   * drops out of the counts silently (the next EVENT_UPDATE / fetch has them).
+   */
+  | { t: 'EVENT_RSVP_UPDATE'; d: { eventId: string; spaceId: string; userId: string; status: RsvpStatus | null; going: number; maybe: number } }
+  /**
+   * Only to members who answered going/maybe, EVENT_REMINDER_MINUTES before an occurrence, once per occurrence (sent at
+   * most once even across restarts; offline = missed, the event card still shows it). The desktop shows the notice.
+   */
+  | { t: 'EVENT_REMINDER'; d: { eventId: string; spaceId: string; channelId: string | null; title: string; startsAt: string } }
+  /**
+   * Monday 10:00 (EVENT_TIME_ZONE), to adults online with a recap for `week` (GET /users/@me/recap). 16–17 never get
+   * it: they see the card when they open the app. Nothing else in the retention package ever dispatches a notice.
+   */
+  | { t: 'WEEKLY_RECAP_READY'; d: { week: string } }
   /** E2EE (e2ee.ts): only to member devices of the call's MLS group at `epoch` (the bound sockets of those devices). */
   | { t: 'E2EE_PROPOSALS'; d: E2eeProposals }
   | { t: 'E2EE_COMMIT'; d: E2eeCommit }

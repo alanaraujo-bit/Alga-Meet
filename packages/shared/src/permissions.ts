@@ -22,12 +22,14 @@ export const Permission = {
   CHANGE_NICKNAME: 1 << 18,
   /** Change other members' nicknames (below you in the role hierarchy). */
   MANAGE_NICKNAMES: 1 << 19,
+  /** Create space events (events.ts); editing/deleting one takes being its creator or MANAGE_SPACE. */
+  CREATE_EVENTS: 1 << 20,
 } as const
 export type PermissionName = keyof typeof Permission
 
 export const ALL_PERMISSIONS = Object.values(Permission).reduce((a, b) => a | b, 0)
 
-/** Default for the implicit @everyone role (role id == space id). */
+/** Default for the implicit @everyone role (role id == space id): the "Grupo de amigos" model, where anyone creates events. */
 export const DEFAULT_EVERYONE_PERMISSIONS =
   Permission.VIEW_CHANNELS |
   Permission.CREATE_INVITES |
@@ -37,7 +39,8 @@ export const DEFAULT_EVERYONE_PERMISSIONS =
   Permission.CONNECT |
   Permission.SPEAK |
   Permission.STREAM |
-  Permission.CHANGE_NICKNAME
+  Permission.CHANGE_NICKNAME |
+  Permission.CREATE_EVENTS
 
 export function hasPermission(granted: number, needed: number): boolean {
   if (granted & Permission.ADMINISTRATOR) return true

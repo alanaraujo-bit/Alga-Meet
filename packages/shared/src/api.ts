@@ -224,6 +224,45 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  *                                                          "provider page" a sandbox checkout URL opens)
  * POST   /livekit/webhook          (LiveKit-signed)      -> 200 (server-to-server only)
  *
+ * Retention (models, bodies, limits and time helpers in events.ts; rules in docs/business/growth-plan.md §4; server
+ * notes in docs/retention/server.md). Events are visible only to members of their space who can view channels (others:
+ * 403 for a space route, 404 for an event id). Dates are wall time in EVENT_TIME_ZONE.
+ * GET    /events                                         -> EventView[] (every event of your spaces with an occurrence
+ *                                                          live or ahead, soonest first; for "Agora" on Home; 60/min)
+ * GET    /spaces/:id/events                              -> EventView[] (same, one space; 60/min)
+ * POST   /spaces/:id/events        CreateEventBody       -> EventView (201; CREATE_EVENTS; channelId = a voice channel of
+ *                                                          the space (400 `fields.channelId`); startsLocal from now to
+ *                                                          EVENT_MAX_DAYS_AHEAD (400 `fields.startsLocal`); cover needs
+ *                                                          the Casa lit (409); 409 above MAX_EVENTS_PER_SPACE;
+ *                                                          EVENT_CREATE; 20/h)
+ * PATCH  /events/:id               PatchEventBody        -> EventView (its creator while still holding CREATE_EVENTS, or
+ *                                                          MANAGE_SPACE; same checks; EVENT_UPDATE; 30/min)
+ * DELETE /events/:id                                     -> 204 (same people; EVENT_DELETE; 30/min)
+ * PUT    /events/:id/rsvp          RsvpBody              -> EventView (your answer for every occurrence; emailReminder
+ *                                                          needs a verified e-mail (403) and is dropped with
+ *                                                          not_going; EVENT_RSVP_UPDATE; 30/min)
+ * DELETE /events/:id/rsvp                                -> EventView (no answer; EVENT_RSVP_UPDATE status null; 30/min)
+ * GET    /events/:id/rsvps                               -> EventRsvps (members; "Não" is never listed; 60/min)
+ *   Reminders: EVENT_REMINDER EVENT_REMINDER_MINUTES before each occurrence to going/maybe; the e-mail
+ *   EVENT_EMAIL_REMINDER_MINUTES before only to who asked on that event (verified address). Each exactly once per
+ *   occurrence, whatever restarts or concurrent workers happen.
+ * GET    /users/@me/recap?week=YYYY-MM-DD                -> { recap: WeeklyRecap | null } (latest week by default; the
+ *                                                          last RECAP_WEEKS_KEPT weeks; null = no voice that week; 60/min)
+ * GET    /spaces/:id/weeks-together                      -> WeeksTogether (members; 60/min)
+ * PATCH  /spaces/:id/weeks-together PatchWeeksTogetherBody -> WeeksTogether (MANAGE_SPACE; never dispatched; 10/min)
+ * GET    /users/@me/activity-settings                    -> ActivitySettings (30/min)
+ * PATCH  /users/@me/activity-settings PatchActivitySettingsBody -> ActivitySettings (activityEmail true: 403 unless
+ *                                                          ActivitySettings.activityEmailAllowed; every consent change is
+ *                                                          recorded in consent_records; 10/min)
+ * GET    /users/@me/voice-notify                         -> VoiceNotifyScopes (30/min)
+ * PUT    /users/@me/voice-notify/:scopeId PutVoiceNotifyBody -> VoiceNotifyScope (a space you are in or a DM / group
+ *                                                          DM you are part of, else 404; 30/min)
+ * GET    /email/unsubscribe?u=&sig=                      -> HTML (no auth: the activity e-mail's one-click link; turns
+ *                                                          activityEmail off and records it; 403 bad signature; 30/min/IP)
+ * POST   /email/unsubscribe?u=&sig=                      -> 204 (same, for mail clients' one-click unsubscribe)
+ * POST   /shop/opened                                    -> 204 (counter only, fixed labels, nothing stored per user;
+ *                                                          30/h)
+ *
  * Trust & Safety and privacy (bodies and models in trust-safety.ts; policies in docs/trust-safety/README.md):
  * GET    /legal                                          -> LegalInfo (public; changeSummary = "o que mudou" in this version)
  * PATCH  /users/@me/birth-date     BirthDateBody         -> Me (once, while Me.ageBracket is 'unknown'; 409 after; under
