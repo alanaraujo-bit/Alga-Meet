@@ -41,6 +41,8 @@ export default defineRailway(() => {
       LIVEKIT_API_KEY: preserve(),
       LIVEKIT_API_SECRET: preserve(),
       FILES_SECRET: preserve(),
+      // E2EE Delivery Service signing key: base64 of 32 random bytes. Production refuses to start without it.
+      E2EE_DS_KEY: preserve(),
       STORAGE_DRIVER: 's3',
       // Credentials tab of the bucket (variable references); S3_URL_STYLE=path only if that tab says path-style.
       S3_ENDPOINT: preserve(),

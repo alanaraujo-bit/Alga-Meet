@@ -11,6 +11,7 @@
 !apps/server/tsconfig.json
 !apps/server/src/**
 !apps/server/drizzle/**
+!native/mls/pkg/**
 # Never, even inside allowed folders.
 **/.env
 **/.env.*

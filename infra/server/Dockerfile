@@ -42,6 +42,8 @@ RUN npm ci --workspace @alga/server --include-workspace-root=false --omit=dev --
  && npm cache clean --force
 COPY --from=build /app/apps/server/dist apps/server/dist
 COPY apps/server/drizzle apps/server/drizzle
+# MLS WASM build used by the E2EE Delivery Service (committed artifacts, checked by `npm run verify:mls`).
+COPY native/mls/pkg native/mls/pkg
 # Writable only for STORAGE_DRIVER=local with a mounted volume (and PGlite, which production never uses).
 RUN mkdir -p apps/server/data && chown node:node apps/server/data
 USER node
