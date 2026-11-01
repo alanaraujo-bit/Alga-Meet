@@ -1,10 +1,10 @@
 import { join } from 'node:path'
 import { app, utilityProcess, type UtilityProcess } from 'electron'
 import { log } from '../log'
-import type { MlsMessage, MlsOp } from './worker'
+import type { MlsMessage, MlsOp } from './rpc'
 
-// Main-side handle on the "alga-e2ee" utilityProcess (0004 §3.1). Not on the renderer bridge yet: phase 1 adds
-// the e2ee_* relay. The worker starts on first use and again after a crash (state lives in the host's blobs).
+// Main-side handle on the "alga-e2ee" utilityProcess (0004 §3.1). Only src/main/mls/e2ee.ts talks to it; the renderer
+// never does. The worker starts on first use and again after a crash (onWorkerExit: its handles are gone then).
 
 /** wasm-bindgen glue + .wasm: native/mls/pkg in dev, resources/mls when packaged (electron-builder extraResources). */
 const gluePath = (): string =>
@@ -15,6 +15,7 @@ const gluePath = (): string =>
 let worker: Promise<UtilityProcess> | null = null
 let nextId = 1
 const pending = new Map<number, { resolve(v: unknown): void; reject(e: Error): void }>()
+const exitListeners = new Set<() => void>()
 
 function start(): Promise<UtilityProcess> {
   return new Promise((resolve, reject) => {
@@ -36,11 +37,12 @@ function start(): Promise<UtilityProcess> {
       reject(new Error(`alga-e2ee exited (${code})`))
       for (const p of pending.values()) p.reject(new Error(`alga-e2ee exited (${code})`))
       pending.clear()
+      for (const fn of exitListeners) fn()
     })
   })
 }
 
-/** One request to the MLS worker: `new`/`from_identity`/`load_state` resolve to a client handle. */
+/** One request to the MLS worker: `new`/`from_identity` resolve to a client handle. */
 export async function mls(op: MlsOp): Promise<unknown> {
   worker ??= start()
   const child = await worker.catch((err) => {
@@ -52,4 +54,21 @@ export async function mls(op: MlsOp): Promise<unknown> {
     pending.set(id, { resolve, reject })
     child.postMessage({ id, ...op })
   })
+}
+
+/** Starts the worker now (pre-warm: cold start is 54–77 ms, too much for the join path). */
+export async function warmMls(): Promise<void> {
+  worker ??= start()
+  await worker
+}
+
+export function onWorkerExit(fn: () => void): () => void {
+  exitListeners.add(fn)
+  return () => exitListeners.delete(fn)
+}
+
+export async function stopMls(): Promise<void> {
+  const w = worker
+  worker = null
+  if (w) (await w.catch(() => null))?.kill()
 }

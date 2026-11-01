@@ -9,6 +9,7 @@ import { receiveDeepLink, registerDeepLinkIpc, trackDeepLinkPage } from './deep-
 import { registerHotkeyIpc, stopHotkeys } from './hotkeys'
 import { bool, handle, isTrustedSender, on, str } from './ipc'
 import { initLog, log, logDir } from './log'
+import { registerE2eeIpc, startE2ee, stopE2ee } from './mls/e2ee'
 import { registerNotificationIpc } from './notifications'
 import { initPower } from './power'
 import { getToken, setToken } from './secure-store'
@@ -66,7 +67,12 @@ function registerAppIpc(): void {
     e.returnValue = isTrustedSender(e) ? config : null
   })
   handle(IPC.authGetToken, () => getToken())
-  handle(IPC.authSetToken, (t) => setToken(t === null ? null : str(t, 8192)))
+  handle(IPC.authSetToken, async (t) => {
+    const token = t === null ? null : str(t, 8192)
+    await setToken(token)
+    if (token) startE2ee(apiUrl, token)
+    else stopE2ee()
+  })
   handle(IPC.appGetStartAtLogin, () => app.getLoginItemSettings({ args: loginArgs }).openAtLogin)
   handle(IPC.appSetStartAtLogin, (v) => app.setLoginItemSettings({ openAtLogin: bool(v), args: loginArgs }))
   handle(IPC.appGetCloseToTray, () => getSettings().closeToTray)
@@ -86,6 +92,7 @@ function registerAppIpc(): void {
   registerHotkeyIpc()
   registerNotificationIpc()
   registerDeepLinkIpc()
+  registerE2eeIpc()
 }
 
 if (!app.requestSingleInstanceLock()) app.quit()
@@ -103,10 +110,13 @@ else {
     createTray()
     initPower()
     initUpdater()
+    // Signed in from a previous run: pre-warm E2EE now (the worker and key packages must be ready before a join).
+    void getToken().then((t) => t && startE2ee(apiUrl, t))
   })
   app.on('before-quit', setQuitting)
   app.on('will-quit', () => {
     stopHotkeys() // the hook thread would otherwise keep the process alive
+    stopE2ee()
     destroyTray()
     log.info('quit')
   })

@@ -90,6 +90,18 @@ const bridge: AlgaBridge = {
     takePending: () => ipcRenderer.invoke(IPC.deepLinksTakePending),
   },
 
+  e2ee: {
+    status: () => ipcRenderer.invoke(IPC.e2eeStatus),
+    joinCall: (channelId) => ipcRenderer.invoke(IPC.e2eeJoin, String(channelId)),
+    leaveCall: (channelId) => ipcRenderer.invoke(IPC.e2eeLeave, String(channelId)),
+    // Gateway JSON: a JSON round trip keeps it plain data.
+    handleDispatch: (t, d) => ipcRenderer.send(IPC.e2eeDispatch, String(t), JSON.parse(JSON.stringify(d ?? null))),
+    onGatewaySend: (cb) => subscribe(IPC.e2eeSend, cb),
+    onFrameKey: (cb) => subscribe(IPC.e2eeKey, cb),
+    onEpoch: (cb) => subscribe(IPC.e2eeEpoch, cb),
+    verificationCode: (channelId, userId) => ipcRenderer.invoke(IPC.e2eeCode, String(channelId), userId === undefined ? null : String(userId)),
+  },
+
   app: {
     getStartAtLogin: () => ipcRenderer.invoke(IPC.appGetStartAtLogin),
     setStartAtLogin: (enabled) => ipcRenderer.invoke(IPC.appSetStartAtLogin, enabled === true),

@@ -3,6 +3,7 @@
  * Implemented in src/preload (exposed as `window.alga`), consumed by src/renderer.
  * Everything crossing this boundary must be structured-cloneable.
  */
+import type { E2eeClientFrame } from '@alga/shared'
 
 export type Unsubscribe = () => void
 
@@ -65,6 +66,56 @@ export type DeepLink =
   | { kind: 'verify-email'; token: string }
   | { kind: 'password-reset'; token: string }
   | { kind: 'invite'; code: string }
+
+// ---- E2EE of calls (docs/decisions/0004-e2ee.md; main side in src/main/mls) -------------------------------------
+
+/**
+ * Per-sender media key of one epoch, for LiveKit's key provider (BaseKeyProvider, sharedKey: false):
+ * `onSetEncryptionKey(await createKeyMaterialFromBuffer(key.buffer), userId, keyIndex)`. Remote senders' keys come as
+ * soon as the epoch is installed; ours (`self`) only when the DS says everyone has the epoch, which is the moment to
+ * start sending with it. 32 bytes; never log or persist it.
+ */
+export interface E2eeFrameKey {
+  channelId: string
+  /** LiveKit participant identity. */
+  userId: string
+  epoch: number
+  /** epoch % 16 (LiveKit keyring slot). */
+  keyIndex: number
+  key: Uint8Array
+  self: boolean
+}
+
+export interface E2eeMember {
+  userId: string
+  deviceId: string
+  self: boolean
+}
+
+export type E2eeCallState = 'joining' | 'active' | 'removed' | 'failed'
+
+/**
+ * `active`: we send with `keyIndex` from now on; `members` is the MLS group (0004 §3.8: compare with the LiveKit room,
+ * never trust a server-provided list). `removed`: the DS took us out (kick, ban, move). `failed`: E2EE could not be
+ * set up for this call (`reason`: forbidden | unavailable | resync_limit); do not publish as if encrypted.
+ */
+export interface E2eeEpochInfo {
+  channelId: string
+  state: Exclude<E2eeCallState, 'joining'>
+  epoch: number
+  keyIndex: number
+  members: E2eeMember[]
+  reason?: string
+}
+
+export interface E2eeStatus {
+  /** off: disabled in this build (packaged without ALGA_E2EE=1) or signed out. */
+  state: 'off' | 'starting' | 'ready' | 'error'
+  deviceId: string | null
+  /** false: no DPAPI, the device identity lives for this run only (verification codes change on restart). */
+  persistent: boolean
+  call: { channelId: string; state: E2eeCallState; epoch: number } | null
+}
 
 export interface AlgaBridge {
   config: AppConfig
@@ -137,6 +188,28 @@ export interface AlgaBridge {
      * Calling it tells main the page is listening: later links are pushed to onLink instead.
      */
     takePending(): Promise<DeepLink | null>
+  }
+
+  /**
+   * MLS for calls. The renderer relays gateway frames and installs frame keys; it never sees MLS state or the device's
+   * identity key (they stay in the "alga-e2ee" utilityProcess). One call at a time.
+   */
+  e2ee: {
+    status(): Promise<E2eeStatus>
+    /**
+     * Joins the call's MLS group (right after POST /voice/join, in parallel with LiveKit). Call it again with the same
+     * channel after every gateway READY: it re-announces our epoch so the DS resends what we missed.
+     */
+    joinCall(channelId: string): Promise<void>
+    leaveCall(channelId: string): Promise<void>
+    /** Every E2EE_* gateway dispatch, unchanged. */
+    handleDispatch(t: string, d: unknown): void
+    /** e2ee_* frames to send on the gateway socket, as they are. */
+    onGatewaySend(cb: (frame: E2eeClientFrame) => void): Unsubscribe
+    onFrameKey(cb: (k: E2eeFrameKey) => void): Unsubscribe
+    onEpoch(cb: (e: E2eeEpochInfo) => void): Unsubscribe
+    /** Call code (30 digits, the same for everyone in the call) or, with `userId`, the pairwise code (45 digits). */
+    verificationCode(channelId: string, userId?: string): Promise<string | null>
   }
 
   app: {

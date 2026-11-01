@@ -48,4 +48,13 @@ export const IPC = {
   appOpenExternal: 'alga:app:open-external', // invoke
   appOpenLogs: 'alga:app:open-logs', // invoke
   appQuit: 'alga:app:quit', // send
+
+  e2eeStatus: 'alga:e2ee:status', // invoke
+  e2eeJoin: 'alga:e2ee:join', // invoke
+  e2eeLeave: 'alga:e2ee:leave', // invoke
+  e2eeCode: 'alga:e2ee:code', // invoke
+  e2eeDispatch: 'alga:e2ee:dispatch', // send
+  e2eeSend: 'alga:e2ee:send', // event
+  e2eeKey: 'alga:e2ee:key', // event
+  e2eeEpoch: 'alga:e2ee:epoch', // event
 } as const
