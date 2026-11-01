@@ -85,7 +85,13 @@ for (const scale of [1, 1.25]) {
           const y = Math.min(...rs.map((r) => r.top)) - 16
           return { x, y, width: Math.max(...rs.map((r) => r.right)) + 16 - x, height: Math.max(...rs.map((r) => r.bottom)) + 16 - y }
         })
-        await record(page, box, aura ? 3400 : ms, async () => moves && (await replay.click()), join(OUT, `${id}.gif`))
+        // Reactions: send three from the mock tile (one per 1.6 s, above the 1.5 s per-person limit).
+        const react = id.startsWith('reactions_')
+          ? async () => {
+              for (let i = 0; i < 3; i++) await card.locator('[data-react]').click().then(() => sleep(1600))
+            }
+          : null
+        await record(page, box, aura ? 3400 : react ? 1400 : ms, react ?? (async () => moves && (await replay.click())), join(OUT, `${id}.gif`))
       } else if (moves) {
         await replay.click()
         await sleep(ms)

@@ -221,10 +221,18 @@ function SheetArt({ id }: { id: CosmeticId }) {
   if (slot === 'theme' || slot === 'effect')
     return (
       <div className={s.sheetCard}>
-        <ProfileCard user={me} look={{ [slot]: id }} motion="rest" />
+        <ProfileCard user={me} look={{ [slot]: id }} motion="rest" pose />
       </div>
     )
-  if (slot === 'aura') return <SpeakingSample user={me} size={80} aura={id} />
+  if (slot === 'aura')
+    return (
+      <SpeakingSample user={me} size={56} aura={id}>
+        <span className={s.pill}>
+          <AuraGlyph id={id} />
+          {me.displayName}
+        </span>
+      </SpeakingSample>
+    )
   if (slot === 'frame') return <StreamSample id={id} width={200} motion="rest" />
   if (slot === 'reactions')
     return (

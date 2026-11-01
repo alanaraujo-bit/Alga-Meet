@@ -84,6 +84,7 @@ export function ProfileCard({
   presence,
   children,
   motion = 'play',
+  pose,
 }: {
   user: ProfileUser
   look: Look
@@ -92,12 +93,14 @@ export function ProfileCard({
   presence?: PresenceStatus
   children?: ReactNode
   motion?: Motion
+  /** Still previews: an effect that rests invisible (HA-08) shows a mid-gesture frame instead. */
+  pose?: boolean
 }) {
   const hueBanner = user.accentColor ?? `oklch(0.45 0.05 ${hueFor(user.id)})`
   return (
     <div className={s.card} data-theme={look.theme} style={{ ['--banner' as string]: hueBanner }}>
       <div className={s.banner} />
-      <ProfileEffect id={look.effect} seed={user.id} motion={motion} />
+      <ProfileEffect id={look.effect} seed={user.id} motion={motion} pose={pose} />
       <div className={s.avatarSlot}>
         <span className={s.avatarRing}>
           <DecoratedAvatar user={user} size={80} presence={presence} decoration={look.decoration} decorative motion={motion} />
@@ -191,7 +194,8 @@ export function Cosmetic({ slot, id, size = 80, state = 'rest', user = SAMPLE_US
   if (kind === 'nameplate')
     return (
       <span className={s.sampleName}>
-        <Nameplate id={id} motion={state}>
+        {/* The row variant: no outdent, so the plate sizes to the name wherever the sample is placed. */}
+        <Nameplate id={id} row motion={state}>
           {user.displayName}
         </Nameplate>
       </span>
