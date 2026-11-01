@@ -131,6 +131,7 @@ Variáveis opcionais (acrescente com `echo 'NOME=valor' >> .env`):
 | `UPNP` | `1` | `0` = portas encaminhadas à mão (§2) |
 | `UPNP_LAN_IP` | IP local do servidor | força o IP interno dos encaminhamentos |
 | `DUCKDNS_IPV6` | `0` | `1` = também publica AAAA (só depois de liberar entrada IPv6 no roteador) |
+| `UPNP_URL` | vazio | URL de descrição do IGD do roteador (ex. `http://192.168.1.1:12345/12345gatedesc.xml`). Necessário quando o ufw bloqueia as respostas SSDP e o `upnp` diz "No IGD UPnP Device found" — caso deste servidor. Descubra no PC com um M-SEARCH SSDP |
 | `NODE_IP` | vazio | IP público fixo para o LiveKit, se o STUN falhar (§7, "LiveKit anuncia") |
 
 `ALGA_UID`/`ALGA_GID` são escritos pelo `install.sh` (os contêineres rodam como o seu usuário).

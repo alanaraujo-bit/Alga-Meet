@@ -9,7 +9,9 @@ API pública `https://api-staging-b3ea.up.railway.app` + Postgres + bucket — v
 - **Sem CGNAT (confirmado):** WAN do roteador (Huawei IGD, via UPnP) = `203.0.113.10` = IP público visto de fora. IPv6 público também (provedor local).
 - Upload medido pelo dono: **220 Mbps** (download 429, ping 2 ms) → folga para ~20+ espectadores de 1080p60.
 - Servidor `home-server` (`192.168.1.110`): Ubuntu 24.04.5, Xeon E5-2650 v2 ×16, 15 GB RAM, 64 GB livres, Docker 29.9 + Compose v5.6. **Acesso SSH por chave autorizado** (`~/.ssh/alga_homeserver` deste PC, usuário `alanaraujo`, grupo `docker`; `sudo` exige senha → Maestro não usa sudo). ufw **ativo** → stack em modo bridge com portas publicadas (DNAT do Docker contorna o ufw, como o Minecraft já faz). Serviços existentes a preservar: Minecraft (25565, 8100), alga-connect/aionix-connect (UDP 7441-7442, postgres, redis). Livres: 80, 443, 7880-7882, 3478, 5349.
-- Kit de instalação: `infra/home-sfu/` (em preparação).
+- Kit `infra/home-sfu/` (00f94d1 + correção UPnP) **instalado em 2026-11-01**: LiveKit 1.13.11 + Caddy (TLS Let's Encrypt para `example-sfu.duckdns.org` e `turn.`) + DuckDNS + UPnP, em `~/alga-sfu`, sem sudo. UPnP abriu 80/443/7881 TCP e 7882/3478 UDP no roteador (com `UPNP_URL`, porque o ufw bloqueia SSDP). Segredos do LiveKit copiados do Railway sem exibição; token DuckDNS gravado pelo dono.
+- **Staging aponta para o SFU de casa:** `LIVEKIT_URL=https://example-sfu.duckdns.org`; `/api/v1/ready` (visto do Railway, de fora) → `livekit: ok`. NAT loopback funciona do PC da LAN (HTTPS 200 pelo IP público).
+- Pendentes: teste real de mídia (voz + tela) passando pelo SFU de casa; teste de fora da rede (amigo/hotspot); reserva DHCP do `192.168.1.110` no roteador; `sudo bash root-setup.sh` (buffers UDP 5 MB) pelo dono.
 
 ## Versão executável
 - Dev: `npm install && npm run dev` (ver `README.md`). Multiusuário local: `npm run dev -- --profiles=bob` — abre duas janelas; crie uma conta em cada, adicione como amigo, crie um espaço, convide, entre no canal de voz e transmita a tela.

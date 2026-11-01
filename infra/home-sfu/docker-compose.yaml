@@ -104,6 +104,7 @@ services:
     environment:
       UPNP: "${UPNP:-1}"
       UPNP_LAN_IP: "${UPNP_LAN_IP:-}"   # empty = this host's LAN IP (route to the internet)
+      UPNP_URL: "${UPNP_URL:-}"         # IGD description URL; set when SSDP discovery is blocked (ufw)
     volumes:
       - ./upnp.sh:/upnp.sh:ro
     tmpfs: [/tmp]
