@@ -23,7 +23,7 @@
 | Motor de mídia onda 1 | `apps/desktop/src/renderer/src/media` | **feito** — ver Validado e Qualidade |
 | Backend onda 3 (anexos/avatares, Postgres real, pacote de deploy) | `apps/server`, `infra/` | **feito** — ver Validado |
 | Backend onda 4 (EXIF/GPS, verificação de e-mail, reset de senha) | `apps/server` | **feito** — ver Validado |
-| Nativo onda 2 (deep links `algameet://`, notificação/badge/iniciar com Windows verificados) | `src/main`, `preload` | em andamento |
+| Nativo onda 2 (deep links, verificações visuais) | `src/main`, `preload` | **feito** — ver Validado |
 | UI onda 3 (anexos, avatares, configurações do espaço, verificação de e-mail/reset) | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Monetização: estratégia + motor de direitos (planos, assinaturas, cosméticos, webhooks) + listar/revogar convites | `docs/business`, `apps/server` | em andamento |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
@@ -42,6 +42,7 @@
 - Backend onda 3: anexos em mensagens (multipart, tipo detectado pelo conteúdo, HTML/SVG disfarçado servido só como download), downloads com URL assinada por usuário (~1 h) e reverificação de acesso, avatares/ícones próprios (M9 fechado). **104 testes passando em PGlite e os mesmos 104 em PostgreSQL 18.6 real.** Corrida B2 (pedido de amizade × bloqueio) confirmada no Postgres real e corrigida com lock transacional. Build de produção sobe contra Postgres real. Pacote de deploy: `infra/server/Dockerfile`, `railway.ts`, `infra/livekit/livekit.prod.yaml` + Caddy/TURN 443, guia `docs/infra/deploy.md` (Docker build não testado — sem Docker na máquina).
 - Backend onda 4: imagens re-codificadas com sharp (EXIF/GPS removidos, orientação aplicada, bombas de descompressão rejeitadas); verificação de e-mail e recuperação de senha (driver console em dev → `apps/server/data/outbox/*.eml`; driver Resend em prod); B5 e B10 corrigidos (senha mínima 10 + lista de senhas comuns). Contas não verificadas não criam convites, não têm >1 espaço nem abrem DM com não-amigos. **120 testes em PGlite e em PostgreSQL 18.**
 - UI onda 3: anexos (botão, arrastar, colar, progresso real, retry, grade 1–10, lightbox, players, refetch de link expirado testado com 403 forçado), avatar/ícone com recorte, configurações do espaço (visão geral, cargos com hierarquia espelhando o servidor, membros, banimentos, convites), apelidos em todo lugar, troca de senha, sair de outras sessões, verificação de e-mail e "Esqueci minha senha". 78 testes no desktop. Capturas `docs/screenshots/2026-11-01-chat-attachments-v3.png`, `space-settings-roles-v4.png`, `settings-account-security-v2.png`…
+- Nativo onda 2: deep links `algameet://auth/verify-email?token=`, `auth/reset-password?token=`, `invite/<code>` (parse estrito, tokens redigidos do log), entregues a frio, por segunda instância e pelo caminho real do Windows (`Start-Process`); protocolo registrado/removido pelo instalador NSIS (testado). safeStorage migrado para API assíncrona sem perder tokens antigos. Verificados com captura: toast nativo (clique foca e dispara evento), badge da barra de tarefas, iniciar com o Windows (`--hidden` vai para a bandeja). 20 testes nativos + verify-native verde. **UI ainda não consome `window.alga.deepLinks`.**
 - Backend: 47 testes vitest (PGlite em memória, REST via inject + gateway via WebSocket real) passando, conferido pelo Maestro. Smoke test com LiveKit real: webhooks `room_started/finished` e `participant_joined/left` reais recebidos e assinatura verificada; `VOICE_STATE_UPDATE/REMOVE` entregues no gateway.
 
 ## Pesquisa concluída
@@ -73,7 +74,6 @@ Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não d
 - Domínio do link de convite (`https://alga.meet/i/`) é provisório — precisa de domínio real.
 - Bundle do renderer ~835 KB (zod do `@alga/shared` entra no renderer).
 - Push-to-talk não funciona enquanto um jogo rodando como administrador tem o foco (limite do Windows para hooks de processo não elevado).
-- Notificação nativa, badge da barra de tarefas e iniciar com o Windows ainda não verificados visualmente.
 - **Sem E2EE de mídia.** Mídia é cifrada só até o SFU (DTLS-SRTP). Discord tem E2EE (DAVE) obrigatório desde 2026-03 → paridade necessária antes de lançamento público.
 - Strings da UI direto em pt-BR, sem framework de i18n ainda.
 - Anexos/upload de arquivos fora do escopo da primeira fatia.
