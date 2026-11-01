@@ -11,7 +11,8 @@ import type { Tx } from '../db/index.js'
 import { attachments, messages, spaces, users } from '../db/schema.js'
 import { HttpError, badRequest, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
 import {
-  FILE_HEADERS, IMAGE_EXT, IMAGE_NAME_RE, IMAGE_TYPE_BY_EXT, contentDisposition, inspect, isInlineType, spool, type Spooled,
+  FILE_HEADERS, IMAGE_EXT, IMAGE_NAME_RE, IMAGE_TYPE_BY_EXT, MAX_PROFILE_IMAGE_SIDE, contentDisposition, inspect, isInlineType,
+  scrubImage, spool, type Scrubbed,
 } from '../files.js'
 import type { ByteRange } from '../storage.js'
 import { meView, spaceView } from '../views.js'
@@ -92,16 +93,14 @@ export function filePublicRoutes(app: FastifyInstance, ctx: Ctx): void {
   }
 }
 
-interface Image extends Spooled {
-  ext: string
-  contentType: string
-}
-
 export function fileRoutes(app: FastifyInstance, ctx: Ctx): void {
   const { db, hub, files } = ctx
 
-  /** One `file` part: png/jpeg/webp/gif by its bytes, ≤ MAX_AVATAR_BYTES, ≤ MAX_AVATAR_SIDE per side. */
-  async function readImage(req: FastifyRequest): Promise<Image> {
+  /**
+   * One `file` part: png/jpeg/webp/gif by its bytes, ≤ MAX_AVATAR_BYTES, ≤ MAX_AVATAR_SIDE per side; stored as WebP
+   * (animated if the input was) fitting 1024 px, without metadata. The client's crop is kept.
+   */
+  async function readImage(req: FastifyRequest): Promise<Scrubbed> {
     if (!req.isMultipart()) throw badRequest('Envie a imagem como multipart/form-data (campo "file").')
     const part = await req.file({ limits: { fileSize: MAX_AVATAR_BYTES, files: 1 } })
     if (!part) throw invalid({ file: 'Envie uma imagem.' })
@@ -113,7 +112,7 @@ export function fileRoutes(app: FastifyInstance, ctx: Ctx): void {
       if (!info.width || !info.height || Math.max(info.width, info.height) > MAX_AVATAR_SIDE) {
         throw invalid({ file: `A imagem deve ter até ${MAX_AVATAR_SIDE}×${MAX_AVATAR_SIDE} px.` })
       }
-      return { ...spooled, ext, contentType: info.sniffed! }
+      return await scrubImage(spooled, info.sniffed!, MAX_PROFILE_IMAGE_SIDE, 'webp')
     } catch (err) {
       await rm(spooled.path, { force: true })
       throw err
@@ -124,7 +123,7 @@ export function fileRoutes(app: FastifyInstance, ctx: Ctx): void {
    * Stores `img` under a fresh random name and runs `swap` (which sets the new URL and returns the previous one) in a
    * transaction that also keeps the new object and queues the previous one for deletion.
    */
-  async function replaceImage<T>(kind: 'avatars' | 'icons', ownerId: string, img: Image,
+  async function replaceImage<T>(kind: 'avatars' | 'icons', ownerId: string, img: Scrubbed,
     swap: (tx: Tx, url: string) => Promise<{ result: T; previous: string | null }>): Promise<T> {
     const name = `${randomBytes(16).toString('hex')}.${img.ext}`
     const key = `${kind}/${ownerId}/${name}`

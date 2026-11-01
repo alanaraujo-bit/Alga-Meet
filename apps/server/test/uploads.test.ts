@@ -6,12 +6,13 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
+import sharp from 'sharp'
 import { MAX_ATTACHMENTS, type Invite, type Me, type Message, type Space, type SpaceSnapshot } from '@alga/shared'
 import { eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { loadConfig } from '../src/config.js'
-import { storageDeletions } from '../src/db/schema.js'
+import { attachments, storageDeletions } from '../src/db/schema.js'
 import { safeUrl } from '../src/errors.js'
 import { contentDisposition, safeFilename } from '../src/files.js'
 import { parseRange } from '../src/routes/files.js'
@@ -32,8 +33,8 @@ afterAll(async () => {
   for (const d of dirs) rmSync(d, { recursive: true, force: true })
 })
 
-/** A real w×h RGB PNG. */
-function png(w: number, h: number): Buffer {
+/** A real w×h RGB PNG; `headerOnly` keeps a tiny IDAT (the header alone decides the decoded size). */
+function png(w: number, h: number, headerOnly = false): Buffer {
   const chunk = (type: string, data: Buffer) => {
     const body = Buffer.concat([Buffer.from(type, 'latin1'), data])
     const out = Buffer.alloc(body.length + 8)
@@ -49,7 +50,7 @@ function png(w: number, h: number): Buffer {
   ihdr[9] = 2
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', ihdr), chunk('IDAT', deflateSync(Buffer.alloc((w * 3 + 1) * h))), chunk('IEND', Buffer.alloc(0)),
+    chunk('IHDR', ihdr), chunk('IDAT', deflateSync(Buffer.alloc(headerOnly ? 64 : (w * 3 + 1) * h))), chunk('IEND', Buffer.alloc(0)),
   ])
 }
 const HTML = Buffer.from('<!doctype html><html><body><script>alert(document.cookie)</script></body></html>')
@@ -100,7 +101,7 @@ describe('message attachments', () => {
     expect(msg.nonce).toBe('n1')
     expect(msg.attachments).toHaveLength(2)
     const [img, txt] = msg.attachments
-    expect(img).toMatchObject({ filename: 'foto.png', contentType: 'image/png', width: 3, height: 2, size: png(3, 2).length })
+    expect(img).toMatchObject({ filename: 'foto.png', contentType: 'image/png', width: 3, height: 2 })
     expect(txt).toMatchObject({ filename: 'notastxt.exe', contentType: 'application/octet-stream', size: Buffer.byteLength('só texto\n') })
     expect(txt).not.toHaveProperty('width')
     expect(new URL(img!.url).searchParams.get('uid')).toBe(owner.user.id)
@@ -113,7 +114,9 @@ describe('message attachments', () => {
 
     const got = await download(s.app, live.attachments[0]!.url)
     expect(got.statusCode).toBe(200)
-    expect(got.rawPayload.equals(png(3, 2))).toBe(true)
+    // Re-encoded (no metadata), same pixels.
+    expect(got.rawPayload.length).toBe(img!.size)
+    expect(await sharp(got.rawPayload).metadata()).toMatchObject({ format: 'png', width: 3, height: 2 })
     expect(got.headers).toMatchObject({
       'content-type': 'image/png',
       'x-content-type-options': 'nosniff',
@@ -150,16 +153,13 @@ describe('message attachments', () => {
       { name: 'logo.svg', data: SVG, type: 'image/svg+xml' },
       { name: 'evil.html', data: png(2, 2), type: 'text/html' },
       { name: 'doc.png', data: Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\n'), type: 'image/png' },
-      // Decodes to gigabytes in every viewer: kept as a download.
-      { name: 'bomb.png', data: png(20_000, 1), type: 'image/png' },
     ], { content: 'olha' })
     expect(res.status).toBe(200)
-    const [html, svg, img, pdf, bomb] = (res.body as Message).attachments
+    const [html, svg, img, pdf] = (res.body as Message).attachments
     expect(html!.contentType).toBe('application/octet-stream')
     expect(svg!.contentType).toBe('application/octet-stream')
     expect(img).toMatchObject({ contentType: 'image/png', filename: 'evil.png' })
     expect(pdf).toMatchObject({ contentType: 'application/octet-stream', filename: 'doc.png' })
-    expect(bomb!.contentType).toBe('application/octet-stream')
     for (const a of [html!, svg!, pdf!]) {
       const r = await download(s.app, a.url)
       expect(r.statusCode).toBe(200)
@@ -254,10 +254,10 @@ describe('avatars and space icons', () => {
     const up = await multipart(s.app, 'PUT', '/users/@me/avatar', a.token, [{ field: 'file', name: 'eu.png', data: png(64, 64), type: 'image/jpeg' }])
     expect(up.status).toBe(200)
     const first = (up.body as Me).avatarUrl!
-    expect(first).toMatch(new RegExp(`^${PUBLIC}/api/v1/avatars/${a.user.id}/[0-9a-f]{32}\\.png$`))
+    expect(first).toMatch(new RegExp(`^${PUBLIC}/api/v1/avatars/${a.user.id}/[0-9a-f]{32}\\.webp$`))
     const img = await download(s.app, first)
     expect(img.statusCode).toBe(200)
-    expect(img.headers['content-type']).toBe('image/png')
+    expect(img.headers['content-type']).toBe('image/webp')
     expect(img.headers['cache-control']).toBe('public, max-age=31536000, immutable')
     expect(img.headers['x-content-type-options']).toBe('nosniff')
 
@@ -292,12 +292,100 @@ describe('avatars and space icons', () => {
     const res = await multipart(s.app, 'PUT', `/spaces/${space.id}/icon`, owner.token, icon)
     expect(res.status).toBe(200)
     const iconUrl = (res.body as Space).iconUrl!
-    expect(iconUrl).toMatch(new RegExp(`^${PUBLIC}/api/v1/icons/${space.id}/[0-9a-f]{32}\\.png$`))
+    expect(iconUrl).toMatch(new RegExp(`^${PUBLIC}/api/v1/icons/${space.id}/[0-9a-f]{32}\\.webp$`))
     await gw.waitFor('SPACE_UPDATE', (d) => d.iconUrl === iconUrl)
     gw.close()
     const invite = (await api<Invite>(s.app, 'POST', `/spaces/${space.id}/invites`, { token: owner.token, body: {} })).body
     expect((await api<Invite>(s.app, 'GET', `/invites/${invite.code}`)).body.space.iconUrl).toBe(iconUrl)
     expect((await download(s.app, iconUrl)).statusCode).toBe(200)
+  })
+})
+
+describe('image privacy (re-encoded with sharp)', () => {
+  const MARKER = 'MARKER-Rua-Exemplo-123'
+  /** 40×20 JPEG shot "rotated" (EXIF orientation 6 = displayed 20×40) with GPS, a camera field and a Display P3 profile. */
+  const phoneJpeg = () => sharp({ create: { width: 40, height: 20, channels: 3, background: '#d03030' } })
+    .withExifMerge({
+      IFD0: { Make: 'Phone', ImageDescription: MARKER },
+      IFD3: { GPSLatitudeRef: 'S', GPSLatitude: '23/1 33/1 0/1', GPSLongitudeRef: 'W', GPSLongitude: '46/1 38/1 0/1' },
+    })
+    .withMetadata({ orientation: 6 }).withIccProfile('p3').jpeg().toBuffer()
+  // GPSInfo IFD pointer tag (0x8825), either byte order.
+  const hasGps = (exif: Buffer | undefined) => !!exif && (exif.includes(Buffer.from([0x88, 0x25])) || exif.includes(Buffer.from([0x25, 0x88])))
+  const animatedGif = async (frames: number, w = 8, h = 8) => sharp(
+    await Promise.all(Array.from({ length: frames }, (_, i) => sharp({ create: { width: w, height: h, channels: 3, background: i % 2 ? '#0f0' : '#00f' } }).png().toBuffer())),
+    { join: { animated: true } },
+  ).gif({ delay: 50 }).toBuffer()
+
+  it('a phone JPEG loses EXIF/GPS/ICC, gets its orientation applied and reports the displayed size', async () => {
+    const { owner, text } = await spaceWithMember()
+    const input = await phoneJpeg()
+    const before = await sharp(input).metadata()
+    expect(before).toMatchObject({ width: 40, height: 20, orientation: 6 })
+    expect(hasGps(before.exif)).toBe(true)
+    expect(before.icc).toBeDefined()
+    expect(input.includes(Buffer.from(MARKER))).toBe(true)
+
+    const msg = (await multipart(s.app, 'POST', `/channels/${text.id}/messages`, owner.token, [{ name: 'IMG_0001.JPG', data: input }], {})).body as Message
+    expect(msg.attachments[0]).toMatchObject({ filename: 'IMG_0001.JPG', contentType: 'image/jpeg', width: 20, height: 40 })
+    const out = (await download(s.app, msg.attachments[0]!.url)).rawPayload
+    expect(out.length).toBe(msg.attachments[0]!.size)
+    const after = await sharp(out).metadata()
+    expect(after).toMatchObject({ format: 'jpeg', width: 20, height: 40, space: 'srgb' })
+    expect(after.orientation).toBeUndefined()
+    expect(after.exif).toBeUndefined()
+    expect(after.icc).toBeUndefined()
+    expect(after.xmp).toBeUndefined()
+    expect(out.includes(Buffer.from(MARKER))).toBe(false)
+    // The stored row matches what is served.
+    const [row] = await s.app.ctx.db.select().from(attachments).where(eq(attachments.id, msg.attachments[0]!.id))
+    expect(row).toMatchObject({ width: 20, height: 40, size: out.length })
+  })
+
+  it('keeps GIF animation and size, scales anything past 8192 px down, avatars become ≤ 1024 px WebP', async () => {
+    const { owner, text } = await spaceWithMember()
+    const msg = (await multipart(s.app, 'POST', `/channels/${text.id}/messages`, owner.token, [
+      { name: 'dance.gif', data: await animatedGif(6, 12, 10) },
+      { name: 'wide.png', data: png(9000, 2) },
+    ], {})).body as Message
+    const [gif, wide] = msg.attachments
+    expect(gif).toMatchObject({ contentType: 'image/gif', width: 12, height: 10 })
+    expect(await sharp((await download(s.app, gif!.url)).rawPayload, { animated: true }).metadata()).toMatchObject({ format: 'gif', pages: 6, pageHeight: 10 })
+    expect(wide).toMatchObject({ contentType: 'image/png', width: 8192, height: 2 })
+
+    const a = await register(s.app)
+    const put = async (data: Buffer, name: string) => {
+      const me = (await multipart(s.app, 'PUT', '/users/@me/avatar', a.token, [{ field: 'file', name, data }])).body as Me
+      return sharp((await download(s.app, me.avatarUrl!)).rawPayload, { animated: true }).metadata()
+    }
+    const still = await put(await phoneJpeg(), 'eu.jpg')
+    expect(still).toMatchObject({ format: 'webp', width: 20, height: 40 })
+    expect(still.exif).toBeUndefined()
+    expect(await put(png(2048, 1024), 'big.png')).toMatchObject({ format: 'webp', width: 1024, height: 512 })
+    expect(await put(await animatedGif(4, 1200, 1200), 'anim.gif')).toMatchObject({ format: 'webp', width: 1024, pages: 4, pageHeight: 1024 })
+  })
+
+  it('refuses decompression bombs and endless animations, storing nothing', async () => {
+    const { owner, text } = await spaceWithMember()
+    const put = vi.spyOn(s.app.ctx.files.storage, 'put')
+    try {
+      // 20000×20000 = 400 MP declared by a ~100-byte file.
+      const bomb = await multipart(s.app, 'POST', `/channels/${text.id}/messages`, owner.token, [
+        { name: 'ok.txt', data: Buffer.from('ok') }, { name: 'bomb.png', data: png(20_000, 20_000, true) },
+      ], { content: 'x' })
+      expect(bomb.status).toBe(400)
+      expect(bomb.body.error.fields.files).toMatch(/megapixels/)
+      const frames = await multipart(s.app, 'POST', `/channels/${text.id}/messages`, owner.token, [{ name: 'long.gif', data: await animatedGif(501, 2, 2) }], {})
+      expect(frames.status).toBe(400)
+      expect(frames.body.error.fields.files).toMatch(/quadros/)
+      const avatar = await multipart(s.app, 'PUT', '/users/@me/avatar', owner.token, [{ field: 'file', name: 'a.gif', data: await animatedGif(501, 2, 2) }])
+      expect(avatar.status).toBe(400)
+      expect(put).not.toHaveBeenCalled()
+    } finally {
+      put.mockRestore()
+    }
+    expect((await api<Message[]>(s.app, 'GET', `/channels/${text.id}/messages`, { token: owner.token })).body).toEqual([])
+    expect(leftoverSpools()).toEqual([])
   })
 })
 
@@ -384,8 +472,9 @@ describe('S3 driver', () => {
       expect(objects.get(key)).toMatchObject({ type: 'image/png' })
       expect(objects.get(`/alga/attachments/${text.id}/${msg.attachments[1]!.id}`)!.body.equals(blob)).toBe(true)
       const got = await download(srv.app, msg.attachments[0]!.url)
-      expect(got.rawPayload.equals(data)).toBe(true)
-      expect((await download(srv.app, msg.attachments[0]!.url, { range: 'bytes=0-7' })).rawPayload.equals(data.subarray(0, 8))).toBe(true)
+      const stored = objects.get(key)!.body
+      expect(got.rawPayload.equals(stored)).toBe(true)
+      expect((await download(srv.app, msg.attachments[0]!.url, { range: 'bytes=0-7' })).rawPayload.equals(stored.subarray(0, 8))).toBe(true)
       expect((await api(srv.app, 'DELETE', `/channels/${text.id}/messages/${msg.id}`, { token: owner.token })).status).toBe(204)
       await srv.app.ctx.files.sweep()
       expect(objects.has(key)).toBe(false)

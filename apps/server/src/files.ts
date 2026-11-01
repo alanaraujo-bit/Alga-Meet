@@ -1,10 +1,11 @@
 /**
- * Uploads: spooling multipart files to disk, sniffing the real type, filename sanitizing, signed download URLs,
+ * Uploads: spooling multipart files to disk, sniffing the real type, re-encoding images without metadata (sharp),
+ * filename sanitizing, signed download URLs,
  * response headers that keep user files inert, and the storage deletion outbox (`storage_deletions`).
  */
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
-import { open, rm } from 'node:fs/promises'
+import { open, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Readable } from 'node:stream'
@@ -13,10 +14,11 @@ import { eq, inArray, lte, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import { fileTypeFromFile } from 'file-type'
 import { imageSize } from 'image-size'
+import sharp from 'sharp'
 import type { Config } from './config.js'
 import type { Db, Tx } from './db/index.js'
 import { storageDeletions } from './db/schema.js'
-import { HttpError, safeErr } from './errors.js'
+import { HttpError, invalid, safeErr } from './errors.js'
 import type { Storage } from './storage.js'
 
 /** Served inline (and rendered by clients) only for these sniffed types; anything else is an octet-stream download. */
@@ -104,6 +106,83 @@ export async function inspect(path: string): Promise<Inspected> {
     Math.max(out.width, out.height) <= MAX_INLINE_SIDE && out.width * out.height <= MAX_INLINE_PIXELS)
   if (INLINE_TYPES.has(ft.mime) && sane) out.contentType = ft.mime
   return out
+}
+
+// Uploads are one-shot: libvips' operation cache would only keep decoded inputs alive.
+sharp.cache(false)
+
+/** Decoded pixels (all frames together) above which an upload is treated as a decompression bomb and refused. */
+export const MAX_IMAGE_PIXELS = 100_000_000
+export const MAX_IMAGE_FRAMES = 500
+/** Attachments keep their size up to this many px per side (scaled down beyond it); avatars and icons use 1024. */
+export const MAX_ATTACHMENT_SIDE = 8192
+export const MAX_PROFILE_IMAGE_SIDE = 1024
+
+type ImageFormat = 'jpeg' | 'png' | 'webp' | 'gif'
+/** Every inline image type is re-encoded (sniffed type → output); other images stay octet-stream downloads. */
+const SCRUB_FORMAT: Record<string, ImageFormat> = {
+  'image/jpeg': 'jpeg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+  // AVIF encoding is slow; WebP keeps alpha and renders everywhere.
+  'image/avif': 'webp',
+}
+const FORMAT_TYPE: Record<ImageFormat, [contentType: string, ext: string]> = {
+  jpeg: ['image/jpeg', 'jpg'], png: ['image/png', 'png'], webp: ['image/webp', 'webp'], gif: ['image/gif', 'gif'],
+}
+export const canScrub = (sniffed: string | undefined): sniffed is string => !!sniffed && sniffed in SCRUB_FORMAT
+
+// Each decode can hold hundreds of MB: two at a time per process, the rest wait their turn.
+const MAX_DECODES = 2
+let decoding = 0
+const decodeQueue: (() => void)[] = []
+async function oneOfTwo<T>(fn: () => Promise<T>): Promise<T> {
+  if (decoding < MAX_DECODES) decoding++
+  else await new Promise<void>((resolve) => decodeQueue.push(resolve)) // a finishing job hands its slot over
+  try {
+    return await fn()
+  } finally {
+    const next = decodeQueue.shift()
+    if (next) next()
+    else decoding--
+  }
+}
+
+export interface Scrubbed extends Spooled {
+  contentType: string
+  ext: string
+  width: number
+  height: number
+}
+
+/**
+ * Re-encodes the image at `f.path` in place so no metadata survives (EXIF with GPS, XMP, IPTC, comments, ICC): the
+ * EXIF orientation is applied to the pixels, colors are converted to sRGB, it is scaled down to fit `maxSide` (never
+ * up) and animation is kept. 400 for decompression bombs (MAX_IMAGE_PIXELS), too many frames or undecodable data.
+ */
+export async function scrubImage(f: Spooled, sniffed: string, maxSide: number, format: ImageFormat = SCRUB_FORMAT[sniffed]!): Promise<Scrubbed> {
+  const input = await readFile(f.path)
+  // `limitInputPixels` counts every frame of an animation; `failOn: 'error'` tolerates truncated phone JPEGs.
+  const load = { animated: true, autoOrient: true, limitInputPixels: MAX_IMAGE_PIXELS, failOn: 'error' } as const
+  const bomb = invalid({ files: `Imagem grande demais (máximo de ${MAX_IMAGE_PIXELS / 1_000_000} megapixels somando os quadros).` })
+  const failed = (err: Error) => {
+    throw /pixel limit/i.test(err.message) ? bomb : invalid({ files: 'Imagem corrompida ou em formato não suportado.' })
+  }
+  const { data, info } = await oneOfTwo(async () => {
+    // Header only: bombs and frame counts are refused before any pixel is decoded.
+    const meta = await sharp(input, load).metadata().catch(failed)
+    if (!meta.width || !meta.height) failed(new Error('no dimensions'))
+    if (meta.width * meta.height > MAX_IMAGE_PIXELS) throw bomb
+    if ((meta.pages ?? 1) > MAX_IMAGE_FRAMES) throw invalid({ files: `Animação com mais de ${MAX_IMAGE_FRAMES} quadros.` })
+    const img = sharp(input, load).resize({ width: maxSide, height: maxSide, fit: 'inside', withoutEnlargement: true })
+    // Without keepMetadata/withMetadata sharp writes no metadata at all and converts to sRGB.
+    const out = format === 'jpeg' ? img.jpeg({ quality: 90 }) : format === 'png' ? img.png() : format === 'webp' ? img.webp({ quality: 90 }) : img.gif()
+    return out.toBuffer({ resolveWithObject: true }).catch(failed)
+  })
+  await writeFile(f.path, data)
+  const [contentType, ext] = FORMAT_TYPE[format]
+  return {
+    ...f, size: data.length, sha256: createHash('sha256').update(data).digest('hex'),
+    contentType, ext, width: info.width, height: info.pageHeight ?? info.height,
+  }
 }
 
 // Controls, C1, zero-width and bidi overrides (spoofing "gpj.exe" as "exe.jpg"), and characters Windows refuses.

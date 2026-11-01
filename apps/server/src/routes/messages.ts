@@ -11,7 +11,7 @@ import type { Ctx } from '../app.js'
 import type { Db } from '../db/index.js'
 import { attachments, channels, messages, reactions, readStates, type MessageRow } from '../db/schema.js'
 import { HttpError, badRequest, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
-import { inspect, safeFilename, spool, tooLarge, type Spooled } from '../files.js'
+import { MAX_ATTACHMENT_SIDE, canScrub, inspect, safeFilename, scrubImage, spool, tooLarge, type Spooled } from '../files.js'
 import { messageFor, messageViews, type FileUrl } from '../views.js'
 
 const HistoryQuery = z.object({
@@ -130,8 +130,10 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
       const now = Date.now()
       const prepared = await Promise.all(spooled.map(async (f, i) => {
         const info = await inspect(f.path)
+        // Inline images are re-encoded in place: no EXIF/GPS reaches the other members.
+        const file = canScrub(info.sniffed) ? await scrubImage(f, info.sniffed, MAX_ATTACHMENT_SIDE) : { ...f, ...info }
         const id = uuidv7(now + i) // + i ms: ids sort in upload order
-        return { ...f, ...info, id, key: `attachments/${access.channel.id}/${id}`, filename: safeFilename(f.name, info) }
+        return { ...file, id, key: `attachments/${access.channel.id}/${id}`, filename: safeFilename(f.name, file) }
       }))
       await files.store(prepared)
       stored = prepared.map((f) => f.key)
