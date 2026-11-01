@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { StreamPreset } from './billing.js'
 import type { Me } from './models.js'
 import { ALL_PERMISSIONS } from './permissions.js'
+import { birthDate, termsVersion, type AccountRestriction } from './trust-safety.js'
 
 /**
  * REST contract. All routes are prefixed with /api/v1 and use JSON.
@@ -12,8 +13,13 @@ import { ALL_PERMISSIONS } from './permissions.js'
  *   409 only for a taken username (usernames are public). A taken e-mail is never revealed: the account is created
  *   unverified and the address gets a "you already have an account" mail instead of a verification link.
  *   Passwords: MIN_PASSWORD_LENGTH..256 characters and not a common/leaked password (400 `fields.password`).
+ *   birthDate + termsVersion (GET /legal): required when LegalInfo.signupRequiresBirthDate (production), optional in
+ *   dev until every client sends them. Under MIN_AGE -> 400 `fields.birthDate` (nothing is stored); an old
+ *   termsVersion -> 400 `fields.termsVersion`.
  * POST   /auth/login               LoginBody             -> AuthResponse
  *   By username, or by e-mail once that e-mail is verified (Me.emailVerified); same 401 either way.
+ *   Suspended/banned account (right password): 403 with ApiError.error.restriction (reason, until, appeal token).
+ *   A pending account deletion is canceled by logging in (AuthResponse.deletionCanceled).
  * POST   /auth/verify-email        VerifyEmailBody       -> 204 (no auth; token from the e-mail, 24 h, single use;
  *                                                          ME_UPDATE; 400 `fields.token` if invalid/expired/used)
  * POST   /auth/verify-email/resend                       -> 204 (auth; 3 per 15 min; no-op when already verified)
@@ -120,6 +126,38 @@ import { ALL_PERMISSIONS } from './permissions.js'
  * GET    /billing/sandbox/checkout/:reference?sig=&outcome=approve|decline -> HTML (sandbox provider only: the fake
  *                                                          "provider page" a sandbox checkout URL opens)
  * POST   /livekit/webhook          (LiveKit-signed)      -> 200 (server-to-server only)
+ *
+ * Trust & Safety and privacy (bodies and models in trust-safety.ts; policies in docs/trust-safety/README.md):
+ * GET    /legal                                          -> LegalInfo (public)
+ * PATCH  /users/@me/birth-date     BirthDateBody         -> Me (once, while Me.ageBracket is 'unknown'; 409 after; under
+ *                                                          MIN_AGE -> 403 restriction 'underage': sessions revoked,
+ *                                                          account deleted in APPEAL_WINDOW_DAYS unless an appeal wins)
+ * POST   /users/@me/accept-terms   AcceptTermsBody       -> Me (400 `fields.termsVersion` for an old version)
+ * DELETE /users/@me                DeleteAccountBody     -> 202 AccountDeletionScheduled (password re-check; stops a
+ *                                                          renewing subscription; every session revoked (4004); purge
+ *                                                          7 days later unless you log in before)
+ * POST   /users/@me/export                               -> 202 DataExportRequested (verified e-mail; 1 per 24 h, else
+ *                                                          429): a zip (JSON + attachment links) whose signed link
+ *                                                          (7 days) goes to your e-mail only
+ * GET    /exports/:id?exp=&sig=                          -> application/zip (no auth: the e-mailed link is signed)
+ * POST   /reports                  CreateReportBody      -> 201 ReportReceipt (200 for a duplicate of your open report;
+ *                                                          10 per hour; not your own content; you must see the message)
+ * GET    /users/@me/actions                              -> AccountAction[]
+ * POST   /appeals                  CreateAppealBody      -> 201 AppealView (session or appealToken; one per action,
+ *                                                          within APPEAL_WINDOW_DAYS; 10 per hour per IP)
+ * Staff only (users.staff_role, never settable through the API; every call is audit-logged; 403 otherwise):
+ * GET    /admin/reports?status=open|resolved|dismissed&limit= -> AdminReport[] (priority, then oldest first)
+ * PATCH  /admin/reports/:id        PatchReportBody       -> AdminReport
+ * POST   /admin/users/:id/actions  AccountActionBody     -> AccountAction (warn | suspend until | ban | lift; e-mail
+ *                                                          to the user with the reason category; suspend/ban revoke
+ *                                                          sessions, close sockets with ACCOUNT_RESTRICTED, leave voice)
+ * PATCH  /admin/users/:id          PatchAdminUserBody    -> 204 (legal hold)
+ * GET    /admin/appeals?status=                          -> AdminAppeal[]
+ * PATCH  /admin/appeals/:id        PatchAppealBody       -> AdminAppeal
+ * POST   /admin/attachments/:id/quarantine QuarantineBody -> QuarantinedFile (unservable at once, preserved apart)
+ * GET    /admin/quarantine                               -> QuarantinedFile[]
+ * PATCH  /admin/quarantine/:id     PatchQuarantineBody   -> QuarantinedFile
+ * GET    /admin/access-logs?userId=|username=&from=&to=&limit= -> AccessLogEntry[] (admin role only)
  * GET    /health                                         -> { ok: true, version }
  */
 
@@ -134,7 +172,8 @@ export type ApiErrorCode =
   | 'internal'
 
 export interface ApiError {
-  error: { code: ApiErrorCode; message: string; fields?: Record<string, string> }
+  /** `restriction`: only on 403s for a suspended/banned account (login, or a session that raced the action). */
+  error: { code: ApiErrorCode; message: string; fields?: Record<string, string>; restriction?: AccountRestriction }
 }
 
 /**
@@ -161,6 +200,10 @@ export const RegisterBody = z.object({
   username,
   displayName: z.string().trim().min(1).max(32).optional(),
   password,
+  /** YYYY-MM-DD. Used only to check the age (Lei 15.211/2025, art. 13); never shown to anyone. */
+  birthDate: birthDate.optional(),
+  /** LegalInfo.termsVersion the user accepted (an unchecked box the user ticked). */
+  termsVersion: termsVersion.optional(),
 })
 export type RegisterBody = z.infer<typeof RegisterBody>
 
@@ -192,6 +235,8 @@ export type PasswordResetConfirmBody = z.infer<typeof PasswordResetConfirmBody>
 export interface AuthResponse {
   token: string
   user: Me
+  /** Login only: this login canceled a pending account deletion (DELETE /users/@me); tell the user. */
+  deletionCanceled?: boolean
 }
 
 export const PatchMeBody = z.object({

@@ -1,5 +1,6 @@
 /** Wire models shared by server and desktop. Timestamps are ISO-8601 strings. */
 import type { PlanSummary } from './billing.js'
+import type { AgeBracket } from './trust-safety.js'
 
 
 export type PresenceStatus = 'online' | 'idle' | 'dnd' | 'offline'
@@ -27,6 +28,10 @@ export interface Me extends PublicUser {
   createdAt: string
   /** Current plan and its limits (stream presets, attachment cap). Always sent by the server; optional like emailVerified. */
   plan?: PlanSummary
+  /** 'unknown' -> ask the birth date once (PATCH /users/@me/birth-date). Always sent by the server; optional like plan. */
+  ageBracket?: AgeBracket
+  /** The legal bundle changed since the user accepted it: show it and POST /users/@me/accept-terms. Always sent. */
+  needsTermsAcceptance?: boolean
 }
 
 export interface Presence {

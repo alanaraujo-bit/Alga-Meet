@@ -21,6 +21,8 @@ export const GatewayClose = {
   HEARTBEAT_TIMEOUT: 4002,
   INVALID_PAYLOAD: 4003,
   SESSION_REVOKED: 4004,
+  /** The account was suspended or banned: do not reconnect; log in again to see the reason and appeal. */
+  ACCOUNT_RESTRICTED: 4010,
   /** Too many frames or too many sockets for this user. */
   RATE_LIMITED: 4008,
 } as const
