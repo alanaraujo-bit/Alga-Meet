@@ -11,6 +11,7 @@ import { t } from '../shell/strings'
 import { actorFor, visibleSections } from '../spaceSettings/permissions'
 import { openSpaceSettings } from '../spaceSettings/store'
 import { t as tss } from '../spaceSettings/strings'
+import { t as ts } from './strings'
 
 /** Same entries for the rail context menu and the sidebar header dropdown. */
 export function spaceMenu(spaceId: string): MenuEntry[] {
@@ -30,13 +31,15 @@ export function spaceMenu(spaceId: string): MenuEntry[] {
   if (visibleSections(actorFor(d, spaceId)).length) items.push({ label: tss.open, icon: Settings, onSelect: () => openSpaceSettings(spaceId) })
   if (items.length) items.push({ kind: 'separator' })
   items.push({ label: t.space.markRead, icon: CheckCheck, onSelect: () => markSpaceRead(spaceId) })
-  // The owner cannot leave (the server forbids it); deleting a space is a settings-wave action.
+  // The owner cannot leave (the server forbids it): the item stays, disabled, and says why.
   if (sp.ownerId !== d.me?.id) {
     items.push(
       { kind: 'separator' },
       { label: tr.report.menu.space, icon: Flag, onSelect: () => openReport({ kind: 'space', spaceId }) },
       { label: t.space.leave, icon: LogOut, danger: true, onSelect: () => ui.openModal({ kind: 'leaveSpace', spaceId }) },
     )
+  } else {
+    items.push({ kind: 'separator' }, { label: t.space.leave, icon: LogOut, disabled: true, hint: ts.menu.ownerCantLeave, onSelect: () => undefined })
   }
   return items
 }

@@ -4,7 +4,11 @@
   inset: var(--titlebar-h) 0 0 0;
   z-index: var(--z-modal);
   display: grid;
-  grid-template-columns: minmax(200px, 1fr) minmax(0, 3fr);
+  /*
+   * Nav (232) + content (808) = one 1040 px frame, centered on wide windows (the nav's surface still reaches the left
+   * edge). 50% - 288 = half the window - 520 + 232. Below 1040 the nav keeps its 232 and the content takes the rest.
+   */
+  grid-template-columns: minmax(232px, calc(50% - 288px)) minmax(0, 1fr);
   background: var(--bg-content);
   border-top-left-radius: var(--r-lg);
 }
@@ -76,8 +80,12 @@
   overflow-y: auto;
 }
 .contentInner {
-  max-width: 680px;
+  max-width: 808px;
   padding: var(--s-6) var(--s-8) var(--s-16);
+}
+/* The shop: a 1240 px frame (grid + sticky preview), growing to the right so the nav stays where it was. */
+.wide .contentInner {
+  max-width: 1008px;
 }
 .header {
   position: sticky;
@@ -164,6 +172,19 @@
 .error {
   color: var(--danger);
 }
+/* Neutral tag next to a row label ("Este dispositivo"). */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  margin-left: var(--s-2);
+  padding: 0 var(--s-1_5);
+  border-radius: var(--r-xs);
+  background: var(--state-selected);
+  color: var(--text-secondary);
+  font: var(--type-badge);
+  vertical-align: 1px;
+}
 
 /* ── Account ── */
 .profileFields {
@@ -225,20 +246,35 @@
 }
 
 /* ── Voice ── */
+/* Device picker trigger (MenuButton): reads like a field, opens the app's Menu at the same width. */
 .select {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
   width: 280px;
   height: var(--h-control);
-  padding: 0 var(--s-2);
-  border: 0;
+  padding: 0 var(--s-2) 0 var(--s-3);
   border-radius: var(--r-md);
   background: var(--bg-raised);
   box-shadow: inset 0 0 0 1px var(--border-default);
   color: var(--text-primary);
   font: var(--type-ui);
+  text-align: left;
 }
-.select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.select:hover,
+.select[aria-expanded='true'] {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.select svg {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+.selectText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .meterRow {
   display: flex;

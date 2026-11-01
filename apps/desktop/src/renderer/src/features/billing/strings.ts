@@ -91,6 +91,12 @@ export const t = {
     intro: 'Itens para o seu perfil, com preço em reais. Comprou uma vez, fica na sua conta, sem renovação. Sem moeda virtual e sem caixa surpresa. Nenhum dá vantagem: é só aparência.',
     preview: 'Prévia no seu perfil',
     previewHint: 'Clique num item para ver como fica em você.',
+    where: {
+      card: 'Cartão de perfil',
+      cardOnly: 'Cartão de perfil: o único lugar onde este item aparece.',
+      row: 'Lista de membros',
+      stage: 'Palco da chamada',
+    },
     slots: { decoration: 'Decorações de avatar', theme: 'Temas de perfil', effect: 'Efeitos de perfil', nameplate: 'Placas de nome' } satisfies Record<Slot, string>,
     slot: { decoration: 'Decoração de avatar', theme: 'Tema de perfil', effect: 'Efeito de perfil', nameplate: 'Placa de nome' } satisfies Record<Slot, string>,
     buy: (price: string) => `Comprar por ${price}`,

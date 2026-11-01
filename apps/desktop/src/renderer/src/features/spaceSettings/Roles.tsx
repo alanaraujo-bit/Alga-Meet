@@ -217,7 +217,7 @@ function RoleEditor({ spaceId, roleId, onBack }: { spaceId: string; roleId: stri
       {!everyone && (
         <Group>
           <Row label={t.roles.delete} hint={t.roles.deleteBody(holders)}>
-            <Button variant="danger" icon={Trash2} disabled={!!lock} onClick={() => setConfirm(true)}>
+            <Button variant="secondary-danger" icon={Trash2} disabled={!!lock} onClick={() => setConfirm(true)}>
               {t.roles.delete}
             </Button>
           </Row>

@@ -50,6 +50,9 @@ export const t = {
     retry: 'Tentar de novo',
     code: (c: string) => `Código: ${c}`,
   },
+  menu: {
+    ownerCantLeave: 'Você é o dono',
+  },
   cancel: 'Cancelar',
   error: 'Algo deu errado. Tente de novo.',
 } as const

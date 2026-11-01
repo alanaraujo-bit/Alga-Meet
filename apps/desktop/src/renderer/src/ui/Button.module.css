@@ -68,6 +68,14 @@
 .secondary:active:not(:disabled) {
   background: color-mix(in srgb, var(--bg-raised), white 8%);
 }
+/* Destructive action at rest (outside a confirmation): red text only, the red fill waits for the modal. */
+.secondary-danger {
+  composes: secondary;
+  color: var(--danger);
+}
+.secondary-danger:hover:not(:disabled) {
+  color: var(--danger-hover);
+}
 
 .ghost {
   color: var(--text-secondary);

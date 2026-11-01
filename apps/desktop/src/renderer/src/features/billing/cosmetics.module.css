@@ -24,6 +24,10 @@
   /* "brilho suave": a static glow, rasterized once. */
   filter: drop-shadow(0 0 2px rgba(214, 144, 127, 0.35));
 }
+/* At 40 px and under a 2 px blur turns the reef into a smudge: shape and contrast only. */
+.coral.small {
+  filter: none;
+}
 .sway {
   transform-origin: 0 0;
 }
@@ -48,21 +52,22 @@
 }
 
 /* ── Nameplates ── */
+/* A plate is its gradient only: no outline (an outline reads as a tag). */
 .plate {
   position: relative;
   display: inline-flex;
   align-items: center;
   max-width: 100%;
   margin-left: -8px;
-  padding: 1px 8px;
+  padding: 2px 8px;
   overflow: hidden;
-  border-radius: var(--r-full);
+  border-radius: var(--r-sm);
   isolation: isolate;
 }
 .plateRow {
   /* Lists clip at the row edge: no negative margin, the name just sits inside its plate. */
   margin-left: 0;
-  padding: 0 6px;
+  padding: 1px 6px;
 }
 .plateRow[data-plate='nameplate_cardume'] {
   padding-right: 30px;
@@ -79,7 +84,6 @@
   /* Room on the right for the school; the name never has fish over it. */
   padding-right: 34px;
   background: linear-gradient(90deg, rgba(38, 86, 112, 0.62), rgba(28, 58, 86, 0.34));
-  box-shadow: inset 0 0 0 1px rgba(160, 210, 230, 0.08);
 }
 .school {
   position: absolute;
@@ -112,8 +116,7 @@
 }
 
 .plate[data-plate='nameplate_plus_correnteza'] {
-  background: linear-gradient(90deg, rgba(33, 201, 202, 0.14), rgba(33, 201, 202, 0.05));
-  box-shadow: inset 0 0 0 1px rgba(77, 220, 220, 0.16);
+  background: linear-gradient(90deg, rgba(33, 201, 202, 0.2), rgba(33, 201, 202, 0.06));
 }
 /* The current: one soft band crossing the plate. */
 .plate[data-plate='nameplate_plus_correnteza']::before {
@@ -184,7 +187,8 @@
 
 .avatarSlot {
   position: absolute;
-  top: 36px;
+  /* 80 px avatar + 4 px ring, centered on the banner's bottom edge (72). */
+  top: 28px;
   left: 16px;
   z-index: 1;
 }
@@ -198,7 +202,7 @@
 .body {
   display: grid;
   gap: 2px;
-  padding: 40px 16px 16px;
+  padding: 48px 16px 16px;
 }
 .name {
   display: flex;

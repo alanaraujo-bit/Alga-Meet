@@ -53,6 +53,8 @@ const KELP = [
   leaf(230, 282, R + 1.5, R + 8, 3),
   leaf(266, 304, R + 1, R + 5.5, 2),
 ]
+/** 40 px and under (member list, user panel): three broad leaves with free tips; ribs and the ring would be sub-pixel. */
+const KELP_SMALL = [leaf(116, 176, R + 1, R + 14, 6), leaf(170, 234, R + 1, R + 15.5, 7), leaf(230, 290, R + 1, R + 12, 5.5)]
 
 /** Staghorn coral in a local frame (+x = away from the avatar, ±y = along it): stem, branches, twig, polyp tips. */
 const TREE = {
@@ -75,13 +77,27 @@ const CORAL = [
   [188, 0.84, false],
   [204, 0.6, true],
 ] as const
+/** Small sizes: two thick branches per root, big polyps, a solid base; fine twigs at 32 px read as noise. */
+const TREE_SMALL = {
+  paths: [
+    ['M 0 0 C 4 0.4 8 -1 12 -4', 4.6],
+    ['M 5 0.4 C 8 2 11 3.6 14 4.2', 3.6],
+  ] as const,
+  tips: [[12, -4], [14, 4.2]] as const,
+}
+const CORAL_SMALL = [
+  [120, 1.05, false],
+  [150, 1.1, true],
+  [180, 1.05, false],
+  [206, 0.85, true],
+] as const
 
-export function Decoration({ id }: { id: CosmeticId }) {
+export function Decoration({ id, small }: { id: CosmeticId; small?: boolean }) {
   // Unique per instance: a shared gradient id breaks when the first copy sits in a hidden subtree.
   const grad = useId()
   if (id === 'deco_folha_de_alga')
     return (
-      <svg className={`${s.deco} ${s.kelp}`} viewBox="-60 -60 120 120" aria-hidden>
+      <svg className={`${s.deco} ${s.kelp} ${small ? s.small : ''}`} viewBox="-60 -60 120 120" aria-hidden>
         <defs>
           <linearGradient id={grad} gradientUnits="userSpaceOnUse" x1="-30" y1="50" x2="20" y2="-60">
             <stop offset="0" stopColor="#2c6b55" />
@@ -89,36 +105,39 @@ export function Decoration({ id }: { id: CosmeticId }) {
             <stop offset="1" stopColor="#9ccfb0" />
           </linearGradient>
         </defs>
-        <path d={arc(R + 1.2, 100, 312)} fill="none" stroke="#86bfa0" strokeOpacity="0.34" strokeWidth="0.9" />
+        {!small && <path d={arc(R + 1.2, 100, 312)} fill="none" stroke="#86bfa0" strokeOpacity="0.34" strokeWidth="0.9" />}
         <g className={s.sway}>
-          {KELP.map((l, i) => (
+          {(small ? KELP_SMALL : KELP).map((l, i) => (
             <g key={i}>
               <path d={l.blade} fill={`url(#${grad})`} fillOpacity={i % 2 ? 0.86 : 0.97} />
-              <path d={l.rib} fill="none" stroke="#c9ead6" strokeOpacity="0.32" strokeWidth="0.6" strokeLinecap="round" />
+              {!small && <path d={l.rib} fill="none" stroke="#c9ead6" strokeOpacity="0.32" strokeWidth="0.6" strokeLinecap="round" />}
             </g>
           ))}
         </g>
       </svg>
     )
-  if (id === 'deco_coral')
+  if (id === 'deco_coral') {
+    const tree: { paths: ReadonlyArray<readonly [string, number]>; tips: ReadonlyArray<readonly [number, number]> } = small ? TREE_SMALL : TREE
+    const reef: ReadonlyArray<readonly [number, number, boolean]> = small ? CORAL_SMALL : CORAL
     return (
-      <svg className={`${s.deco} ${s.coral}`} viewBox="-60 -60 120 120" aria-hidden>
-        <path d={arc(R + 1.2, 214, 292)} fill="none" stroke="#d99484" strokeOpacity="0.3" strokeWidth="0.9" />
-        <path d={arc(R + 1.4, 104, 214)} fill="none" stroke="#b86e60" strokeWidth="3.4" strokeLinecap="round" />
+      <svg className={`${s.deco} ${s.coral} ${small ? s.small : ''}`} viewBox="-60 -60 120 120" aria-hidden>
+        {!small && <path d={arc(R + 1.2, 214, 292)} fill="none" stroke="#d99484" strokeOpacity="0.3" strokeWidth="0.9" />}
+        <path d={arc(R + 1.4, 104, 214)} fill="none" stroke="#b86e60" strokeWidth={small ? 5 : 3.4} strokeLinecap="round" />
         <g className={s.sway}>
-          {CORAL.map(([a, k, flip], i) => (
+          {reef.map(([a, k, flip], i) => (
             <g key={i} transform={`rotate(${a}) translate(${R + 0.6} 0) scale(${k} ${flip ? -k : k})`}>
-              {TREE.paths.map(([d, w], j) => (
+              {tree.paths.map(([d, w], j) => (
                 <path key={j} d={d} fill="none" stroke={j === 0 ? '#c47a6b' : '#d99484'} strokeWidth={w} strokeLinecap="round" />
               ))}
-              {TREE.tips.map(([x, y], j) => (
-                <circle key={j} cx={x} cy={y} r="1.25" fill="#f0c2b4" />
+              {tree.tips.map(([x, y], j) => (
+                <circle key={j} cx={x} cy={y} r={small ? 2.4 : 1.25} fill="#f0c2b4" />
               ))}
             </g>
           ))}
         </g>
       </svg>
     )
+  }
   return null
 }
 
@@ -143,7 +162,7 @@ export function DecoratedAvatar({
   return (
     <span className={`${s.decoWrap} ${play ? s.play : ''}`} style={{ width: size, height: size }}>
       <Avatar user={user} size={size} presence={presence} decorative={decorative} glow={glow} />
-      {decoration && <Decoration id={decoration} />}
+      {decoration && <Decoration id={decoration} small={size <= 40} />}
     </span>
   )
 }
@@ -260,7 +279,7 @@ export function ProfileCard({
       <Effect id={look.effect} />
       <div className={s.avatarSlot}>
         <span className={s.avatarRing}>
-          <DecoratedAvatar user={user} size={64} presence={presence} decoration={look.decoration} decorative play />
+          <DecoratedAvatar user={user} size={80} presence={presence} decoration={look.decoration} decorative play />
         </span>
       </div>
       <div className={s.body}>
@@ -280,7 +299,7 @@ export function ProfileCard({
 /** Small stand-alone sample of one item (shop tiles). */
 export function CosmeticThumb({ id, user }: { id: CosmeticId; user: ProfileUser }) {
   const slot = COSMETICS[id]
-  if (slot === 'decoration') return <DecoratedAvatar user={user} size={40} decoration={id} decorative />
+  if (slot === 'decoration') return <DecoratedAvatar user={user} size={56} decoration={id} decorative />
   if (slot === 'nameplate')
     return (
       <span className={s.thumbName}>

@@ -24,6 +24,7 @@ export function SettingsFrame<Id extends string>({
   onClose,
   closeLabel,
   heading,
+  wide,
   children,
 }: {
   /** Dialog name (screen readers). */
@@ -37,6 +38,8 @@ export function SettingsFrame<Id extends string>({
   closeLabel: string
   /** Overrides the section title (sub-pages like a single role). */
   heading?: ReactNode
+  /** Wider content column (the shop's grid + preview); the nav does not move. */
+  wide?: boolean
   children: ReactNode
 }) {
   const root = useRef<HTMLDivElement>(null)
@@ -78,7 +81,7 @@ export function SettingsFrame<Id extends string>({
   return (
     <motion.div
       ref={root}
-      className={s.root}
+      className={`${s.root} ${wide ? s.wide : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={label}

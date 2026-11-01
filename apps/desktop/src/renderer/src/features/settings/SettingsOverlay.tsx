@@ -1,5 +1,5 @@
 import type { Session } from '@alga/shared'
-import { Bell, CreditCard, Gem, Keyboard, LogOut, Mic, Monitor, Palette, Power, Shield, User, Wrench, X, type LucideIcon } from 'lucide-react'
+import { Bell, ChevronsUpDown, CreditCard, Gem, Keyboard, LogOut, Mic, Monitor, Palette, Power, Shield, User, Wrench, X, type LucideIcon } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -10,8 +10,8 @@ import { errorText, fieldErrors } from '@/lib/errors'
 import { changePassword, listSessions, patchMe, removeAvatar, revokeOtherSessions, revokeSession, uploadAvatar } from '@/store/actions'
 import { useData } from '@/store/data'
 import { useSession } from '@/store/session'
-import { useUi } from '@/store/ui'
-import { Avatar, Button, IconButton, Kbd, SegmentedControl, Spinner, Switch, TextField, toast } from '@/ui'
+import { useUi, type TextSize } from '@/store/ui'
+import { Avatar, Button, Icon, IconButton, Kbd, MenuButton, SegmentedControl, Spinner, Switch, TextField, toast } from '@/ui'
 import { MIN_PASSWORD_LENGTH } from '@alga/shared'
 import { StrengthMeter, strengthHint } from '../auth/PasswordStrength'
 import { openVerifyEmail } from '../auth/VerifyEmail'
@@ -20,7 +20,9 @@ import { ShopSection } from '../billing/Shop'
 import { PrivacySection } from '../trust/Privacy'
 import { Group, Row, SettingsFrame } from './Frame'
 import { HOTKEY_ACTIONS, loadBindings, saveBindings, type SavedBinding } from './hotkeys'
+import { defaultDeviceName } from './devices'
 import { ImagePicker } from './ImagePicker'
+import { sessionDevice } from './sessions'
 import { closeSettings, openSettings, useSettings, type SettingsSection } from './store'
 import { t } from './strings'
 import s from './settings.module.css'
@@ -75,6 +77,7 @@ function Panel({ section }: { section: SettingsSection }) {
       onSelect={openSettings}
       onClose={closeSettings}
       closeLabel={t.close}
+      wide={section === 'shop'}
     >
       {section === 'account' && <Account />}
       {section === 'privacy' && <PrivacySection />}
@@ -184,7 +187,7 @@ function Account() {
       <Sessions key={sessionsKey} />
       <Group>
         <Row label={t.account.logout} hint={t.account.logoutBody}>
-          <Button variant="danger" icon={LogOut} onClick={() => void useSession.getState().logout()}>
+          <Button variant="secondary-danger" icon={LogOut} onClick={() => void useSession.getState().logout()}>
             {t.account.logout}
           </Button>
         </Row>
@@ -243,12 +246,7 @@ function PasswordForm({ onChanged }: { onChanged: () => void }) {
 }
 
 const when = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-/** "Chrome 140 / Windows" out of a user agent, or the raw string when we can't tell. */
-function deviceName(ua: string): string {
-  const app = /AlgaMeet|Electron/i.test(ua) ? 'Alga Meet' : /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /node|undici/i.test(ua) ? 'API' : null
-  const os = /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : null
-  return [app, os].filter(Boolean).join(' · ') || ua.slice(0, 48) || 'Dispositivo desconhecido'
-}
+const at = (iso: string) => when.format(new Date(iso))
 
 function Sessions() {
   const [list, setList] = useState<Session[] | null>(null)
@@ -275,7 +273,16 @@ function Sessions() {
       ) : (
         <>
           {list.map((x) => (
-            <Row key={x.id} label={x.current ? `${deviceName(x.userAgent)} · ${t.account.thisDevice}` : deviceName(x.userAgent)} hint={t.account.lastUsed(when.format(new Date(x.lastUsedAt)))}>
+            <Row
+              key={x.id}
+              label={
+                <>
+                  {sessionDevice(x.userAgent)}
+                  {x.current && <span className={s.chip}>{t.account.thisDevice}</span>}
+                </>
+              }
+              hint={x.current ? t.account.sessionNow(at(x.createdAt)) : t.account.sessionUsed(at(x.createdAt), at(x.lastUsedAt))}
+            >
               {!x.current && (
                 <Button
                   size="sm"
@@ -296,7 +303,7 @@ function Sessions() {
           ))}
           <Row label={t.account.otherDevices} hint={others ? t.account.signOutOthersBody(others) : t.account.onlyThis}>
             <Button
-              variant="danger"
+              variant="secondary-danger"
               size="sm"
               icon={LogOut}
               disabled={!others}
@@ -323,18 +330,34 @@ function Sessions() {
 
 // ── Voz e vídeo ────────────────────────────────────────────────
 
-function DeviceSelect({ id, value, options, onChange }: { id: string; value: string | null; options: Array<{ deviceId: string; label: string }>; onChange: (v: string | null) => void }) {
+/** The app's own menu, not the OS list: 28 px rows, a check on the one in use, and which device "system default" is. */
+function DevicePicker({ kind, label, value, options, onChange }: { kind: 'audioinput' | 'audiooutput'; label: string; value: string | null; options: Array<{ deviceId: string; label: string }>; onChange: (v: string | null) => void }) {
+  const [sys, setSys] = useState<string | null>(null)
+  useEffect(() => {
+    // The engine drops Chromium's "default" alias; only it says which device Windows picked. Re-read when the list changes.
+    let live = true
+    navigator.mediaDevices?.enumerateDevices().then((l) => live && setSys(defaultDeviceName(l, kind)), () => undefined)
+    return () => {
+      live = false
+    }
+  }, [options, kind])
+  const current = options.find((o) => o.deviceId === value)
+  const def = sys ? t.voice.systemDefaultIs(sys) : t.voice.systemDefault
+  const text = current?.label ?? def
   return (
-    <select id={id} className={s.select} value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
-      <option value="">{t.voice.systemDefault}</option>
-      {options
-        .filter((o) => o.deviceId && o.deviceId !== 'default' && o.deviceId !== 'communications')
-        .map((o, i) => (
-          <option key={o.deviceId} value={o.deviceId}>
-            {o.label || `${id === 'in' ? t.voice.input : t.voice.output} ${i + 1}`}
-          </option>
-        ))}
-    </select>
+    <MenuButton
+      label={label}
+      items={() => [
+        { label: def, checked: !current, onSelect: () => onChange(null) },
+        ...(options.length ? [{ kind: 'separator' as const }] : []),
+        ...options.map((o) => ({ label: o.label, checked: o.deviceId === current?.deviceId, onSelect: () => onChange(o.deviceId) })),
+      ]}
+    >
+      <button type="button" className={s.select} aria-label={`${label}: ${text}`}>
+        <span className={s.selectText}>{text}</span>
+        <Icon icon={ChevronsUpDown} size={14} />
+      </button>
+    </MenuButton>
   )
 }
 
@@ -356,11 +379,11 @@ function Voice() {
   return (
     <>
       <Group title={t.voice.devices} description={noLabels ? t.voice.noLabels : undefined}>
-        <Row label={t.voice.input} htmlFor="in">
-          <DeviceSelect id="in" value={devices.inputId} options={devices.inputs} onChange={(v) => void media.setInputDevice(v)} />
+        <Row label={t.voice.input}>
+          <DevicePicker kind="audioinput" label={t.voice.input} value={devices.inputId} options={devices.inputs} onChange={(v) => void media.setInputDevice(v)} />
         </Row>
-        <Row label={t.voice.output} htmlFor="out">
-          <DeviceSelect id="out" value={devices.outputId} options={devices.outputs} onChange={(v) => void media.setOutputDevice(v)} />
+        <Row label={t.voice.output}>
+          <DevicePicker kind="audiooutput" label={t.voice.output} value={devices.outputId} options={devices.outputs} onChange={(v) => void media.setOutputDevice(v)} />
         </Row>
       </Group>
 
@@ -565,11 +588,16 @@ function Notifications() {
   )
 }
 
+const TEXT_SIZES: TextSize[] = ['14', '15', '16', '17']
+
 function Appearance() {
-  const ui = useUi(useShallow((st) => ({ density: st.density, reduced: st.reducedMotion })))
+  const ui = useUi(useShallow((st) => ({ density: st.density, avatars: st.compactAvatars, text: st.textSize, reduced: st.reducedMotion })))
   const set = useUi.getState().setPref
   return (
     <Group>
+      <Row label={t.appearance.textSize} hint={t.appearance.textSizeHint(ui.text)}>
+        <SegmentedControl label={t.appearance.textSize} value={ui.text} onChange={(v) => set('textSize', v)} items={TEXT_SIZES.map((v) => ({ value: v, label: v }))} />
+      </Row>
       <Row label={t.appearance.density} hint={t.appearance.densityHint}>
         <SegmentedControl
           label={t.appearance.density}
@@ -581,6 +609,11 @@ function Appearance() {
           ]}
         />
       </Row>
+      {ui.density === 'compact' && (
+        <Row label={t.appearance.avatars} hint={ui.avatars ? t.appearance.avatarsOn : t.appearance.avatarsOff}>
+          <Switch checked={ui.avatars} label={t.appearance.avatars} onChange={(v) => set('compactAvatars', v)} />
+        </Row>
+      )}
       <Row label={t.appearance.reduceMotion} hint={t.appearance.reduceMotionHint}>
         <Switch checked={ui.reduced} label={t.appearance.reduceMotion} onChange={(v) => set('reducedMotion', v)} />
       </Row>

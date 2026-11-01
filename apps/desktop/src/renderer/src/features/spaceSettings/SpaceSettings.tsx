@@ -120,7 +120,7 @@ function Overview({ spaceId }: { spaceId: string }) {
       </Group>
       <Group title={t.overview.danger}>
         <Row label={t.overview.delete} hint={isOwner ? t.overview.deleteBody : t.overview.ownerOnly}>
-          <Button variant="danger" icon={Trash2} disabled={!isOwner} onClick={() => setDeleting(true)}>
+          <Button variant="secondary-danger" icon={Trash2} disabled={!isOwner} onClick={() => setDeleting(true)}>
             {t.overview.delete}
           </Button>
         </Row>

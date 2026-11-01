@@ -213,7 +213,13 @@ function MenuPanel({ menu }: { menu: OpenMenu }) {
       aria-label={menu.label}
       tabIndex={-1}
       className={s.menu}
-      style={{ left: pos?.left ?? -9999, top: pos?.top ?? -9999, visibility: pos ? 'visible' : 'hidden' }}
+      // A dropdown from a wide trigger (sidebar header, device picker) is at least as wide as it, edges aligned.
+      style={{
+        left: pos?.left ?? -9999,
+        top: pos?.top ?? -9999,
+        visibility: pos ? 'visible' : 'hidden',
+        ...(menu.anchor.width > 200 && { minWidth: menu.anchor.width, maxWidth: Math.max(300, menu.anchor.width) }),
+      }}
       onKeyDown={onKeyDown}
       onPointerLeave={() => setActive(-1)}
       onContextMenu={(e) => e.preventDefault()}

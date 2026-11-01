@@ -8,7 +8,8 @@ import s from './Button.module.css'
 
 const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(' ')
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
+/** `secondary-danger`: a destructive action at rest (secondary surface, `--danger` text); `danger` fill is for the confirmation. */
+type Variant = 'primary' | 'secondary' | 'secondary-danger' | 'ghost' | 'danger'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant

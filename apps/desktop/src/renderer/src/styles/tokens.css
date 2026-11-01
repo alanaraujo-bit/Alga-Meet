@@ -72,7 +72,10 @@
   --type-meta: 400 12px/16px var(--font-ui);
   --type-ui: 400 13px/20px var(--font-ui);
   --type-ui-lg: 510 14px/20px var(--font-ui);
-  --type-message: 400 15px/22px var(--font-ui);
+  /* Message size/line come from Aparência (text size, density): see the blocks after :root. */
+  --msg-size: 15px;
+  --msg-line: 22px;
+  --type-message: 400 var(--msg-size) / var(--msg-line) var(--font-ui);
   --type-title-sm: 590 17px/24px var(--font-ui);
   --type-title: 590 20px/28px var(--font-ui);
   --type-title-lg: 590 24px/32px var(--font-ui);
@@ -155,11 +158,30 @@
   --z-context-menu: 1200;
 }
 
-/* Compact density (Aparência): the dense "classic" layout. Rows and message rhythm tighten, type stays. */
+/* Aparência › Tamanho do texto (html[data-text-size], store/ui.ts): message text only, the UI chrome stays. */
+:root[data-text-size='14'] {
+  --msg-size: 14px;
+  --msg-line: 20px;
+}
+:root[data-text-size='16'] {
+  --msg-size: 16px;
+  --msg-line: 24px;
+}
+:root[data-text-size='17'] {
+  --msg-size: 17px;
+  --msg-line: 26px;
+}
+
+/* Compact density (Aparência): the dense "classic" layout. Rows tighten, message lines are 20 px, type size stays. */
 :root.density-compact {
   --h-row: 24px;
   --density-gap: 0;
   --density-head: 8px;
+  --msg-line: 20px;
+}
+:root.density-compact[data-text-size='16'],
+:root.density-compact[data-text-size='17'] {
+  --msg-line: 22px;
 }
 
 /* Reduced motion: OS setting or the in-app toggle (html.reduce-motion). */

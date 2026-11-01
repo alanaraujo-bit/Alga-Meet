@@ -17,11 +17,16 @@ export type ModalState =
   | null
 
 export type Density = 'comfortable' | 'compact'
+/** Message text in px (Aparência › Tamanho do texto): html[data-text-size] feeds --type-message (tokens.css). */
+export type TextSize = '14' | '15' | '16' | '17'
 
 interface Prefs {
   reducedMotion: boolean
   /** Compact = the "classic" dense layout migrants ask for (smaller rows, no message gaps). */
   density: Density
+  /** Compact only: false = IRC-like lines (time, name and text on one line, no avatar). */
+  compactAvatars: boolean
+  textSize: TextSize
   /** Desktop notifications for DMs and @mentions while the window is not focused. */
   notifyMessages: boolean
   /** Native notification for an incoming call while the window is not focused. */
@@ -54,7 +59,7 @@ interface UiState extends Prefs {
 
 const KEY = `alga.ui.v1`
 function loadPrefs(): Prefs {
-  const d: Prefs = { reducedMotion: false, density: 'comfortable', notifyMessages: true, notifyCalls: true, taskbarBadge: true, memberList: true, lastChannelBySpace: {}, onboarded: {} }
+  const d: Prefs = { reducedMotion: false, density: 'comfortable', compactAvatars: true, textSize: '15', notifyMessages: true, notifyCalls: true, taskbarBadge: true, memberList: true, lastChannelBySpace: {}, onboarded: {} }
   try {
     return { ...d, ...(JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Prefs>) }
   } catch {
@@ -68,6 +73,8 @@ const savePrefs = (s: Prefs) => {
       JSON.stringify({
         reducedMotion: s.reducedMotion,
         density: s.density,
+        compactAvatars: s.compactAvatars,
+        textSize: s.textSize,
         notifyMessages: s.notifyMessages,
         notifyCalls: s.notifyCalls,
         taskbarBadge: s.taskbarBadge,
@@ -108,10 +115,11 @@ export const useUi = create<UiState>()((set, get) => ({
   },
 }))
 
-// Manual reduced-motion and density: one class each on <html>, read by CSS tokens (and MotionConfig).
+// Manual reduced-motion, density and text size: one class or attribute each on <html>, read by CSS tokens (and MotionConfig).
 const applyHtml = (s: Prefs) => {
   document.documentElement.classList.toggle('reduce-motion', s.reducedMotion)
   document.documentElement.classList.toggle('density-compact', s.density === 'compact')
+  document.documentElement.dataset.textSize = s.textSize
 }
 useUi.subscribe(applyHtml)
 applyHtml(useUi.getState())

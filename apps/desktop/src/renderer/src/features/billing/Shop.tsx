@@ -8,7 +8,7 @@ import { Button, Icon } from '@/ui'
 import { needsVerification, openVerifyEmail } from '../auth/VerifyEmail'
 import { openSettings } from '../settings/store'
 import { TeenPurchaseNotice, useIsTeen } from '../trust/Privacy'
-import { CosmeticThumb, ProfileCard, type ProfileUser } from './Cosmetics'
+import { CosmeticThumb, DecoratedAvatar, Nameplate, ProfileCard, type ProfileUser } from './Cosmetics'
 import { COSMETICS, isCosmeticId, itemState, money, SLOTS, type CosmeticId, type ItemState, type Look } from './look'
 import { BillingGate, ProviderNotice, useBillingReady, Waiting } from './Plan'
 import { equip, loadBilling, startCheckout, useBilling, useLook } from './store'
@@ -36,6 +36,7 @@ function Shop({ catalog, billing, user }: { catalog: BillingCatalog; billing: Bi
   useEffect(() => () => void (useBilling.getState().arrived && !useBilling.getState().arrived!.startsWith('plan:') && useBilling.setState({ arrived: null })), [])
 
   const preview = product && isCosmeticId(product.id) ? { ...look, [COSMETICS[product.id]]: product.id } : look
+  const slot = product && isCosmeticId(product.id) ? COSMETICS[product.id] : null
   return (
     <>
       <ProviderNotice catalog={catalog} />
@@ -65,8 +66,31 @@ function Shop({ catalog, billing, user }: { catalog: BillingCatalog; billing: Bi
               {/* Remount per item so its motion (sway, motes, fish) plays when you pick it. */}
               <ProfileCard key={selected ?? 'none'} user={user} look={preview} />
             </div>
-            <figcaption className={s.caption}>{t.shop.preview}</figcaption>
+            <figcaption className={s.caption}>{slot === 'theme' || slot === 'effect' ? t.shop.where.cardOnly : t.shop.where.card}</figcaption>
           </figure>
+          {/* The same item where else it shows, at its real size: the list row (32) and, for decorations, the call stage (96). */}
+          {(slot === 'decoration' || slot === 'nameplate') && (
+            <figure className={s.previewCol}>
+              <div className={s.sampleRow} data-cosmetic-hover>
+                <DecoratedAvatar user={user} size={32} decoration={preview.decoration} decorative />
+                <span className={s.sampleName}>
+                  <Nameplate id={preview.nameplate} row>
+                    {user.displayName}
+                  </Nameplate>
+                </span>
+              </div>
+              <figcaption className={s.caption}>{t.shop.where.row}</figcaption>
+            </figure>
+          )}
+          {slot === 'decoration' && (
+            <figure className={s.previewCol}>
+              <div className={s.sampleStage}>
+                <DecoratedAvatar user={user} size={96} decoration={preview.decoration} decorative />
+                <span className={s.sampleLabel}>{user.displayName}</span>
+              </div>
+              <figcaption className={s.caption}>{t.shop.where.stage}</figcaption>
+            </figure>
+          )}
           {product && <Detail product={product} state={state(product)} look={look} names={names} arrived={arrived === product.id} enabled={!!catalog.provider} />}
         </aside>
       </div>

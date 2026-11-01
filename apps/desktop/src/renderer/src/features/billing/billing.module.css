@@ -276,7 +276,7 @@
 }
 .shopLayout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 288px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: var(--s-8);
   align-items: start;
 }
@@ -301,6 +301,48 @@
   color: var(--text-tertiary);
   font: var(--type-meta);
   text-align: center;
+}
+/* The selected item at its other real sizes: a member-list row and a call tile. */
+.sampleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-lg);
+  background: var(--bg-sidebar);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.sampleName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+  white-space: nowrap;
+}
+.sampleStage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-lg);
+  background: var(--bg-raised);
+}
+.sampleLabel {
+  position: absolute;
+  left: var(--s-2);
+  bottom: var(--s-2);
+  max-width: calc(100% - var(--s-4));
+  padding: 2px var(--s-2);
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--text-primary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .detail {
   position: relative;
@@ -343,7 +385,7 @@
 }
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
   gap: var(--s-2);
   margin-top: var(--s-3);
 }
@@ -366,7 +408,7 @@
 .thumb {
   display: grid;
   place-items: center;
-  height: 64px;
+  height: 96px;
   margin-bottom: var(--s-1_5);
   overflow: hidden;
   border-radius: var(--r-md);
