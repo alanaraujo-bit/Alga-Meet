@@ -25,7 +25,9 @@
 | Backend onda 4 (EXIF/GPS, verificação de e-mail, reset de senha) | `apps/server` | **feito** — ver Validado |
 | Nativo onda 2 (deep links, verificações visuais) | `src/main`, `preload` | **feito** — ver Validado |
 | UI onda 3 (anexos, avatares, configurações do espaço, verificação de e-mail/reset) | `apps/desktop/src/renderer` | **feito** — ver Validado |
-| Monetização: estratégia + motor de direitos (planos, assinaturas, cosméticos, webhooks) + listar/revogar convites | `docs/business`, `apps/server` | em andamento |
+| Monetização (estratégia + motor de direitos) + listar/revogar convites | `docs/business`, `apps/server` | **feito** — ver Validado |
+| UI onda 4a (planos/checkout, loja de cosméticos, deep links, página de convites) | `apps/desktop/src/renderer` (exceto `media/`, `features/voice`) | em andamento |
+| Rascunhos legais (Termos, Privacidade/LGPD, Diretrizes) | `docs/legal` | em andamento |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Crítica de design independente | `docs/design/critique-2026-11-01.md` | **feito**: nota 5/10 vs Linear (tela de chamada ausente, layout clone do Discord, excesso de vermelho e bordas) → corrigindo na UI onda 2 |
 | Camada de dados do renderer | `lib/api.ts`, `lib/gateway.ts`, `store/*` | feito (Maestro), typecheck ok, sem teste de integração ainda |
@@ -43,6 +45,7 @@
 - Backend onda 4: imagens re-codificadas com sharp (EXIF/GPS removidos, orientação aplicada, bombas de descompressão rejeitadas); verificação de e-mail e recuperação de senha (driver console em dev → `apps/server/data/outbox/*.eml`; driver Resend em prod); B5 e B10 corrigidos (senha mínima 10 + lista de senhas comuns). Contas não verificadas não criam convites, não têm >1 espaço nem abrem DM com não-amigos. **120 testes em PGlite e em PostgreSQL 18.**
 - UI onda 3: anexos (botão, arrastar, colar, progresso real, retry, grade 1–10, lightbox, players, refetch de link expirado testado com 403 forçado), avatar/ícone com recorte, configurações do espaço (visão geral, cargos com hierarquia espelhando o servidor, membros, banimentos, convites), apelidos em todo lugar, troca de senha, sair de outras sessões, verificação de e-mail e "Esqueci minha senha". 78 testes no desktop. Capturas `docs/screenshots/2026-11-01-chat-attachments-v3.png`, `space-settings-roles-v4.png`, `settings-account-security-v2.png`…
 - Nativo onda 2: deep links `algameet://auth/verify-email?token=`, `auth/reset-password?token=`, `invite/<code>` (parse estrito, tokens redigidos do log), entregues a frio, por segunda instância e pelo caminho real do Windows (`Start-Process`); protocolo registrado/removido pelo instalador NSIS (testado). safeStorage migrado para API assíncrona sem perder tokens antigos. Verificados com captura: toast nativo (clique foca e dispara evento), badge da barra de tarefas, iniciar com o Windows (`--hidden` vai para a bandeja). 20 testes nativos + verify-native verde. **UI ainda não consome `window.alga.deepLinks`.**
+- Monetização (`docs/business/monetization.md`): proposta **Alga Plus R$ 14,90/mês ou R$ 149/ano** (1080p60/1440p60/4K30, anexos 100 MB, 2 cosméticos inclusos); grátis mantém voz igual para todos, social completo e tela até 1080p30; cosméticos avulsos R$ 5,90–12,90, sem moeda virtual, sem anúncios/quests. Provedor recomendado: **Mercado Pago** (Pix 0,99%). Com banda em pacote o Plus cobre toda a infra a partir de ~2,3% de conversão (1k CCU); a preço de tabela precisa ~5,5%. Motor de direitos no servidor: só webhook verificado muda estado de pagamento; provedor sandbox bloqueado em produção; presets de transmissão do plano vão no token LiveKit e o servidor muta transmissão acima do plano. **138 testes em PGlite e PostgreSQL 18.** Adaptador Mercado Pago testado só contra API simulada.
 - Backend: 47 testes vitest (PGlite em memória, REST via inject + gateway via WebSocket real) passando, conferido pelo Maestro. Smoke test com LiveKit real: webhooks `room_started/finished` e `participant_joined/left` reais recebidos e assinatura verificada; `VOICE_STATE_UPDATE/REMOVE` entregues no gateway.
 
 ## Pesquisa concluída
@@ -66,6 +69,8 @@ Medições [MEDIDO] em `docs/benchmarks/media-baseline.md` — **localhost, duas
 Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não decodifica HEVC (backup **ainda não exercitado**); H.264 por hardware não engata no Electron 45 (sempre OpenH264). Decisão em `docs/decisions/0001-media-engine.md`.
 
 ## Problemas conhecidos
+- Checagem de qualidade de transmissão confia nas dimensões reportadas pelo cliente (cliente modificado pode burlar); sem reembolso self-service; Pix ainda não em assinaturas.
+- PGlite aceita um processo por diretório: dois servidores no mesmo `PGLITE_DIR` travam (`postmaster.pid`). Aconteceu em 2026-11-01 com um servidor órfão de agente — Maestro matou o órfão e removeu o lock.
 - E-mail sem retry (falha do provedor só aparece no log); HEIC/TIFF mantêm EXIF; contas não verificadas nunca são limpas.
 - Downloads de anexos passam pela API → egress do Railway (US$ 0,05/GB); buckets do Railway não têm backup; uploads > 5 min são cortados pelo Railway.
 - **Memória do renderer cresceu com transmissões repetidas no mesmo processo (143 → 889 MB com VP8/VP9/AV1)** — investigar vazamento antes de liberar para usuários.
@@ -90,6 +95,9 @@ Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não d
 | Deploy de teste: API+Postgres no Railway (~US$ 9–21/mês no beta) + domínio | Testar entre PCs diferentes | Autorizar criação no Railway; comprar/definir domínio | Só funciona nesta máquina |
 | Servidor com UDP para o SFU: VM São Paulo (Vultr ~US$ 40–80/mês + banda) **ou** LiveKit Cloud plano grátis | Railway não expõe UDP | Criar conta Vultr (ou LiveKit Cloud) e autorizar custo | Voz/tela só funcionam em rede local/dev |
 | Conta Resend + domínio de envio verificado (DKIM/SPF/DMARC) | E-mails de verificação e reset em produção | Criar conta, configurar DNS (ver `docs/infra/deploy.md`) | Produção não sobe sem provedor de e-mail |
+| Aprovar preços e planos (`docs/business/monetization.md`) | Decisão comercial | Revisar e aprovar/ajustar | Checkout fica só em sandbox |
+| Conta Mercado Pago (CNPJ) + `MP_ACCESS_TOKEN`/`MP_WEBHOOK_SECRET` + URL de webhook + página https de retorno | Cobrar de verdade | Criar conta, gerar credenciais, configurar webhook | Sem pagamentos reais |
+| Contador (Simples Anexo III vs V, NFS-e, ISS, remessas em USD) e advogado (termos, arrependimento 7 dias, compras por menores) | Operar comercialmente no Brasil | Contratar | Lançamento pago bloqueado |
 | Cotação escrita Latitude.sh São Paulo (pacote de banda) | O custo recomendado depende dela (US$ 4,9k vs 18,3k/mês a 10k CCU) | Pedir cotação antes da fase 1k CCU | Plano de custo a 1k+ CCU fica incerto |
 | Segunda máquina independente | Validar voz/tela entre dispositivos reais e NATs diferentes | Instalar o build em outro PC e entrar num canal | Só temos medições em localhost |
 
