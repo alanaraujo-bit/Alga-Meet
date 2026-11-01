@@ -2,7 +2,6 @@ import { ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, 
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { create } from 'zustand'
 import { openExternal } from '@/lib/clipboard'
 import { attachmentKind, formatBytes } from '@/lib/files'
 import { refreshMessage } from '@/store/actions'
@@ -11,12 +10,10 @@ import { IconButton } from '@/ui'
 import { focusables } from '@/ui/floating'
 import { EASE_IN, EASE_OUT_QUART } from '@/ui/motion'
 import { saveAttachment } from './Attachments'
+import { useLightbox } from './lightboxStore'
 import { t } from './strings'
 import s from './chat.module.css'
 
-/** One lightbox app-wide. It points at a message (not at URLs) so refreshed signed URLs flow in. */
-const useLightbox = create<{ at: { channelId: string; messageId: string; index: number } | null }>()(() => ({ at: null }))
-export const openLightbox = (channelId: string, messageId: string, index: number) => useLightbox.setState({ at: { channelId, messageId, index } })
 const close = () => useLightbox.setState({ at: null })
 
 export function Lightbox() {

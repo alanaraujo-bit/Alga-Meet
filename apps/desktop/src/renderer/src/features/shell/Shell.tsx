@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { useEffect, useMemo, useRef } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useData } from '@/store/data'
 import { spaceChannels } from '@/store/selectors'
 import { useUi } from '@/store/ui'
@@ -12,9 +12,9 @@ import { startNotifications } from '../app/notifications'
 import { ChatView } from '../chat/ChatView'
 import { FriendsView } from '../friends/FriendsView'
 import { Onboarding, useNeedsOnboarding } from '../onboarding/Onboarding'
-import { SettingsOverlay } from '../settings/SettingsOverlay'
+import { useSettings } from '../settings/store'
 import { SpaceModals } from '../spaces/SpaceModals'
-import { SpaceSettingsOverlay } from '../spaceSettings/SpaceSettings'
+import { useSpaceSettings } from '../spaceSettings/store'
 import { VerifyEmailDialog } from '../auth/VerifyEmail'
 import { QuickSwitcher } from '../switcher/QuickSwitcher'
 import { useDeletionCanceledNotice } from '../trust/Gate'
@@ -29,6 +29,24 @@ import { SpaceRail } from './SpaceRail'
 import { t } from './strings'
 import s from './shell.module.css'
 
+// Off the first paint: settings (with billing/shop) mount once the app is idle (Ctrl+, lives in there) or on first
+// open, space settings on first open; both then stay mounted for their exit animations.
+const SettingsOverlay = lazy(() => import('../settings/SettingsOverlay').then((m) => ({ default: m.SettingsOverlay })))
+const SpaceSettingsOverlay = lazy(() => import('../spaceSettings/SpaceSettings').then((m) => ({ default: m.SpaceSettingsOverlay })))
+function useLatch(on: boolean): boolean {
+  const [latched, setLatched] = useState(on)
+  if (on && !latched) setLatched(true)
+  return latched || on
+}
+function useIdle(): boolean {
+  const [idle, setIdle] = useState(false)
+  useEffect(() => {
+    const id = requestIdleCallback(() => setIdle(true), { timeout: 3000 })
+    return () => cancelIdleCallback(id)
+  }, [])
+  return idle
+}
+
 export function Shell() {
   useGlobalShortcuts()
   useViewGuard()
@@ -37,6 +55,10 @@ export function Shell() {
   useEffect(() => startBilling(), [])
   useInviteLink()
   useDeletionCanceledNotice()
+  const idle = useIdle()
+  const settingsOpen = useSettings((st) => st.section !== null)
+  const settings = useLatch(settingsOpen || idle)
+  const spaceSettings = useLatch(useSpaceSettings((st) => st.spaceId !== null))
   const view = useUi((st) => st.view)
   const order = useData((st) => st.spaceOrder)
 
@@ -67,8 +89,10 @@ export function Shell() {
       <QuickSwitcher />
       <ScreenPicker />
       <IncomingCall />
-      <SettingsOverlay />
-      <SpaceSettingsOverlay />
+      <Suspense fallback={null}>
+        {settings && <SettingsOverlay />}
+        {spaceSettings && <SpaceSettingsOverlay />}
+      </Suspense>
       <VerifyEmailDialog />
       <ReportHost />
     </motion.div>

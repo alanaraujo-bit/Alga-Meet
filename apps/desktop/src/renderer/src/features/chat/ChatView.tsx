@@ -1,6 +1,6 @@
 import { DEFAULT_MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, Permission } from '@alga/shared'
 import { Ban, FileUp, Hash, Phone, PhoneIncoming, Users } from 'lucide-react'
-import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { formatBytes } from '@/lib/files'
 import { useMedia } from '@/media'
 import { useData } from '@/store/data'
@@ -11,7 +11,7 @@ import { CallStage } from '../voice/CallStage'
 import { t as tv } from '../voice/strings'
 import { joinVoice } from '../voice/voice'
 import { Composer } from './Composer'
-import { Lightbox } from './Lightbox'
+import { useLightbox } from './lightboxStore'
 import { DeleteConfirm } from './MessageItem'
 import { MessageList } from './MessageList'
 import { TypingIndicator } from './TypingIndicator'
@@ -19,6 +19,8 @@ import { addFiles } from './tray'
 import { t } from './strings'
 import sh from '../shell/shell.module.css'
 import s from './chat.module.css'
+
+const Lightbox = lazy(() => import('./Lightbox').then((m) => ({ default: m.Lightbox })))
 
 /** Text conversation for a space channel or a DM. Remounted per channel (key) so per-channel state resets. */
 export function ChatView({ channelId, aside }: { channelId: string; aside?: ReactNode }) {
@@ -36,6 +38,10 @@ export function ChatView({ channelId, aside }: { channelId: string; aside?: Reac
   // Read marker as it was when the channel opened: the "Novas" line stays put while you read.
   const [unreadAfter] = useState(() => useData.getState().readStates[channelId]?.lastReadMessageId ?? null)
   const input = useRef<HTMLTextAreaElement>(null)
+  // The lightbox chunk loads on the first open and then stays mounted (its exit animation needs it).
+  const lightboxOpen = useLightbox((st) => st.at !== null)
+  const lightbox = useRef(false)
+  lightbox.current ||= lightboxOpen
 
   useEffect(() => {
     input.current?.focus()
@@ -136,7 +142,11 @@ export function ChatView({ channelId, aside }: { channelId: string; aside?: Reac
       </div>
       {aside}
       <DeleteConfirm />
-      <Lightbox />
+      {lightbox.current && (
+        <Suspense fallback={null}>
+          <Lightbox />
+        </Suspense>
+      )}
     </div>
   )
 }

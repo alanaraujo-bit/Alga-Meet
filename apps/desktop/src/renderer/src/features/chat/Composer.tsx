@@ -10,6 +10,7 @@ import { useSession } from '@/store/session'
 import { useUi } from '@/store/ui'
 import { Avatar, IconButton } from '@/ui'
 import { AttachmentTray, attachmentSummary } from './Attachments'
+import { authorName } from './author'
 import { EmojiPicker } from './EmojiPicker'
 import { encodeMentions } from './mentions'
 import { addFiles, namePasted, takeFiles, useTray, type TrayItem } from './tray'
@@ -62,7 +63,7 @@ export function Composer({
   const lastTyping = useRef(0)
   const replyToId = useUi((st) => st.replyTo[channelId])
   const reply = useData((st) => (replyToId ? st.messages[channelId]?.byId[replyToId] : undefined))
-  const replyName = useData((st) => (reply ? displayName(st, reply.author.id, spaceId) : ''))
+  const replyName = useData((st) => (reply ? authorName(reply.author.id, (id) => displayName(st, id, spaceId)) : ''))
   const users = useData((st) => st.users)
   const offline = useSession((st) => st.gateway === 'reconnecting')
   const candidates = useCandidates(channelId, spaceId)

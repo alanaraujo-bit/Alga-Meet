@@ -3,7 +3,6 @@ import { Check, Copy, Gavel, LayoutGrid, Link, Shield, Trash2, Users } from 'luc
 import { AnimatePresence } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { create } from 'zustand'
 import { ApiRequestError } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
 import { errorText } from '@/lib/errors'
@@ -20,18 +19,12 @@ import { needsVerification, openVerifyEmail } from '../auth/VerifyEmail'
 import { t as ta } from '../auth/strings'
 import { Members } from './Members'
 import { actorFor, visibleSections, type SpaceSection } from './permissions'
+import { useSpaceSettings } from './store'
 import { Roles } from './Roles'
 import { t } from './strings'
 import st from '../settings/settings.module.css'
 import s from './spaceSettings.module.css'
 
-/** Space settings overlay (same frame as user settings). null = closed. */
-export const useSpaceSettings = create<{ spaceId: string | null; section: SpaceSection }>()(() => ({ spaceId: null, section: 'overview' }))
-export function openSpaceSettings(spaceId: string, section?: SpaceSection): void {
-  const allowed = visibleSections(actorFor(useData.getState(), spaceId))
-  const next = section && allowed.includes(section) ? section : allowed[0]
-  if (next) useSpaceSettings.setState({ spaceId, section: next })
-}
 const close = () => useSpaceSettings.setState({ spaceId: null })
 
 export function SpaceSettingsOverlay() {

@@ -9,7 +9,7 @@ import { t as tr } from '../trust/strings'
 import type { MenuEntry } from '@/ui'
 import { t } from '../shell/strings'
 import { actorFor, visibleSections } from '../spaceSettings/permissions'
-import { openSpaceSettings } from '../spaceSettings/SpaceSettings'
+import { openSpaceSettings } from '../spaceSettings/store'
 import { t as tss } from '../spaceSettings/strings'
 
 /** Same entries for the rail context menu and the sidebar header dropdown. */

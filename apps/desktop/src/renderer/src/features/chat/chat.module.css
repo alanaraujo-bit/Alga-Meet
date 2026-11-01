@@ -9,7 +9,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  overflow-anchor: none; /* anchoring is done in JS (prepend + stick to bottom) */
+  overflow-anchor: none; /* anchoring is done in JS (MessageList + virtual.ts) */
   scrollbar-gutter: stable;
 }
 .scroller::-webkit-scrollbar {
@@ -29,6 +29,18 @@
   justify-content: flex-end;
   min-height: 100%;
   padding: var(--s-4) 0 var(--s-2);
+}
+
+/* Virtualized rows (MessageList): wrappers measured as they are; spacers stand in for unmounted rows. */
+.row,
+.gap {
+  flex: none;
+}
+.row:focus-visible {
+  outline-offset: -2px;
+}
+.row:focus .toolbar {
+  display: flex;
 }
 
 .intro {
@@ -350,7 +362,7 @@
   display: none;
 }
 /* Never cover the "Novas" line right above the first unread message. */
-.unreadLine + .msg .toolbar {
+.row[data-kind='unread'] + .row .toolbar {
   top: 6px;
 }
 .toolEmoji {

@@ -23,6 +23,7 @@ export const t = {
   loadingOlder: 'Carregando mensagens anteriores…',
   replyMissing: 'Mensagem original indisponível',
   unknownUser: 'usuário desconhecido',
+  removedAuthor: 'Usuário removido',
   actions: {
     react: (e: string) => `Reagir com ${e}`,
     reply: 'Responder',

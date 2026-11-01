@@ -7,7 +7,7 @@ import { attachmentKind, fitBox, formatBytes, gridRows, localKind } from '@/lib/
 import { refreshMessage } from '@/store/actions'
 import { useData } from '@/store/data'
 import { Icon, IconButton, toast } from '@/ui'
-import { openLightbox } from './Lightbox'
+import { openLightbox } from './lightboxStore'
 import { removeFile, type TrayItem } from './tray'
 import { t } from './strings'
 import s from './chat.module.css'

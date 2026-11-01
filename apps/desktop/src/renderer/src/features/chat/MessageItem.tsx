@@ -11,7 +11,9 @@ import { useData } from '@/store/data'
 import { displayName, roleColor } from '@/store/selectors'
 import { useUi } from '@/store/ui'
 import { Avatar, Button, contextMenuHandler, Icon, IconButton, Kbd, MenuButton, Modal, Tooltip, toast, type MenuEntry } from '@/ui'
+import { messageReportEntries } from '../trust/Report'
 import { Attachments, attachmentSummary } from './Attachments'
+import { authorFace, authorName, isRemovedAuthor } from './author'
 import { EmojiPicker } from './EmojiPicker'
 import { Markdown } from './Markdown'
 import { QUICK_EMOJI, t } from './strings'
@@ -43,6 +45,7 @@ export const MessageItem = memo(function MessageItem({
   mentioned,
   failed,
   editing,
+  onJump,
 }: {
   message: Message
   head: boolean
@@ -52,11 +55,13 @@ export const MessageItem = memo(function MessageItem({
   /** Send failed: true, or the server's reason. */
   failed: boolean | string
   editing: boolean
+  /** Scroll to (and flash) another message of the list, mounting it if needed. */
+  onJump: (messageId: string) => void
 }) {
   const mine = m.author.id === meId
   const pending = m.nonce === m.id
-  const name = useData((st) => displayName(st, m.author.id, spaceId))
-  const color = useData((st) => (spaceId ? roleColor(st, spaceId, m.author.id) : null))
+  const name = useData((st) => authorName(m.author.id, (id) => displayName(st, id, spaceId)))
+  const color = useData((st) => (spaceId && !isRemovedAuthor(m.author.id) ? roleColor(st, spaceId, m.author.id) : null))
   const at = new Date(m.createdAt)
   const row = useRef<HTMLDivElement>(null)
   const [pickerAt, setPickerAt] = useState<HTMLElement | null>(null)
@@ -81,6 +86,7 @@ export const MessageItem = memo(function MessageItem({
         { label: t.actions.delete, icon: Trash2, danger: true, onSelect: () => requestDelete(m) },
       )
     }
+    items.push(...messageReportEntries(m))
     return items
   }
 
@@ -91,10 +97,10 @@ export const MessageItem = memo(function MessageItem({
       data-message-id={m.id}
       onContextMenu={contextMenuHandler(menu)}
     >
-      {m.replyToId && <ReplyPreview channelId={m.channelId} replyToId={m.replyToId} spaceId={spaceId} />}
+      {m.replyToId && <ReplyPreview channelId={m.channelId} replyToId={m.replyToId} spaceId={spaceId} onJump={onJump} />}
       <div className={s.gutter}>
         {head ? (
-          <Avatar user={m.author} size={36} decorative />
+          <Avatar user={authorFace(m.author)} size={36} decorative />
         ) : (
           <Tooltip content={fullDate(at)}>
             <time className={`${s.hoverTime} tnum`} dateTime={m.createdAt}>
@@ -200,22 +206,16 @@ export const MessageItem = memo(function MessageItem({
   )
 })
 
-function ReplyPreview({ channelId, replyToId, spaceId }: { channelId: string; replyToId: string; spaceId: string | null }) {
+function ReplyPreview({ channelId, replyToId, spaceId, onJump }: { channelId: string; replyToId: string; spaceId: string | null; onJump: (id: string) => void }) {
   const target = useData((st) => st.messages[channelId]?.byId[replyToId])
-  const name = useData((st) => (target ? displayName(st, target.author.id, spaceId) : ''))
-  const jump = () => {
-    const el = document.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(replyToId)}"]`)
-    if (!el) return
-    el.scrollIntoView({ block: 'center', behavior: document.documentElement.classList.contains('reduce-motion') ? 'auto' : 'smooth' })
-    el.classList.add(s.flash!)
-    setTimeout(() => el.classList.remove(s.flash!), 1200)
-  }
+  const name = useData((st) => (target ? authorName(target.author.id, (id) => displayName(st, id, spaceId)) : ''))
+  const jump = () => onJump(replyToId)
   return (
     <div className={s.reply}>
       <span className={s.replyLine} aria-hidden />
       {target ? (
         <button type="button" className={s.replyBody} onClick={jump}>
-          <Avatar user={target.author} size={16} decorative />
+          <Avatar user={authorFace(target.author)} size={16} decorative />
           <span className={s.replyName}>{name}</span>
           <span className={s.replyText}>{target.content ? toPlainText(target.content, (id) => displayName(useData.getState(), id, spaceId)) : attachmentSummary(target)}</span>
         </button>
@@ -318,9 +318,9 @@ export function DeleteConfirm() {
       {m && (
         <>
           <div className={s.deletePreview}>
-            <Avatar user={m.author} size={24} decorative />
+            <Avatar user={authorFace(m.author)} size={24} decorative />
             <div style={{ minWidth: 0 }}>
-              <div className={s.author}>{m.author.displayName}</div>
+              <div className={s.author}>{authorName(m.author.id, () => m.author.displayName)}</div>
               <div className={s.content}>{m.content ? <Markdown source={m.content} /> : attachmentSummary(m)}</div>
             </div>
           </div>
