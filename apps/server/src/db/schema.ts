@@ -1,7 +1,7 @@
 import { ACCOUNT_ACTION_REASONS, REPORT_REASONS, type EquippedCosmetics } from '@alga/shared'
 import { sql } from 'drizzle-orm'
 import {
-  boolean, date, foreignKey, index, integer, jsonb, pgTable, primaryKey, real, text, timestamp, uniqueIndex, uuid,
+  type AnyPgColumn, boolean, date, foreignKey, index, integer, jsonb, pgTable, primaryKey, real, text, timestamp, uniqueIndex, uuid,
 } from 'drizzle-orm/pg-core'
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' })
@@ -49,6 +49,13 @@ export const users = pgTable('users', {
   telemetryOptInAt: ts('telemetry_opt_in_at'),
   /** Reports by this account that staff dismissed (reporter reliability, AdminReport.reporterFalseReports). */
   falseReports: integer('false_reports').notNull().default(0),
+  /**
+   * Cache written only by Billing.recompute: while a paid Plus is active, now − (months of Plus summed so far), so
+   * PublicUser.plusBadge needs no query; null without a paid Plus.
+   */
+  plusSince: ts('plus_since'),
+  /** Wishlist shown to friends; null = the default for the age bracket (on for 18+, off for 16–17). */
+  wishlistVisible: boolean('wishlist_visible'),
 }, (t) => [
   // An address belongs to at most one verified account; unverified accounts may claim a taken one.
   uniqueIndex('users_verified_email_key').on(t.email).where(sql`${t.emailVerifiedAt} is not null`),
@@ -100,7 +107,16 @@ export const spaces = pgTable('spaces', {
   createdAt: ts('created_at').notNull().defaultNow(),
   /** Space.e2ee: calls in its voice channels are end-to-end encrypted (opt-in, rollout phase 5a). */
   e2ee: boolean('e2ee').notNull().default(false),
-}, (t) => [index('spaces_owner_id_idx').on(t.ownerId)])
+  /** Casa (Space.upgrade): end of the paid days, rebuilt by Billing from space_upgrade_contributions; null = never had one. */
+  upgradeEndsAt: ts('upgrade_ends_at'),
+  upgradeTone: text('upgrade_tone'),
+  /** Code of the vanity invite (an `invites` row expiring with the Casa). */
+  upgradeInviteCode: text('upgrade_invite_code'),
+}, (t) => [
+  index('spaces_owner_id_idx').on(t.ownerId),
+  uniqueIndex('spaces_upgrade_invite_code_key').on(t.upgradeInviteCode),
+  index('spaces_upgrade_ends_at_idx').on(t.upgradeEndsAt),
+])
 
 export const spaceMembers = pgTable('space_members', {
   spaceId: uuid('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
@@ -252,7 +268,7 @@ export type AttachmentRow = typeof attachments.$inferSelect
 /** Mirror of src/billing/catalog.ts, upserted at startup. Rows are never deleted (orders reference them): dropped SKUs go inactive. */
 export const products = pgTable('products', {
   id: text('id').primaryKey(),
-  kind: text('kind', { enum: ['plan', 'cosmetic'] }).notNull(),
+  kind: text('kind', { enum: ['plan', 'cosmetic', 'bundle', 'space_upgrade'] }).notNull(),
   planId: text('plan_id'),
   interval: text('interval', { enum: ['month', 'year'] }),
   cosmeticType: text('cosmetic_type'),
@@ -284,8 +300,18 @@ export const subscriptions = pgTable('subscriptions', {
   providerUpdatedAt: ts('provider_updated_at'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
+  /** renewing = provider subscription; period = one paid period from `orderId` (Pix, gift); pass = free 7-day pass from `grantedBy`. */
+  kind: text('kind', { enum: ['renewing', 'period', 'pass'] }).notNull().default('renewing'),
+  orderId: uuid('order_id').references((): AnyPgColumn => orders.id),
+  grantedBy: uuid('granted_by').references(() => users.id, { onDelete: 'set null' }),
+  /** Start of the paid time (first activation; a period stacked after another starts later). */
+  startedAt: ts('started_at'),
+  /** First charge's payment at the provider (what a 7-day refund refunds). */
+  providerPaymentId: text('provider_payment_id'),
+  refundRequestedAt: ts('refund_requested_at'),
 }, (t) => [
   index('subscriptions_user_id_idx').on(t.userId),
+  index('subscriptions_order_id_idx').on(t.orderId),
   index('subscriptions_status_period_idx').on(t.status, t.currentPeriodEnd),
   uniqueIndex('subscriptions_provider_ref_key').on(t.provider, t.providerSubscriptionId),
 ])
@@ -305,7 +331,14 @@ export const orders = pgTable('orders', {
   providerUpdatedAt: ts('provider_updated_at'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
+  /** Cosmetic SKUs this order grants (a bundle: the ones missing at checkout); [] for plan periods and Casa. */
+  items: jsonb('items').$type<string[]>().notNull().default([]),
+  /** The annual Plus item: claimed under this subscription (amount 0, revoked if the subscription is refunded). */
+  subscriptionId: uuid('subscription_id').references((): AnyPgColumn => subscriptions.id),
+  paidAt: ts('paid_at'),
+  refundRequestedAt: ts('refund_requested_at'),
 }, (t) => [
+  index('orders_subscription_id_idx').on(t.subscriptionId),
   index('orders_user_id_idx').on(t.userId),
   index('orders_status_created_idx').on(t.status, t.createdAt),
   uniqueIndex('orders_provider_ref_key').on(t.provider, t.providerPaymentId),
@@ -331,9 +364,48 @@ export const billingEvents = pgTable('billing_events', {
   receivedAt: ts('received_at').notNull().defaultNow(),
 }, (t) => [uniqueIndex('billing_events_provider_event_key').on(t.provider, t.providerEventId)])
 
+/** Gifts (growth-plan §2.4). A Plus pass has no order. Sender/recipient go null when that account is purged. */
+export const gifts = pgTable('gifts', {
+  id: uuid('id').primaryKey(),
+  orderId: uuid('order_id').references(() => orders.id),
+  productId: text('product_id').notNull().references(() => products.id),
+  senderId: uuid('sender_id').references(() => users.id, { onDelete: 'set null' }),
+  recipientId: uuid('recipient_id').references(() => users.id, { onDelete: 'set null' }),
+  message: text('message'),
+  deliverAt: ts('deliver_at'),
+  deliveredAt: ts('delivered_at'),
+  status: text('status', { enum: ['unpaid', 'scheduled', 'delivered', 'accepted', 'declined', 'refunded', 'canceled'] }).notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex('gifts_order_id_key').on(t.orderId),
+  index('gifts_sender_id_idx').on(t.senderId),
+  index('gifts_recipient_id_idx').on(t.recipientId),
+  index('gifts_status_deliver_at_idx').on(t.status, t.deliverAt),
+])
+
+export const wishlists = pgTable('wishlists', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  productId: text('product_id').notNull().references(() => products.id),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.userId, t.productId] })])
+
+/** One per Casa contribution order; the order's status says whether its days count. */
+export const spaceUpgradeContributions = pgTable('space_upgrade_contributions', {
+  orderId: uuid('order_id').primaryKey().references(() => orders.id),
+  spaceId: uuid('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+  // set null: the days stay with the space when the contributor's account is purged.
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  days: integer('days').notNull(),
+  /** Appears on the Mural da Casa (name only, never the amount). */
+  showOnWall: boolean('show_on_wall').notNull().default(false),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [index('space_upgrade_contributions_space_id_idx').on(t.spaceId)])
+
 export type SubscriptionRow = typeof subscriptions.$inferSelect
 export type OrderRow = typeof orders.$inferSelect
 export type EntitlementRow = typeof entitlements.$inferSelect
+export type GiftRow = typeof gifts.$inferSelect
 
 // ---- trust & safety, privacy (src/trust-safety.ts, src/privacy.ts) -------------------------------------------------
 

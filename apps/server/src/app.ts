@@ -84,7 +84,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   const files = new Files(config, database.db, createStorage(config.storage), app.log)
   const mail = new Mailer(createEmailSender(config.email, app.log, config.env === 'production'), app.log, config.email.linkUrl)
   const voice = new Voice(config, database.db, hub, app.log)
-  const billing = new Billing(config, database.db, hub, voice, app.log)
+  const billing = new Billing(config, database.db, hub, voice, app.log, mail)
   await billing.syncCatalog()
   // trust/privacy take the whole Ctx (they use every other service); assigned right below.
   const e2ee = new E2ee(config, database.db, hub, voice, app.log)

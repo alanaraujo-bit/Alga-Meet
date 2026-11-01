@@ -20,6 +20,8 @@ export interface SubscriptionUpdate {
   status: 'pending' | 'active' | 'past_due' | 'ended' | 'revoked'
   currentPeriodEnd?: Date
   amountCents?: number
+  /** The (first) charge's payment id: what a 7-day refund of the first charge refunds. */
+  providerPaymentId?: string
   /** Provider-side time of this state; older than the last applied one → ignored. */
   occurredAt: Date
 }
@@ -56,6 +58,10 @@ export interface CheckoutInput {
   amountCents: number
   currency: 'BRL'
   payerEmail: string
+  /** Line title on the provider page when it is not the product name (gifts, Casa). */
+  title?: string
+  /** Offer Pix only (no cards): the sender is past today's card limit for gifts. */
+  pixOnly?: boolean
 }
 
 export interface PaymentProvider {
@@ -70,7 +76,7 @@ export interface PaymentProvider {
   cancelSubscription(providerSubscriptionId: string | null, final?: boolean): Promise<void>
   /** Turns renewals back on for a subscription stopped with a non-final cancelSubscription. */
   resumeSubscription(providerSubscriptionId: string | null): Promise<void>
-  /** Asks for a refund; the result arrives as a webhook (order → refunded). */
+  /** Asks for a full refund; the result arrives as a webhook (order → refunded, subscription → revoked). */
   refund(providerPaymentId: string): Promise<void>
   /** Verifies the signature and returns the normalized updates. Throws WebhookRejected when not authentic. */
   parseWebhook(req: WebhookRequest): Promise<VerifiedEvent>
@@ -113,6 +119,7 @@ const SandboxEvent = z.object({
       status: z.enum(['pending', 'active', 'past_due', 'ended', 'revoked']),
       currentPeriodEnd: date.optional(),
       amountCents: z.number().int().min(0).optional(),
+      providerPaymentId: z.string().max(128).optional(),
       occurredAt: date,
     }),
     z.object({

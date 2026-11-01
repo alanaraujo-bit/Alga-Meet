@@ -30,7 +30,7 @@ Ver `.env.example` (copie para `.env`; é carregado automaticamente). Validaçã
 `MAX_ATTACHMENT_BYTES`, `STORAGE_DRIVER` (`local` | `s3`), `UPLOADS_DIR`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`,
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_URL_STYLE` (`virtual` | `path`), `EMAIL_DRIVER` (`console` | `resend`),
 `ALGA_ALLOW_CONSOLE_EMAIL`, `ALGA_AUTO_VERIFY_EMAIL`, `EMAIL_OUTBOX_DIR`, `EMAIL_FROM`, `RESEND_API_KEY`, `EMAIL_LINK_URL`, `BILLING_PROVIDER`
-(`none` | `sandbox` | `mercadopago`), `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `MP_API_URL`, `BILLING_RETURN_URL`,
+(`none` | `sandbox` | `mercadopago`), `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `MP_API_URL`, `BILLING_RETURN_URL`, `CASA_CINEMA`,
 `REQUIRE_BIRTHDATE`, `LEGAL_URL`, `METRICS_TOKEN`, `E2EE_DS_KEY`, `E2EE_MLS_PKG`.
 
 Falha fechada:
@@ -46,7 +46,9 @@ Falha fechada:
   resposta passa a distinguir os dois casos: não use com cadastro aberto.
 - **Pagamentos**: em produção o padrão é `BILLING_PROVIDER=none` (checkout 503). `sandbox` é **recusado em produção**,
   sem válvula de escape (nem `ALGA_ALLOW_DEV_SECRETS`); staging usa `mercadopago` com credenciais de teste do MP.
-  `mercadopago` exige `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` e `BILLING_RETURN_URL` (https).
+  `mercadopago` exige `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` e `BILLING_RETURN_URL` (https). `CASA_CINEMA=1` (1080p60
+  da Casa) é recusado em produção: falta o pacote de banda, o medidor de 60 h/mês e a concessão no `voice.ts`; em
+  dev só lista o perk.
 - A chave `devkey` e o segredo de `infra/livekit/livekit.dev.yaml` (públicos) só são aceitos com `NODE_ENV=development`
   ou `test` **e** `HOST` loopback, ou com `ALGA_ALLOW_DEV_SECRETS=1` (ex. teste em LAN com `HOST=0.0.0.0`).
 - **Cadastro em produção** exige `birthDate` e `termsVersion` (`GET /legal`); fora de produção só com
@@ -79,7 +81,7 @@ Falha fechada:
 | `src/gateway/` | conexões, fan-out, presença, `Throttle`; handshake, heartbeat, limites, READY, ops `presence`/`voice_state` |
 | `src/voice.ts` | tokens/grants LiveKit, webhook (assinatura + dedupe), `VoiceState` autoritativo, limite de usuários, moderação no SFU |
 | `src/e2ee.ts` | **E2EE Delivery Service** (`docs/decisions/0004-e2ee.md`; contrato e fluxo em `packages/shared/src/e2ee.ts`; garantias e ataques em `docs/security/e2ee-delivery-service.md`): dispositivos e key packages (uso único, `SKIP LOCKED`), grupo MLS por chamada com o estado **público** (OpenMLS `PublicGroup` do `native/mls/pkg`, carregado em Node), proposals Add/Remove assinadas pelo DS, um commit por época conferido contra a árvore, Welcome só para o dispositivo adicionado, remoção imediata no hook `Voice.onLeave`, timeout do committer e reset. Sem `native/mls/pkg` a E2EE fica desligada (503) |
-| `src/billing/` | `catalog.ts` (planos, preços, cosméticos; versionado), `billing.ts` (motor: checkout, webhooks idempotentes, recompute de direitos, job de expiração), `provider.ts` (interface `PaymentProvider` + `SandboxProvider`), `mercadopago.ts` (Checkout Pro + preapproval, `x-signature`) |
+| `src/billing/` | `catalog.ts` (planos, preços, Coleção 01, conjuntos, Casa, coleções/ondas; versionado), `billing.ts` (motor: checkout, presentes, convites Plus, item anual, reembolsos, webhooks idempotentes, recompute de direitos, job de expiração, recibos), `casa.ts` (dias da Casa, mural, tom e convite próprio), `wishlist.ts`, `tryon.ts` (provador na chamada, em memória), `provider.ts` (interface `PaymentProvider` + `SandboxProvider`), `mercadopago.ts` (Checkout Pro + preapproval + reembolso, `x-signature`) |
 | `src/legal.ts` | catálogo `LEGAL_VERSIONS` (versão + `changeSummary`; a do topo é `TERMS_VERSION`), faixa etária (`ageBracketOf`), prioridade e rótulos pt-BR dos motivos, prazos |
 | `src/trust-safety.ts` | medidas na conta (`applyAction`: warn/suspend/ban/lift aplicados em login, sessões, gateway 4010 e voz), token de recurso, quarentena de anexos com cópia em `evidence/` + SHA-256 e liberação (falso positivo), retenção legal, `setStaffRole` |
 | `src/privacy.ts` | registros de acesso (Marco Civil art. 15), exclusão de conta (carência + expurgo), exportação (zip + link assinado por e-mail; no app, só com a senha), job de retenção |
@@ -192,9 +194,49 @@ Falha fechada:
   dele vão junto); convite que expira ou esgota os usos não é anunciado.
 - **Pagamentos e direitos** (`src/billing/`; estratégia em `docs/business/monetization.md`; contrato em
   `packages/shared/src/billing.ts`):
-  - Catálogo em `catalog.ts` (`CATALOG_VERSION`), copiado para `products` a cada subida (SKU removido fica inativo).
-    Planos: `free` (720p30/720p60/1080p30, anexo = `MAX_ATTACHMENT_BYTES`) e `plus` (+1080p60/1440p60/4K30, anexo
-    100 MiB, coleção Plus). Voz igual para todos (D12).
+  - Catálogo em `catalog.ts` (`CATALOG_VERSION = 2`, `docs/business/growth-plan.md` §2–§3), copiado para `products` a
+    cada subida (SKU removido ou aposentado fica inativo). Planos: `free` (720p30/720p60/1080p30, anexo =
+    `MAX_ATTACHMENT_BYTES`) e `plus` (+1080p60/1440p60/4K30, anexo 100 MiB, `perks` do Plus v2). Voz igual para todos
+    (D12). Coleção 01 "Hora Azul": 28 itens em 2 ondas (`COLLECTIONS[].waves[].opensAt`; `null` = onda fechada; a 2
+    ainda não tem data), 25 vendáveis (R$ 240,50) e o guarda-roupa Plus (aura Frondes, ícones Noite/Porcelana, 3 cores
+    do app; um item mensal = `includedIn: ['plus']` + `includedFrom`). `Product.available` = vendável agora. Os 7
+    itens v1 "oceano" saíram da venda (`retired`), mas quem tiver um continua com ele (pedido pago → direito). Preços e
+    datas são do dono: uma edição em `catalog.ts`.
+  - **Lugares**: `COSMETIC_SLOTS` ganhou `voiceAura`, `entranceSound`, `callReactions`, `streamFrame`, `appIcon` e
+    `appAccent`; os dois últimos (`PRIVATE_COSMETIC_SLOTS`) só aparecem em `Me.cosmetics`, nunca em `PublicUser`.
+  - **Conjuntos**: `kind: 'bundle'` com `items`; preço = conjunto × (valor que falta ÷ soma), para baixo em ,90
+    (`bundlePriceCents`, `GET /billing/quote`); o pedido grava em `orders.items` só o que faltava e um webhook concede
+    tudo de uma vez. Todos os 4 conjuntos têm item da onda 2: abrem com ela.
+  - **Presentes** (`gifts`): amigo há 72 h+, sem bloqueio, não para quem já tem (nem para quem já vai ganhar); pedido
+    `pending` + presente `unpaid` → pago (webhook) → `delivered` (`GIFT_RECEIVED`; em `deliverAt`, pelo job) → só
+    vale depois de `accept` (para todos; 16–17 também, sem e-mail) ou `decline` antes de abrir (estorno ao pagador).
+    O reembolso de 7 dias do pagador revoga do destinatário (`GIFT_UPDATE` `refunded`). Limite em 24 h: acima de
+    R$ 100 a preferência do MP sai só com Pix (o saldo MP não pode ser excluído), acima de R$ 300, 409. Plus como
+    presente e "Plus 12 meses no Pix" (`billing: 'one_time'`) viram `subscriptions.kind = 'period'`
+    (`cancel_at_period_end`, sem renovação, empilhado depois do plano atual; `resume` 409).
+  - **Plus v2**: insígnia por meses **somados** (`users.plus_since` = agora − tempo pago somado, mantido pelo
+    `recompute`; `PublicUser.plusBadge` só com Plus pago ativo; passes e reembolsos não contam; virar de faixa não
+    gera evento). Convites (`POST /billing/passes`): 2 por mês (BRT) de quem paga, para amigo 18+, 1 por pessoa a cada
+    12 meses, 7 dias a partir do "Abrir" (`kind = 'pass'`, `granted_by`). Item anual: 1 da Coleção 01 até R$ 12,90 por
+    ano pago, pedido de valor 0 ligado à assinatura (`orders.subscription_id`), revogado se a assinatura for
+    reembolsada.
+  - **Lista de desejos** (`wishlists`, até 20): só amigos veem, nada é anunciado; padrão ligado para 18+ e desligado
+    para 16–17 (`users.wishlist_visible` null = padrão).
+  - **Provador** (`tryon.ts`): em chamada, 18+, item à venda, 5 min, 1 por vez, 10 por dia; `USER_UPDATE` com
+    `tryOn` só para o canal de voz; acaba sozinho. Em memória (uma instância).
+  - **Casa** (`space_upgrade_contributions` + cache em `spaces.upgrade_*`): contribuição de membro 18+ (R$ 5/10/19,90/199
+    = 7/15/30/365 dias) por `POST /spaces/:id/upgrade/contributions`; pagos somam dias a partir do fim (ou do
+    pagamento, se já tinha acabado), reembolso tira; nada renova. `Space.upgrade` nos snapshots e
+    `SPACE_UPGRADE_UPDATE` (pagamento, reembolso, ajuste e fim, no mesmo job). Mural: quem escolheu aparecer, em ordem
+    alfabética, sem valores. Tom e convite próprio (`invites` comum que expira com a Casa) com `MANAGE_SPACE`, só com a
+    Casa acesa. Os avisos de fim saem do `endsAt` no cliente (não há mensagem de sistema). Cinema desligado
+    (`CASA_CINEMA`).
+  - **Reembolso self-service** (7 dias, Termos 9.5): `POST /billing/orders/:id/refund` (itens, conjuntos, presentes,
+    Plus único, Casa) e `POST /billing/subscription/refund` (1ª cobrança do Plus recorrente; cancela a preapproval de
+    vez). Pede `POST /v1/payments/{id}/refunds` (corpo vazio = total, `X-Render-In-Process-Refunds: true`) e grava
+    `refund_requested_at`; o estado só muda quando o webhook re-buscado diz `refunded` (no sandbox, o provedor confirma
+    na hora, como a página de checkout). Recibo por e-mail (`receiptMail`) a cada pedido pago e 1ª ativação, e aviso de
+    presente ao destinatário adulto (sem a mensagem, que é texto do usuário).
   - `POST /billing/checkout` cria `subscriptions`/`orders` **pendentes** e devolve a página do provedor; nada é
     concedido aqui. Só `POST /billing/webhooks/:provider` com assinatura válida muda estado. Cada evento entra em
     `billing_events` (único por provedor + id do evento, SHA-256 do corpo, sem dado de cartão) na mesma transação que
@@ -321,7 +363,7 @@ Falha fechada:
   aleatório e `user_hash` com sal aleatório trocado todo dia e nunca gravado; expurgo aos 30 dias; vira histogramas
   `alga_call_*`.
 
-## Testes (`test/`, 183 casos)
+## Testes (`test/`, 203 casos)
 
 `npm test` roda em PGlite; `npm run test:pg` roda os mesmos casos num PostgreSQL 18 real (`test/pg-setup.ts`: um
 cluster UTF8 descartável por execução, um banco por `startServer`). Os dois passam.
@@ -370,6 +412,15 @@ saída do criador). `billing.test.ts` também cobre retomar (idempotente, carên
 (só itens com direito, espaço errado/desconhecido, `USER_UPDATE` e perfis com `cosmetics`, desequipar; itens do plano
 saem no fim do plano e o comprado fica; reembolso tira) e, no Mercado Pago simulado, `paused` no cancelamento,
 `authorized` no retomar, pausa/retomada pela conta do pagador e `cancelled` na exclusão de conta.
+`billing-v2.test.ts` (20): catálogo v2 (28 itens, ondas, soma R$ 240,50, conjuntos, Casa, v1 aposentado e o item v1
+de quem já tem), conjunto com 0/1/todos possuídos e concessão atômica, presentes (amizade de 72 h, bloqueio, já tem,
+16–17 não dão e só recebem com aceite, entrega agendada, aceite/recusa → estorno, reembolso do pagador revoga com
+evento, recibo sem a mensagem, Plus de presente de 12 meses, limites R$ 100/R$ 300), lista de desejos, Plus v2
+(guarda-roupa, lugares privados, item do mês pelo job, insígnia por meses somados, convites, item anual que fica e
+que sai com o reembolso, Plus no Pix), Casa (contribuições somam, duplicado não soma, reembolso tira, mural, READY,
+tom e convite próprio que expira com ela, fim pelo job, Cinema desligado e recusado em produção), reembolsos (7 dias,
+só o pagador, idempotente, 1ª cobrança) e provador; e, no Mercado Pago simulado, reembolso → re-busca, preferência
+só Pix e reembolso da 1ª cobrança com cancelamento definitivo.
 `observability.test.ts` (6): formato de exposição (escape, histogramas cumulativos), `uid` dos logs, acesso ao
 `/metrics` (aberto em test, bearer com token, 404 em produção sem token), `/health` × `/ready` (banco ok, LiveKit
 fechado → 503, LiveKit falso → 200), métricas de HTTP/gateway/banco (driver certo nas duas suítes)/voz/webhooks/rate
@@ -458,8 +509,13 @@ na lacuna abaixo.
   `docs/business/monetization.md` §8, mais o retomar: conferir que `paused` não cobra e que `authorized` volta a
   cobrar no `next_payment_date` original, sem cobrança imediata (falta anotar no §8). Uma preapproval pausada pelo
   cancelamento fica pausada no MP depois que a assinatura expira aqui (não cobra; se o pagador a retomar pelo MP, o
-  webhook reativa a assinatura antiga). Sem reembolso self-service (CDC art. 49): hoje é estorno manual no painel →
-  webhook revoga. Sem Pix na assinatura (só cartão recorrente). USD não é cobrado (MP é só BRL).
+  webhook reativa a assinatura antiga). Reembolso self-service e preferência só com Pix dos presentes escritos pela doc
+  (2026-11-01) e testados só contra a API simulada. Sem Pix na assinatura recorrente: a busca na doc do MP
+  (2026-11-01) não acha Pix Automático no `/preapproval`; o Plus no Pix é pagamento único. USD não é cobrado (MP é só
+  BRL).
+- **Pacote A (growth-plan §5.2) fora daqui**: "Contar no espaço" e os avisos de fim da Casa como mensagem (não há
+  mensagem de sistema), "Denunciar" no presente (fluxo de T&S), contadores do funil da loja (pacote D), avatar por
+  espaço, Casa Cinema (medidor de 60 h e preset no `voice.ts`). O provador e o limite diário dele ficam em memória.
 - O mute de tela acima do plano usa as dimensões/bitrates que o SDK do cliente declara ao publicar: um cliente
   modificado pode declarar menos (medição real exigiria estatísticas do SFU). **Descida com a tela no ar:** como o
   SFU guarda as camadas da publicação (smoke acima), uma tela publicada acima do plano novo é mutada 10 s depois

@@ -83,6 +83,8 @@ const EnvSchema = z
     MP_API_URL: z.url().default('https://api.mercadopago.com'),
     /** Page the provider sends the buyer back to after paying (https; e.g. a site page that opens algameet://). */
     BILLING_RETURN_URL: z.url().optional(),
+    /** Casa Cinema (1080p60 for a Casa's streams): off until the bandwidth deal; refused in production (not built). */
+    CASA_CINEMA: bool,
     /** Makes RegisterBody.birthDate and termsVersion mandatory outside production (production always requires them). */
     REQUIRE_BIRTHDATE: bool,
     /** Where the published Termos/Política/Diretrizes live (GET /legal links). */
@@ -131,6 +133,9 @@ const EnvSchema = z
     if (env.NODE_ENV === 'production' && env.BILLING_PROVIDER === 'sandbox') {
       ctx.addIssue({ code: 'custom', path: ['BILLING_PROVIDER'], message: 'sandbox is for development/test only; use mercadopago (with test credentials on staging) or none' })
     }
+    if (env.NODE_ENV === 'production' && env.CASA_CINEMA) {
+      ctx.addIssue({ code: 'custom', path: ['CASA_CINEMA'], message: 'Casa Cinema needs the bandwidth deal, the 60 h/month meter and the voice preset grant (growth-plan §2.3); none is built' })
+    }
     if (env.BILLING_PROVIDER === 'mercadopago') {
       for (const k of ['MP_ACCESS_TOKEN', 'MP_WEBHOOK_SECRET', 'BILLING_RETURN_URL'] as const) {
         if (!env[k]) ctx.addIssue({ code: 'custom', path: [k], message: 'required with BILLING_PROVIDER=mercadopago' })
@@ -176,6 +181,8 @@ export interface BillingConfig {
   provider: 'none' | 'sandbox' | 'mercadopago'
   /** HMAC key of sandbox webhooks and checkout links; random per process (dev/test only). */
   sandboxSecret: string
+  /** CASA_CINEMA: list the Cinema perk (dev/staging only for now). */
+  casaCinema: boolean
   /** mercadopago only. */
   returnUrl: string
   mercadopago?: { accessToken: string; webhookSecret: string; apiUrl: string }
@@ -239,6 +246,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     billing: {
       provider: e.BILLING_PROVIDER ?? (e.NODE_ENV === 'production' ? 'none' : 'sandbox'),
       sandboxSecret: randomBytes(32).toString('hex'),
+      casaCinema: e.CASA_CINEMA,
       returnUrl: e.BILLING_RETURN_URL ?? 'https://algameet.com.br/billing/return',
       ...(e.BILLING_PROVIDER === 'mercadopago'
         ? { mercadopago: { accessToken: e.MP_ACCESS_TOKEN!, webhookSecret: e.MP_WEBHOOK_SECRET!, apiUrl: e.MP_API_URL.replace(/\/+$/, '') } }

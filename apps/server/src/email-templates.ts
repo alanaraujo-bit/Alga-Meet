@@ -128,3 +128,34 @@ export function dataExportMail(link: string, expiresOn: string): Content {
     html: html(lines, { label: 'Baixar meus dados', href: link }),
   }
 }
+
+const brl = (cents: number) => `R$ ${(cents / 100).toFixed(2).replace('.', ',')}`
+
+/**
+ * Receipt to the payer (Decreto 7.962/2013 art. 4º; growth-plan §2.4 "checkout honesto"). Only catalog text and the
+ * recipient's @username (a constrained charset), never a display name or a gift message.
+ */
+export function receiptMail(r: {
+  reference: string; productName: string; amountCents: number; paidAt: Date; renews: 'month' | 'year' | null
+  giftTo: string | null; termsUrl: string
+}): Content {
+  const lines = [
+    `Recebemos o seu pagamento de ${brl(r.amountCents)} por ${r.productName}${r.giftTo ? `, de presente para @${r.giftTo}` : ''}.`,
+    r.renews
+      ? `Renova sozinho a cada ${r.renews === 'year' ? '12 meses' : 'mês'}, pelo mesmo valor. Você pode cancelar a renovação no app quando quiser.`
+      : 'Pagamento único: não há renovação.',
+    'Você pode pedir o reembolso integral em até 7 dias, no próprio app ("Pedir reembolso"), sem precisar explicar o motivo.',
+    `Data: ${r.paidAt.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}. Pedido: ${r.reference}. O que você compra é uma licença de uso que fica na sua conta.`,
+    `Termos de Uso: ${r.termsUrl}`,
+  ]
+  return { subject: `Recibo do Alga Meet: ${r.productName}`, text: text(lines), html: html(lines.map(esc)) }
+}
+
+/** To an adult recipient with a verified address when a gift arrives. No message text (it is user-chosen). */
+export function giftReceivedMail(senderUsername: string | null): Content {
+  const lines = [
+    `${senderUsername ? `@${senderUsername}` : 'Um amigo'} mandou um presente para você no Alga Meet.`,
+    'Abra o app para ver o que é: você pode abrir ou recusar. Se recusar, quem deu recebe o valor de volta.',
+  ]
+  return { subject: 'Você recebeu um presente no Alga Meet', text: text(lines), html: html(lines.map(esc)) }
+}

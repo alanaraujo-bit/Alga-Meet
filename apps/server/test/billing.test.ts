@@ -73,7 +73,7 @@ describe('catalog and checkout', () => {
     expect((await checkout(unverified.token, 'plus_monthly')).status).toBe(403)
     const u = await register(s.app)
     expect((await checkout(u.token, 'nope')).status).toBe(404)
-    expect((await checkout(u.token, 'theme_plus_mare')).status).toBe(404) // included in Plus, not sold
+    expect((await checkout(u.token, 'icon_ha_noite')).status).toBe(404) // included in Plus, not sold
     const res = await checkout(u.token, 'plus_monthly')
     expect(res.status).toBe(201)
     expect(res.body).toMatchObject({ kind: 'subscription', provider: 'sandbox', sandbox: true })
@@ -101,15 +101,15 @@ describe('catalog and checkout', () => {
     expect(new Date(sub.currentPeriodEnd!).getTime() - Date.now()).toBeGreaterThan(360 * DAY)
     expect((await checkout(u.token, 'plus_monthly')).status).toBe(409) // already subscribed
 
-    const deco = (await checkout(u.token, 'deco_coral')).body
+    const deco = (await checkout(u.token, 'deco_ha_orbita')).body
     expect(deco.kind).toBe('order')
     await openPage(deco.url)
     const me = await billingMe(u.token)
-    expect(me.orders[0]).toMatchObject({ productId: 'deco_coral', status: 'paid', amountCents: 990, sandbox: true })
+    expect(me.orders[0]).toMatchObject({ productId: 'deco_ha_orbita', status: 'paid', amountCents: 990, sandbox: true })
     expect(me.items.map((i) => [i.sku, i.source, i.expiresAt === null])).toEqual(expect.arrayContaining([
-      ['deco_coral', 'order', true], ['plan:plus', 'subscription', false], ['theme_plus_mare', 'subscription', false],
+      ['deco_ha_orbita', 'order', true], ['plan:plus', 'subscription', false], ['icon_ha_noite', 'subscription', false],
     ]))
-    expect((await checkout(u.token, 'deco_coral')).status).toBe(409) // already owned
+    expect((await checkout(u.token, 'deco_ha_orbita')).status).toBe(409) // already owned
     gw.close()
   })
 })
@@ -174,7 +174,7 @@ describe('webhooks', () => {
     const co = (await checkout(u.token, 'plus_monthly')).body
     await sandboxHook(s.app, subEvent(co.reference, 'active', { currentPeriodEnd: new Date(Date.now() + DAY).toISOString(), amountCents: 1 }))
     expect(await planOf(u.token)).toBe('free')
-    const order = (await checkout(u.token, 'nameplate_cardume')).body
+    const order = (await checkout(u.token, 'nameplate_ha_vidro_fosco')).body
     await sandboxHook(s.app, orderEvent(order.reference, 'paid', { amountCents: 100, currency: 'BRL', providerPaymentId: 'p1' }))
     expect((await billingMe(u.token)).orders[0]!.status).toBe('pending')
   })
@@ -240,24 +240,24 @@ describe('entitlements lifecycle', () => {
     expect(await planOf(u.token)).toBe('free')
 
     const v = await register(s.app)
-    const pending = (await checkout(v.token, 'deco_folha_de_alga')).body
+    const pending = (await checkout(v.token, 'deco_ha_constelacao')).body
     await s.app.ctx.billing.sweep(new Date(Date.now() + DAY + 1000))
     expect((await billingMe(v.token)).orders.find((o) => o.id === pending.reference)!.status).toBe('expired')
   })
 
   it('recompute: refunds remove owned cosmetics, owned ones outlive the plan, plan cosmetics follow the plan', async () => {
     const u = await subscribed()
-    const order = (await checkout(u.token, 'effect_bioluminescencia')).body
+    const order = (await checkout(u.token, 'effect_ha_poeira_luz')).body
     await sandboxHook(s.app, orderEvent(order.reference, 'paid', { amountCents: 1290, currency: 'BRL', providerPaymentId: `pay_${order.reference}` }))
     const skus = async () => (await billingMe(u.token)).items.map((i) => i.sku).sort()
-    expect(await skus()).toEqual(['effect_bioluminescencia', 'nameplate_plus_correnteza', 'plan:plus', 'theme_plus_mare'])
+    expect(await skus()).toEqual(['accent_ardosia', 'accent_grafite', 'accent_lavanda', 'aura_ha_frondes', 'effect_ha_poeira_luz', 'icon_ha_noite', 'icon_ha_porcelana', 'plan:plus'])
     await sandboxHook(s.app, subEvent(u.reference, 'revoked'))
-    expect(await skus()).toEqual(['effect_bioluminescencia'])
+    expect(await skus()).toEqual(['effect_ha_poeira_luz'])
     await sandboxHook(s.app, orderEvent(order.reference, 'refunded'))
     expect(await skus()).toEqual([])
     expect((await billingMe(u.token)).orders[0]!.status).toBe('refunded')
     // A declined payment cancels the pending order.
-    const other = (await checkout(u.token, 'deco_folha_de_alga')).body
+    const other = (await checkout(u.token, 'deco_ha_constelacao')).body
     await sandboxHook(s.app, orderEvent(other.reference, 'failed'))
     expect((await billingMe(u.token)).orders.find((o) => o.id === other.reference)!.status).toBe('canceled')
   })
@@ -278,26 +278,26 @@ describe('cosmetics', () => {
     await befriend(s.app, u, friend)
     const fgw = await connect(s.port, friend.token)
     expect((await api<Me>(s.app, 'GET', '/users/@me', { token: u.token })).body.cosmetics).toBeUndefined()
-    expect((await equip(u.token, { avatarDecoration: 'deco_coral' })).status).toBe(403) // not owned
-    expect((await equip(u.token, { profileTheme: 'theme_plus_mare' })).status).toBe(403) // Plus only
+    expect((await equip(u.token, { avatarDecoration: 'deco_ha_orbita' })).status).toBe(403) // not owned
+    expect((await equip(u.token, { voiceAura: 'aura_ha_frondes' })).status).toBe(403) // Plus only
     expect((await equip(u.token, { avatarDecoration: 'nope' })).body.error.fields).toHaveProperty('avatarDecoration')
-    expect((await equip(u.token, { avatarDecoration: 'theme_noite_paulistana' })).status).toBe(400) // wrong slot
+    expect((await equip(u.token, { avatarDecoration: 'theme_ha_noite_indigo' })).status).toBe(400) // wrong slot
     expect((await equip(u.token, { avatarDecoration: 'plus_monthly' })).status).toBe(400) // not a cosmetic
-    expect((await equip(u.token, { halo: 'deco_coral' })).status).toBe(400) // unknown slot
+    expect((await equip(u.token, { halo: 'deco_ha_orbita' })).status).toBe(400) // unknown slot
 
-    await buy(u.token, 'deco_coral')
-    await buy(u.token, 'effect_bioluminescencia')
-    const res = await equip(u.token, { avatarDecoration: 'deco_coral', profileEffect: 'effect_bioluminescencia' })
+    await buy(u.token, 'deco_ha_orbita')
+    await buy(u.token, 'effect_ha_poeira_luz')
+    const res = await equip(u.token, { avatarDecoration: 'deco_ha_orbita', profileEffect: 'effect_ha_poeira_luz' })
     expect(res.status).toBe(200)
-    expect(res.body.cosmetics).toEqual({ avatarDecoration: 'deco_coral', profileEffect: 'effect_bioluminescencia' })
-    await fgw.waitFor('USER_UPDATE', (d) => d.id === u.user.id && d.cosmetics?.avatarDecoration === 'deco_coral')
+    expect(res.body.cosmetics).toEqual({ avatarDecoration: 'deco_ha_orbita', profileEffect: 'effect_ha_poeira_luz' })
+    await fgw.waitFor('USER_UPDATE', (d) => d.id === u.user.id && d.cosmetics?.avatarDecoration === 'deco_ha_orbita')
     expect((await api(s.app, 'GET', `/users/${u.user.id}`, { token: friend.token })).body.cosmetics).toEqual(res.body.cosmetics)
     const rels = (await api(s.app, 'GET', '/relationships', { token: friend.token })).body as { user: { id: string; cosmetics?: unknown } }[]
     expect(rels.find((r) => r.user.id === u.user.id)!.user.cosmetics).toEqual(res.body.cosmetics)
 
     // Omitted slots keep their item; null unequips; an empty set leaves the field out.
-    expect((await equip(u.token, { profileEffect: null })).body.cosmetics).toEqual({ avatarDecoration: 'deco_coral' })
-    expect((await equip(u.token, {})).body.cosmetics).toEqual({ avatarDecoration: 'deco_coral' })
+    expect((await equip(u.token, { profileEffect: null })).body.cosmetics).toEqual({ avatarDecoration: 'deco_ha_orbita' })
+    expect((await equip(u.token, {})).body.cosmetics).toEqual({ avatarDecoration: 'deco_ha_orbita' })
     expect((await equip(u.token, { avatarDecoration: null })).body.cosmetics).toBeUndefined()
     await fgw.waitFor('USER_UPDATE', (d) => d.id === u.user.id && d.cosmetics === undefined)
     fgw.close()
@@ -308,17 +308,17 @@ describe('cosmetics', () => {
     const u = await subscribed(periodEnd)
     const friend = await register(s.app)
     await befriend(s.app, u, friend)
-    const owned = await buy(u.token, 'deco_folha_de_alga')
-    const all = { avatarDecoration: 'deco_folha_de_alga', profileTheme: 'theme_plus_mare', nameplate: 'nameplate_plus_correnteza' }
+    const owned = await buy(u.token, 'deco_ha_constelacao')
+    const all = { avatarDecoration: 'deco_ha_constelacao', voiceAura: 'aura_ha_frondes', appIcon: 'icon_ha_noite' }
     expect((await equip(u.token, all)).body.cosmetics).toEqual(all)
     const gw = await connect(s.port, u.token)
     const fgw = await connect(s.port, friend.token)
     await api(s.app, 'POST', '/billing/subscription/cancel', { token: u.token })
     await s.app.ctx.billing.sweep(new Date(periodEnd.getTime() + 1000))
-    const onlyOwned = { avatarDecoration: 'deco_folha_de_alga' }
+    const onlyOwned = { avatarDecoration: 'deco_ha_constelacao' }
     await fgw.waitFor('USER_UPDATE', (d) => d.id === u.user.id && JSON.stringify(d.cosmetics) === JSON.stringify(onlyOwned))
     await gw.waitFor('ME_UPDATE', (d) => d.plan?.id === 'free' && JSON.stringify(d.cosmetics) === JSON.stringify(onlyOwned))
-    expect((await equip(u.token, { profileTheme: 'theme_plus_mare' })).status).toBe(403) // lapsed with the plan
+    expect((await equip(u.token, { voiceAura: 'aura_ha_frondes' })).status).toBe(403) // lapsed with the plan
 
     await sandboxHook(s.app, orderEvent(owned, 'refunded'))
     await fgw.waitFor('USER_UPDATE', (d) => d.id === u.user.id && d.cosmetics === undefined)
@@ -580,7 +580,7 @@ describe('mercado pago adapter', () => {
       expect((await api<BillingMe>(m.app, 'GET', '/billing/me', { token: u.token })).body.subscription!.cancelAtPeriodEnd).toBe(false)
 
       // One-time purchase: Checkout Pro preference, then a payment notification re-fetched from /v1/payments.
-      const order = await api<CheckoutResponse>(m.app, 'POST', '/billing/checkout', { token: u.token, body: { productId: 'deco_coral' } })
+      const order = await api<CheckoutResponse>(m.app, 'POST', '/billing/checkout', { token: u.token, body: { productId: 'deco_ha_orbita' } })
       expect(order.body.url).toBe('https://mp.test/checkout/pref1')
       store.set('/v1/payments/555', {
         id: 555, status: 'approved', external_reference: `o_${order.body.reference}`, transaction_amount: 9.9, currency_id: 'BRL',
@@ -589,7 +589,7 @@ describe('mercado pago adapter', () => {
       expect((await hook('payment', '555')).statusCode).toBe(200)
       const me = (await api<BillingMe>(m.app, 'GET', '/billing/me', { token: u.token })).body
       expect(me.orders[0]).toMatchObject({ id: order.body.reference, status: 'paid', sandbox: false })
-      expect(me.items.map((i) => i.sku)).toContain('deco_coral')
+      expect(me.items.map((i) => i.sku)).toContain('deco_ha_orbita')
 
       // Account deletion cancels the preapproval for good (never resumable).
       expect((await api(m.app, 'DELETE', '/users/@me', { token: u.token, body: { password: u.password } })).status).toBe(202)

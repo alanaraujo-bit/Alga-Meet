@@ -67,13 +67,14 @@ export class MercadoPagoProvider implements PaymentProvider {
 
   constructor(private readonly opts: MercadoPagoOptions, private readonly fetchImpl: typeof fetch = (...a) => fetch(...a)) {}
 
-  private async call(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown, idempotencyKey?: string): Promise<Json> {
+  private async call(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown, idempotencyKey?: string, extra: Record<string, string> = {}): Promise<Json> {
     const res = await this.fetchImpl(`${this.opts.apiUrl}${path}`, {
       method,
       headers: {
         authorization: `Bearer ${this.opts.accessToken}`,
         'content-type': 'application/json',
         ...(idempotencyKey ? { 'x-idempotency-key': idempotencyKey } : {}),
+        ...extra,
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       signal: AbortSignal.timeout(10_000),
@@ -105,9 +106,11 @@ export class MercadoPagoProvider implements PaymentProvider {
       return { url: pa.init_point, providerSubscriptionId: String(pa.id) }
     }
     const pref = await this.call('POST', '/checkout/preferences', {
-      items: [{ id: input.product.id, title: input.product.name, quantity: 1, unit_price: amount, currency_id: input.currency }],
+      items: [{ id: input.product.id, title: input.title ?? input.product.name, quantity: 1, unit_price: amount, currency_id: input.currency }],
       external_reference: `o_${input.reference}`,
       payer: { email: input.payerEmail },
+      // Docs (2026-11-01): "Dinheiro em conta" cannot be excluded, so "Pix only" still allows the MP balance.
+      ...(input.pixOnly ? { payment_methods: { excluded_payment_types: ['credit_card', 'debit_card', 'prepaid_card', 'ticket'].map((id) => ({ id })) } } : {}),
       notification_url: this.opts.notificationUrl,
       back_urls: { success: this.opts.returnUrl, failure: this.opts.returnUrl, pending: this.opts.returnUrl },
       statement_descriptor: 'ALGAMEET',
@@ -130,8 +133,13 @@ export class MercadoPagoProvider implements PaymentProvider {
     await this.call('PUT', `/preapproval/${encodeURIComponent(providerSubscriptionId)}`, { status: 'authorized' })
   }
 
+  /**
+   * Full refund (empty body). A Pix refund may stay `in_process` (contingency with the central bank): the header makes
+   * MP answer 201 instead of 400 then; the payment turns `refunded` later and its webhook revokes.
+   */
   async refund(providerPaymentId: string): Promise<void> {
-    await this.call('POST', `/v1/payments/${encodeURIComponent(providerPaymentId)}/refunds`, {}, `refund_${providerPaymentId}`)
+    await this.call('POST', `/v1/payments/${encodeURIComponent(providerPaymentId)}/refunds`, {}, `refund_${providerPaymentId}`,
+      { 'x-render-in-process-refunds': 'true' })
   }
 
   /** x-signature check (see file header). Requires a signed data.id: that id is what gets re-fetched. */
@@ -194,6 +202,7 @@ export class MercadoPagoProvider implements PaymentProvider {
         const paid = mapPaymentStatus(ap.payment?.status)
         if (paid === 'failed') update.status = 'past_due'
         if (paid === 'refunded') update.status = 'revoked'
+        if (paid === 'paid' && ap.payment?.id !== undefined) update.providerPaymentId = String(ap.payment.id)
         const apAt = dateOf(ap.last_modified, ap.date_created)
         if (apAt > update.occurredAt) update.occurredAt = apAt
         return [update]

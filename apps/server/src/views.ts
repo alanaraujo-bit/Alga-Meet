@@ -1,9 +1,12 @@
 /** Row → wire-model mapping and batched loaders for composite models. */
-import type {
-  Attachment, Channel, Me, Member, Message, PublicUser, Relationship, Role, Space, SpaceSnapshot,
+import {
+  PRIVATE_COSMETIC_SLOTS,
+  type Attachment, type Channel, type CosmeticSlot, type Me, type Member, type Message, type PublicUser, type Relationship, type Role,
+  type Space, type SpaceSnapshot,
 } from '@alga/shared'
 import { and, asc, eq, inArray } from 'drizzle-orm'
-import { planSummary } from './billing/catalog.js'
+import { planSummary, plusBadgeOf } from './billing/catalog.js'
+import { spaceUpgradeState } from './billing/casa.js'
 import { TERMS_VERSION, ageBracketOf } from './legal.js'
 import type { Db } from './db/index.js'
 import {
@@ -11,20 +14,26 @@ import {
   type ChannelRow, type MessageRow, type RoleRow, type SpaceRow, type UserRow,
 } from './db/schema.js'
 
-export const publicUser = (u: UserRow): PublicUser => ({
-  id: u.id,
-  username: u.username,
-  displayName: u.displayName,
-  avatarUrl: u.avatarUrl,
-  accentColor: u.accentColor,
-  bio: u.bio,
-  // Omitted when empty: member lists in READY stay small.
-  ...(Object.keys(u.cosmetics).length ? { cosmetics: { ...u.cosmetics } } : {}),
-})
+export const publicUser = (u: UserRow): PublicUser => {
+  // Private slots (app icon/accent) are the user's alone; empty cosmetics are omitted so READY member lists stay small.
+  const shown = Object.entries(u.cosmetics).filter(([slot]) => !PRIVATE_COSMETIC_SLOTS.includes(slot as CosmeticSlot))
+  const badge = plusBadgeOf(u.plusSince, u.plan)
+  return {
+    id: u.id,
+    username: u.username,
+    displayName: u.displayName,
+    avatarUrl: u.avatarUrl,
+    accentColor: u.accentColor,
+    bio: u.bio,
+    ...(shown.length ? { cosmetics: Object.fromEntries(shown) } : {}),
+    ...(badge ? { plusBadge: badge } : {}),
+  }
+}
 
 /** `defaultAttachmentBytes` = config.files.maxAttachmentBytes (the free plan's cap). */
 export const meView = (u: UserRow, defaultAttachmentBytes: number): Me => ({
   ...publicUser(u),
+  ...(Object.keys(u.cosmetics).length ? { cosmetics: { ...u.cosmetics } } : {}),
   email: u.email,
   emailVerified: u.emailVerifiedAt !== null,
   statusPreference: u.statusPreference,
@@ -43,6 +52,7 @@ export const spaceView = (s: SpaceRow): Space => ({
   ownerId: s.ownerId,
   createdAt: s.createdAt.toISOString(),
   e2ee: s.e2ee,
+  ...(s.upgradeEndsAt ? { upgrade: spaceUpgradeState(s)! } : {}),
 })
 
 export const roleView = (r: RoleRow): Role => ({

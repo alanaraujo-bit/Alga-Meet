@@ -268,7 +268,7 @@ describe('account deletion (LGPD art. 18 VI)', () => {
     const dm = (await api(s.app, 'POST', '/users/@me/channels', { token: alice.token, body: { recipientIds: [bob.user.id] } })).body
     await api(s.app, 'POST', `/channels/${dm.id}/messages`, { token: alice.token, body: { content: 'oi bob' } })
     await api(s.app, 'POST', '/reports', { token: alice.token, body: { targetType: 'user', targetId: carol.user.id, reason: 'spam' } })
-    const co = (await api(s.app, 'POST', '/billing/checkout', { token: alice.token, body: { productId: 'deco_coral' } })).body
+    const co = (await api(s.app, 'POST', '/billing/checkout', { token: alice.token, body: { productId: 'deco_ha_orbita' } })).body
     await s.app.inject({ method: 'GET', url: new URL(co.url).pathname + new URL(co.url).search })
     expect((await db.select().from(orders).where(eq(orders.userId, alice.user.id)))[0]!.status).toBe('paid')
 
