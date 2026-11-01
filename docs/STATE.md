@@ -5,6 +5,12 @@
 ## Staging (Railway, criado 2026-11-01 com aprovação do dono)
 API pública `https://api-staging-b3ea.up.railway.app` + Postgres + bucket — ver `docs/infra/staging.md`. Funciona: contas, social, espaços, convites, mensagens, gateway (e-mail auto-verificado só em staging). Instalador apontando para staging: `apps/desktop/release/AlgaMeet-Setup-0.1.0-staging.exe` (não assinado). **Não funciona ainda: voz/tela (sem SFU com UDP), e-mail real, pagamentos.**
 
+## Servidor de voz em casa (decisão do dono 2026-11-01: custo zero, servidor Ubuntu próprio)
+- **Sem CGNAT (confirmado):** WAN do roteador (Huawei IGD, via UPnP) = `203.0.113.10` = IP público visto de fora. IPv6 público também (provedor local).
+- Upload medido pelo dono: **220 Mbps** (download 429, ping 2 ms) → folga para ~20+ espectadores de 1080p60.
+- Servidor encontrado na LAN: `192.168.1.110`, OpenSSH 9.6p1 Ubuntu-3ubuntu13.20 (Ubuntu 24.04). Acesso SSH por chave **ainda não autorizado** pelo dono.
+- Kit de instalação: `infra/home-sfu/` (em preparação).
+
 ## Versão executável
 - Dev: `npm install && npm run dev` (ver `README.md`). Multiusuário local: `npm run dev -- --profiles=bob` — abre duas janelas; crie uma conta em cada, adicione como amigo, crie um espaço, convide, entre no canal de voz e transmita a tela.
 - Funciona só nesta máquina/rede local até o deploy (API no Railway + SFU em VPS) — ver Bloqueios humanos.
