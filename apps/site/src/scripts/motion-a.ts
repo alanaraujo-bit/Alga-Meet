@@ -73,7 +73,8 @@ export function initTierA() {
 
   initHero(w, narrow);
   initRoom(w);
-  if (w) { initFloat(w, narrow); initMoods(w); }
+  if (w) { initFloat(w, narrow); initMoods(w); initFinal(w); }
+  initLightTitles();
   initMagnetic(fine);
   initRest();
 
@@ -230,7 +231,7 @@ function initMoods(w: World) {
   w.onFrame = (t) => {
     prev?.(t);
     const y = scrollY;
-    if (y <= heroEnd || !pts.length) return; // a abertura cuida da própria água
+    if (y <= heroEnd || !pts.length || w.state.surface > 0.001) return; // abertura e fechamento cuidam da própria água
     let d = pts[pts.length - 1].d, r = pts[pts.length - 1].r;
     for (let i = 0; i < pts.length - 1; i++) {
       if (y < pts[i + 1].y) { const k = gsap.utils.clamp(0, 1, (y - pts[i].y) / (pts[i + 1].y - pts[i].y)); const e = k * k * (3 - 2 * k); d = pts[i].d + (pts[i + 1].d - pts[i].d) * e; r = pts[i].r + (pts[i + 1].r - pts[i].r) * e; break; }
@@ -238,6 +239,44 @@ function initMoods(w: World) {
     w.state.depth += (d - w.state.depth) * 0.1;
     w.state.rays += (r - w.state.rays) * 0.1;
   };
+}
+
+// Fechamento: subimos, a câmera atravessa a superfície, o horizonte da hora azul nasce e as frondes se encontram.
+function initFinal(w: World) {
+  const fin = $('[data-final]');
+  const space = $('.mark-space', fin || document);
+  if (!fin || !space) return;
+  let active = false;
+  const prev = w.onFrame;
+  w.onFrame = (t) => {
+    prev?.(t);
+    if (!active) return;
+    const r = space.getBoundingClientRect();
+    w.bladeAt = { x: (r.left + r.width / 2) / innerWidth, y: 1 - (r.top + r.height / 2) / innerHeight, h: (r.height / innerHeight) * 0.92 };
+    // as frondes ficam de pé na linha do horizonte
+    w.state.horizon = 1 - (r.bottom - 4) / innerHeight;
+  };
+  const tl = gsap.timeline({ defaults: { ease: 'none' } });
+  tl.to(w.state, { surface: 1, depth: 0.15, rays: 1, duration: 2.0, ease: 'power1.inOut' }, 0)
+    .fromTo(w.blade, { fade: 0, lean: 1 }, { fade: 1, duration: 0.8, immediateRender: false }, 1.0)
+    .to(w.blade, { lean: 0, duration: 1.0, ease: 'expo.inOut' }, 1.9)
+    .add(() => { const r = space.getBoundingClientRect(); w.ripple((r.left + r.width / 2) / innerWidth, (r.bottom - 6) / innerHeight, 1.8); }, 2.85)
+    .fromTo(w.blade, { glow: 0 }, { glow: 0.6, duration: 0.2, yoyo: true, repeat: 1, immediateRender: false }, 2.8)
+    .fromTo('[data-final-t]', { opacity: 0, filter: 'blur(18px)', scale: 1.08 }, { opacity: 1, filter: 'blur(0px)', scale: 1, duration: 0.9, ease: 'power2.out' }, 2.6)
+    .fromTo('[data-final-in]', { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.6, stagger: 0.12, ease: 'power2.out' }, 3.0)
+    .set({}, {}, 4.2);
+  ScrollTrigger.create({
+    trigger: fin, start: 'top bottom', end: 'bottom bottom', scrub: 0.6, animation: tl,
+    onToggle: (s) => { active = s.isActive || s.direction > 0; if (!active) { w.bladeAt = null; w.blade.lean = 0; w.blade.fade = 0; w.state.surface = 0; } },
+  });
+}
+
+// Títulos de capítulo nascem da luz: saem do desfoque com brilho índigo.
+function initLightTitles() {
+  ScrollTrigger.batch('h2[data-reveal]', {
+    start: 'top 88%', once: true,
+    onEnter: (els) => gsap.fromTo(els, { opacity: 0, y: 0, filter: 'blur(16px)', scale: 1.05, textShadow: '0 0 34px rgba(139,142,247,0.9)' }, { opacity: 1, filter: 'blur(0px)', scale: 1, textShadow: '0 0 0px rgba(139,142,247,0)', duration: 1.3, ease: 'expo.out', overwrite: true, clearProps: 'filter,textShadow' }),
+  });
 }
 
 // Botões magnéticos (só mouse): o botão vem um pouco na direção do cursor.
@@ -257,7 +296,7 @@ function initMagnetic(fine: boolean) {
 
 // Seções de conteúdo (até ganharem os próprios momentos).
 function initRest() {
-  ScrollTrigger.batch('[data-reveal]', {
+  ScrollTrigger.batch('[data-reveal]:not(h2)', {
     start: 'top 90%', once: true,
     onEnter: (els) => gsap.to(els, { opacity: 1, y: 0, duration: 0.9, ease: 'expo.out', stagger: 0.08, overwrite: true }),
   });

@@ -102,6 +102,11 @@ canvas.world { position: fixed; left: 0; top: 0; z-index: 0; pointer-events: non
 html.gl-on canvas.world { opacity: 1; }
 main, .final, .foot { position: relative; z-index: 1; }
 
+/* Clique no download: um anel de luz sai do ponto do clique (main.ts). */
+.btn { position: relative; }
+.btn .ring { position: absolute; left: var(--rx); top: var(--ry); width: 10px; height: 10px; margin: -5px; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 2px rgba(210, 212, 255, 0.95), 0 0 24px rgba(139, 142, 247, 0.9); animation: btn-ring 800ms var(--ease-out) forwards; }
+@keyframes btn-ring { to { transform: scale(22); opacity: 0; } }
+
 /* Revelação por scroll: só com JS (classe no <html>), nunca esconde conteúdo sem JS. */
 html.js.tier-a [data-reveal], html.js.tier-b [data-reveal] { opacity: 0; transform: translateY(16px); }
 html.js.tier-b [data-reveal] { transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out); transition-delay: var(--d, 0ms); }

@@ -6,14 +6,17 @@ import { facts } from '../data/facts';
 import { downloadNote, releasesUrl } from '../data/links';
 const year = new Date().getFullYear();
 ---
-<section class="final" aria-labelledby="final-t">
-  <div class="horizon" data-horizon aria-hidden="true"></div>
-  <div class="wrap inner">
-    <img class="mark" src={mark} width="72" height="72" alt="" data-reveal />
-    <h2 id="final-t" data-reveal>Chama o pessoal.</h2>
-    <p class="lede" data-reveal>Baixe, crie um espaço e mande o convite. Em dois minutos vocês estão conversando.</p>
-    <div data-reveal><Download /></div>
-    <p class="specs" data-reveal>{downloadNote} · instalador de {facts.installerMb} MB · <a href={releasesUrl} rel="noopener">ver novidades</a></p>
+<section class="final" aria-labelledby="final-t" data-final>
+  <div class="final-stage" data-final-stage>
+    <div class="horizon" data-horizon aria-hidden="true"></div>
+    <div class="wrap inner">
+      <img class="mark" src={mark} width="72" height="72" alt="" data-reveal />
+      <span class="mark-space" aria-hidden="true"></span>
+      <h2 id="final-t" data-final-t>Chama o <em>pessoal.</em></h2>
+      <p class="lede" data-final-in>Baixe, crie um espaço e mande o convite. Em dois minutos vocês estão conversando.</p>
+      <div class="cta" data-final-in><Download /></div>
+      <p class="specs" data-final-in>{downloadNote} · instalador de {facts.installerMb} MB · <a href={releasesUrl} rel="noopener">ver novidades</a></p>
+    </div>
   </div>
 </section>
 
@@ -25,7 +28,19 @@ const year = new Date().getFullYear();
 </footer>
 
 <style>
-  .final { position: relative; overflow: clip; padding-block: clamp(120px, 20vh, 220px) clamp(120px, 18vh, 200px); text-align: center; isolation: isolate; }
+  .final { position: relative; overflow: clip; text-align: center; isolation: isolate; }
+  .final-stage { position: relative; padding-block: clamp(120px, 20vh, 220px) clamp(120px, 18vh, 200px); }
+  h2 em { font-style: normal; color: #a9acff; }
+  .mark-space { display: none; }
+  /* Nível A: a superfície. A água sobe, o horizonte da hora azul nasce (WebGL) e as frondes se encontram. */
+  :global(html.gl-on) .final { height: 260vh; overflow: visible; }
+  :global(html.gl-on) .final-stage { position: sticky; top: 0; height: 100vh; height: 100lvh; padding: 0; display: grid; place-items: center; }
+  :global(html.gl-on) .final .horizon, :global(html.gl-on) .final::before, :global(html.gl-on) .mark { display: none; }
+  :global(html.gl-on) .mark-space { display: block; height: clamp(150px, 24vh, 240px); }
+  :global(html.gl-on) .final h2 { text-shadow: 0 4px 40px rgba(6, 8, 30, 0.6); }
+  :global(html.gl-on) .final .lede { color: var(--text-2); text-shadow: 0 2px 20px rgba(6, 8, 30, 0.8); }
+  :global(html.gl-on) .final .specs { color: #b8bcd6; }
+
   /* Horizonte da hora azul: a borda de um planeta escuro com a luz índigo nascendo atrás. */
   .horizon {
     position: absolute; left: 50%; top: 74%; width: max(1400px, 170vw); aspect-ratio: 1; margin-left: calc(max(1400px, 170vw) / -2); z-index: -1; border-radius: 50%;

@@ -44,11 +44,12 @@ uniform vec4 uObjA;
 uniform vec4 uObjB;
 uniform vec3 uBed;
 uniform vec3 uDust;
+uniform float uHorizon;
 ${noiseGLSL}
 
 vec3 sky(vec2 uv, vec2 p, float t) {
   // Hora azul: índigo profundo em cima, faixa de luz no horizonte, água escura embaixo.
-  float h = 0.36;
+  float h = uHorizon;
   float yy = uv.y - h;
   vec3 top = vec3(0.07, 0.08, 0.24);
   vec3 band = vec3(0.42, 0.44, 0.95);

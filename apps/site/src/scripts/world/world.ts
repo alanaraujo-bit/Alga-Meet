@@ -12,7 +12,7 @@ const MX0 = 62, MX1 = 194, MY0 = 12, MY1 = 244;
 const MARK_H = 208.2;
 
 type V4 = { x: number; y: number; r: number; i: number };
-export type WaterState = { depth: number; rays: number; tint: [number, number, number]; surface: number; pool: V4; objA: V4; objB: V4 };
+export type WaterState = { depth: number; rays: number; tint: [number, number, number]; surface: number; horizon: number; pool: V4; objA: V4; objB: V4 };
 const v4 = (o: V4) => [o.x, o.y, o.r, o.i];
 
 function maskTexture(): HTMLCanvasElement {
@@ -87,7 +87,7 @@ export class World {
   cam = { z: 6, y: 0, x: 0 };
   blade = { grow: [0, 0], lean: 1, fade: 1, glow: 0, x: 0, y: 0, scale: 1, bend: 0 };
   state: WaterState = {
-    depth: 0, rays: 1, tint: [0.26, 0.32, 0.86], surface: 0,
+    depth: 0, rays: 1, tint: [0.26, 0.32, 0.86], surface: 0, horizon: 0.36,
     pool: { x: 0.5, y: -0.15, r: 1, i: 0 }, objA: { x: 0, y: 0, r: 0, i: 0 }, objB: { x: 0, y: 0, r: 0, i: 0 },
   };
   scroll = 0;
@@ -118,7 +118,7 @@ export class World {
       vertex: fullVert, fragment: waterFrag, depthTest: false, depthWrite: false,
       uniforms: {
         uTime: { value: 0 }, uAspect: { value: 1 }, uDepth: { value: 0 }, uRays: { value: 1 }, uIntro: { value: 0 },
-        uSurface: { value: 0 }, uFlow: { value: 0 }, uTint: { value: [0.26, 0.32, 0.86] }, uBed: { value: [0.5, 0, 0] }, uDust: { value: [0.5, 0, 0] },
+        uSurface: { value: 0 }, uFlow: { value: 0 }, uTint: { value: [0.26, 0.32, 0.86] }, uBed: { value: [0.5, 0, 0] }, uDust: { value: [0.5, 0, 0] }, uHorizon: { value: 0.36 },
         uMouse: { value: [0.5, 0.5] }, uMouseOn: { value: 0 }, uRip: { value: rip.flat() },
         uPool: { value: [0.5, -0.15, 1, 0] }, uObjA: { value: [0, 0, 0, 0] }, uObjB: { value: [0, 0, 0, 0] },
       },
@@ -226,7 +226,7 @@ export class World {
 
     const s = this.state, u = this.water.uniforms;
     u.uTime.value = t; u.uIntro.value = ease; u.uDepth.value = s.depth; u.uRays.value = s.rays; u.uTint.value = s.tint;
-    u.uSurface.value = s.surface; u.uPool.value = v4(s.pool); u.uObjA.value = v4(s.objA); u.uObjB.value = v4(s.objB);
+    u.uSurface.value = s.surface; u.uHorizon.value = s.horizon; u.uPool.value = v4(s.pool); u.uObjA.value = v4(s.objA); u.uObjB.value = v4(s.objB);
     // leito sob as frondes: projeta a base do grupo na tela
     const bx = 0.5 + (this.layout.x + this.blade.x) / ((2 * this.cam.z * Math.tan((35 * Math.PI) / 360)) * (innerWidth / innerHeight));
     const by = 0.5 + (this.layout.y + this.blade.y) / (2 * this.cam.z * Math.tan((35 * Math.PI) / 360));
@@ -258,7 +258,7 @@ export class World {
       if (i === 1) { mesh.rotation.z = -0.42 * b.lean; mesh.position.x = (135 - 127.6) * (3.1 / MARK_H) + 0.28 * b.lean; }
     });
     const pu = this.particles.program.uniforms;
-    pu.uTime.value = t; pu.uScroll.value = this.scroll; pu.uIntro.value = ease; pu.uFocus.value = this.cam.z;
+    pu.uTime.value = t; pu.uScroll.value = this.scroll; pu.uIntro.value = ease * (1 - s.surface * 0.85); pu.uFocus.value = this.cam.z;
 
     this.renderer.render({ scene: this.composite, clear: false });
     this.renderer.render({ scene: this.scene, camera: this.camera, clear: false, frustumCull: false });

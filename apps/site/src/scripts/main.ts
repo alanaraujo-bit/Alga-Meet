@@ -102,8 +102,25 @@ function initTierB() {
   document.querySelectorAll('[data-reveal], [data-count], [data-bars], [data-lit]').forEach((el) => io.observe(el));
 }
 
+// Clique no download (A e B): anel de luz no botão e, com a água ligada, uma onda que corre por ela.
+function initDownloadClick() {
+  if (tier === 'c') return;
+  for (const b of document.querySelectorAll<HTMLElement>('[data-download], [data-invite-open]')) {
+    b.addEventListener('click', (e) => {
+      const r = b.getBoundingClientRect();
+      const ring = document.createElement('span');
+      ring.className = 'ring';
+      ring.style.setProperty('--rx', `${e.clientX - r.left}px`);
+      ring.style.setProperty('--ry', `${e.clientY - r.top}px`);
+      b.append(ring);
+      setTimeout(() => ring.remove(), 850);
+    });
+  }
+}
+
 initNav();
 initInvite();
+initDownloadClick();
 initCompare();
 initNoise();
 
