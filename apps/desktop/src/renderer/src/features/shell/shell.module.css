@@ -329,7 +329,7 @@
   align-items: center;
   gap: var(--s-0_5);
   height: 52px;
-  padding: 0 var(--s-1_5) 0 var(--s-1_5);
+  padding: 0 var(--s-1);
 }
 .me {
   display: flex;
@@ -338,7 +338,7 @@
   flex: 1;
   min-width: 0;
   height: 40px;
-  padding: 0 var(--s-1_5) 0 var(--s-1);
+  padding: 0 var(--s-1);
   border-radius: var(--r-md);
   text-align: left;
 }
@@ -357,7 +357,7 @@
   white-space: nowrap;
   color: var(--text-primary);
   font: var(--type-ui);
-  font-weight: var(--w-semibold);
+  font-weight: var(--w-medium);
 }
 .meStatus {
   overflow: hidden;

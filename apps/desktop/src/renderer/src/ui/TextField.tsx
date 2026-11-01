@@ -73,10 +73,9 @@ export function TextField({ label, ariaLabel, hint, error, optional, leadingIcon
             capsCheck(e)
             onKeyUp?.(e)
           }}
-          onBlur={(e) => {
-            setCaps(false)
-            onBlur?.(e)
-          }}
+          // Caps state is kept on blur on purpose: hiding the hint on mousedown would shift the
+          // layout under the pointer and make the click on "Entrar" miss.
+          onBlur={onBlur}
         />
         {(isPassword || trailing) && (
           <span className={s.trailing}>

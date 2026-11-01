@@ -4,6 +4,7 @@ import { patchReaction } from '../store/data'
 import { homeBadge, spaceUnread } from '../store/selectors'
 import { place } from '../ui/floating'
 import { fuzzyScore } from './fuzzy'
+import { parseInviteCode } from './invite'
 import { buildRows, GROUP_WINDOW_MS } from './grouping'
 import { mentionedIds, parseMarkdown, safeUrl, toPlainText, type MdNode } from './markdown'
 
@@ -176,5 +177,15 @@ describe('unread + reactions', () => {
     const other = patchReaction(once, '👍', 1, false)
     expect(other.reactions[0]).toEqual({ emoji: '👍', count: 2, me: true })
     expect(patchReaction(patchReaction(other, '👍', -1, true), '👍', -1, true).reactions[0]).toEqual({ emoji: '👍', count: 1, me: false })
+  })
+})
+
+describe('parseInviteCode', () => {
+  it('accepts bare codes and links, rejects junk', () => {
+    expect(parseInviteCode('k3yZ9q')).toBe('k3yZ9q')
+    expect(parseInviteCode('  https://alga.meet/i/k3yZ9q?ref=x  ')).toBe('k3yZ9q')
+    expect(parseInviteCode('alga.meet/i/k3yZ9q/')).toBe('k3yZ9q')
+    expect(parseInviteCode('não é convite!')).toBeNull()
+    expect(parseInviteCode('')).toBeNull()
   })
 })
