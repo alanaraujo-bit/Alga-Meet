@@ -45,18 +45,26 @@ declare module 'fastify' {
 }
 
 const TOUCH_INTERVAL_MS = 60_000
+const DAY_MS = 24 * 60 * 60 * 1000
+export const SESSION_IDLE_MS = 30 * DAY_MS
+export const SESSION_MAX_AGE_MS = 90 * DAY_MS
 
-/** Resolves a bearer token to its session + user, or null. Touches lastUsedAt at most once a minute. */
+/** Resolves a bearer token to its session + user, or null (expired ones are deleted). Touches lastUsedAt at most once a minute. */
 export async function resolveToken(db: Db, token: string): Promise<AuthContext | null> {
   if (!token || token.length > 128) return null
   const [row] = await db
-    .select({ user: users, sessionId: sessions.id, lastUsedAt: sessions.lastUsedAt })
+    .select({ user: users, sessionId: sessions.id, createdAt: sessions.createdAt, lastUsedAt: sessions.lastUsedAt })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
     .where(eq(sessions.tokenHash, sha256Hex(token)))
     .limit(1)
   if (!row) return null
-  if (Date.now() - row.lastUsedAt.getTime() > TOUCH_INTERVAL_MS) {
+  const now = Date.now()
+  if (now - row.lastUsedAt.getTime() > SESSION_IDLE_MS || now - row.createdAt.getTime() > SESSION_MAX_AGE_MS) {
+    await db.delete(sessions).where(eq(sessions.id, row.sessionId))
+    return null
+  }
+  if (now - row.lastUsedAt.getTime() > TOUCH_INTERVAL_MS) {
     await db.update(sessions).set({ lastUsedAt: new Date() }).where(eq(sessions.id, row.sessionId))
   }
   return { user: row.user, sessionId: row.sessionId }
@@ -77,4 +85,8 @@ export function authenticate(db: Db) {
     if (!auth) throw new HttpError('unauthorized', 'Sessão inválida ou expirada.')
     req.auth = auth
   }
+}
+
+export async function hasSession(db: Db, userId: string): Promise<boolean> {
+  return (await db.select({ id: sessions.id }).from(sessions).where(eq(sessions.userId, userId)).limit(1)).length > 0
 }

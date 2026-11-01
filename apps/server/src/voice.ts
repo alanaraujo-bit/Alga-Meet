@@ -6,6 +6,7 @@ import { Permission, hasPermission, type VoiceState } from '@alga/shared'
 import type { FastifyBaseLogger } from 'fastify'
 import { AccessToken, RoomServiceClient, TrackSource, WebhookReceiver, type WebhookEvent } from 'livekit-server-sdk'
 import { channelAudience, memberPermissions, spaceMemberIds } from './access.js'
+import { hasSession } from './auth.js'
 import type { Config } from './config.js'
 import type { Db } from './db/index.js'
 import type { Hub } from './gateway/hub.js'
@@ -102,10 +103,10 @@ export class Voice {
       return
     }
     const { row, recipientIds } = found
-    // Tokens live for an hour, so re-check access: a kicked member must not linger in the room.
-    const allowed = row.spaceId
+    // Tokens live for an hour, so re-check access: a kicked or logged-out user must not linger in the room.
+    const allowed = (row.spaceId
       ? hasPermission((await memberPermissions(this.db, row.spaceId, userId)).get(userId) ?? 0, Permission.CONNECT)
-      : recipientIds.includes(userId)
+      : recipientIds.includes(userId)) && await hasSession(this.db, userId)
     if (!allowed) {
       this.log.warn({ channelId, userId }, 'voice: participant without access, removing from room')
       await this.kick(channelId, userId)
@@ -152,10 +153,10 @@ export class Voice {
     this.hub.dispatch(await this.audience(state), 'VOICE_STATE_UPDATE', state)
   }
 
-  /** Disconnects a user from voice in any of `channelIds` (leave/kick). */
-  async disconnect(userId: string, channelIds: string[]): Promise<void> {
+  /** Disconnects a user from voice in any of `channelIds` (leave/kick), or from any channel when omitted. */
+  async disconnect(userId: string, channelIds?: string[]): Promise<void> {
     const s = this.states.get(userId)
-    if (!s || !channelIds.includes(s.channelId)) return
+    if (!s || (channelIds && !channelIds.includes(s.channelId))) return
     await this.remove(s)
     await this.kick(s.channelId, userId)
   }

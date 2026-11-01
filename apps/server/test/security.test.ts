@@ -4,7 +4,9 @@
  */
 import { GatewayClose, type Invite, type SpaceSnapshot } from '@alga/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { eq } from 'drizzle-orm'
 import { loadConfig } from '../src/config.js'
+import { sessions } from '../src/db/schema.js'
 import { api, connect, freshIp, openGateway, postWebhook, register, startServer, type TestServer } from './helpers.js'
 
 let s: TestServer
@@ -179,4 +181,54 @@ describe('A2/M3 gateway throttling and limits', () => {
     expect((await idle.closed).code).toBe(GatewayClose.HEARTBEAT_TIMEOUT)
     expect(Date.now() - started).toBeLessThan(12_000)
   }, 15_000)
+})
+
+describe('M2 sessions expire and can all be revoked', () => {
+  const DAY = 24 * 60 * 60 * 1000
+
+  it('rejects sessions idle for 30 days or older than 90 days', async () => {
+    const idle = await register(s.app)
+    const old = await register(s.app)
+    await s.app.ctx.db.update(sessions).set({ lastUsedAt: new Date(Date.now() - 31 * DAY) }).where(eq(sessions.userId, idle.user.id))
+    await s.app.ctx.db.update(sessions).set({ createdAt: new Date(Date.now() - 91 * DAY) }).where(eq(sessions.userId, old.user.id))
+    expect((await api(s.app, 'GET', '/users/@me', { token: idle.token })).status).toBe(401)
+    expect((await api(s.app, 'GET', '/users/@me', { token: old.token })).status).toBe(401)
+    expect(await s.app.ctx.db.select().from(sessions).where(eq(sessions.userId, old.user.id))).toEqual([])
+  })
+
+  it('POST /auth/password checks the current password and revokes every other session', async () => {
+    const a = await register(s.app)
+    const other = (await api(s.app, 'POST', '/auth/login', { ip: freshIp(), body: { login: a.user.username, password: a.password } })).body.token as string
+    const gw = await connect(s.port, other)
+    const wrong = await api(s.app, 'POST', '/auth/password', { token: a.token, body: { currentPassword: 'nope-nope', newPassword: 'brand new password' } })
+    expect(wrong.status).toBe(400)
+    expect(wrong.body.error.fields.currentPassword).toBeDefined()
+    expect((await api(s.app, 'POST', '/auth/password', { token: a.token, body: { currentPassword: a.password, newPassword: 'brand new password' } })).status).toBe(204)
+    expect((await gw.closed).code).toBe(GatewayClose.SESSION_REVOKED)
+    expect((await api(s.app, 'GET', '/users/@me', { token: other })).status).toBe(401)
+    expect((await api(s.app, 'GET', '/users/@me', { token: a.token })).status).toBe(200)
+    expect((await api(s.app, 'POST', '/auth/login', { ip: freshIp(), body: { login: a.user.username, password: a.password } })).status).toBe(401)
+    expect((await api(s.app, 'POST', '/auth/login', { ip: freshIp(), body: { login: a.user.username, password: 'brand new password' } })).status).toBe(200)
+  })
+
+  it('DELETE /auth/sessions revokes all but the current session', async () => {
+    const a = await register(s.app)
+    const t2 = (await api(s.app, 'POST', '/auth/login', { ip: freshIp(), body: { login: a.user.username, password: a.password } })).body.token as string
+    expect((await api(s.app, 'DELETE', '/auth/sessions', { token: a.token })).status).toBe(204)
+    expect((await api(s.app, 'GET', '/users/@me', { token: t2 })).status).toBe(401)
+    expect((await api(s.app, 'GET', '/auth/sessions', { token: a.token })).body).toHaveLength(1)
+  })
+
+  it('logging out of the last session drops voice, and the old LiveKit token cannot rejoin', async () => {
+    const [a, b] = [await register(s.app), await register(s.app)]
+    const { voice } = await spaceWith(a.token, b.token)
+    const ga = await connect(s.port, a.token)
+    await postWebhook(s.app, s.config, lkEvent('participant_joined', voice.id, b.user.id))
+    await ga.waitFor('VOICE_STATE_UPDATE', (v) => v.userId === b.user.id)
+    expect((await api(s.app, 'POST', '/auth/logout', { token: b.token })).status).toBe(204)
+    await ga.waitFor('VOICE_STATE_REMOVE', (d) => d.userId === b.user.id)
+    await postWebhook(s.app, s.config, lkEvent('participant_joined', voice.id, b.user.id))
+    expect(s.app.ctx.voice.inChannel(voice.id)).toEqual([])
+    ga.close()
+  })
 })

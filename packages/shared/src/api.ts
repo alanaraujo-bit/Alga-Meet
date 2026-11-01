@@ -9,8 +9,11 @@ import type { Me } from './models.js'
  * POST   /auth/register            RegisterBody          -> AuthResponse
  * POST   /auth/login               LoginBody             -> AuthResponse
  * POST   /auth/logout                                    -> 204
+ * POST   /auth/password            ChangePasswordBody    -> 204 (revokes every other session)
  * GET    /auth/sessions                                  -> Session[]
+ * DELETE /auth/sessions                                  -> 204 (revoke all except the current one)
  * DELETE /auth/sessions/:id                              -> 204
+ *   Sessions expire after 30 days without use or 90 days after login (then 401).
  * GET    /users/@me                                      -> Me
  * PATCH  /users/@me                PatchMeBody           -> Me
  * GET    /users/:id                                      -> PublicUser
@@ -79,6 +82,12 @@ export const LoginBody = z.object({
   password: z.string().min(1).max(256),
 })
 export type LoginBody = z.infer<typeof LoginBody>
+
+export const ChangePasswordBody = z.object({
+  currentPassword: z.string().min(1).max(256),
+  newPassword: RegisterBody.shape.password,
+})
+export type ChangePasswordBody = z.infer<typeof ChangePasswordBody>
 
 export interface AuthResponse {
   token: string

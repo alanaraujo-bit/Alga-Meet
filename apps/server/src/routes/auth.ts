@@ -1,11 +1,11 @@
-import { GatewayClose, LoginBody, RegisterBody, uuidv7, type AuthResponse, type Session } from '@alga/shared'
-import { and, desc, eq, or } from 'drizzle-orm'
+import { ChangePasswordBody, GatewayClose, LoginBody, RegisterBody, uuidv7, type AuthResponse, type Session } from '@alga/shared'
+import { and, desc, eq, ne, or } from 'drizzle-orm'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import type { Ctx } from '../app.js'
-import { createSession, hashPassword, verifyPassword } from '../auth.js'
+import { createSession, hasSession, hashPassword, verifyPassword } from '../auth.js'
 import { isUniqueViolation } from '../db/index.js'
 import { sessions, users } from '../db/schema.js'
-import { HttpError, conflict, idParam, notFound, parse } from '../errors.js'
+import { HttpError, conflict, idParam, invalid, notFound, parse } from '../errors.js'
 import { meView } from '../views.js'
 
 /** Per client IP (see TRUST_PROXY). */
@@ -69,10 +69,32 @@ function takenError(taken: { email: string; username: string }[], body: { email:
   return conflict('E-mail ou nome de usuário já em uso.', fields)
 }
 
-export function authRoutes(app: FastifyInstance, { db, hub }: Ctx): void {
+export function authRoutes(app: FastifyInstance, { db, hub, voice }: Ctx): void {
+  /** Closes the sockets of deleted sessions; a user left without any session also leaves voice. */
+  const revoked = async (userId: string, deleted: { id: string }[], reason: string) => {
+    for (const s of deleted) hub.closeSession(s.id, GatewayClose.SESSION_REVOKED, reason)
+    if (deleted.length && !(await hasSession(db, userId))) await voice.disconnect(userId)
+  }
+  const deleteOthers = (req: FastifyRequest) => db.delete(sessions)
+    .where(and(eq(sessions.userId, req.auth.user.id), ne(sessions.id, req.auth.sessionId))).returning({ id: sessions.id })
+
   app.post('/auth/logout', async (req, reply) => {
-    await db.delete(sessions).where(eq(sessions.id, req.auth.sessionId))
-    hub.closeSession(req.auth.sessionId, GatewayClose.SESSION_REVOKED, 'logged out')
+    const deleted = await db.delete(sessions).where(eq(sessions.id, req.auth.sessionId)).returning({ id: sessions.id })
+    await revoked(req.auth.user.id, deleted, 'logged out')
+    return reply.code(204).send()
+  })
+
+  app.post('/auth/password', { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } }, async (req, reply) => {
+    const body = parse(ChangePasswordBody, req.body)
+    const me = req.auth.user
+    if (!(await verifyPassword(me.passwordHash, body.currentPassword))) throw invalid({ currentPassword: 'Senha atual incorreta.' })
+    await db.update(users).set({ passwordHash: await hashPassword(body.newPassword) }).where(eq(users.id, me.id))
+    await revoked(me.id, await deleteOthers(req), 'password changed')
+    return reply.code(204).send()
+  })
+
+  app.delete('/auth/sessions', async (req, reply) => {
+    await revoked(req.auth.user.id, await deleteOthers(req), 'session revoked')
     return reply.code(204).send()
   })
 
@@ -93,7 +115,7 @@ export function authRoutes(app: FastifyInstance, { db, hub }: Ctx): void {
       .where(and(eq(sessions.id, id), eq(sessions.userId, req.auth.user.id)))
       .returning({ id: sessions.id })
     if (!deleted.length) throw notFound('Sessão não encontrada.')
-    hub.closeSession(id, GatewayClose.SESSION_REVOKED, 'session revoked')
+    await revoked(req.auth.user.id, deleted, 'session revoked')
     return reply.code(204).send()
   })
 }
