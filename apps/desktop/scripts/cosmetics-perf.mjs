@@ -9,8 +9,9 @@
 //   - GPU process and renderer CPU (Electron app.getAppMetrics, % of one core, 1 s samples)
 //   - engine counters: JS ms spent by cosmetics (aura callbacks, canvas), gestures started/skipped, concurrency
 //   Memory: a fresh app per scene, renderer private bytes over 60 s (start / mean / end) and the JS heap.
-//   node scripts/cosmetics-perf.mjs [--skip-build] [--parts]   env: COSMETICS_SECONDS (60), COSMETICS_ROUNDS (4)
+//   node scripts/cosmetics-perf.mjs [--skip-build] [--parts[=tiles,list,…]]   env: COSMETICS_SECONDS (60), COSMETICS_ROUNDS (4)
 //   --parts adds each part of the scene on its own (call tiles, list, still decorations, frame, each aura).
+//   One Electron at a time (automation mode: off-screen, inactive), each closed as soon as its measurement ends.
 // Prints markdown tables (docs/benchmarks/cosmetics-perf.md) and writes <work>/perf.json.
 import { writeFileSync } from 'node:fs'
 import { cpus } from 'node:os'
@@ -19,8 +20,11 @@ import { build, gallery, launch, sleep, work } from './cosmetics-lib.mjs'
 
 const SECONDS = Number(process.env.COSMETICS_SECONDS ?? 60)
 const ROUNDS = Number(process.env.COSMETICS_ROUNDS ?? 4)
-const PARTS = ['bench:tiles', 'bench:list', 'bench:decos', 'bench:frame', 'bench:aura_ha_respiro', 'bench:aura_ha_prisma', 'bench:aura_ha_ondas', 'bench:aura_ha_frondes']
-const SCENES = ['bench-off', 'bench', ...(process.argv.includes('--parts') ? PARTS : [])]
+const ALL_PARTS = ['tiles', 'list', 'decos', 'frame', 'aura_ha_respiro', 'aura_ha_prisma', 'aura_ha_ondas', 'aura_ha_frondes']
+// --parts = all of them; --parts=tiles,list = those only.
+const partsArg = process.argv.find((a) => a.startsWith('--parts'))
+const PARTS = (partsArg?.includes('=') ? partsArg.split('=')[1].split(',') : partsArg ? ALL_PARTS : []).map((p) => `bench:${p}`)
+const SCENES = ['bench-off', 'bench', ...PARTS]
 build({ skip: process.argv.includes('--skip-build') })
 
 const q = (xs, p) => {

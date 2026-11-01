@@ -10,8 +10,10 @@
   width: 140%;
   height: 140%;
   pointer-events: none;
-  /* Its own layer: the speaking ring under it repaints every frame, the decoration's raster must not
-     (measured: 8 tiles with still decorations went from +1.26 ms to ~0 per frame). */
+}
+/* On a call tile, its own layer: the speaking ring under it repaints every frame and the decoration's raster must
+   not. Only there: a layer per row in a 50-member list would just add compositing work to every frame. */
+:global([data-speak-host]) .deco {
   will-change: transform;
 }
 .art,

@@ -126,13 +126,16 @@ export const useAurasOn = () => useAuraGate((g) => !g.crowded && !g.slow && !g.e
  * One frame-time sample per envelope write (the envelope writes once per frame while someone speaks, so the gaps
  * between writes are frame times; silence writes nothing and needs no watching).
  */
+let windowStart = 0
 function frameSample(now: number) {
   if (now - lastFrame < 4) return // several tiles in the same frame
   if (lastFrame && now - lastFrame < 250) frames.push(now - lastFrame)
+  else windowStart = now // silence in between: start a new 2 s window
   lastFrame = now
-  if (frames.length < 120) return // ~2 s at 60 Hz
+  if (now - windowStart < 2000 || frames.length < 30) return
   const p95 = [...frames].sort((a, b) => a - b)[Math.floor(frames.length * 0.95)]!
   frames.length = 0
+  windowStart = now
   if (p95 > 20) {
     slowUntil = now + 10_000
     useAuraGate.setState({ slow: true })
