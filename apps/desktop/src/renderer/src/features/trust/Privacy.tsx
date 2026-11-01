@@ -1,11 +1,12 @@
-import type { AccountAction, AccountDeletionScheduled, AppealView, DataExportRequested } from '@alga/shared'
-import { AlertCircle, Ban, CheckCircle2, Clock, Download, Info, PauseCircle, RotateCcw, ShieldCheck, Trash2, UserX, type LucideIcon } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
+import { EXPORT_DOWNLOAD_TTL_MINUTES, type AccountAction, type AccountDeletionScheduled, type AppealView, type DataExport, type DataExportDownload } from '@alga/shared'
+import { AlertCircle, Ban, CheckCircle2, Clock, Download, EyeOff, Info, PauseCircle, RotateCcw, ShieldCheck, Trash2, UserX, type LucideIcon } from 'lucide-react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiRequestError } from '@/lib/api'
 import { errorText } from '@/lib/errors'
+import { patchMe } from '@/store/actions'
 import { useData } from '@/store/data'
 import { useSession } from '@/store/session'
-import { Button, Icon, Modal, Spinner, TextField } from '@/ui'
+import { Button, Icon, Modal, Spinner, Switch, TextField } from '@/ui'
 import { t as ta } from '../auth/strings'
 import { needsVerification, openVerifyEmail } from '../auth/VerifyEmail'
 import { Group, Row } from '../settings/Frame'
@@ -28,6 +29,7 @@ export function PrivacySection() {
       <Group title={t.privacy.docsTitle} description={t.privacy.docsBody}>
         {info ? <LegalDocs info={info} /> : <Row label={<Spinner size={16} label="Carregando" />} />}
       </Group>
+      <TelemetryGroup />
       <ExportGroup />
       <Group title={t.privacy.deleteTitle} description={t.privacy.deleteBody}>
         <Row label={t.privacy.deleteRow} hint={t.privacy.deleteHint}>
@@ -168,38 +170,104 @@ function AppealChip({ status }: { status: AppealView['status'] }) {
   )
 }
 
+// ── Relatório de qualidade de chamada (docs/legal/politica-de-privacidade.md: opcional, desligado por padrão) ──
+
+function TelemetryGroup() {
+  const on = useData((x) => x.me?.telemetryOptIn === true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const set = async (telemetryOptIn: boolean) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await patchMe({ telemetryOptIn })
+    } catch (e) {
+      setError(errorText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Group title={t.privacy.telemetryTitle} description={t.privacy.telemetryBody}>
+      <Row
+        label={t.privacy.telemetryRow}
+        hint={
+          error ? (
+            <span className={st.error} role="alert">
+              {error}
+            </span>
+          ) : on ? (
+            t.privacy.telemetryOn
+          ) : (
+            t.privacy.telemetryOff
+          )
+        }
+      >
+        <Switch checked={on} label={t.privacy.telemetryRow} disabled={busy} onChange={(v) => void set(v)} />
+      </Row>
+      <div className={s.disclosure}>
+        <div className={s.disclosureCol}>
+          <span className={s.disclosureHead}>
+            <Icon icon={CheckCircle2} size={14} />
+            {t.privacy.telemetrySentTitle}
+          </span>
+          <p>{t.privacy.telemetrySent}</p>
+        </div>
+        <div className={s.disclosureCol}>
+          <span className={`${s.disclosureHead} ${s.disclosureNever}`}>
+            <Icon icon={EyeOff} size={14} />
+            {t.privacy.telemetryNeverTitle}
+          </span>
+          <p>{t.privacy.telemetryNever}</p>
+        </div>
+        <p className={s.disclosureFoot}>{t.privacy.telemetryKept}</p>
+      </div>
+    </Group>
+  )
+}
+
 // ── Exportação ─────────────────────────────────────────────────
 
-// shortcut: the API has no "my exports" route, so the pending request is remembered on this device only; a request
-// from another device still answers 429 with the server's own sentence. Upgrade when GET /users/@me/exports exists.
-const exportKey = (userId: string) => `alga.export.${userId}`
-function lastExport(userId: string): string | null {
-  try {
-    const at = localStorage.getItem(exportKey(userId))
-    return at && Date.now() - Date.parse(at) < 24 * 60 * 60 * 1000 ? at : null
-  } catch {
-    return null
-  }
-}
+/** While a copy is being built: its status has no gateway event, so this page asks again now and then. */
+const EXPORT_POLL_MS = 15_000
 
 function ExportGroup() {
   const me = useData((x) => x.me)
-  const [pending, setPending] = useState(() => (me ? lastExport(me.id) : null))
+  const [list, setList] = useState<DataExport[] | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [error, setError] = useState<{ text: string; gated?: boolean } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [downloading, setDownloading] = useState<DataExport | null>(null)
+  const [opened, setOpened] = useState(false)
+  const load = useCallback(() => {
+    api<DataExport[]>('GET', '/users/@me/exports').then(
+      (l) => {
+        setList(l)
+        setLoadError(null)
+      },
+      (e: unknown) => setLoadError(errorText(e, t.privacy.exportLoadError)),
+    )
+  }, [])
+  const last = list?.[0] ?? null
+  const building = last?.status === 'queued' || last?.status === 'processing'
+  useEffect(() => {
+    load()
+    window.addEventListener('focus', load)
+    return () => window.removeEventListener('focus', load)
+  }, [load])
+  useEffect(() => {
+    if (!building) return
+    const id = setInterval(load, EXPORT_POLL_MS)
+    return () => clearInterval(id)
+  }, [building, load])
   if (!me) return null
   const unverified = me.emailVerified === false
   const request = async () => {
     setBusy(true)
     setError(null)
     try {
-      const r = await api<DataExportRequested>('POST', '/users/@me/export')
-      setPending(r.createdAt)
-      try {
-        localStorage.setItem(exportKey(me.id), r.createdAt)
-      } catch {
-        /* a convenience only */
-      }
+      await api('POST', '/users/@me/export')
+      load()
     } catch (e) {
       // 429 carries the useful sentence (once a day, the link goes to the e-mail): keep the server's words.
       setError({ text: e instanceof ApiRequestError && e.code === 'rate_limited' ? e.message : errorText(e), gated: needsVerification(e) })
@@ -207,20 +275,37 @@ function ExportGroup() {
       setBusy(false)
     }
   }
+  const status = (x: DataExport) =>
+    x.status === 'ready' ? (
+      <span className={s.okLine} role="status">
+        <Icon icon={CheckCircle2} size={12} />
+        {opened ? t.privacy.exportOpened : t.privacy.exportReady(longDate(x.expiresAt ?? x.createdAt))}
+      </span>
+    ) : x.status === 'queued' || x.status === 'processing' ? (
+      <span className={s.iconLabel} role="status">
+        <Spinner size={12} />
+        {t.privacy.exportBuilding(longDateTime(x.createdAt))}
+      </span>
+    ) : x.status === 'expired' ? (
+      t.privacy.exportExpired(longDate(x.expiresAt ?? x.createdAt))
+    ) : (
+      t.privacy.exportFailed
+    )
   return (
     <Group title={t.privacy.exportTitle} description={t.privacy.exportBody}>
       <Row
         label={t.privacy.exportRow}
         hint={
-          unverified ? t.privacy.exportVerify : pending ? (
-            <span className={s.okLine} role="status">
-              <Icon icon={CheckCircle2} size={12} />
-              {t.privacy.exportPending(longDateTime(pending))}
-            </span>
+          unverified ? (
+            t.privacy.exportVerify
           ) : error ? (
             <span className={st.error} role="alert">
               {error.text}
             </span>
+          ) : loadError ? (
+            <span className={st.error}>{loadError}</span>
+          ) : last ? (
+            status(last)
           ) : (
             t.privacy.exportHint
           )
@@ -230,13 +315,92 @@ function ExportGroup() {
           <Button variant="primary" onClick={openVerifyEmail}>
             {ta.verify.action}
           </Button>
+        ) : last?.status === 'ready' ? (
+          <Button variant="primary" icon={Download} onClick={() => setDownloading(last)}>
+            {t.privacy.exportDownload}
+          </Button>
         ) : (
-          <Button icon={Download} loading={busy} disabled={!!pending} onClick={() => void request()}>
+          <Button icon={Download} loading={busy} disabled={!list || building} onClick={() => void request()}>
             {t.privacy.exportRequest}
           </Button>
         )}
       </Row>
+      <ExportDownloadDialog
+        item={downloading}
+        onClose={() => setDownloading(null)}
+        onGone={() => {
+          setDownloading(null)
+          load()
+        }}
+        onOpened={() => {
+          setDownloading(null)
+          setOpened(true)
+        }}
+      />
     </Group>
+  )
+}
+
+/** The password again (a stolen session alone cannot take the data out), then the short-lived link opens in the browser. */
+function ExportDownloadDialog({ item, onClose, onGone, onOpened }: { item: DataExport | null; onClose: () => void; onGone: () => void; onOpened: () => void }) {
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    setPassword('')
+    setError(null)
+  }, [item])
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!item) return
+    if (!password) return setError(t.deletion.required)
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await api<DataExportDownload>('POST', `/users/@me/exports/${item.id}/download`, { password })
+      await window.alga.app.openExternal(r.downloadUrl)
+      onOpened()
+    } catch (err) {
+      // 404/409: the copy expired or is not ready any more; the list says what is true now.
+      if (err instanceof ApiRequestError && (err.status === 404 || err.status === 409)) return onGone()
+      setError(err instanceof ApiRequestError && err.fields?.password ? err.fields.password : errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal
+      open={!!item}
+      onClose={onClose}
+      title={t.privacy.exportDownloadTitle}
+      description={t.privacy.exportDownloadBody(EXPORT_DOWNLOAD_TTL_MINUTES)}
+      width={440}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            {t.report.cancel}
+          </Button>
+          <Button type="submit" form="export-download" variant="primary" icon={Download} loading={busy}>
+            {t.privacy.exportDownloadConfirm}
+          </Button>
+        </>
+      }
+    >
+      <form id="export-download" onSubmit={submit} noValidate>
+        <TextField
+          label={t.deletion.password}
+          type="password"
+          autoComplete="current-password"
+          data-autofocus
+          value={password}
+          error={error}
+          onChange={(ev) => {
+            setPassword(ev.target.value)
+            setError(null)
+          }}
+        />
+      </form>
+    </Modal>
   )
 }
 

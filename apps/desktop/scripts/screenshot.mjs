@@ -1,5 +1,5 @@
 // Visual validation loop: build → seed real data through the REST API → drive the REAL Electron app → PNGs.
-//   node scripts/screenshot.mjs [--skip-build] [--only=auth,home,chat,spaces,attachments,uploads,spacesettings,connection,sizes,settings,voice,billing,invites,trust]
+//   node scripts/screenshot.mjs [--skip-build] [--only=auth,home,chat,spaces,attachments,uploads,spacesettings,connection,sizes,settings,voice,billing,invites,trust,wave6]
 // Another API (ALGA_API_URL=http://127.0.0.1:4100) gets its own users file, so runs never mix accounts.
 // Voice runs two real app instances (profiles shots + shots-b) through the local LiveKit with Chromium fake
 // devices: a generated speech WAV is B's microphone (so the speaking glow moves for real) and A's screen share
@@ -1835,6 +1835,406 @@ async function trustShots() {
   }
 }
 
+// ── wave 6 (--only=wave6): equip cosmetics + others' cosmetics live, invites live, resume renewal, telemetry,
+// export download with the password, mini-player in the shell, toasts above the dock, staff triage ──
+// Its own people (saved under `w6` in the users file) and its own space, recreated every run. Voice uses the LiveKit
+// the API points at (LIVEKIT_HTTP, default :7880). The staff account is created on the first run; grant it with
+// apps/server/scripts/grant-staff.ts while the API is stopped (PGlite: one process), start it again and re-run.
+// Profiles shots-w (Ana, owner), shots-w2 (Nina, cosmetics), shots-w3 (staff).
+async function w6Users() {
+  const saved = existsSync(usersFile) ? JSON.parse(readFileSync(usersFile, 'utf8')) : { users: {} }
+  const W = (saved.w6 ??= {})
+  for (const [k, name] of [['ana', 'Ana Ribeiro'], ['nina', 'Nina Duarte'], ['caio', 'Caio Torres'], ['staff', 'Equipe Alga']]) {
+    if (!W[k]) W[k] = await freshUser(`w6${k}`, name)
+    const r = await api(null, 'POST', '/auth/login', { login: W[k].username, password: W[k].password }).catch((e) => {
+      // A suspension from an earlier run (the staff shots suspend Caio) answers 403: lifted below with the staff token.
+      if (e.status === 403) return null
+      throw e
+    })
+    W[k].suspended = !r
+    if (r) Object.assign(W[k], { token: r.token, me: r.user })
+    writeFileSync(usersFile, JSON.stringify(saved, null, 2))
+  }
+  for (const k of ['ana', 'nina', 'caio', 'staff']) if (!W[k].suspended) await verifyEmail(W[k])
+  writeFileSync(usersFile, JSON.stringify(saved, null, 2))
+  return { saved, W }
+}
+
+/** The READY payload of a gateway session (what the app gets on connect). */
+function readyOf(token) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(`${API.replace(/^http/, 'ws')}/gateway`)
+    const timer = setTimeout(() => (ws.close(), reject(new Error('no READY'))), 10_000)
+    ws.onopen = () => ws.send(JSON.stringify({ op: 'identify', token }))
+    ws.onmessage = (ev) => {
+      const f = JSON.parse(String(ev.data))
+      if (f.t !== 'READY') return
+      clearTimeout(timer)
+      ws.close()
+      resolve(f.d)
+    }
+    ws.onerror = () => reject(new Error('gateway error'))
+  })
+}
+
+/** Sandbox checkout paid "in the browser" (the provider confirms through the verified-webhook path). */
+async function sandboxBuy(u, productId) {
+  const r = await api(u.token, 'POST', '/billing/checkout', { productId })
+  await payInBrowser(r.url)
+  for (let i = 0; i < 40; i++) {
+    const me = await api(u.token, 'GET', '/billing/me')
+    if (me.items.some((e) => e.sku === productId || (productId.startsWith('plus') && e.sku === 'plan:plus'))) return me
+    await sleep(250)
+  }
+  throw new Error(`${productId} never arrived`)
+}
+const owns = (billing, sku) => billing.items.some((e) => e.sku === sku)
+
+/** W6_PARTS=cosmetics,voice,settings,staff re-shoots only those parts (default: all). */
+const w6part = (n) => !process.env.W6_PARTS || process.env.W6_PARTS.split(',').includes(n)
+
+async function wave6Shots() {
+  console.log('wave 6…')
+  const { W } = await w6Users()
+  const T = (k) => W[k].token
+  const isStaff = await api(T('staff'), 'GET', '/admin/reports?limit=1').then(() => true, () => false)
+  if (!isStaff) console.warn(`  staff shots skipped: stop the API, run \`npx tsx scripts/grant-staff.ts ${W.staff.username} moderator\` with its PGLITE_DIR, start it and re-run`)
+  if (args.includes('--prep')) return console.log(`  accounts ready (staff: ${W.staff.username})`)
+  if (W.caio.suspended) {
+    // Suspended by the previous run: lift it (the staff API is the only way) and log in again.
+    if (!isStaff) throw new Error('Caio is suspended and the staff account cannot lift it')
+    await api(T('staff'), 'POST', `/admin/users/${W.caio.me.id}/actions`, { type: 'lift', reason: 'harassment', note: 'Nova execução das capturas.' })
+    const r = await api(null, 'POST', '/auth/login', { login: W.caio.username, password: W.caio.password })
+    Object.assign(W.caio, { token: r.token, me: r.user, suspended: false })
+  }
+
+  // A fresh space every run: Ana owns it, Nina and Caio are members. Earlier ones (even from a run that crashed
+  // before saving) are found in Ana's READY: there is no REST list of spaces.
+  for (const old of (await readyOf(T('ana'))).spaces.filter((x) => x.ownerId === W.ana.me.id)) await api(T('ana'), 'DELETE', `/spaces/${old.id}`)
+  const sp = await api(T('ana'), 'POST', '/spaces', { name: 'Ateliê Maré' })
+  const geral = sp.channels.find((c) => c.type === 'text')
+  const som = await api(T('ana'), 'POST', `/spaces/${sp.id}/channels`, { type: 'voice', name: 'Sala de som' })
+  const entry = await api(T('ana'), 'POST', `/spaces/${sp.id}/invites`, { maxAgeSeconds: 0, maxUses: 0 })
+  for (const k of ['nina', 'caio']) await api(T(k), 'POST', `/invites/${entry.code}`)
+  await api(T('ana'), 'DELETE', `/invites/${entry.code}`)
+  const say = (k, content) => api(T(k), 'POST', `/channels/${geral.id}/messages`, { content })
+  await say('ana', 'Bom dia! Hoje a gente fecha a paleta do projeto novo.')
+  await say('nina', 'Trouxe as referências de maré baixa, já subo.')
+  await say('caio', 'Vou mandar umas opções de capa.')
+
+  // Nina owns Coral and Cardume (bought once in the sandbox, kept across runs) and starts with nothing equipped.
+  let nb = await api(T('nina'), 'GET', '/billing/me')
+  if (!owns(nb, 'deco_coral')) nb = await sandboxBuy(W.nina, 'deco_coral')
+  if (!owns(nb, 'nameplate_cardume')) nb = await sandboxBuy(W.nina, 'nameplate_cardume')
+  await api(T('nina'), 'PUT', '/users/@me/cosmetics', { avatarDecoration: null, profileTheme: null, profileEffect: null, nameplate: null })
+  await api(T('ana'), 'PATCH', '/users/@me', { telemetryOptIn: false })
+
+  const { speech, silence } = speechWav()
+  const lkHttp = process.env.LIVEKIT_HTTP ?? 'http://127.0.0.1:7880'
+  const lk = await fetch(`${lkHttp}/`).then((r) => r.ok, () => false)
+  let dlg
+  const A = await launch({ profile: 'shots-w', extra: MEDIA_FLAGS(silence) })
+  const B = w6part('cosmetics') || w6part('voice') ? await launch({ profile: 'shots-w2', extra: MEDIA_FLAGS(speech) }) : null
+  for (const [n, x] of [['A', A], ['B', B]].filter(([, x]) => x)) {
+    x.page.on('console', (m) => m.type() === 'error' && console.log(`  ${n} console.error:`, m.text().slice(0, 240)))
+    x.page.on('pageerror', (e) => console.log(`  ${n} pageerror:`, e.message))
+  }
+  try {
+    await login(A.page, W.ana)
+    if (B) await login(B.page, W.nina)
+    await rail(A.page, /^Ateliê Maré/).click()
+    await channels(A.page).getByRole('button', { name: /geral/ }).first().click()
+    await A.page.getByLabel('Membros').getByRole('button', { name: /Nina Duarte/ }).waitFor()
+    if (w6part('cosmetics')) {
+    // 1. Nina equips Coral in Personalização (the server keeps it; nothing is derived on the client any more).
+    dlg = await userSection(B.page, 'Personalização')
+    await dlg.getByRole('button', { name: /Coral/ }).click()
+    await dlg.getByRole('button', { name: 'Usar no perfil' }).waitFor()
+    await B.page.mouse.move(10, 300)
+    await sleep(500)
+    await shot(B.page, 'shop-equip-owned')
+    await dlg.getByRole('button', { name: 'Usar no perfil' }).click()
+    await dlg.getByRole('button', { name: 'Tirar do perfil' }).waitFor()
+    await B.page.mouse.move(10, 300)
+    await sleep(600)
+    await shot(B.page, 'shop-equipped')
+
+    // 2. Ana sees it live (USER_UPDATE), then the plate arrives too.
+    const ninaRow = A.page.getByLabel('Membros').getByRole('button', { name: /Nina Duarte/ })
+    await A.page.waitForFunction((name) => [...document.querySelectorAll('button')].some((b) => b.textContent?.includes(name) && b.querySelector('svg[viewBox="-60 -60 120 120"]')), 'Nina Duarte', { timeout: 10_000 })
+    await dlg.getByRole('button', { name: /Cardume/ }).click()
+    await dlg.getByRole('button', { name: 'Usar no perfil' }).click()
+    await dlg.getByRole('button', { name: 'Tirar do perfil' }).waitFor()
+    await A.page.waitForFunction(() => !!document.querySelector('[data-plate="nameplate_cardume"]'), null, { timeout: 10_000 })
+    await sleep(500)
+    await shot(A.page, 'members-cosmetics-others')
+    await ninaRow.click()
+    await A.page.getByRole('dialog', { name: 'Nina Duarte' }).waitFor()
+    await sleep(1600)
+    await shot(A.page, 'profile-popover-others')
+    await A.page.keyboard.press('Escape')
+    // Taken off from another device: Ana's list drops the plate without a refresh.
+    await api(T('nina'), 'PUT', '/users/@me/cosmetics', { nameplate: null })
+    await A.page.waitForFunction(() => !document.querySelector('[data-plate="nameplate_cardume"]'), null, { timeout: 10_000 })
+    await sleep(300)
+    await shot(A.page, 'members-cosmetics-live-unequipped')
+    await api(T('nina'), 'PUT', '/users/@me/cosmetics', { nameplate: 'nameplate_cardume' })
+    await B.page.keyboard.press('Escape')
+    } else await api(T('nina'), 'PUT', '/users/@me/cosmetics', { avatarDecoration: 'deco_coral', nameplate: 'nameplate_cardume' })
+
+    // 3. Voice: the decoration rides along, discreetly, on Nina's tile.
+    if (!w6part('voice')) {
+      /* skipped */
+    } else if (!lk) console.warn(`  LiveKit not reachable at ${lkHttp}: voice shots skipped`)
+    else {
+      await rail(B.page, /^Ateliê Maré/).click()
+      await channels(B.page).getByRole('button', { name: /Sala de som/ }).click()
+      await waitConnected(B.page)
+      await channels(A.page).getByRole('button', { name: /Sala de som/ }).click()
+      await waitConnected(A.page)
+      await A.page.locator(`[data-user-id="${W.nina.me.id}"] svg[viewBox="-60 -60 120 120"]`).waitFor({ timeout: 15_000 })
+      await waitSpeaking(A.page, W.nina.me.id, 0.4)
+      await A.page.mouse.move(10, 500)
+      await shot(A.page, 'voice-tile-cosmetics')
+
+      // 4. Narrow window: a toast rises above the dock instead of covering Desconectar.
+      await A.app.evaluate(({ BrowserWindow }) => {
+        const win = BrowserWindow.getAllWindows()[0]
+        win.setContentSize(960, 600)
+      })
+      await sleep(800)
+      await A.page.locator('[class*="userRow"] button[aria-haspopup="dialog"]').first().click()
+      await A.page.getByRole('button', { name: 'Copiar nome de usuário' }).click()
+      await A.page.getByText('Copiado', { exact: true }).waitFor()
+      await A.page.mouse.move(400, 200)
+      await sleep(500)
+      await shot(A.page, 'voice-toast-above-dock-960x600')
+      await A.app.evaluate(({ BrowserWindow }) => {
+        const win = BrowserWindow.getAllWindows()[0]
+        win.setContentSize(1320, 840)
+        win.center()
+      })
+      await sleep(4500)
+
+      // 5. Nina streams, Ana watches, then goes Home: the mini-player now lives in the shell.
+      startPattern()
+      await sleep(1500)
+      await dock(B.page).getByRole('button', { name: 'Compartilhar tela' }).click()
+      const picker = B.page.getByRole('dialog', { name: 'Compartilhar tela' })
+      await picker.getByRole('radiogroup', { name: 'Telas' }).getByRole('radio').first().waitFor({ timeout: 20_000 })
+      await picker.getByRole('button', { name: 'Transmitir' }).click()
+      await picker.waitFor({ state: 'detached', timeout: 15_000 })
+      stopPattern()
+      await A.page.getByRole('button', { name: 'Assistir' }).first().click({ timeout: 20_000 })
+      await A.page.waitForFunction(() => [...document.querySelectorAll('video')].some((v) => v.readyState >= 2 && v.videoWidth > 0), null, { timeout: 20_000 })
+      await A.page.getByRole('button', { name: 'Conversas', exact: true }).click()
+      await A.page.waitForFunction(() => [...document.querySelectorAll('video')].some((v) => v.readyState >= 2 && v.videoWidth > 0), null, { timeout: 20_000 })
+      await sleep(1500)
+      await A.page.mouse.move(600, 300)
+      await shot(A.page, 'stream-mini-player-shell')
+      await dock(B.page).getByRole('button', { name: 'Parar transmissão' }).click()
+      await B.page.getByRole('menuitem', { name: 'Parar transmissão' }).click()
+      await sleep(600)
+      for (const p of [A.page, B.page]) await p.getByRole('button', { name: 'Desconectar' }).first().click().catch(() => undefined)
+      await sleep(600)
+    }
+  } finally {
+    stopPattern()
+    if (B) await close(B.app)
+  }
+
+  if (w6part('settings')) try {
+    // 6. Invites arrive and leave on the gateway (no 20 s polling): created and revoked from "another device".
+    await rail(A.page, /^Ateliê Maré/).click()
+    await rail(A.page, /^Ateliê Maré/).click({ button: 'right' })
+    await A.page.getByRole('menuitem', { name: 'Configurações do espaço' }).click()
+    const ss = A.page.locator('[data-settings]')
+    await ss.getByRole('navigation').getByRole('button', { name: 'Convites', exact: true }).click()
+    await ss.getByText('Nenhum convite ativo', { exact: false }).waitFor()
+    const t0 = Date.now()
+    const inv = await api(T('ana'), 'POST', `/spaces/${sp.id}/invites`, { maxAgeSeconds: 86_400, maxUses: 10 })
+    await ss.getByText(inv.code, { exact: false }).waitFor({ timeout: 5000 })
+    console.log(`  INVITE_CREATE on screen after ${Date.now() - t0} ms`)
+    await sleep(300)
+    await shot(A.page, 'space-settings-invites-live-created')
+    const t1 = Date.now()
+    await api(T('ana'), 'DELETE', `/invites/${inv.code}`)
+    await ss.getByText(inv.code, { exact: false }).waitFor({ state: 'detached', timeout: 5000 })
+    console.log(`  INVITE_DELETE off screen after ${Date.now() - t1} ms`)
+    await sleep(300)
+    await shot(A.page, 'space-settings-invites-live-revoked')
+    await A.page.keyboard.press('Escape')
+    // "Configurações de Ateliê Maré" also matches the user settings dialog name while it animates out.
+    await ss.waitFor({ state: 'detached' })
+
+    // 7. Assinatura: canceled renewal → "Retomar renovação" (the price and the date said before the click).
+    const catalog = await api(null, 'GET', '/billing/catalog')
+    const monthly = catalog.products.find((p) => p.kind === 'plan' && p.interval === 'month')
+    let ab = await api(T('ana'), 'GET', '/billing/me')
+    if (ab.subscription?.status !== 'active') ab = await sandboxBuy(W.ana, monthly.id)
+    await api(T('ana'), 'POST', '/billing/subscription/cancel')
+    dlg = await userSection(A.page, 'Assinatura')
+    await dlg.getByRole('button', { name: 'Retomar renovação' }).waitFor()
+    await A.page.mouse.move(10, 300)
+    await sleep(300)
+    await shot(A.page, 'billing-plan-canceled-resume')
+    await dlg.getByRole('button', { name: 'Retomar renovação' }).click()
+    await dlg.getByRole('button', { name: 'Cancelar renovação' }).waitFor()
+    await A.page.mouse.move(10, 300)
+    await sleep(300)
+    await shot(A.page, 'billing-plan-resumed')
+
+    // 8. Privacidade: the call-quality report, off by default, with the policy's own words.
+    dlg = await userSection(A.page, 'Privacidade')
+    const tele = dlg.getByRole('switch', { name: 'Enviar relatório de qualidade de chamada' })
+    await tele.waitFor()
+    await tele.evaluate((el) => el.closest('section')?.scrollIntoView({ block: 'center' }))
+    await sleep(300)
+    await shot(A.page, 'settings-privacy-telemetry-off')
+    await tele.click()
+    await A.page.waitForFunction(() => document.querySelector('[role="switch"][aria-label="Enviar relatório de qualidade de chamada"]')?.getAttribute('aria-checked') === 'true')
+    const optIn = (await api(T('ana'), 'GET', '/users/@me')).telemetryOptIn
+    console.log(`  telemetryOptIn on the server: ${optIn}`)
+    await A.page.mouse.move(10, 300)
+    await sleep(300)
+    await shot(A.page, 'settings-privacy-telemetry-on')
+    await tele.click()
+
+    // 9. Export: status from GET /users/@me/exports; the download asks for the password, then opens the short link.
+    await api(T('ana'), 'POST', '/users/@me/export').catch((e) => {
+      if (e.status !== 429) throw e
+    })
+    for (let i = 0; i < 80; i++) {
+      const l = await api(T('ana'), 'GET', '/users/@me/exports')
+      if (l[0]?.status === 'ready') break
+      await sleep(500)
+    }
+    await captureExternal(A.app)
+    dlg = await userSection(A.page, 'Assinatura')
+    dlg = await userSection(A.page, 'Privacidade')
+    const dl = dlg.getByRole('button', { name: 'Baixar…' })
+    await dl.waitFor({ timeout: 15_000 })
+    await dl.evaluate((el) => el.closest('section')?.scrollIntoView({ block: 'center' }))
+    await A.page.mouse.move(10, 300)
+    await sleep(300)
+    await shot(A.page, 'settings-privacy-export-ready')
+    await dl.click()
+    const modal = A.page.getByRole('dialog', { name: 'Baixar sua cópia' })
+    await modal.waitFor()
+    await sleep(300)
+    await shot(A.page, 'settings-privacy-export-download')
+    await modal.getByLabel('Sua senha').fill('nao-e-a-senha-certa')
+    await modal.getByRole('button', { name: 'Baixar', exact: true }).click()
+    await modal.getByText('Senha incorreta.').waitFor()
+    await sleep(200)
+    await shot(A.page, 'settings-privacy-export-wrong-password')
+    await modal.getByLabel('Sua senha').fill(W.ana.password)
+    await modal.getByRole('button', { name: 'Baixar', exact: true }).click()
+    const url = await nextExternal(A.app, 1)
+    const zip = await fetch(url)
+    const head = Buffer.from(await zip.arrayBuffer()).subarray(0, 2).toString()
+    console.log(`  download link → ${zip.status} ${zip.headers.get('content-type')} ${head === 'PK' ? '(zip)' : '(not a zip!)'}`)
+    await dlg.getByText('Download aberto no navegador.').waitFor()
+    await A.page.mouse.move(10, 300)
+    await sleep(300)
+    await shot(A.page, 'settings-privacy-export-opened')
+    await A.page.keyboard.press('Escape')
+  } finally {
+    await close(A.app)
+  }
+  else await close(A.app)
+
+  if (!isStaff || !w6part('staff')) return
+  // 10. Staff triage. Earlier runs' open items are closed first so the queue tells this run's story.
+  for (const r of await api(T('staff'), 'GET', '/admin/reports?status=open&limit=500')) {
+    await api(T('staff'), 'PATCH', `/admin/reports/${r.id}`, { status: 'resolved', action: 'none', note: 'Fechada antes de uma nova execução das capturas.' })
+  }
+  for (const a of await api(T('staff'), 'GET', '/admin/appeals?status=open&limit=500')) {
+    await api(T('staff'), 'PATCH', `/admin/appeals/${a.id}`, { status: 'rejected', note: 'Fechado antes de uma nova execução das capturas.' })
+  }
+  mkdirSync(work, { recursive: true })
+  const cover = join(work, 'capa-opcao-2.png')
+  if (!existsSync(cover)) ffmpeg(['-f', 'lavfi', '-i', 'testsrc2=size=960x540', '-frames:v', '1', cover])
+  const withFile = await apiForm(T('caio'), 'POST', `/channels/${geral.id}/messages`, fileForm([cover], { content: 'segue a opção 2' }))
+  const rude = await say('caio', 'Ninguém aguenta mais as suas ideias, Nina. Some daqui.')
+  await api(T('nina'), 'POST', '/reports', { targetType: 'message', targetId: withFile.id, reason: 'csam', details: 'A imagem mostra uma criança. Não abri de novo.' })
+  await api(T('nina'), 'POST', '/reports', { targetType: 'message', targetId: rude.id, reason: 'harassment', details: 'Ele faz isso toda semana no canal.' })
+  await api(T('ana'), 'POST', '/reports', { targetType: 'user', targetId: W.caio.me.id, reason: 'spam', details: 'Manda o mesmo convite para todo mundo.' })
+  const warn = await api(T('staff'), 'POST', `/admin/users/${W.nina.me.id}/actions`, { type: 'warn', reason: 'spam', note: 'Convites repetidos em #geral.' })
+  await api(T('nina'), 'POST', '/appeals', { actionId: warn.id, message: 'Eu só mandei o convite do nosso ateliê duas vezes, para pessoas que pediram. Não foi spam.' })
+  await sleep(1500) // the csam report's evidence copy (SHA-256) is made in the background
+
+  const S = await launch({ profile: 'shots-w3' })
+  S.page.on('pageerror', (e) => console.log('  S pageerror:', e.message))
+  try {
+    await login(S.page, W.staff)
+    await S.page.getByRole('button', { name: 'Painel da equipe' }).click()
+    const panel = S.page.getByRole('dialog', { name: 'Painel da equipe' })
+    await panel.getByRole('option').first().waitFor()
+    await sleep(600)
+    await shot(S.page, 'staff-queue-csam')
+    await S.page.keyboard.press('ArrowDown')
+    await panel.getByText('Ninguém aguenta mais', { exact: false }).last().waitFor()
+    await sleep(300)
+    await shot(S.page, 'staff-report-message')
+    await S.page.keyboard.press('s')
+    const confirm = S.page.getByRole('dialog', { name: /^Suspender:/ })
+    await confirm.waitFor()
+    await confirm.getByRole('radio', { name: '3 dias' }).click()
+    await confirm.getByRole('textbox').fill('Ataque direto a uma colega, de novo. Reincidente no canal.')
+    await sleep(300)
+    await shot(S.page, 'staff-decision-suspend')
+    await confirm.getByRole('textbox').press('Control+Enter')
+    await confirm.waitFor({ state: 'detached' })
+    await panel.getByText('registrado no log de auditoria', { exact: false }).waitFor()
+    await sleep(400)
+    await shot(S.page, 'staff-decision-done')
+    await S.page.keyboard.press('a')
+    await S.page.getByRole('dialog', { name: /^Arquivar:/ }).waitFor()
+    await sleep(300)
+    await shot(S.page, 'staff-decision-dismiss')
+    await S.page.keyboard.press('Escape')
+    // Keys wait while a confirmation is still on screen (its exit animation included).
+    await S.page.getByRole('dialog', { name: /^Arquivar:/ }).waitFor({ state: 'detached' })
+    await S.page.keyboard.press('2')
+    await panel.getByText('Eu só mandei o convite', { exact: false }).waitFor()
+    await sleep(300)
+    await shot(S.page, 'staff-appeals')
+    await S.page.keyboard.press('r')
+    const rev = S.page.getByRole('dialog', { name: /^Reverter a decisão:/ })
+    await rev.waitFor()
+    await sleep(300)
+    await shot(S.page, 'staff-appeal-revert')
+    await rev.getByRole('textbox').fill('Convite pedido pelas pessoas. Aviso retirado.')
+    await rev.getByRole('textbox').press('Control+Enter')
+    await rev.waitFor({ state: 'detached' })
+    await S.page.keyboard.press('3')
+    await panel.getByText('capa-opcao-2.png').first().waitFor()
+    await sleep(300)
+    await shot(S.page, 'staff-quarantine')
+    await S.page.keyboard.press('l')
+    await S.page.getByRole('dialog', { name: /^Liberar/ }).waitFor()
+    await sleep(300)
+    await shot(S.page, 'staff-quarantine-release')
+    await S.page.keyboard.press('Escape')
+    await S.page.getByRole('dialog', { name: /^Liberar/ }).waitFor({ state: 'detached' })
+    await S.page.keyboard.press('1')
+    await panel.getByRole('radio', { name: 'Resolvidas' }).click()
+    await panel.getByText('Ataque direto a uma colega', { exact: false }).or(panel.getByRole('option').first()).first().waitFor()
+    await panel.getByRole('option', { name: /Assédio/ }).first().click()
+    await panel.getByText('Ataque direto a uma colega', { exact: false }).waitFor()
+    await sleep(300)
+    await shot(S.page, 'staff-reports-resolved')
+    await S.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(960, 600))
+    await panel.getByRole('radio', { name: 'Abertas' }).click()
+    await sleep(800)
+    await shot(S.page, 'staff-queue-960x600')
+  } finally {
+    await close(S.app)
+  }
+  // Caio stays suspended until the next run lifts it (w6Users).
+}
+
 // ── main ──────────────────────────────────────────────────────
 if (!args.includes('--skip-build')) {
   console.log('building…')
@@ -1853,4 +2253,5 @@ if (serverUp && ['auth', 'home', 'chat', 'spaces', 'attachments', 'uploads', 'sp
   await mainShots(saved)
 }
 if (serverUp && want('trust')) await trustShots()
+if (serverUp && want('wave6')) await wave6Shots()
 console.log(`\n${shots.length} screenshots.`)

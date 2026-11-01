@@ -9,7 +9,7 @@ import { Group, Row } from '../settings/Frame'
 import { openSettings } from '../settings/store'
 import { TeenPurchaseNotice, useIsTeen } from '../trust/Privacy'
 import { historyOf, money } from './look'
-import { cancelRenewal, loadBilling, reopenCheckout, startCheckout, stopWaiting, useBilling } from './store'
+import { cancelRenewal, loadBilling, reopenCheckout, resumeRenewal, startCheckout, stopWaiting, useBilling } from './store'
 import { t } from './strings'
 import st from '../settings/settings.module.css'
 import s from './billing.module.css'
@@ -102,7 +102,7 @@ function PlanPage({ catalog, me }: { catalog: BillingCatalog; me: BillingMe }) {
                 {sub.status === 'past_due'
                   ? t.plan.pastDueLine
                   : sub.cancelAtPeriodEnd
-                    ? t.plan.canceledLine(day(sub.currentPeriodEnd))
+                    ? t.plan.canceledLine(day(sub.currentPeriodEnd), money(sub.amountCents, sub.currency))
                     : t.plan.plusLine(catalog.products.find((p) => p.id === sub.productId)?.interval, day(sub.currentPeriodEnd), money(sub.amountCents, sub.currency))}
               </span>
             ) : (
@@ -113,6 +113,7 @@ function PlanPage({ catalog, me }: { catalog: BillingCatalog; me: BillingMe }) {
           {plus && sub && sub.status === 'active' && !sub.cancelAtPeriodEnd && !planArrived && (
             <CancelRenewal until={day(sub.currentPeriodEnd)} freeMb={Math.round((catalog.plans.find((p) => p.id === 'free')?.maxAttachmentBytes ?? 0) / MB)} />
           )}
+          {plus && sub && sub.status === 'active' && sub.cancelAtPeriodEnd && <ResumeRenewal />}
         </div>
         {!plus && planWaiting && <Waiting />}
         {!plus && !planWaiting && declined && plans.some((p) => p.id === declined) && <p className={s.declined}>{t.waiting.declined}</p>}
@@ -290,6 +291,26 @@ function CancelRenewal({ until, freeMb }: { until: string; freeMb: number }) {
         }
       />
     </>
+  )
+}
+
+/** Undo the cancel while the period is paid. No modal: nothing is charged now, and the line says when it renews. */
+function ResumeRenewal() {
+  const [busy, setBusy] = useState(false)
+  const resume = async () => {
+    setBusy(true)
+    try {
+      await resumeRenewal()
+    } catch (e) {
+      toastError(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Button variant="secondary" size="sm" loading={busy} onClick={() => void resume()}>
+      {t.plan.resume}
+    </Button>
   )
 }
 

@@ -1,7 +1,7 @@
 import type { Channel } from '@alga/shared'
 import type { LucideIcon } from 'lucide-react'
 import { Headphones, HeadphoneOff, Mic, MicOff, MonitorOff, MonitorUp, PhoneOff, Settings2 } from 'lucide-react'
-import { useCallback, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { useCallback, useLayoutEffect, useRef, type ButtonHTMLAttributes, type ReactNode, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
 import { useData } from '@/store/data'
@@ -11,6 +11,36 @@ import { levelNow } from './levels'
 import { t } from './strings'
 import { leaveVoice, useVoice } from './voice'
 import s from './stage.module.css'
+
+/** Toast stack's right edge (ui/overlay.module.css: right 16 px, up to 380 px wide). */
+const TOAST_ZONE = 16 + 380
+
+/**
+ * Toasts live bottom-right. When this dock sits on the window's bottom edge under that corner (narrow windows),
+ * the stack rises above it (--toast-bottom), so a toast never covers Desconectar.
+ */
+function useToastClearance(ref: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const root = document.documentElement.style
+    const update = () => {
+      const r = el.getBoundingClientRect()
+      const under = window.innerHeight - r.bottom < 48 && r.right > window.innerWidth - TOAST_ZONE
+      if (under) root.setProperty('--toast-bottom', `${Math.ceil(window.innerHeight - r.top + 12)}px`)
+      else root.removeProperty('--toast-bottom')
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    window.addEventListener('resize', update)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', update)
+      root.removeProperty('--toast-bottom')
+    }
+  }, [ref])
+}
 
 /** Floating call controls: mic, deafen | share | settings | disconnect. 40px targets, state by icon + color + tint. */
 export function ControlsDock({ channel: _channel }: { channel: Channel }) {
@@ -23,9 +53,11 @@ export function ControlsDock({ channel: _channel }: { channel: Channel }) {
   const meter = useRef<HTMLSpanElement>(null)
   const level = useCallback(() => levelNow(meId), [meId])
   useEnvelope(meter, level)
+  const dock = useRef<HTMLDivElement>(null)
+  useToastClearance(dock)
 
   return (
-    <div className={s.dock} role="toolbar" aria-label="Controles da chamada">
+    <div ref={dock} className={s.dock} role="toolbar" aria-label="Controles da chamada">
       <CallButton
         icon={self.muted || !self.mic || server.mute ? MicOff : Mic}
         label={server.mute ? t.dock.serverMuted : !self.mic ? t.dock.noMic : self.muted ? t.dock.unmute : t.dock.mute}

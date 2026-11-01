@@ -54,6 +54,8 @@ export function MemberList({ spaceId }: { spaceId: string }) {
 function MemberRow({ m, name, presence, color, inVoice, owner }: { m: Member; name: string; presence: PresenceStatus; color: string | null | undefined; inVoice: boolean; owner: boolean }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const self = useData((st) => st.me?.id === m.user.id)
+  // USER_UPDATE refreshes `users`, not the member copy: the profile (and its cosmetics) stays live.
+  const user = useData((st) => st.users[m.user.id]) ?? m.user
   // Cosmetics: subtle in a list (no motion unless hovered), the full card in the popover.
   const look = useLook(m.user.id)
   return (
@@ -65,9 +67,9 @@ function MemberRow({ m, name, presence, color, inVoice, owner }: { m: Member; na
         aria-expanded={!!anchor}
         data-cosmetic-hover
         onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}
-        onContextMenu={contextMenuHandler(() => userReportEntries(m.user), name)}
+        onContextMenu={contextMenuHandler(() => userReportEntries(user), name)}
       >
-        <DecoratedAvatar user={m.user} size={32} presence={presence === 'offline' ? undefined : presence} decoration={look.decoration} />
+        <DecoratedAvatar user={user} size={32} presence={presence === 'offline' ? undefined : presence} decoration={look.decoration} />
         <span className={s.memberName} style={color ? { color } : undefined}>
           <Nameplate id={look.nameplate} row>
             {name}
@@ -89,7 +91,7 @@ function MemberRow({ m, name, presence, color, inVoice, owner }: { m: Member; na
         )}
       </button>
       <Popover anchor={anchor} onClose={() => setAnchor(null)} side="left" align="start" gap={12} label={name} width={280}>
-        <ProfileCard user={m.user} look={look} name={name} presence={presence}>
+        <ProfileCard user={user} look={look} name={name} presence={presence}>
           {!self && (
             <div className={s.profileActions}>
               <Button
@@ -98,7 +100,7 @@ function MemberRow({ m, name, presence, color, inVoice, owner }: { m: Member; na
                 icon={Flag}
                 onClick={() => {
                   setAnchor(null)
-                  openReport({ kind: 'user', user: m.user })
+                  openReport({ kind: 'user', user })
                 }}
               >
                 {tr.report.action}

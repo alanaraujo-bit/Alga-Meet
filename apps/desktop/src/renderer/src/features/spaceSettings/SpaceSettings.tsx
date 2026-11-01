@@ -9,6 +9,7 @@ import { errorText } from '@/lib/errors'
 import { inviteLink } from '@/lib/invite'
 import { createInvite, deleteSpace, listBans, listInvites, patchSpace, revokeInvite, unban, uploadSpaceIcon } from '@/store/actions'
 import { useData } from '@/store/data'
+import { onDispatch } from '@/store/session'
 import { can, spacePermissions } from '@/store/selectors'
 import { useUi } from '@/store/ui'
 import { Avatar, Button, IconButton, Modal, SegmentedControl, Spinner, TextField, tintFor, toast } from '@/ui'
@@ -236,8 +237,8 @@ function Bans({ spaceId }: { spaceId: string }) {
 const EXPIRY = { h1: 3600, d1: 86400, d7: 604800, d30: 2592000, never: 0 } as const
 const USES = { u0: 0, u1: 1, u5: 5, u10: 10, u25: 25, u100: 100 } as const
 const relFmt = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-/** Uses change as people join and there is no invite event on the gateway: refetch while the page is open. */
-const REFRESH_MS = 20_000
+/** Still usable: the server does not announce invites that expire or run out of uses (INVITE_DELETE is revoke-only). */
+const usable = (inv: Invite, now: number) => (!inv.expiresAt || Date.parse(inv.expiresAt) > now) && (!inv.maxUses || inv.uses < inv.maxUses)
 
 function Invites({ spaceId }: { spaceId: string }) {
   const [expiry, setExpiry] = useState<keyof typeof EXPIRY>('d7')
@@ -263,13 +264,27 @@ function Invites({ spaceId }: { spaceId: string }) {
   }, [spaceId])
   useEffect(() => {
     load()
-    const id = setInterval(load, REFRESH_MS)
+    // Live: new and revoked invites arrive on the gateway. Use counts are not announced, so focus refetches them.
+    const off = onDispatch((d) => {
+      if (d.t === 'INVITE_CREATE' && d.d.space.id === spaceId) setList((l) => (l ? [d.d, ...l.filter((x) => x.code !== d.d.code)] : l))
+      else if (d.t === 'INVITE_DELETE' && d.d.spaceId === spaceId) setList((l) => l?.filter((x) => x.code !== d.d.code) ?? null)
+      else if (d.t === 'READY') load()
+    })
     window.addEventListener('focus', load)
     return () => {
-      clearInterval(id)
+      off()
       window.removeEventListener('focus', load)
     }
-  }, [load])
+  }, [load, spaceId])
+  // Drop an invite the moment it expires (nothing on the gateway says so).
+  const [now, setNow] = useState(Date.now)
+  const shown = useMemo(() => list?.filter((inv) => usable(inv, now)) ?? null, [list, now])
+  useEffect(() => {
+    const next = Math.min(...(shown ?? []).map((inv) => (inv.expiresAt ? Date.parse(inv.expiresAt) : Infinity)))
+    if (!Number.isFinite(next)) return
+    const id = setTimeout(() => setNow(Date.now()), Math.min(next - Date.now() + 50, 2 ** 31 - 1))
+    return () => clearTimeout(id)
+  }, [shown])
 
   const create = async () => {
     setBusy(true)
@@ -317,12 +332,12 @@ function Invites({ spaceId }: { spaceId: string }) {
               {t.retry}
             </Button>
           </Row>
-        ) : !list ? (
+        ) : !shown ? (
           <Row label={<Spinner size={16} label="Carregando" />} />
-        ) : list.length === 0 ? (
+        ) : shown.length === 0 ? (
           <p className={s.empty}>{t.invites.empty}</p>
         ) : (
-          list.map((inv) => (
+          shown.map((inv) => (
             <InviteRow key={inv.code} invite={inv} fresh={inv.code === fresh} canRevoke={manages || inv.inviterId === me} onRevoke={() => setRevoking(inv)} />
           ))
         )}

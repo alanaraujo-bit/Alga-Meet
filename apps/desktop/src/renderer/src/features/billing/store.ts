@@ -1,4 +1,4 @@
-import type { BillingCatalog, BillingMe, CheckoutResponse, Product, Subscription } from '@alga/shared'
+import type { BillingCatalog, BillingMe, CheckoutResponse, Me, Product, PutCosmeticsBody, Subscription } from '@alga/shared'
 import { useMemo } from 'react'
 import { create } from 'zustand'
 import { api } from '@/lib/api'
@@ -7,7 +7,7 @@ import { useData } from '@/store/data'
 import { onDispatch, useSession } from '@/store/session'
 import { toast } from '@/ui'
 import { openSettings, useSettings } from '../settings/store'
-import { granted, lookFrom, skuFor, type Look } from './look'
+import { granted, lookOf, SLOT_KEY, skuFor, type CosmeticId, type Look, type Slot } from './look'
 import { t } from './strings'
 
 interface Waiting {
@@ -68,6 +68,19 @@ export async function cancelRenewal(): Promise<Subscription> {
   return sub
 }
 
+/** Undo a cancel while the period is still paid: renewals resume at the provider. */
+export async function resumeRenewal(): Promise<Subscription> {
+  const sub = await api<Subscription>('POST', '/billing/subscription/resume')
+  await loadBilling()
+  return sub
+}
+
+/** Equip (or, with null, take off) one slot. The server answers with Me and tells everyone else (USER_UPDATE). */
+export async function equip(slot: Slot, id: CosmeticId | null): Promise<void> {
+  const me = await api<Me>('PUT', '/users/@me/cosmetics', { [SLOT_KEY[slot]]: id } satisfies PutCosmeticsBody)
+  useData.getState().apply({ t: 'ME_UPDATE', d: me })
+}
+
 /**
  * Live entitlements: ENTITLEMENTS_UPDATE patches plan + items at once (history is refetched), READY reloads
  * (something may have changed while offline), focus re-checks a waiting checkout. Returns the unsubscribe.
@@ -104,10 +117,8 @@ function celebrate(p: Product) {
   toast.success(text, { action: { label: t.arrived.see, run: () => openSettings(section) } })
 }
 
-/** The look a user's profile shows. Only your own is known: the API does not expose other people's cosmetics yet. */
+/** The look a user's profile shows: what they equipped (PublicUser.cosmetics), live through USER_UPDATE / ME_UPDATE. */
 export function useLook(userId: string | undefined): Look {
-  const mine = useData((x) => !!userId && x.me?.id === userId)
-  const items = useBilling((x) => (mine ? x.me?.items : undefined))
-  const orders = useBilling((x) => (mine ? x.me?.orders : undefined))
-  return useMemo(() => (items ? lookFrom(items, orders ?? []) : {}), [items, orders])
+  const equipped = useData((x) => (userId ? x.users[userId]?.cosmetics : undefined))
+  return useMemo(() => lookOf(equipped), [equipped])
 }

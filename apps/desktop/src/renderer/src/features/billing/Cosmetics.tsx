@@ -129,6 +129,7 @@ export function DecoratedAvatar({
   decoration,
   decorative,
   play,
+  glow,
 }: {
   user: AvatarUser
   size: AvatarSize
@@ -136,10 +137,12 @@ export function DecoratedAvatar({
   decoration?: CosmeticId
   decorative?: boolean
   play?: boolean
+  /** Speaking halo driven by an ancestor's --speak (call tiles). */
+  glow?: boolean
 }) {
   return (
     <span className={`${s.decoWrap} ${play ? s.play : ''}`} style={{ width: size, height: size }}>
-      <Avatar user={user} size={size} presence={presence} decorative={decorative} />
+      <Avatar user={user} size={size} presence={presence} decorative={decorative} glow={glow} />
       {decoration && <Decoration id={decoration} />}
     </span>
   )

@@ -16,11 +16,13 @@ import { useSettings } from '../settings/store'
 import { SpaceModals } from '../spaces/SpaceModals'
 import { useSpaceSettings } from '../spaceSettings/store'
 import { VerifyEmailDialog } from '../auth/VerifyEmail'
+import { probeStaff, useStaff } from '../staff/store'
 import { QuickSwitcher } from '../switcher/QuickSwitcher'
 import { useDeletionCanceledNotice } from '../trust/Gate'
 import { ReportHost } from '../trust/Report'
 import { CallStage } from '../voice/CallStage'
 import { IncomingCall } from '../voice/IncomingCall'
+import { MiniPlayer } from '../voice/MiniPlayer'
 import { ScreenPicker } from '../voice/ScreenPicker'
 import { startVoiceSync } from '../voice/voice'
 import { MemberList } from './MemberList'
@@ -33,6 +35,8 @@ import s from './shell.module.css'
 // open, space settings on first open; both then stay mounted for their exit animations.
 const SettingsOverlay = lazy(() => import('../settings/SettingsOverlay').then((m) => ({ default: m.SettingsOverlay })))
 const SpaceSettingsOverlay = lazy(() => import('../spaceSettings/SpaceSettings').then((m) => ({ default: m.SpaceSettingsOverlay })))
+// Staff only: the moderation panel never loads for anyone else.
+const StaffPanel = lazy(() => import('../staff/StaffPanel'))
 function useLatch(on: boolean): boolean {
   const [latched, setLatched] = useState(on)
   if (on && !latched) setLatched(true)
@@ -55,6 +59,8 @@ export function Shell() {
   useEffect(() => startBilling(), [])
   useInviteLink()
   useDeletionCanceledNotice()
+  useEffect(() => void probeStaff(), [])
+  const staffPanel = useLatch(useStaff((st) => st.open))
   const idle = useIdle()
   const settingsOpen = useSettings((st) => st.section !== null)
   const settings = useLatch(settingsOpen || idle)
@@ -89,9 +95,11 @@ export function Shell() {
       <QuickSwitcher />
       <ScreenPicker />
       <IncomingCall />
+      <MiniPlayer />
       <Suspense fallback={null}>
         {settings && <SettingsOverlay />}
         {spaceSettings && <SpaceSettingsOverlay />}
+        {staffPanel && <StaffPanel />}
       </Suspense>
       <VerifyEmailDialog />
       <ReportHost />

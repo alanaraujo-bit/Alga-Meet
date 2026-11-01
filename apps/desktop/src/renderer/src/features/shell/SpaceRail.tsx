@@ -1,4 +1,4 @@
-import { MessageCircle, Plus } from 'lucide-react'
+import { MessageCircle, Plus, ShieldCheck } from 'lucide-react'
 import { useMemo } from 'react'
 import { useMedia } from '@/media'
 import { useData } from '@/store/data'
@@ -8,6 +8,8 @@ import { Badge, contextMenuHandler, Fronds, Icon, MenuButton, Tooltip, tintFor }
 import { initials } from '@/ui/Avatar'
 import { roomLevelNow } from '../voice/levels'
 import { spaceMenu } from '../spaces/spaceMenu'
+import { openStaff, useStaff } from '../staff/store'
+import { t as tstaff } from '../staff/strings'
 import { t } from '../app/strings'
 import s from './shell.module.css'
 
@@ -19,6 +21,7 @@ export function SpaceRail() {
   const readStates = useData((st) => st.readStates)
   const home = useMemo(() => homeBadge({ channels, readStates, relationships }), [channels, readStates, relationships])
   const dmCall = useData((st) => Object.values(st.voiceStates).some((v) => v.spaceId === null))
+  const staff = useStaff((st) => st.isStaff)
 
   return (
     <nav className={s.rail} aria-label="Espaços">
@@ -65,6 +68,15 @@ export function SpaceRail() {
             </button>
           </MenuButton>
         </div>
+        {staff && (
+          <div className={s.railItem}>
+            <Tooltip content={tstaff.open} side="right">
+              <button type="button" className={`${s.spaceBtn} ${s.addBtn}`} aria-label={tstaff.open} onClick={openStaff}>
+                <Icon icon={ShieldCheck} size={20} />
+              </button>
+            </Tooltip>
+          </div>
+        )}
       </div>
     </nav>
   )

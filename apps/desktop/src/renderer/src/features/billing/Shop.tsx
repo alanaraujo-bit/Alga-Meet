@@ -1,6 +1,6 @@
 import type { BillingCatalog, BillingMe, Product } from '@alga/shared'
 import { CircleCheck } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ApiRequestError } from '@/lib/api'
 import { errorText } from '@/lib/errors'
 import { useData } from '@/store/data'
@@ -9,14 +9,12 @@ import { needsVerification, openVerifyEmail } from '../auth/VerifyEmail'
 import { openSettings } from '../settings/store'
 import { TeenPurchaseNotice, useIsTeen } from '../trust/Privacy'
 import { CosmeticThumb, ProfileCard, type ProfileUser } from './Cosmetics'
-import { COSMETICS, isCosmeticId, itemState, lookFrom, money, type ItemState, type Slot } from './look'
+import { COSMETICS, isCosmeticId, itemState, money, SLOTS, type CosmeticId, type ItemState, type Look } from './look'
 import { BillingGate, ProviderNotice, useBillingReady, Waiting } from './Plan'
-import { loadBilling, startCheckout, useBilling } from './store'
+import { equip, loadBilling, startCheckout, useBilling, useLook } from './store'
 import { t } from './strings'
 import st from '../settings/settings.module.css'
 import s from './billing.module.css'
-
-const SLOTS: Slot[] = ['decoration', 'theme', 'effect', 'nameplate']
 
 export function ShopSection() {
   const ready = useBillingReady()
@@ -28,11 +26,12 @@ export function ShopSection() {
 
 function Shop({ catalog, billing, user }: { catalog: BillingCatalog; billing: BillingMe; user: ProfileUser }) {
   const items = useMemo(() => catalog.products.filter((p) => p.kind === 'cosmetic' && isCosmeticId(p.id)), [catalog])
-  const look = useMemo(() => lookFrom(billing.items, billing.orders), [billing])
+  const look = useLook(user.id)
   const state = (p: Product) => itemState(p, billing.items, look, billing.plan.id)
   // Start on something worth previewing: the first item you could get, else the first one.
   const [selected, setSelected] = useState(() => (items.find((p) => state(p) === 'buy') ?? items[0])?.id ?? null)
   const product = items.find((p) => p.id === selected) ?? null
+  const names = useMemo(() => Object.fromEntries(items.map((p) => [p.id, p.name])), [items])
   const arrived = useBilling((x) => x.arrived)
   useEffect(() => () => void (useBilling.getState().arrived && !useBilling.getState().arrived!.startsWith('plan:') && useBilling.setState({ arrived: null })), [])
 
@@ -68,7 +67,7 @@ function Shop({ catalog, billing, user }: { catalog: BillingCatalog; billing: Bi
             </div>
             <figcaption className={s.caption}>{t.shop.preview}</figcaption>
           </figure>
-          {product && <Detail product={product} state={state(product)} arrived={arrived === product.id} enabled={!!catalog.provider} />}
+          {product && <Detail product={product} state={state(product)} look={look} names={names} arrived={arrived === product.id} enabled={!!catalog.provider} />}
         </aside>
       </div>
     </>
@@ -89,7 +88,7 @@ function Tile({ product, user, state, selected, onSelect }: { product: Product; 
   )
 }
 
-function Detail({ product, state, arrived, enabled }: { product: Product; state: ItemState; arrived: boolean; enabled: boolean }) {
+function Detail({ product, state, look, names, arrived, enabled }: { product: Product; state: ItemState; look: Look; names: Record<string, string>; arrived: boolean; enabled: boolean }) {
   const waiting = useBilling((x) => x.waiting)
   const declined = useBilling((x) => x.declined === product.id)
   // 16–17: the explanation takes the button's place (no generic error from the server's refusal).
@@ -118,10 +117,16 @@ function Detail({ product, state, arrived, enabled }: { product: Product; state:
       <p className={s.detailDesc}>{product.description}</p>
       <div className={s.detailAction}>
         {arrived ? (
-          <span className={s.arrivedLine} role="status">
-            <Icon icon={CircleCheck} size={14} />
-            {t.shop.arrived}
-          </span>
+          <Equip
+            id={product.id as CosmeticId}
+            inUse={state === 'in_use'}
+            lead={
+              <span className={s.arrivedLine} role="status">
+                <Icon icon={CircleCheck} size={14} />
+                {t.shop.arrived}
+              </span>
+            }
+          />
         ) : waiting?.product.id === product.id ? (
           <Waiting />
         ) : state === 'buy' && teen ? (
@@ -150,10 +155,49 @@ function Detail({ product, state, arrived, enabled }: { product: Product; state:
             <span className={st.rowHint}>{t.shop.plusOnlyLine}</span>
             <Button onClick={() => openSettings('plan')}>{t.shop.seePlus}</Button>
           </>
+        ) : slot && (state === 'in_use' || state === 'owned' || state === 'included') ? (
+          <Equip
+            id={product.id as CosmeticId}
+            inUse={state === 'in_use'}
+            lead={<span className={st.rowHint}>{state === 'in_use' ? t.shop.inUseLine : look[slot] ? t.shop.replaces(names[look[slot]!] ?? '') : state === 'owned' ? t.shop.ownedLine : t.shop.includedLine}</span>}
+          />
         ) : (
-          <span className={st.rowHint}>{state === 'in_use' ? t.shop.inUseLine : state === 'owned' ? t.shop.ownedLine : state === 'included' ? t.shop.includedLine : t.shop.unavailable}</span>
+          <span className={st.rowHint}>{t.shop.unavailable}</span>
         )}
       </div>
     </div>
+  )
+}
+
+/** Use it on the profile / take it off. Feedback in place: the tile chip, the preview and this line change. */
+function Equip({ id, inUse, lead }: { id: CosmeticId; inUse: boolean; lead: ReactNode }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => setError(null), [id])
+  const run = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await equip(COSMETICS[id], inUse ? null : id)
+    } catch (e) {
+      // 403 = the item left your account meanwhile (refund, plan ended): refresh so the page says so.
+      if (e instanceof ApiRequestError && e.status === 403) void loadBilling()
+      setError(errorText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <>
+      {lead}
+      <Button variant={inUse ? 'secondary' : 'primary'} loading={busy} onClick={() => void run()}>
+        {inUse ? t.shop.unequip : t.shop.equip}
+      </Button>
+      {error && (
+        <span className={`${st.rowHint} ${st.error}`} role="alert">
+          {error}
+        </span>
+      )}
+    </>
   )
 }

@@ -11,6 +11,8 @@ import { errorText } from '@/lib/errors'
 import { can, channelTitle, displayName, spaceChannels, spacePermissions, voiceMembers } from '@/store/selectors'
 import { Avatar, Button, contextMenuHandler, Fronds, Icon, IconButton, Popover, SegmentedControl, Spinner, Switch, toast, Tooltip, useEnvelope, type MenuEntry } from '@/ui'
 import { EASE_OUT_QUART } from '@/ui/motion'
+import { DecoratedAvatar } from '../billing/Cosmetics'
+import { useLook } from '../billing/store'
 import { ControlsDock } from './ControlsDock'
 import { stageLayout, type StageLayout } from './layout'
 import { useLevelGetter, roomLevelNow } from './levels'
@@ -302,6 +304,7 @@ function PersonTile({ userId, channel, size }: { userId: string; channel: Channe
   const [menu, setMenu] = useState<HTMLElement | null>(null)
   const others = useMedia((st) => Object.keys(st.participants).length)
   const title = useData((st) => channelTitle(st, channel))
+  const look = useLook(userId)
   if (!user) return null
 
   const serverDeaf = !!vs?.serverDeaf
@@ -325,7 +328,8 @@ function PersonTile({ userId, channel, size }: { userId: string; channel: Channe
       onContextMenu={isMe ? undefined : contextMenuHandler(() => personMenu(userId, channel, !!remote?.locallyMuted, serverMute, serverDeaf), name)}
     >
       <div className={s.tileBody}>
-        <Avatar user={user} size={size} glow decorative />
+        {/* Cosmetics stay discreet on the stage: the avatar decoration only, never motion (the voice glow leads). */}
+        <DecoratedAvatar user={user} size={size} glow decorative decoration={small ? undefined : look.decoration} />
         {isMe && connecting && <span className={s.waiting}>{t.joining}</span>}
         {isMe && !connecting && others === 0 && channel.type === 'dm' && !small && <span className={s.waiting}>{t.call.waiting(title)}</span>}
       </div>
