@@ -51,30 +51,18 @@ export function instrument(): void {
       keep(reg.pcs, this)
     }
   } as typeof RTCPeerConnection
-  // A/B of voice protection (scripts/media-net.mjs): rewrite the SFU's answer to our publisher offer.
+  // FEC A/B (scripts/media-net.mjs): rewrite the SFU's answer to our publisher offer. RED can't be done this
+  // way (the SFU drops plain Opus on a track published as RED: measured), so it goes through JoinParams.red.
   const srd = PC.prototype.setRemoteDescription as (this: RTCPeerConnection, d?: RTCSessionDescriptionInit) => Promise<void>
   PC.prototype.setRemoteDescription = function (this: RTCPeerConnection, d?: RTCSessionDescriptionInit) {
-    const f = labSdp
-    return srd.call(this, f && d?.type === 'answer' && d.sdp ? { type: d.type, sdp: mungeAudio(d.sdp, f) } : d)
+    const noFec = labSdp?.fec === false && d?.type === 'answer' && d.sdp
+    return srd.call(this, noFec ? { type: d.type, sdp: d.sdp!.replace(/useinbandfec=1/g, 'useinbandfec=0') } : d)
   } as typeof PC.prototype.setRemoteDescription
 }
 
-/** Lab-only voice protection override, applied at the next publisher negotiation (rejoin to apply). */
-let labSdp: { red?: boolean; fec?: boolean } | null = null
-export const setLabSdp = (f: { red?: boolean; fec?: boolean } | null): void => void (labSdp = f)
-
-/** red:false drops RED from every audio m-line (Opus only); fec:false answers useinbandfec=0 (encoder FEC off). */
-export function mungeAudio(sdp: string, f: { red?: boolean; fec?: boolean }): string {
-  let s = sdp
-  if (f.fec === false) s = s.replace(/useinbandfec=1/g, 'useinbandfec=0')
-  if (f.red === false) {
-    for (const pt of new Set([...s.matchAll(/^a=rtpmap:(\d+) red\/48000\/2/gim)].map((m) => m[1]!))) {
-      s = s.replace(new RegExp(`^a=(rtpmap|fmtp|rtcp-fb):${pt} .*\\r?\\n`, 'gm'), '')
-      s = s.replace(/^(m=audio \d+ \S+)((?: \d+)+)/gm, (_m, head: string, pts: string) => head + pts.split(' ').filter((p) => p !== pt).join(' '))
-    }
-  }
-  return s
-}
+/** Lab-only: fec:false answers useinbandfec=0 (Opus encoder FEC off) at the next publisher negotiation. */
+let labSdp: { fec?: boolean } | null = null
+export const setLabSdp = (f: { fec?: boolean } | null): void => void (labSdp = f)
 
 /** Open RTCPeerConnections of this page (publisher + subscriber), for transceiver/stats inspection. */
 export const peerConnections = (): RTCPeerConnection[] => [...reg.pcs].map((r) => r.deref()).filter((p): p is RTCPeerConnection => !!p && p.connectionState !== 'closed')

@@ -1,0 +1,3971 @@
+{
+  "env": {
+    "proxy": "scripts/netem/udp-impair.mjs (Node dgram, por cliente, sem reordenação)",
+    "sfu": "LiveKit lab, ICE-lite, UDP mux 169.254.83.107:7892 (só essa IP), node_ip 192.168.1.116 (o proxy), tcp_port 0",
+    "when": "2026-11-01T07:49:17.858Z"
+  },
+  "voice": {
+    "when": "2026-11-01T07:15:20.625Z",
+    "signal": "TTS pt-BR em loop (8 frases, pausas de 900 ms), modo Padrão, VAD automático",
+    "seconds": 25,
+    "path": {
+      "a": [
+        {
+          "local": "udp prflx",
+          "remote": "udp 192.168.1.116:7892 host",
+          "rttMs": 1
+        }
+      ],
+      "b": [
+        {
+          "local": "udp prflx",
+          "remote": "udp 192.168.1.116:7892 host",
+          "rttMs": 0
+        }
+      ]
+    },
+    "runs": [
+      {
+        "rttMs": 50,
+        "jitterMs": 30,
+        "lossPct": 0,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 0,
+        "rtpLossPct": 0,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 89.1,
+        "jitterBufferTargetMs": 84.9,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0.1,
+        "sendKbps": 75.8,
+        "senderRttMs": 50.7
+      },
+      {
+        "rttMs": 50,
+        "jitterMs": 30,
+        "lossPct": 2,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 1.8,
+        "rtpLossPct": 2.2,
+        "concealedPct": 0.1,
+        "concealmentEventsPerMin": 2.4,
+        "jitterBufferMs": 89.5,
+        "jitterBufferTargetMs": 80,
+        "fecPacketsReceived": 1184,
+        "fecPacketsDiscarded": 1183,
+        "stretchPct": 0,
+        "sendKbps": 72.6,
+        "senderRttMs": 64.3
+      },
+      {
+        "rttMs": 50,
+        "jitterMs": 30,
+        "lossPct": 5,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 5,
+        "rtpLossPct": 4.6,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 89,
+        "jitterBufferTargetMs": 80,
+        "fecPacketsReceived": 1247,
+        "fecPacketsDiscarded": 1246,
+        "stretchPct": 0,
+        "sendKbps": 73.2,
+        "senderRttMs": 48.3
+      },
+      {
+        "rttMs": 50,
+        "jitterMs": 30,
+        "lossPct": 10,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 8.9,
+        "rtpLossPct": 8.5,
+        "concealedPct": 0.2,
+        "concealmentEventsPerMin": 4.8,
+        "jitterBufferMs": 81.8,
+        "jitterBufferTargetMs": 80,
+        "fecPacketsReceived": 1199,
+        "fecPacketsDiscarded": 1193,
+        "stretchPct": 0,
+        "sendKbps": 73,
+        "senderRttMs": 53.4
+      },
+      {
+        "rttMs": 50,
+        "jitterMs": 30,
+        "lossPct": 20,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 20.1,
+        "rtpLossPct": 19.6,
+        "concealedPct": 1.4,
+        "concealmentEventsPerMin": 38.4,
+        "jitterBufferMs": 67.6,
+        "jitterBufferTargetMs": 100,
+        "fecPacketsReceived": 1057,
+        "fecPacketsDiscarded": 1033,
+        "stretchPct": 0.1,
+        "sendKbps": 73.5,
+        "senderRttMs": 74
+      },
+      {
+        "rttMs": 150,
+        "jitterMs": 30,
+        "lossPct": 0,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 0,
+        "rtpLossPct": 0,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 129.2,
+        "jitterBufferTargetMs": 115.5,
+        "fecPacketsReceived": 1323,
+        "fecPacketsDiscarded": 1323,
+        "stretchPct": 0,
+        "sendKbps": 74.9,
+        "senderRttMs": 151.9
+      },
+      {
+        "rttMs": 150,
+        "jitterMs": 30,
+        "lossPct": 2,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 2.7,
+        "rtpLossPct": 2.6,
+        "concealedPct": 0.1,
+        "concealmentEventsPerMin": 2.4,
+        "jitterBufferMs": 120.3,
+        "jitterBufferTargetMs": 100,
+        "fecPacketsReceived": 1326,
+        "fecPacketsDiscarded": 1326,
+        "stretchPct": 0,
+        "sendKbps": 76.9,
+        "senderRttMs": 158.5
+      },
+      {
+        "rttMs": 150,
+        "jitterMs": 30,
+        "lossPct": 5,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 5.2,
+        "rtpLossPct": 5.6,
+        "concealedPct": 0.2,
+        "concealmentEventsPerMin": 4.8,
+        "jitterBufferMs": 112.6,
+        "jitterBufferTargetMs": 100,
+        "fecPacketsReceived": 1322,
+        "fecPacketsDiscarded": 1319,
+        "stretchPct": 0,
+        "sendKbps": 78.2,
+        "senderRttMs": 148.9
+      },
+      {
+        "rttMs": 150,
+        "jitterMs": 30,
+        "lossPct": 10,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 10.5,
+        "rtpLossPct": 10.4,
+        "concealedPct": 0.5,
+        "concealmentEventsPerMin": 12,
+        "jitterBufferMs": 92.5,
+        "jitterBufferTargetMs": 100,
+        "fecPacketsReceived": 1278,
+        "fecPacketsDiscarded": 1268,
+        "stretchPct": 0,
+        "sendKbps": 78.2,
+        "senderRttMs": 148
+      },
+      {
+        "rttMs": 150,
+        "jitterMs": 30,
+        "lossPct": 20,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 19.3,
+        "rtpLossPct": 19.8,
+        "concealedPct": 1.1,
+        "concealmentEventsPerMin": 28.8,
+        "jitterBufferMs": 69.3,
+        "jitterBufferTargetMs": 100,
+        "fecPacketsReceived": 1122,
+        "fecPacketsDiscarded": 1102,
+        "stretchPct": 0.2,
+        "sendKbps": 78.2,
+        "senderRttMs": 163.5
+      },
+      {
+        "rttMs": 300,
+        "jitterMs": 30,
+        "lossPct": 0,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 0,
+        "rtpLossPct": 0,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 137.4,
+        "jitterBufferTargetMs": 123.2,
+        "fecPacketsReceived": 1414,
+        "fecPacketsDiscarded": 1414,
+        "stretchPct": 0.1,
+        "sendKbps": 77.4,
+        "senderRttMs": 286.5
+      },
+      {
+        "rttMs": 300,
+        "jitterMs": 30,
+        "lossPct": 2,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 1.6,
+        "rtpLossPct": 2,
+        "concealedPct": 0.1,
+        "concealmentEventsPerMin": 2.4,
+        "jitterBufferMs": 113.2,
+        "jitterBufferTargetMs": 100,
+        "fecPacketsReceived": 1355,
+        "fecPacketsDiscarded": 1355,
+        "stretchPct": 0,
+        "sendKbps": 75.5,
+        "senderRttMs": 305.4
+      },
+      {
+        "rttMs": 300,
+        "jitterMs": 30,
+        "lossPct": 5,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 5,
+        "rtpLossPct": 4.9,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 2.4,
+        "jitterBufferMs": 99.2,
+        "jitterBufferTargetMs": 100,
+        "fecPacketsReceived": 1284,
+        "fecPacketsDiscarded": 1284,
+        "stretchPct": 0,
+        "sendKbps": 74.4,
+        "senderRttMs": 323.3
+      },
+      {
+        "rttMs": 300,
+        "jitterMs": 30,
+        "lossPct": 10,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 10.6,
+        "rtpLossPct": 11,
+        "concealedPct": 0.3,
+        "concealmentEventsPerMin": 9.6,
+        "jitterBufferMs": 85.8,
+        "jitterBufferTargetMs": 100,
+        "fecPacketsReceived": 1184,
+        "fecPacketsDiscarded": 1179,
+        "stretchPct": 0,
+        "sendKbps": 74.2,
+        "senderRttMs": 303
+      },
+      {
+        "rttMs": 300,
+        "jitterMs": 30,
+        "lossPct": 20,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 19.6,
+        "rtpLossPct": 19.6,
+        "concealedPct": 0.9,
+        "concealmentEventsPerMin": 19.2,
+        "jitterBufferMs": 68.4,
+        "jitterBufferTargetMs": 100,
+        "fecPacketsReceived": 1069,
+        "fecPacketsDiscarded": 1051,
+        "stretchPct": 0.1,
+        "sendKbps": 74.2,
+        "senderRttMs": 312.9
+      }
+    ]
+  },
+  "proxyTotals": {
+    "clients": 2,
+    "up": {
+      "in": 15722,
+      "sent": 14911,
+      "lost": 811,
+      "outage": 0,
+      "queueDrop": 0,
+      "bytesIn": 4467101,
+      "bytesSent": 4234334
+    },
+    "down": {
+      "in": 16242,
+      "sent": 16242,
+      "lost": 0,
+      "outage": 0,
+      "queueDrop": 0,
+      "bytesIn": 4138088,
+      "bytesSent": 4138088
+    }
+  },
+  "screenAuto": {
+    "when": "2026-11-01T07:29:38.654Z",
+    "source": "janela ffplay testsrc2 1920x1080@60 (atrás das outras janelas), codec automático — espectador em Automática (camada pelo tamanho do <video>, ~1280 px)",
+    "runs": [
+      {
+        "quality": "1080p30",
+        "condition": "limpo (RTT 0)",
+        "fps": 29.3,
+        "kbps": 1680,
+        "res": [
+          "1280x720 (100 %)"
+        ],
+        "freezes": 0,
+        "freezeMs": 0,
+        "senderTop": [
+          "1280x720@29",
+          "1280x720@30"
+        ],
+        "limitation": [
+          "none"
+        ]
+      },
+      {
+        "quality": "1080p30",
+        "condition": "RTT 150 ± 30 ms, 2 % perda",
+        "fps": 14.8,
+        "kbps": 513,
+        "res": [
+          "640x360 (100 %)"
+        ],
+        "freezes": 3,
+        "freezeMs": 787,
+        "senderTop": [
+          "1280x720@29",
+          "1280x720@30"
+        ],
+        "limitation": [
+          "none"
+        ]
+      },
+      {
+        "quality": "1080p30",
+        "condition": "uplink do transmissor limitado a 3 Mbit/s (RTT 50)",
+        "fps": 15,
+        "kbps": 1643,
+        "res": [
+          "640x360 (100 %)"
+        ],
+        "freezes": 0,
+        "freezeMs": 0,
+        "senderTop": [
+          "1280x720@29",
+          "1280x720@30"
+        ],
+        "limitation": [
+          "none"
+        ]
+      },
+      {
+        "quality": "1080p30",
+        "condition": "queda de 3 s (100 % perda nos dois sentidos), RTT 50",
+        "fpsBefore": 29.4,
+        "recoveryMsAfterOutage": 3203,
+        "freezesInWindow": 1,
+        "after": {
+          "fps": 29.2,
+          "kbps": 1678,
+          "res": [
+            "1280x720 (100 %)"
+          ],
+          "freezes": 0,
+          "freezeMs": 0,
+          "senderTop": [
+            "1280x720@30",
+            "1280x720@29"
+          ],
+          "limitation": [
+            "none"
+          ]
+        },
+        "timeline": [
+          [
+            0,
+            1963,
+            1280
+          ],
+          [
+            204,
+            1969,
+            1280
+          ],
+          [
+            409,
+            1975,
+            1280
+          ],
+          [
+            611,
+            1981,
+            1280
+          ],
+          [
+            814,
+            1987,
+            1280
+          ],
+          [
+            1017,
+            1993,
+            1280
+          ],
+          [
+            1219,
+            1999,
+            1280
+          ],
+          [
+            1421,
+            2005,
+            1280
+          ],
+          [
+            1623,
+            2010,
+            1280
+          ],
+          [
+            1825,
+            2016,
+            1280
+          ],
+          [
+            2027,
+            2022,
+            1280
+          ],
+          [
+            2230,
+            2028,
+            1280
+          ],
+          [
+            2432,
+            2034,
+            1280
+          ],
+          [
+            2634,
+            2040,
+            1280
+          ],
+          [
+            2836,
+            2046,
+            1280
+          ],
+          [
+            3037,
+            2052,
+            1280
+          ],
+          [
+            3239,
+            2058,
+            1280
+          ],
+          [
+            3441,
+            2064,
+            1280
+          ],
+          [
+            3643,
+            2070,
+            1280
+          ],
+          [
+            3844,
+            2075,
+            1280
+          ],
+          [
+            4045,
+            2081,
+            1280
+          ],
+          [
+            4248,
+            2087,
+            1280
+          ],
+          [
+            4450,
+            2093,
+            1280
+          ],
+          [
+            4654,
+            2099,
+            1280
+          ],
+          [
+            4860,
+            2106,
+            1280
+          ],
+          [
+            5063,
+            2112,
+            1280
+          ],
+          [
+            5270,
+            2114,
+            1280
+          ],
+          [
+            5473,
+            2114,
+            1280
+          ],
+          [
+            5678,
+            2114,
+            1280
+          ],
+          [
+            5881,
+            2114,
+            1280
+          ],
+          [
+            6094,
+            2114,
+            1280
+          ],
+          [
+            6296,
+            2114,
+            1280
+          ],
+          [
+            6514,
+            2114,
+            1280
+          ],
+          [
+            6723,
+            2114,
+            1280
+          ],
+          [
+            6936,
+            2114,
+            1280
+          ],
+          [
+            7139,
+            2114,
+            1280
+          ],
+          [
+            7343,
+            2114,
+            1280
+          ],
+          [
+            7551,
+            2114,
+            1280
+          ],
+          [
+            7757,
+            2114,
+            1280
+          ],
+          [
+            7960,
+            2114,
+            1280
+          ],
+          [
+            8165,
+            2114,
+            1280
+          ],
+          [
+            8368,
+            2114,
+            1280
+          ],
+          [
+            8570,
+            2114,
+            1280
+          ],
+          [
+            8774,
+            2114,
+            1280
+          ],
+          [
+            8976,
+            2114,
+            1280
+          ],
+          [
+            9179,
+            2114,
+            1280
+          ],
+          [
+            9381,
+            2114,
+            1280
+          ],
+          [
+            9583,
+            2114,
+            1280
+          ],
+          [
+            9785,
+            2114,
+            1280
+          ],
+          [
+            9987,
+            2114,
+            1280
+          ],
+          [
+            10189,
+            2114,
+            1280
+          ],
+          [
+            10391,
+            2114,
+            1280
+          ],
+          [
+            10593,
+            2114,
+            1280
+          ],
+          [
+            10795,
+            2114,
+            1280
+          ],
+          [
+            10997,
+            2114,
+            1280
+          ],
+          [
+            11203,
+            2114,
+            1280
+          ],
+          [
+            11409,
+            2118,
+            1280
+          ],
+          [
+            11611,
+            2124,
+            1280
+          ],
+          [
+            11813,
+            2130,
+            1280
+          ],
+          [
+            12015,
+            2136,
+            1280
+          ],
+          [
+            12217,
+            2142,
+            1280
+          ],
+          [
+            12419,
+            2147,
+            1280
+          ],
+          [
+            12621,
+            2153,
+            1280
+          ],
+          [
+            12822,
+            2159,
+            1280
+          ],
+          [
+            13024,
+            2165,
+            1280
+          ],
+          [
+            13226,
+            2171,
+            1280
+          ],
+          [
+            13428,
+            2177,
+            1280
+          ],
+          [
+            13630,
+            2183,
+            1280
+          ],
+          [
+            13831,
+            2189,
+            1280
+          ],
+          [
+            14033,
+            2195,
+            1280
+          ],
+          [
+            14243,
+            2201,
+            1280
+          ],
+          [
+            14447,
+            2207,
+            1280
+          ],
+          [
+            14651,
+            2213,
+            1280
+          ],
+          [
+            14855,
+            2219,
+            1280
+          ],
+          [
+            15059,
+            2225,
+            1280
+          ],
+          [
+            15263,
+            2230,
+            1280
+          ],
+          [
+            15465,
+            2236,
+            1280
+          ],
+          [
+            15676,
+            2243,
+            1280
+          ],
+          [
+            15880,
+            2249,
+            1280
+          ],
+          [
+            16084,
+            2255,
+            1280
+          ],
+          [
+            16294,
+            2261,
+            1280
+          ],
+          [
+            16498,
+            2266,
+            1280
+          ],
+          [
+            16707,
+            2273,
+            1280
+          ],
+          [
+            16909,
+            2279,
+            1280
+          ],
+          [
+            17111,
+            2285,
+            1280
+          ],
+          [
+            17314,
+            2291,
+            1280
+          ],
+          [
+            17518,
+            2297,
+            1280
+          ],
+          [
+            17719,
+            2302,
+            1280
+          ],
+          [
+            17922,
+            2308,
+            1280
+          ],
+          [
+            18124,
+            2314,
+            1280
+          ],
+          [
+            18326,
+            2320,
+            1280
+          ],
+          [
+            18528,
+            2326,
+            1280
+          ],
+          [
+            18730,
+            2332,
+            1280
+          ],
+          [
+            18932,
+            2338,
+            1280
+          ],
+          [
+            19135,
+            2344,
+            1280
+          ],
+          [
+            19337,
+            2350,
+            1280
+          ],
+          [
+            19540,
+            2355,
+            1280
+          ],
+          [
+            19743,
+            2361,
+            1280
+          ],
+          [
+            19946,
+            2367,
+            1280
+          ],
+          [
+            20148,
+            2373,
+            1280
+          ],
+          [
+            20358,
+            2379,
+            1280
+          ],
+          [
+            20562,
+            2386,
+            1280
+          ],
+          [
+            20772,
+            2392,
+            1280
+          ],
+          [
+            20977,
+            2397,
+            1280
+          ],
+          [
+            21178,
+            2402,
+            1280
+          ],
+          [
+            21380,
+            2409,
+            1280
+          ],
+          [
+            21582,
+            2415,
+            1280
+          ],
+          [
+            21784,
+            2421,
+            1280
+          ],
+          [
+            21987,
+            2427,
+            1280
+          ],
+          [
+            22190,
+            2433,
+            1280
+          ],
+          [
+            22392,
+            2439,
+            1280
+          ],
+          [
+            22594,
+            2445,
+            1280
+          ],
+          [
+            22797,
+            2451,
+            1280
+          ],
+          [
+            22999,
+            2457,
+            1280
+          ],
+          [
+            23201,
+            2463,
+            1280
+          ],
+          [
+            23403,
+            2469,
+            1280
+          ],
+          [
+            23605,
+            2475,
+            1280
+          ],
+          [
+            23810,
+            2480,
+            1280
+          ],
+          [
+            24012,
+            2486,
+            1280
+          ],
+          [
+            24214,
+            2492,
+            1280
+          ],
+          [
+            24418,
+            2498,
+            1280
+          ],
+          [
+            24623,
+            2504,
+            1280
+          ],
+          [
+            24826,
+            2510,
+            1280
+          ]
+        ]
+      },
+      {
+        "quality": "1080p60",
+        "condition": "limpo (RTT 0)",
+        "fps": 30,
+        "kbps": 1662,
+        "res": [
+          "1280x720 (100 %)"
+        ],
+        "freezes": 0,
+        "freezeMs": 0,
+        "senderTop": [
+          "1920x1080@0",
+          "1280x720@31",
+          "1280x720@30"
+        ],
+        "limitation": [
+          "none"
+        ]
+      },
+      {
+        "quality": "1080p60",
+        "condition": "RTT 150 ± 30 ms, 2 % perda",
+        "fps": 14.9,
+        "kbps": 616,
+        "res": [
+          "640x360 (100 %)"
+        ],
+        "freezes": 4,
+        "freezeMs": 1162,
+        "senderTop": [
+          "1280x720@30",
+          "1280x720@31"
+        ],
+        "limitation": [
+          "none"
+        ]
+      },
+      {
+        "quality": "1080p60",
+        "condition": "uplink do transmissor limitado a 3 Mbit/s (RTT 50)",
+        "fps": 25.2,
+        "kbps": 1567,
+        "res": [
+          "1280x720 (66 %)",
+          "640x360 (34 %)"
+        ],
+        "freezes": 0,
+        "freezeMs": 0,
+        "senderTop": [
+          "1280x720@31",
+          "1280x720@30"
+        ],
+        "limitation": [
+          "none"
+        ]
+      },
+      {
+        "quality": "1080p60",
+        "condition": "queda de 3 s (100 % perda nos dois sentidos), RTT 50",
+        "fpsBefore": 30.2,
+        "recoveryMsAfterOutage": 3218,
+        "freezesInWindow": 1,
+        "after": {
+          "fps": 29.8,
+          "kbps": 1646,
+          "res": [
+            "1280x720 (100 %)"
+          ],
+          "freezes": 0,
+          "freezeMs": 0,
+          "senderTop": [
+            "1280x720@30",
+            "1280x720@31",
+            "1280x720@28"
+          ],
+          "limitation": [
+            "none"
+          ]
+        },
+        "timeline": [
+          [
+            0,
+            2182,
+            1280
+          ],
+          [
+            204,
+            2189,
+            1280
+          ],
+          [
+            406,
+            2194,
+            1280
+          ],
+          [
+            610,
+            2201,
+            1280
+          ],
+          [
+            813,
+            2207,
+            1280
+          ],
+          [
+            1015,
+            2213,
+            1280
+          ],
+          [
+            1217,
+            2219,
+            1280
+          ],
+          [
+            1420,
+            2225,
+            1280
+          ],
+          [
+            1622,
+            2231,
+            1280
+          ],
+          [
+            1833,
+            2238,
+            1280
+          ],
+          [
+            2035,
+            2244,
+            1280
+          ],
+          [
+            2237,
+            2249,
+            1280
+          ],
+          [
+            2438,
+            2256,
+            1280
+          ],
+          [
+            2640,
+            2261,
+            1280
+          ],
+          [
+            2842,
+            2268,
+            1280
+          ],
+          [
+            3045,
+            2274,
+            1280
+          ],
+          [
+            3247,
+            2279,
+            1280
+          ],
+          [
+            3449,
+            2286,
+            1280
+          ],
+          [
+            3651,
+            2292,
+            1280
+          ],
+          [
+            3860,
+            2299,
+            1280
+          ],
+          [
+            4062,
+            2304,
+            1280
+          ],
+          [
+            4267,
+            2311,
+            1280
+          ],
+          [
+            4468,
+            2317,
+            1280
+          ],
+          [
+            4670,
+            2323,
+            1280
+          ],
+          [
+            4872,
+            2329,
+            1280
+          ],
+          [
+            5074,
+            2335,
+            1280
+          ],
+          [
+            5284,
+            2337,
+            1280
+          ],
+          [
+            5487,
+            2337,
+            1280
+          ],
+          [
+            5700,
+            2337,
+            1280
+          ],
+          [
+            5908,
+            2337,
+            1280
+          ],
+          [
+            6122,
+            2337,
+            1280
+          ],
+          [
+            6334,
+            2337,
+            1280
+          ],
+          [
+            6543,
+            2337,
+            1280
+          ],
+          [
+            6746,
+            2337,
+            1280
+          ],
+          [
+            6952,
+            2337,
+            1280
+          ],
+          [
+            7157,
+            2337,
+            1280
+          ],
+          [
+            7361,
+            2337,
+            1280
+          ],
+          [
+            7564,
+            2337,
+            1280
+          ],
+          [
+            7767,
+            2337,
+            1280
+          ],
+          [
+            7982,
+            2337,
+            1280
+          ],
+          [
+            8185,
+            2337,
+            1280
+          ],
+          [
+            8387,
+            2337,
+            1280
+          ],
+          [
+            8589,
+            2337,
+            1280
+          ],
+          [
+            8791,
+            2337,
+            1280
+          ],
+          [
+            8993,
+            2337,
+            1280
+          ],
+          [
+            9195,
+            2337,
+            1280
+          ],
+          [
+            9399,
+            2337,
+            1280
+          ],
+          [
+            9602,
+            2337,
+            1280
+          ],
+          [
+            9804,
+            2337,
+            1280
+          ],
+          [
+            10006,
+            2337,
+            1280
+          ],
+          [
+            10208,
+            2337,
+            1280
+          ],
+          [
+            10410,
+            2337,
+            1280
+          ],
+          [
+            10612,
+            2337,
+            1280
+          ],
+          [
+            10814,
+            2337,
+            1280
+          ],
+          [
+            11016,
+            2337,
+            1280
+          ],
+          [
+            11218,
+            2337,
+            1280
+          ],
+          [
+            11421,
+            2343,
+            1280
+          ],
+          [
+            11623,
+            2348,
+            1280
+          ],
+          [
+            11825,
+            2355,
+            1280
+          ],
+          [
+            12028,
+            2361,
+            1280
+          ],
+          [
+            12230,
+            2366,
+            1280
+          ],
+          [
+            12433,
+            2373,
+            1280
+          ],
+          [
+            12636,
+            2379,
+            1280
+          ],
+          [
+            12839,
+            2385,
+            1280
+          ],
+          [
+            13041,
+            2391,
+            1280
+          ],
+          [
+            13244,
+            2396,
+            1280
+          ],
+          [
+            13447,
+            2403,
+            1280
+          ],
+          [
+            13649,
+            2409,
+            1280
+          ],
+          [
+            13852,
+            2415,
+            1280
+          ],
+          [
+            14054,
+            2422,
+            1280
+          ],
+          [
+            14258,
+            2426,
+            1280
+          ],
+          [
+            14475,
+            2434,
+            1280
+          ],
+          [
+            14679,
+            2440,
+            1280
+          ],
+          [
+            14881,
+            2446,
+            1280
+          ],
+          [
+            15083,
+            2452,
+            1280
+          ],
+          [
+            15285,
+            2458,
+            1280
+          ],
+          [
+            15490,
+            2465,
+            1280
+          ],
+          [
+            15693,
+            2471,
+            1280
+          ],
+          [
+            15895,
+            2476,
+            1280
+          ],
+          [
+            16097,
+            2483,
+            1280
+          ],
+          [
+            16301,
+            2489,
+            1280
+          ],
+          [
+            16504,
+            2495,
+            1280
+          ],
+          [
+            16706,
+            2501,
+            1280
+          ],
+          [
+            16908,
+            2507,
+            1280
+          ],
+          [
+            17111,
+            2512,
+            1280
+          ],
+          [
+            17313,
+            2519,
+            1280
+          ],
+          [
+            17515,
+            2525,
+            1280
+          ],
+          [
+            17717,
+            2531,
+            1280
+          ],
+          [
+            17918,
+            2536,
+            1280
+          ],
+          [
+            18120,
+            2543,
+            1280
+          ],
+          [
+            18322,
+            2549,
+            1280
+          ],
+          [
+            18535,
+            2556,
+            1280
+          ],
+          [
+            18737,
+            2561,
+            1280
+          ],
+          [
+            18939,
+            2567,
+            1280
+          ],
+          [
+            19144,
+            2572,
+            1280
+          ],
+          [
+            19346,
+            2578,
+            1280
+          ],
+          [
+            19548,
+            2584,
+            1280
+          ],
+          [
+            19752,
+            2590,
+            1280
+          ],
+          [
+            19954,
+            2596,
+            1280
+          ],
+          [
+            20157,
+            2602,
+            1280
+          ],
+          [
+            20360,
+            2609,
+            1280
+          ],
+          [
+            20563,
+            2614,
+            1280
+          ],
+          [
+            20765,
+            2621,
+            1280
+          ],
+          [
+            20968,
+            2626,
+            1280
+          ],
+          [
+            21170,
+            2633,
+            1280
+          ],
+          [
+            21372,
+            2639,
+            1280
+          ],
+          [
+            21574,
+            2645,
+            1280
+          ],
+          [
+            21776,
+            2651,
+            1280
+          ],
+          [
+            21980,
+            2657,
+            1280
+          ],
+          [
+            22182,
+            2663,
+            1280
+          ],
+          [
+            22384,
+            2669,
+            1280
+          ],
+          [
+            22586,
+            2675,
+            1280
+          ],
+          [
+            22789,
+            2681,
+            1280
+          ],
+          [
+            22992,
+            2687,
+            1280
+          ],
+          [
+            23195,
+            2694,
+            1280
+          ],
+          [
+            23398,
+            2699,
+            1280
+          ],
+          [
+            23600,
+            2706,
+            1280
+          ],
+          [
+            23802,
+            2712,
+            1280
+          ],
+          [
+            24004,
+            2717,
+            1280
+          ],
+          [
+            24206,
+            2724,
+            1280
+          ],
+          [
+            24408,
+            2730,
+            1280
+          ],
+          [
+            24610,
+            2737,
+            1280
+          ],
+          [
+            24812,
+            2742,
+            1280
+          ]
+        ]
+      }
+    ]
+  },
+  "protectionSdpRedAttempt": {
+    "note": "RED removido por SDP munging na resposta do SFU: o SFU descartou o Opus puro (trilha publicada como RED) e B não recebeu nada; descartado, refeito via JoinParams.red",
+    "runs": [
+      {
+        "red": false,
+        "fec": true,
+        "lossPct": 5,
+        "burst": 1,
+        "sendCodecs": [
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 4.6,
+        "rtpLossPct": 0,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 0,
+        "jitterBufferTargetMs": 0,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 36.6,
+        "senderRttMs": 50.4
+      },
+      {
+        "red": false,
+        "fec": true,
+        "lossPct": 10,
+        "burst": 1,
+        "sendCodecs": [
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": -15800,
+        "rtpLossPct": 0,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 0,
+        "jitterBufferTargetMs": 0,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 36,
+        "senderRttMs": 50.7
+      },
+      {
+        "red": false,
+        "fec": true,
+        "lossPct": 5,
+        "burst": 3,
+        "sendCodecs": [
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 5.6,
+        "rtpLossPct": 0,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 0,
+        "jitterBufferTargetMs": 0,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 36.1,
+        "senderRttMs": 50.7
+      },
+      {
+        "red": false,
+        "fec": false,
+        "lossPct": 5,
+        "burst": 1,
+        "sendCodecs": [
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 3.8,
+        "rtpLossPct": 0,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 0,
+        "jitterBufferTargetMs": 0,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 38.1,
+        "senderRttMs": 50.6
+      },
+      {
+        "red": false,
+        "fec": false,
+        "lossPct": 10,
+        "burst": 1,
+        "sendCodecs": [
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": -13400,
+        "rtpLossPct": 0,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 0,
+        "jitterBufferTargetMs": 0,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 37.7,
+        "senderRttMs": 50.7
+      },
+      {
+        "red": false,
+        "fec": false,
+        "lossPct": 5,
+        "burst": 3,
+        "sendCodecs": [
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 7,
+        "rtpLossPct": 0,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 0,
+        "jitterBufferTargetMs": 0,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 37.8,
+        "senderRttMs": 51.5
+      }
+    ]
+  },
+  "protection": {
+    "when": "2026-11-01T07:36:22.728Z",
+    "note": "RTT 50 ms sem jitter; perda só no uplink; A sai e entra para renegociar",
+    "seconds": 25,
+    "runs": [
+      {
+        "red": true,
+        "fec": true,
+        "lossPct": 5,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 4.8,
+        "rtpLossPct": 4.7,
+        "concealedPct": 0.4,
+        "concealmentEventsPerMin": 9.6,
+        "jitterBufferMs": 80.7,
+        "jitterBufferTargetMs": 78.5,
+        "fecPacketsReceived": 1242,
+        "fecPacketsDiscarded": 1242,
+        "stretchPct": 0.1,
+        "sendKbps": 74.2,
+        "senderRttMs": 51.7
+      },
+      {
+        "red": true,
+        "fec": true,
+        "lossPct": 10,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 10.8,
+        "rtpLossPct": 10.6,
+        "concealedPct": 0.7,
+        "concealmentEventsPerMin": 16.8,
+        "jitterBufferMs": 63.5,
+        "jitterBufferTargetMs": 80,
+        "fecPacketsReceived": 1173,
+        "fecPacketsDiscarded": 1172,
+        "stretchPct": 0.2,
+        "sendKbps": 73,
+        "senderRttMs": 51.3
+      },
+      {
+        "red": true,
+        "fec": true,
+        "lossPct": 5,
+        "burst": 3,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 2.5,
+        "rtpLossPct": 2.9,
+        "concealedPct": 0.6,
+        "concealmentEventsPerMin": 7.2,
+        "jitterBufferMs": 67.1,
+        "jitterBufferTargetMs": 80,
+        "fecPacketsReceived": 1259,
+        "fecPacketsDiscarded": 1255,
+        "stretchPct": 0,
+        "sendKbps": 73.2,
+        "senderRttMs": 50.7
+      },
+      {
+        "red": false,
+        "fec": true,
+        "lossPct": 5,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/opus minptime=10;stereo=1;useinbandfec=1",
+          "audio/red 111/111",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 5.6,
+        "rtpLossPct": 5.7,
+        "concealedPct": 2.3,
+        "concealmentEventsPerMin": 96,
+        "jitterBufferMs": 31.6,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 613,
+        "fecPacketsDiscarded": 580,
+        "stretchPct": 0.6,
+        "sendKbps": 40.8,
+        "senderRttMs": 50.4
+      },
+      {
+        "red": false,
+        "fec": true,
+        "lossPct": 10,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/opus minptime=10;stereo=1;useinbandfec=1",
+          "audio/red 111/111",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 11.6,
+        "rtpLossPct": 11.8,
+        "concealedPct": 6,
+        "concealmentEventsPerMin": 199.2,
+        "jitterBufferMs": 29.5,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 584,
+        "fecPacketsDiscarded": 530,
+        "stretchPct": 1.2,
+        "sendKbps": 40.5,
+        "senderRttMs": 50.5
+      },
+      {
+        "red": false,
+        "fec": true,
+        "lossPct": 5,
+        "burst": 3,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/opus minptime=10;stereo=1;useinbandfec=1",
+          "audio/red 111/111",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 3.3,
+        "rtpLossPct": 3.7,
+        "concealedPct": 2.1,
+        "concealmentEventsPerMin": 38.4,
+        "jitterBufferMs": 28.2,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 619,
+        "fecPacketsDiscarded": 607,
+        "stretchPct": 0.1,
+        "sendKbps": 40.5,
+        "senderRttMs": 51
+      },
+      {
+        "red": true,
+        "fec": false,
+        "lossPct": 5,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 4.9,
+        "rtpLossPct": 5.3,
+        "concealedPct": 0.5,
+        "concealmentEventsPerMin": 14.4,
+        "jitterBufferMs": 37.1,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 77.1,
+        "senderRttMs": 51.3
+      },
+      {
+        "red": true,
+        "fec": false,
+        "lossPct": 10,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 9.6,
+        "rtpLossPct": 9.8,
+        "concealedPct": 1.2,
+        "concealmentEventsPerMin": 31.2,
+        "jitterBufferMs": 40.9,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 76.3,
+        "senderRttMs": 50.4
+      },
+      {
+        "red": true,
+        "fec": false,
+        "lossPct": 5,
+        "burst": 3,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 3.7,
+        "rtpLossPct": 2.1,
+        "concealedPct": 0.6,
+        "concealmentEventsPerMin": 12,
+        "jitterBufferMs": 30.4,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 76.3,
+        "senderRttMs": 50.5
+      },
+      {
+        "red": false,
+        "fec": false,
+        "lossPct": 5,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/red 111/111",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 4.6,
+        "rtpLossPct": 4.3,
+        "concealedPct": 3,
+        "concealmentEventsPerMin": 91.2,
+        "jitterBufferMs": 19.1,
+        "jitterBufferTargetMs": 20,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 38.2,
+        "senderRttMs": 50.6
+      },
+      {
+        "red": false,
+        "fec": false,
+        "lossPct": 10,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/red 111/111",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 10.2,
+        "rtpLossPct": 10.5,
+        "concealedPct": 6.3,
+        "concealmentEventsPerMin": 182.4,
+        "jitterBufferMs": 17,
+        "jitterBufferTargetMs": 20,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 37.7,
+        "senderRttMs": 50.9
+      },
+      {
+        "red": false,
+        "fec": false,
+        "lossPct": 5,
+        "burst": 3,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/red 111/111",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 4,
+        "rtpLossPct": 4.8,
+        "concealedPct": 3.1,
+        "concealmentEventsPerMin": 28.8,
+        "jitterBufferMs": 17.5,
+        "jitterBufferTargetMs": 20,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 37.7,
+        "senderRttMs": 51.5
+      }
+    ]
+  },
+  "screen": {
+    "when": "2026-11-01T07:42:50.611Z",
+    "source": "janela ffplay testsrc2 1920x1080@60 (atrás das outras janelas), codec automático, espectador em Original (camada alta)",
+    "runs": [
+      {
+        "quality": "1080p30",
+        "condition": "limpo (RTT 0)",
+        "fps": 29.3,
+        "kbps": 3633,
+        "res": [
+          "1920x1080 (100 %)"
+        ],
+        "freezes": 0,
+        "freezeMs": 0,
+        "senderTop": [
+          "1920x1080@29",
+          "1920x1080@30"
+        ],
+        "limitation": [
+          "none"
+        ]
+      },
+      {
+        "quality": "1080p30",
+        "condition": "RTT 150 ± 30 ms, 2 % perda",
+        "fps": 29.3,
+        "kbps": 2173,
+        "res": [
+          "1280x720 (100 %)"
+        ],
+        "freezes": 4,
+        "freezeMs": 815,
+        "senderTop": [
+          "1920x1080@29",
+          "1920x1080@30"
+        ],
+        "limitation": [
+          "none"
+        ]
+      },
+      {
+        "quality": "1080p30",
+        "condition": "uplink do transmissor limitado a 3 Mbit/s (RTT 50)",
+        "fps": 23,
+        "kbps": 1273,
+        "res": [
+          "1280x720 (75 %)",
+          "1920x1080 (25 %)"
+        ],
+        "freezes": 1,
+        "freezeMs": 4510,
+        "senderTop": [
+          "1280x720@29",
+          "1280x720@30",
+          "1920x1080@15",
+          "1920x1080@19",
+          "1920x1080@0"
+        ],
+        "limitation": [
+          "bandwidth",
+          "none"
+        ]
+      },
+      {
+        "quality": "1080p30",
+        "condition": "queda de 3 s (100 % perda nos dois sentidos), RTT 50",
+        "fpsBefore": 28.9,
+        "recoveryMsAfterOutage": 1624,
+        "freezesInWindow": 1,
+        "after": {
+          "fps": 29.4,
+          "kbps": 1682,
+          "res": [
+            "1920x1080 (100 %)"
+          ],
+          "freezes": 0,
+          "freezeMs": 0,
+          "senderTop": [
+            "1920x1080@0",
+            "1920x1080@20",
+            "1920x1080@30",
+            "1920x1080@29"
+          ],
+          "limitation": [
+            "bandwidth",
+            "none"
+          ]
+        },
+        "timeline": [
+          [
+            0,
+            2591,
+            1280
+          ],
+          [
+            202,
+            2597,
+            1280
+          ],
+          [
+            404,
+            2603,
+            1280
+          ],
+          [
+            606,
+            2609,
+            1280
+          ],
+          [
+            807,
+            2615,
+            1280
+          ],
+          [
+            1009,
+            2621,
+            1280
+          ],
+          [
+            1211,
+            2627,
+            1280
+          ],
+          [
+            1414,
+            2632,
+            1280
+          ],
+          [
+            1623,
+            2639,
+            1280
+          ],
+          [
+            1829,
+            2645,
+            1280
+          ],
+          [
+            2031,
+            2651,
+            1280
+          ],
+          [
+            2233,
+            2657,
+            1280
+          ],
+          [
+            2438,
+            2663,
+            1280
+          ],
+          [
+            2640,
+            2669,
+            1280
+          ],
+          [
+            2843,
+            2674,
+            1280
+          ],
+          [
+            3049,
+            2680,
+            1280
+          ],
+          [
+            3254,
+            2686,
+            1280
+          ],
+          [
+            3456,
+            2692,
+            1280
+          ],
+          [
+            3659,
+            2698,
+            1280
+          ],
+          [
+            3861,
+            2704,
+            1280
+          ],
+          [
+            4065,
+            2710,
+            1280
+          ],
+          [
+            4267,
+            2716,
+            1280
+          ],
+          [
+            4469,
+            2722,
+            1280
+          ],
+          [
+            4671,
+            2725,
+            1280
+          ],
+          [
+            4873,
+            2732,
+            1280
+          ],
+          [
+            5077,
+            2738,
+            1280
+          ],
+          [
+            5290,
+            2741,
+            1280
+          ],
+          [
+            5495,
+            2741,
+            1280
+          ],
+          [
+            5713,
+            2741,
+            1280
+          ],
+          [
+            5929,
+            2741,
+            1280
+          ],
+          [
+            6145,
+            2741,
+            1280
+          ],
+          [
+            6363,
+            2741,
+            1280
+          ],
+          [
+            6568,
+            2741,
+            1280
+          ],
+          [
+            6777,
+            2741,
+            1280
+          ],
+          [
+            6984,
+            2741,
+            1280
+          ],
+          [
+            7188,
+            2741,
+            1280
+          ],
+          [
+            7391,
+            2741,
+            1280
+          ],
+          [
+            7594,
+            2741,
+            1280
+          ],
+          [
+            7802,
+            2741,
+            1280
+          ],
+          [
+            8007,
+            2741,
+            1280
+          ],
+          [
+            8209,
+            2741,
+            1280
+          ],
+          [
+            8412,
+            2741,
+            1280
+          ],
+          [
+            8614,
+            2749,
+            1280
+          ],
+          [
+            8816,
+            2755,
+            1280
+          ],
+          [
+            9018,
+            2761,
+            1280
+          ],
+          [
+            9219,
+            2767,
+            1280
+          ],
+          [
+            9421,
+            2773,
+            1280
+          ],
+          [
+            9624,
+            2778,
+            1280
+          ],
+          [
+            9826,
+            2782,
+            1920
+          ],
+          [
+            10028,
+            2789,
+            1920
+          ],
+          [
+            10230,
+            2795,
+            1920
+          ],
+          [
+            10432,
+            2801,
+            1920
+          ],
+          [
+            10636,
+            2807,
+            1920
+          ],
+          [
+            10838,
+            2813,
+            1920
+          ],
+          [
+            11040,
+            2819,
+            1920
+          ],
+          [
+            11242,
+            2825,
+            1920
+          ],
+          [
+            11444,
+            2831,
+            1920
+          ],
+          [
+            11646,
+            2837,
+            1920
+          ],
+          [
+            11852,
+            2843,
+            1920
+          ],
+          [
+            12055,
+            2849,
+            1920
+          ],
+          [
+            12258,
+            2855,
+            1920
+          ],
+          [
+            12460,
+            2860,
+            1920
+          ],
+          [
+            12662,
+            2866,
+            1920
+          ],
+          [
+            12865,
+            2872,
+            1920
+          ],
+          [
+            13067,
+            2878,
+            1920
+          ],
+          [
+            13270,
+            2884,
+            1920
+          ],
+          [
+            13472,
+            2890,
+            1920
+          ],
+          [
+            13677,
+            2896,
+            1920
+          ],
+          [
+            13889,
+            2902,
+            1920
+          ],
+          [
+            14092,
+            2908,
+            1920
+          ],
+          [
+            14294,
+            2914,
+            1920
+          ],
+          [
+            14496,
+            2920,
+            1920
+          ],
+          [
+            14698,
+            2926,
+            1920
+          ],
+          [
+            14900,
+            2932,
+            1920
+          ],
+          [
+            15103,
+            2938,
+            1920
+          ],
+          [
+            15307,
+            2944,
+            1920
+          ],
+          [
+            15512,
+            2950,
+            1920
+          ],
+          [
+            15715,
+            2956,
+            1920
+          ],
+          [
+            15919,
+            2962,
+            1920
+          ],
+          [
+            16122,
+            2967,
+            1920
+          ],
+          [
+            16324,
+            2974,
+            1920
+          ],
+          [
+            16526,
+            2980,
+            1920
+          ],
+          [
+            16729,
+            2986,
+            1920
+          ],
+          [
+            16931,
+            2992,
+            1920
+          ],
+          [
+            17133,
+            2997,
+            1920
+          ],
+          [
+            17335,
+            3003,
+            1920
+          ],
+          [
+            17537,
+            3009,
+            1920
+          ],
+          [
+            17739,
+            3015,
+            1920
+          ],
+          [
+            17942,
+            3021,
+            1920
+          ],
+          [
+            18144,
+            3026,
+            1920
+          ],
+          [
+            18346,
+            3033,
+            1920
+          ],
+          [
+            18548,
+            3039,
+            1920
+          ],
+          [
+            18750,
+            3045,
+            1920
+          ],
+          [
+            18953,
+            3051,
+            1920
+          ],
+          [
+            19158,
+            3056,
+            1920
+          ],
+          [
+            19361,
+            3063,
+            1920
+          ],
+          [
+            19565,
+            3069,
+            1920
+          ],
+          [
+            19767,
+            3075,
+            1920
+          ],
+          [
+            19973,
+            3081,
+            1920
+          ],
+          [
+            20177,
+            3087,
+            1920
+          ],
+          [
+            20382,
+            3093,
+            1920
+          ],
+          [
+            20584,
+            3099,
+            1920
+          ],
+          [
+            20787,
+            3105,
+            1920
+          ],
+          [
+            20989,
+            3111,
+            1920
+          ],
+          [
+            21191,
+            3117,
+            1920
+          ],
+          [
+            21394,
+            3123,
+            1920
+          ],
+          [
+            21596,
+            3129,
+            1920
+          ],
+          [
+            21798,
+            3135,
+            1920
+          ],
+          [
+            22000,
+            3141,
+            1920
+          ],
+          [
+            22202,
+            3146,
+            1920
+          ],
+          [
+            22404,
+            3152,
+            1920
+          ],
+          [
+            22608,
+            3158,
+            1920
+          ],
+          [
+            22813,
+            3164,
+            1920
+          ],
+          [
+            23019,
+            3170,
+            1920
+          ],
+          [
+            23223,
+            3176,
+            1920
+          ],
+          [
+            23427,
+            3182,
+            1920
+          ],
+          [
+            23631,
+            3188,
+            1920
+          ],
+          [
+            23835,
+            3194,
+            1920
+          ],
+          [
+            24037,
+            3200,
+            1920
+          ],
+          [
+            24244,
+            3206,
+            1920
+          ],
+          [
+            24447,
+            3212,
+            1920
+          ],
+          [
+            24649,
+            3218,
+            1920
+          ],
+          [
+            24851,
+            3224,
+            1920
+          ]
+        ]
+      },
+      {
+        "quality": "1080p60",
+        "condition": "limpo (RTT 0)",
+        "fps": 50.5,
+        "kbps": 7668,
+        "res": [
+          "1920x1080 (100 %)"
+        ],
+        "freezes": 0,
+        "freezeMs": 0,
+        "senderTop": [
+          "1920x1080@45",
+          "1920x1080@49",
+          "1920x1080@53",
+          "1920x1080@51",
+          "1920x1080@52",
+          "1920x1080@54"
+        ],
+        "limitation": [
+          "none"
+        ]
+      },
+      {
+        "quality": "1080p60",
+        "condition": "RTT 150 ± 30 ms, 2 % perda",
+        "fps": 15,
+        "kbps": 650,
+        "res": [
+          "640x360 (100 %)"
+        ],
+        "freezes": 4,
+        "freezeMs": 1022,
+        "senderTop": [
+          "1920x1080@46",
+          "1920x1080@54",
+          "1920x1080@55",
+          "1920x1080@49",
+          "1920x1080@52",
+          "1920x1080@51"
+        ],
+        "limitation": [
+          "none"
+        ]
+      },
+      {
+        "quality": "1080p60",
+        "condition": "uplink do transmissor limitado a 3 Mbit/s (RTT 50)",
+        "fps": 20.3,
+        "kbps": 1276,
+        "res": [
+          "1280x720 (48 %)",
+          "640x360 (31 %)",
+          "1920x1080 (20 %)"
+        ],
+        "freezes": 1,
+        "freezeMs": 3741,
+        "senderTop": [
+          "1280x720@30",
+          "1280x720@29",
+          "1920x1080@33",
+          "1920x1080@18",
+          "1920x1080@0"
+        ],
+        "limitation": [
+          "bandwidth",
+          "none"
+        ]
+      },
+      {
+        "quality": "1080p60",
+        "condition": "queda de 3 s (100 % perda nos dois sentidos), RTT 50",
+        "fpsBefore": 29.9,
+        "recoveryMsAfterOutage": 380,
+        "freezesInWindow": 1,
+        "after": {
+          "fps": 46,
+          "kbps": 3113,
+          "res": [
+            "1920x1080 (93 %)",
+            "1280x720 (7 %)"
+          ],
+          "freezes": 0,
+          "freezeMs": 0,
+          "senderTop": [
+            "1920x1080@6",
+            "1920x1080@18",
+            "1920x1080@48",
+            "1920x1080@37",
+            "1920x1080@49",
+            "1920x1080@45"
+          ],
+          "limitation": [
+            "bandwidth",
+            "none"
+          ]
+        },
+        "timeline": [
+          [
+            0,
+            2698,
+            1280
+          ],
+          [
+            203,
+            2704,
+            1280
+          ],
+          [
+            405,
+            2709,
+            1280
+          ],
+          [
+            608,
+            2716,
+            1280
+          ],
+          [
+            810,
+            2722,
+            1280
+          ],
+          [
+            1012,
+            2728,
+            1280
+          ],
+          [
+            1214,
+            2734,
+            1280
+          ],
+          [
+            1418,
+            2740,
+            1280
+          ],
+          [
+            1621,
+            2746,
+            1280
+          ],
+          [
+            1823,
+            2752,
+            1280
+          ],
+          [
+            2025,
+            2759,
+            1280
+          ],
+          [
+            2227,
+            2763,
+            1280
+          ],
+          [
+            2430,
+            2771,
+            1280
+          ],
+          [
+            2632,
+            2777,
+            1280
+          ],
+          [
+            2834,
+            2783,
+            1280
+          ],
+          [
+            3036,
+            2789,
+            1280
+          ],
+          [
+            3238,
+            2794,
+            1280
+          ],
+          [
+            3439,
+            2801,
+            1280
+          ],
+          [
+            3641,
+            2806,
+            1280
+          ],
+          [
+            3843,
+            2813,
+            1280
+          ],
+          [
+            4045,
+            2818,
+            1280
+          ],
+          [
+            4248,
+            2823,
+            1280
+          ],
+          [
+            4450,
+            2831,
+            1280
+          ],
+          [
+            4654,
+            2837,
+            1280
+          ],
+          [
+            4857,
+            2843,
+            1280
+          ],
+          [
+            5059,
+            2848,
+            1280
+          ],
+          [
+            5277,
+            2851,
+            1280
+          ],
+          [
+            5482,
+            2851,
+            1280
+          ],
+          [
+            5686,
+            2851,
+            1280
+          ],
+          [
+            5903,
+            2851,
+            1280
+          ],
+          [
+            6107,
+            2851,
+            1280
+          ],
+          [
+            6313,
+            2851,
+            1280
+          ],
+          [
+            6523,
+            2851,
+            1280
+          ],
+          [
+            6729,
+            2851,
+            1280
+          ],
+          [
+            6932,
+            2851,
+            1280
+          ],
+          [
+            7135,
+            2851,
+            1280
+          ],
+          [
+            7344,
+            2851,
+            1280
+          ],
+          [
+            7555,
+            2851,
+            1280
+          ],
+          [
+            7764,
+            2851,
+            1280
+          ],
+          [
+            7970,
+            2851,
+            1280
+          ],
+          [
+            8177,
+            2851,
+            1280
+          ],
+          [
+            8380,
+            2851,
+            1280
+          ],
+          [
+            8582,
+            2858,
+            1280
+          ],
+          [
+            8785,
+            2865,
+            1280
+          ],
+          [
+            8987,
+            2871,
+            1280
+          ],
+          [
+            9189,
+            2877,
+            1280
+          ],
+          [
+            9391,
+            2883,
+            1280
+          ],
+          [
+            9593,
+            2887,
+            1280
+          ],
+          [
+            9795,
+            2899,
+            1920
+          ],
+          [
+            9997,
+            2910,
+            1920
+          ],
+          [
+            10199,
+            2920,
+            1920
+          ],
+          [
+            10401,
+            2927,
+            1920
+          ],
+          [
+            10603,
+            2934,
+            1920
+          ],
+          [
+            10805,
+            2943,
+            1920
+          ],
+          [
+            11009,
+            2949,
+            1920
+          ],
+          [
+            11213,
+            2955,
+            1920
+          ],
+          [
+            11417,
+            2963,
+            1920
+          ],
+          [
+            11620,
+            2972,
+            1920
+          ],
+          [
+            11822,
+            2983,
+            1920
+          ],
+          [
+            12024,
+            2993,
+            1920
+          ],
+          [
+            12227,
+            3001,
+            1920
+          ],
+          [
+            12432,
+            3014,
+            1920
+          ],
+          [
+            12634,
+            3021,
+            1920
+          ],
+          [
+            12836,
+            3033,
+            1920
+          ],
+          [
+            13039,
+            3042,
+            1920
+          ],
+          [
+            13241,
+            3049,
+            1920
+          ],
+          [
+            13443,
+            3060,
+            1920
+          ],
+          [
+            13647,
+            3069,
+            1920
+          ],
+          [
+            13849,
+            3075,
+            1920
+          ],
+          [
+            14051,
+            3082,
+            1920
+          ],
+          [
+            14254,
+            3092,
+            1920
+          ],
+          [
+            14456,
+            3101,
+            1920
+          ],
+          [
+            14659,
+            3111,
+            1920
+          ],
+          [
+            14862,
+            3121,
+            1920
+          ],
+          [
+            15064,
+            3132,
+            1920
+          ],
+          [
+            15267,
+            3144,
+            1920
+          ],
+          [
+            15469,
+            3154,
+            1920
+          ],
+          [
+            15671,
+            3165,
+            1920
+          ],
+          [
+            15873,
+            3172,
+            1920
+          ],
+          [
+            16075,
+            3181,
+            1920
+          ],
+          [
+            16277,
+            3188,
+            1920
+          ],
+          [
+            16479,
+            3198,
+            1920
+          ],
+          [
+            16681,
+            3206,
+            1920
+          ],
+          [
+            16883,
+            3213,
+            1920
+          ],
+          [
+            17087,
+            3223,
+            1920
+          ],
+          [
+            17291,
+            3230,
+            1920
+          ],
+          [
+            17493,
+            3238,
+            1920
+          ],
+          [
+            17695,
+            3245,
+            1920
+          ],
+          [
+            17897,
+            3256,
+            1920
+          ],
+          [
+            18099,
+            3265,
+            1920
+          ],
+          [
+            18302,
+            3275,
+            1920
+          ],
+          [
+            18504,
+            3283,
+            1920
+          ],
+          [
+            18706,
+            3291,
+            1920
+          ],
+          [
+            18908,
+            3300,
+            1920
+          ],
+          [
+            19110,
+            3307,
+            1920
+          ],
+          [
+            19313,
+            3318,
+            1920
+          ],
+          [
+            19515,
+            3330,
+            1920
+          ],
+          [
+            19718,
+            3341,
+            1920
+          ],
+          [
+            19920,
+            3353,
+            1920
+          ],
+          [
+            20123,
+            3364,
+            1920
+          ],
+          [
+            20325,
+            3375,
+            1920
+          ],
+          [
+            20527,
+            3387,
+            1920
+          ],
+          [
+            20730,
+            3397,
+            1920
+          ],
+          [
+            20934,
+            3408,
+            1920
+          ],
+          [
+            21136,
+            3420,
+            1920
+          ],
+          [
+            21340,
+            3431,
+            1920
+          ],
+          [
+            21542,
+            3442,
+            1920
+          ],
+          [
+            21744,
+            3453,
+            1920
+          ],
+          [
+            21947,
+            3461,
+            1920
+          ],
+          [
+            22149,
+            3473,
+            1920
+          ],
+          [
+            22352,
+            3485,
+            1920
+          ],
+          [
+            22554,
+            3495,
+            1920
+          ],
+          [
+            22756,
+            3506,
+            1920
+          ],
+          [
+            22958,
+            3516,
+            1920
+          ],
+          [
+            23160,
+            3528,
+            1920
+          ],
+          [
+            23363,
+            3538,
+            1920
+          ],
+          [
+            23564,
+            3544,
+            1920
+          ],
+          [
+            23766,
+            3553,
+            1920
+          ],
+          [
+            23969,
+            3564,
+            1920
+          ],
+          [
+            24171,
+            3576,
+            1920
+          ],
+          [
+            24372,
+            3585,
+            1920
+          ],
+          [
+            24574,
+            3593,
+            1920
+          ],
+          [
+            24776,
+            3602,
+            1920
+          ],
+          [
+            24978,
+            3612,
+            1920
+          ]
+        ]
+      }
+    ]
+  },
+  "protectionRepeat": {
+    "when": "2026-11-01T07:49:22.643Z",
+    "note": "RTT 50 ms sem jitter; perda só no uplink; A sai e entra para renegociar",
+    "seconds": 25,
+    "runs": [
+      {
+        "red": true,
+        "fec": true,
+        "joins": 1,
+        "rep": 0,
+        "lossPct": 0,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 0,
+        "rtpLossPct": 0,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 54.4,
+        "jitterBufferTargetMs": 47.6,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0.1,
+        "sendKbps": 76,
+        "senderRttMs": 50.9
+      },
+      {
+        "red": true,
+        "fec": true,
+        "joins": 1,
+        "rep": 0,
+        "lossPct": 5,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 4.8,
+        "rtpLossPct": 5,
+        "concealedPct": 0.1,
+        "concealmentEventsPerMin": 2.4,
+        "jitterBufferMs": 54.1,
+        "jitterBufferTargetMs": 60,
+        "fecPacketsReceived": 1243,
+        "fecPacketsDiscarded": 1242,
+        "stretchPct": 0,
+        "sendKbps": 73,
+        "senderRttMs": 50.4
+      },
+      {
+        "red": true,
+        "fec": true,
+        "joins": 1,
+        "rep": 0,
+        "lossPct": 10,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 11,
+        "rtpLossPct": 9.9,
+        "concealedPct": 0.4,
+        "concealmentEventsPerMin": 12,
+        "jitterBufferMs": 46.8,
+        "jitterBufferTargetMs": 60,
+        "fecPacketsReceived": 1169,
+        "fecPacketsDiscarded": 1163,
+        "stretchPct": 0.1,
+        "sendKbps": 73.1,
+        "senderRttMs": 51.1
+      },
+      {
+        "red": true,
+        "fec": false,
+        "joins": 1,
+        "rep": 0,
+        "lossPct": 0,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 0,
+        "rtpLossPct": 0,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 53.8,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 77.1,
+        "senderRttMs": 51.3
+      },
+      {
+        "red": true,
+        "fec": false,
+        "joins": 1,
+        "rep": 0,
+        "lossPct": 5,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 3.9,
+        "rtpLossPct": 4,
+        "concealedPct": 0.2,
+        "concealmentEventsPerMin": 4.8,
+        "jitterBufferMs": 40.2,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 76.2,
+        "senderRttMs": 50.6
+      },
+      {
+        "red": true,
+        "fec": false,
+        "joins": 1,
+        "rep": 0,
+        "lossPct": 10,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 10.5,
+        "rtpLossPct": 10.9,
+        "concealedPct": 0.7,
+        "concealmentEventsPerMin": 19.2,
+        "jitterBufferMs": 49.1,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 76.3,
+        "senderRttMs": 51.8
+      },
+      {
+        "red": true,
+        "fec": true,
+        "joins": 1,
+        "rep": 1,
+        "lossPct": 0,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 0,
+        "rtpLossPct": 0,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 34.9,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 1121,
+        "fecPacketsDiscarded": 1122,
+        "stretchPct": 0,
+        "sendKbps": 74.1,
+        "senderRttMs": 49.8
+      },
+      {
+        "red": true,
+        "fec": true,
+        "joins": 1,
+        "rep": 1,
+        "lossPct": 5,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 4.8,
+        "rtpLossPct": 5.3,
+        "concealedPct": 0.7,
+        "concealmentEventsPerMin": 19.2,
+        "jitterBufferMs": 38,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 1234,
+        "fecPacketsDiscarded": 1234,
+        "stretchPct": 0,
+        "sendKbps": 73,
+        "senderRttMs": 50
+      },
+      {
+        "red": true,
+        "fec": true,
+        "joins": 1,
+        "rep": 1,
+        "lossPct": 10,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=1",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 12.1,
+        "rtpLossPct": 12.8,
+        "concealedPct": 1,
+        "concealmentEventsPerMin": 28.8,
+        "jitterBufferMs": 53.1,
+        "jitterBufferTargetMs": 60,
+        "fecPacketsReceived": 1138,
+        "fecPacketsDiscarded": 1124,
+        "stretchPct": 0.1,
+        "sendKbps": 73.2,
+        "senderRttMs": 50.4
+      },
+      {
+        "red": true,
+        "fec": false,
+        "joins": 1,
+        "rep": 1,
+        "lossPct": 0,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 0,
+        "rtpLossPct": 0,
+        "concealedPct": 0,
+        "concealmentEventsPerMin": 0,
+        "jitterBufferMs": 55,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 77,
+        "senderRttMs": 49.4
+      },
+      {
+        "red": true,
+        "fec": false,
+        "joins": 1,
+        "rep": 1,
+        "lossPct": 5,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 3.7,
+        "rtpLossPct": 3.9,
+        "concealedPct": 0.2,
+        "concealmentEventsPerMin": 4.8,
+        "jitterBufferMs": 52.9,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 76.1,
+        "senderRttMs": 50.4
+      },
+      {
+        "red": true,
+        "fec": false,
+        "joins": 1,
+        "rep": 1,
+        "lossPct": 10,
+        "burst": 1,
+        "codec": "audio/opus",
+        "sendCodecs": [
+          "audio/red 111/111",
+          "audio/opus minptime=10;usedtx=1;useinbandfec=0",
+          "audio/PCMU",
+          "audio/PCMA"
+        ],
+        "netLossUpPct": 10.3,
+        "rtpLossPct": 10.4,
+        "concealedPct": 1.1,
+        "concealmentEventsPerMin": 40.8,
+        "jitterBufferMs": 32.2,
+        "jitterBufferTargetMs": 40,
+        "fecPacketsReceived": 0,
+        "fecPacketsDiscarded": 0,
+        "stretchPct": 0,
+        "sendKbps": 76.5,
+        "senderRttMs": 50.6
+      }
+    ]
+  }
+}

@@ -37,6 +37,8 @@ export interface JoinParams {
   refresh?: () => Promise<{ url: string; token: string }>
   /** false = join listen-only (no mic capture). */
   publishMic?: boolean
+  /** Voice RED (each packet repeats the previous frame). Default true: measured in docs/benchmarks/media-network.md. */
+  red?: boolean
 }
 
 export interface ScreenShareOptions {
@@ -180,7 +182,7 @@ class MediaEngine {
       // Remote audio through WebAudio: enables >100% per-user gain and AudioContext.setSinkId.
       webAudioMix: true,
       audioOutput: { deviceId: this.activeOutput ?? 'default' },
-      publishDefaults: { dtx: true, red: true, forceStereo: false, audioPreset: { maxBitrate: kbps * 1000 }, stopMicTrackOnMute: false },
+      publishDefaults: { dtx: true, red: params.red !== false, forceStereo: false, audioPreset: { maxBitrate: kbps * 1000 }, stopMicTrackOnMute: false },
       disconnectOnPageLeave: true,
       reconnectPolicy: new DefaultReconnectPolicy(RECONNECT_DELAYS_MS),
     })
@@ -285,7 +287,7 @@ class MediaEngine {
       await this.applyRnnoise(p.processing)
       const s = useMedia.getState().self
       if (s.muted || s.deafened) await track.mute()
-      await room.localParticipant.publishTrack(track, { source: Track.Source.Microphone, dtx: true, red: true, forceStereo: false, audioPreset: { maxBitrate: kbps * 1000 } })
+      await room.localParticipant.publishTrack(track, { source: Track.Source.Microphone, dtx: true, red: this.last?.red !== false, forceStereo: false, audioPreset: { maxBitrate: kbps * 1000 } })
       patch('self', { micAvailable: true })
       patch('devices', { inputId: this.activeInput })
       void this.refreshDevices(false)

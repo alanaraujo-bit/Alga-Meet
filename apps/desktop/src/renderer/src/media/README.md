@@ -15,7 +15,7 @@ Decisões e números que as justificam: `docs/decisions/0001-media-engine.md` e 
 
 | Método | O que faz |
 |---|---|
-| `join({ url, token, bitrateKbps?, channelId?, refresh?, publishMic? })` | Entra no canal (use o `VoiceJoinResponse` do servidor). `bitrateKbps` padrão 64. `refresh` devolve `{url, token}` novos para a reentrada automática (tokens expiram). `publishMic:false` = só ouvir. Rejeita se não conectar (o estado vira `disconnected` com motivo). |
+| `join({ url, token, bitrateKbps?, channelId?, refresh?, publishMic? })` | Entra no canal (use o `VoiceJoinResponse` do servidor). `bitrateKbps` padrão 64. `refresh` devolve `{url, token}` novos para a reentrada automática (tokens expiram). `publishMic:false` = só ouvir. `red:false` desliga a redundância RED da voz (padrão ligado; só para diagnóstico, ver `docs/benchmarks/media-network.md`). Rejeita se não conectar (o estado vira `disconnected` com motivo). |
 | `leave()` | Sai, para captura, volta a `idle`. |
 | `setContext({ channelName })` | Nome legível do canal para a bandeja e `connection.channelName` (em vez de `ch_…`). Chame antes ou depois do `join`; sobrevive às reentradas automáticas, `leave()` limpa. |
 | `setMuted(b)` / `toggleMute()` | Mutar. Desmutar enquanto ensurdecido também desensurdece. |
