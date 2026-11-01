@@ -1,125 +1,158 @@
 # Alga Meet — Design system
 
-> Referência viva das telas. Direção: `docs/research/linear-design-study.md` §17 (régua de qualidade Linear, identidade própria).
-> Código: tokens em `apps/desktop/src/renderer/src/styles/tokens.css`, componentes em `apps/desktop/src/renderer/src/ui/`.
-> Evidência: screenshots do app real em `docs/screenshots/` (gerados por `apps/desktop/scripts/screenshot.mjs`; versões antigas ficam guardadas).
+> Referência viva das telas. Direção visual: **B · Índigo suave** (a linguagem visual da Linear aplicada ao nosso produto; régua medida em `docs/research/linear-design-study.md`).
+> Código: tokens em `apps/desktop/src/renderer/src/styles/tokens.css` (contraste verificado em `tokens.test.ts`), componentes em `apps/desktop/src/renderer/src/ui/`, ícones em `ui/icons.tsx`.
+> Evidência: screenshots do app real em `docs/screenshots/` (gerados por `apps/desktop/scripts/screenshot.mjs`; a passada desta direção usa `ALGA_SHOTS_TAG=v2-indigo`) e comparações lado a lado com a Linear em `docs/design/compare/`.
+
+## Direção B — por quê
+
+O dono rejeitou o visual "Bioluminescência": o teal/ciano soava **artificial, robótico, "tech" demais**, e o app não lembrava a Linear em nada, "nem os ícones, nem nada". Ele escolheu a direção **B · Índigo suave** e deixou o critério de aceite em uma frase:
+
+> *"Eu quero algo gostoso, algo sexy, algo que as pessoas tenham prazer de ver e de utilizar. Lembre-se disso sempre."*
+
+Daí as decisões desta direção:
+
+- **Quase nenhuma cor.** Superfícies quase pretas e neutras, hierarquia por luminância. O índigo suave aparece em poucos lugares, e por isso significa algo: onde você está, a ação principal, o foco, a voz.
+- **A qualidade da Linear, não a marca dela.** Mesma família de valores medidos (texto 13 px, tracking negativo, bordas brancas translúcidas, menus de vidro, 100 ms ease-out), nenhum logo, ilustração ou ativo proprietário.
+- **Calma é o luxo.** Quem fala ganha um anel índigo de 2 px que acompanha a voz. Sem brilho, sem neon, sem luz ambiente.
+- **Prazer nos detalhes, não em efeitos.** Brilho de topo no botão primário, borda acesa no topo dos cartões e menus, hover que entra em 0 ms e sai em 120 ms, foco nítido, alinhamento exato. Gradiente só onde se paga: botão primário, cartão de upgrade, marca.
 
 ## 1. Princípios aplicados
 
-1. **O palco manda, o cromo recua.** Rail (nível 0) < lista de canais (nível 1) < conversa/palco (nível 2). A "folha" de trabalho (sidebar + conteúdo) tem canto superior esquerdo arredondado sobre o cromo, com borda de 6% de branco.
-2. **Hierarquia por luminância.** Quatro degraus de texto e seis de superfície. Cor saturada só para estado: falando, mudo, ao vivo, erro, menção.
-3. **Seleção neutra.** Item ativo = `--state-selected` (branco 7%) + `--text-primary`. Nunca acento em lista.
-4. **O acento é a voz.** Bioluminescência (teal-ciano, H≈195) aparece em: foco, menção, ação primária, presença de voz, brilho de quem fala. Texto sobre preenchimento de acento é sempre escuro (`--on-accent`).
+1. **O palco manda, o cromo recua (L invertido).** Title bar, rail e lista de canais são um plano escuro só (`#0b0b0c`). A conversa e o palco são um painel um degrau acima (`#0f1011`), encaixado nesse plano com raio de 12 px, filete branco a 5 % e anel escuro externo. Configurações usam o mesmo painel.
+2. **Hierarquia por luminância.** Quatro degraus de texto e seis de superfície. Cor saturada só para estado (ao vivo, mudo, erro, menção) e sempre dessaturada.
+3. **"Você está aqui" é índigo; o resto é neutro.** O item atual da sidebar, da navegação de configurações e do rail ganha a tinta índigo (`--state-current`, `#1d1d2c` sobre o cromo) e o glifo **sólido** em `--accent`. Hover, pressionado e destaque de menu ficam neutros (branco 4–8 %).
+4. **O índigo é a voz e a ação.** Ele aparece em: foco, item atual, ação primária, menção, quem está falando, presença de voz no cromo. Texto sobre o preenchimento índigo é branco (5,0:1).
 5. **Resposta direta é instantânea.** Hover entra em 0 ms e sai em 120 ms; seleção em lista muda no mesmo quadro. Só mudança de contexto anima (≤ 300 ms, ease-out).
 6. **Progresso no lugar da ação.** "Enviando…" no próprio balão, "Não enviada · Tentar de novo" na mensagem, banner de reconexão com contagem regressiva, splash que explica a falha. Spinner sem texto é bug.
-7. **Estado nunca só por cor.** Presença tem forma (ponto, lua, barra, anel); mudo/ensurdecido têm ícone riscado + tooltip; não lido = peso 590 + ponto de 6 px.
+7. **Estado nunca só por cor.** Presença tem forma (ponto, lua, barra, anel); mudo/ensurdecido têm ícone riscado + tooltip; toggle ligado tem glifo sólido; não lido = peso 590 + ponto de 6 px.
 8. **Voz e presença primeiro.** O esqueleto continua familiar para quem vem do Discord (espaços à esquerda, canais, chat), mas o que o produto mostra primeiro é *onde as pessoas estão agora*: "Agora" no topo da Home, frondes vivas no rail e nos canais de voz, "3 em Sala de foco" no header do chat, "Em voz" abrindo a lista de membros, painel "Voz conectada" sempre visível, palco de chamada como tela principal do canal de voz.
-9. **A UI nunca mente sobre o estado.** Sem conexão de tempo real, presença fica incerta (ponto a 40 %) e o status diz "Reconectando…"; sem mídia, os tiles ficam cinza, sem brilho, e o palco diz que você não está ouvindo ninguém.
+9. **A UI nunca mente sobre o estado.** Sem conexão de tempo real, presença fica incerta (ponto a 40 %) e o status diz "Reconectando…"; sem mídia, os tiles ficam cinza, sem anel, e o palco diz que você não está ouvindo ninguém.
 
 ## 2. Tokens
 
-### Superfícies (OKLCH H 230, C ≈ 0.006 — "água profunda")
+Todo valor sai de `tokens.css`. Cores neutras são passos de luminância OKLCH com croma quase zero (H ≈ 282, C ≤ 0,004), como a Linear gera os temas dela em LCH; o acento é uma rampa única em H 279. `tokens.test.ts` falha se qualquer par desenhado cair abaixo de AA ou se o teal antigo voltar ao renderer.
 
-| Token | Hex | Uso |
-|---|---|---|
-| `--bg-app` | `#080b0c` | janela, title bar, rail |
-| `--bg-sidebar` | `#0e1113` | lista de canais/DMs, lista de membros |
-| `--bg-content` | `#121517` | conversa, palco de voz |
-| `--bg-raised` | `#191c1e` | cards, inputs, composer |
-| `--bg-overlay` | `#1f2426` | popover, menu, tooltip |
-| `--bg-modal` | `#23272a` | modal (scrim `rgba(0,0,0,.6)`) |
+### Superfícies
 
-Overlays de estado sobre qualquer nível: `--state-hover` 4%, `--state-selected` 7%, `--state-pressed` 10%.
+| Token | Hex | OKLCH L | Uso |
+|---|---|---|---|
+| `--bg-app` | `#0b0b0c` | .150 | title bar, rail (o cromo) |
+| `--bg-sidebar` | `#0b0b0c` | .150 | lista de canais/DMs: o mesmo plano do cromo |
+| `--bg-content` | `#0f1011` | .172 | painel: conversa, palco, lista de membros, configurações |
+| `--bg-raised` | `#161718` | .203 | cards, composer, tile sem câmera |
+| `--bg-overlay` | `#1b1b1d` | .222 | tooltip, toast, dock da chamada (sólido) |
+| `--bg-glass` | `rgba(27,27,30,.9)` + `--glass-blur` (`blur(20px) saturate(1.6)`) | — | menus, popovers, toasts, barra de ações da mensagem |
+| `--bg-modal` | `#171719` | .205 | modal (scrim `rgba(0,0,0,.56)`) |
+
+Overlays de estado sobre qualquer nível: `--state-hover` 4 %, `--state-selected` 6 %, `--state-pressed` 8 % (branco). `--state-current` = `rgba(150,152,255,.13)` (→ `#1d1d2c` no cromo), `--state-current-hover` .17.
 
 ### Texto
 
-| Token | Hex | Contraste em `bg-modal` | Uso |
+| Token | Hex | Pior contraste medido | Uso |
 |---|---|---|---|
-| `--text-primary` | `#f1f4f6` | 13,6:1 | títulos, nomes, item ativo |
-| `--text-secondary` | `#c9cfd2` | 9,6:1 | corpo de mensagem, itens com hover |
-| `--text-tertiary` | `#98a0a3` | 5,7:1 | metadados, rótulos de seção, placeholders |
-| `--text-disabled` | `#636a6e` | — | só desabilitado/decorativo, nunca informação |
+| `--text-primary` | `#f7f8f8` | 14,4:1 (vidro sobre mídia cinza); 17,9:1 no painel | títulos, nomes, item atual |
+| `--text-secondary` | `#d0d6e0` | 10,5:1 (vidro sobre mídia cinza); 13,0:1 no painel | corpo de mensagem, hover |
+| `--text-tertiary` | `#8a8f98` | 4,7:1 (vidro sobre mídia cinza); 5,9:1 no painel | itens inativos, metadados, rótulos, placeholders |
+| `--text-disabled` | `#62666d` | — | só desabilitado/decorativo, nunca informação |
 
 ### Bordas, acento e semântica
 
-- Bordas translúcidas: `--border-subtle` 6%, `--border-default` 9%, `--border-strong` 14%. Antes de pôr uma linha, tente espaço.
-- Acento: `--accent #4ddcdc` (texto/ícone), `--accent-fill #21c9ca` (+ `--on-accent #061415`), `--accent-pressed #38b3b3`, `--accent-tint` 10%.
-- Semântica: `--online #4fce74`, `--idle/--warning #fdbe45`, `--dnd/--danger #f75d59`, `--offline #7b8387`.
-- **Vermelho só para @menção e erro** (e perigo: sair, desconectar, recusar). Contadores informativos (pedidos, DMs não lidas, Pendentes) usam `Badge` neutro (branco 14 %); `Badge mention` é o vermelho. A linha "Novas" é acento a 45 % com o rótulo "furando" a linha.
-- **Ao vivo = acento.** "AO VIVO" é preenchimento `--accent-fill` + texto escuro, com ponto que respira. Transmitir é um sinal de voz, não um alarme.
-- **Avatares:** 8 matizes OKLCH (L .50, C .07, H 150–338, pula a faixa 40–110 que vira marrom). Espaços sem ícone usam o mesmo hash como tinta de 12 % (`tintFor`). Em 20 px ou menos, só o disco de cor.
-- **Cores de cargo** (`ROLE_COLORS`, `spaceSettings/strings.ts`): 8 tons OKLCH L .80 C .09 nos matizes 250 · 280 · 310 · 340 · 10 · 40 · 70 · 115 (`#91c3f6 #b2b8f7 #d0aeea #e6a7d0 #f1a6b0 #f1aa92 #e3b47d #bbc581`). A faixa H 140–215 fica de fora (verde de online e o acento) e o croma fica muito abaixo do âmbar de aviso: um nome colorido nunca lê como estado. Nenhuma cor de cargo é igual a um token semântico.
-- **Mistura de cor em sRGB.** `color-mix(in oklch, X, transparent)` desloca o matiz no Chromium (o cartão de login ficou marrom na v1). Use `in srgb` ou `rgba()`.
+- **Bordas translúcidas:** `--border-subtle` 5 %, `--border-default` 8 % (≈ `#1f2023` no cromo), `--border-strong` 12 %. Antes de pôr uma linha, tente espaço.
+- **Acento índigo suave (H 279):** `--accent #8b8ef7` (texto, ícone, foco, anel de fala; 6,6:1 no painel) · `--accent-hover #a2a8fc` (link em hover) · `--accent-fill #6163d0` (preenchimento, branco 5,0:1) · `--accent-fill-hover #6466d4` · `--accent-pressed #5a5bc1` · `--on-accent #fff` · `--accent-tint` 10 % · `--accent-tint-strong` 18 % · `--accent-sheen` (branco 10 % → 0 em 55 %, o brilho de topo dos preenchimentos) · `--selection-bg` `rgba(110,114,232,.38)`.
+  - O mock aprovado tinha o botão em `#6e72e8`; com texto branco ele dá 4,0:1, então o preenchimento desceu para `#6163d0` (5,0:1) e o `#8b8ef7` ficou para texto, ícone e anel.
+- **Semântica (dessaturada, rara):** `--online/--success #61c28e` · `--idle/--warning #e6b463` · `--danger/--dnd #e66e68` (texto) com `--danger-fill #c04444` (branco 5,1:1) · `--live #e86885` com `--live-fill #be395e` (branco 5,3:1): "ao vivo" é uma rosa, separada do vermelho de perigo · `--offline #777a80`.
+- **Vermelho só para @menção, erro e perigo** (sair, desconectar, recusar). Contadores informativos usam `Badge` neutro (branco 10 %); `Badge mention` é `--danger-fill`. A linha "Novas" é índigo a 42 % com o rótulo "furando" a linha.
+- **Ao vivo = rosa, pequeno.** Selo "AO VIVO" em `--live-fill` + texto branco, com ponto que respira. Um selo, nunca um alarme.
+- **Avatares de iniciais:** disco `#26272b`-like com um sussurro do matiz da pessoa (`oklch(.29 .02 H)`, tinta `oklch(.86 .03 H)`), matizes 140 · 235 · 255 · 275 · 295 · 315 · 340 · 15 (sem teal/ciano, sem a faixa 40–110 que vira barro). Espaços sem ícone usam o mesmo hash como tinta de 8 % (`tintFor`). Em 20 px ou menos, só o disco.
+- **Cores de perfil** (`ACCENTS`, Minha conta): OKLCH L .50 C .085, índigo primeiro, grafite por último, iniciais brancas ≥ 5,8:1 (`#595e93 #3b6692 #6f568a #834f72 #8d4e4f #86572d #486f40 #62636a`).
+- **Cores de cargo** (`ROLE_COLORS`, `spaceSettings/strings.ts`): 8 tons OKLCH L .83 C .045 nos matizes 245 · 300 · 330 · 0 · 30 · 60 · 90 · 120 (`#b0cbe3 #cbc1e1 #d9bdd5 #e1bcc6 #e3bdb6 #dec1ab #d3c7a7 #c3ccac`): o nome lê como branco tingido. Ficam de fora H 140–215 (verde de online) e 270–290 (o índigo), então um nome colorido nunca lê como estado ou menção.
+- **Mistura de cor em sRGB.** `color-mix(in oklch, X, transparent)` desloca o matiz no Chromium. Use `in srgb` ou `rgba()`.
 
 ### Tipografia
 
-Inter Variable embarcada (`@fontsource-variable/inter`, eixo `opsz`), `font-feature-settings: 'cv11', 'ss01', 'calt'`, números tabulares (`.tnum`) em horários, contadores e badges.
+Inter Variable embarcada (`@fontsource-variable/inter/opsz.css`): o pacote traz o eixo **`opsz` 14–32** além do `wght`. Títulos fixam o eixo na ponta display (`font-variation-settings: var(--opsz-display)` = `'opsz' 32`), que é a Inter Display que a Linear usa nos títulos; o texto corrido fica no `font-optical-sizing: auto`. Recursos: `'calt', 'cv01', 'ss03'` (a de duas barrigas, 1 reto, aspas redondas). Números tabulares (`.tnum` ou `font-variant-numeric`) em horários, contadores, badges, reações, preços e estatísticas.
 
-| Token | Tamanho/linha | Peso | Uso |
-|---|---|---|---|
-| `--type-badge` | 11/14 | 590 | badges, contadores |
-| `--type-meta` | 12/16 | 400–510 | horários, cabeçalhos de seção |
-| `--type-ui` | 13/20 | 400–510 | listas, menus, botões, inputs |
-| `--type-ui-lg` | 14/20 | 510–590 | nome de canal no header, autores |
-| `--type-message` | 15/22 | 400 | corpo de mensagem |
-| `--type-title-sm` | 17/24 | 590 | títulos de seção/painel |
-| `--type-title` | 20/28 | 590 | título de modal |
-| `--type-title-lg` | 24/32 | 590 | login, intro de canal |
-| `--type-display` | 32/40 | 590 | onboarding |
+| Token | Tamanho/linha | Peso | Tracking | Uso |
+|---|---|---|---|---|
+| `--type-badge` | 11/14 | 590 | 0 | badges, contadores |
+| `--type-meta` | 12/16 | 400–510 | 0 | horários, rótulos de seção, tooltips |
+| `--type-ui` | 13/20 | 400–510 | −0,008em | listas, menus, botões, inputs (linha da sidebar 13/510) |
+| `--type-ui-lg` | 14/20 | 510–590 | −0,011em | nome do canal no header, autores |
+| `--type-message` | 15/22 | 400 | −0,011em | corpo de mensagem (Aparência: 14–17) |
+| `--type-title-sm` | 17/24 | 590 | −0,016em | títulos de seção/painel (display) |
+| `--type-title` | 20/28 | 590 | −0,016em | título de modal e de configurações (display) |
+| `--type-title-lg` | 24/32 | 590 | −0,015em | login, intro de canal (display) |
+| `--type-display` | 32/40 | 590 | −0,022em | onboarding (display) |
 
-Tracking negativo cresce com o tamanho (−0,005em → −0,022em).
+Pesos: 400, 510, 590, 680. O tracking negativo cresce com o tamanho, como a Linear mede (0 em 12 px, −0,01em em 13–15 px, −0,022em em display).
 
 ### Espaço, raio, alturas, camadas
 
 - Espaço (base 4): `--s-0_5` 2 · `--s-1` 4 · `--s-1_5` 6 · `--s-2` 8 · `--s-3` 12 · `--s-4` 16 · `--s-5` 20 · `--s-6` 24 · `--s-8` 32 …
-- Raio concêntrico: `xs 4` (badge, código) · `sm 6` (item de menu) · `md 8` (linha, botão, input) · `lg 12` (card, menu, popover, rail) · `xl 16` (modal) · `full`. Menu 12 = item 6 + padding 6.
+- Raio concêntrico: `xs 4` (badge, código) · `sm 6` (linha da sidebar, item de menu, botão 28–32) · `md 8` (input, botão 36) · `lg 12` (card, popover, painel, tile) · `xl 16` (modal) · `full` (pílulas, avatares, controles da chamada). Menu 10 = item 6 + padding 4.
 - Alturas: 24 compacto · **28 linha de lista** · 32 botão/input · 36 botão primário/input de formulário · 40 controles de chamada.
-- Layout: title bar 40 (140 px à direita livres para os botões nativos), rail 64, sidebar 248, membros 240, header 48. Lista de membros some abaixo de 1100 px.
+- Layout: title bar 40 (140 px à direita livres para os botões nativos), rail 64, sidebar 248, membros 240, header 48, painel com 8 px de respiro à direita e embaixo. Lista de membros some abaixo de 1100 px.
 - z-index: `sticky 100 · titlebar 200 · call-overlay 300 · overlay 500 · popover 600 · command-palette 650 · modal-scrim 699 · modal 700 · toast 800 · tooltip 1100 · context-menu 1200`.
 
 ### Elevação
 
-Profundidade no escuro = luminância + borda translúcida + anel escuro. `--elev-overlay` (menus, tooltip, popover, toast) e `--elev-modal` (modal, switcher). Cards no nível 3 não têm sombra, só borda.
+Profundidade no escuro = luminância + filete translúcido + anel escuro externo + uma sombra larga e suave + borda acesa no topo (`inset 0 1px 0 rgba(255,255,255,.05)`).
+
+- `--elev-low`: `0 1px 2px rgba(0,0,0,.3)` (botões preenchidos, thumb do segmented).
+- `--elev-overlay`: anel `0 0 0 1px rgba(0,0,0,.45)`, `0 4px 12px` a 22 %, `0 16px 40px` a 38 %, topo aceso. Menus, popovers, tooltip, toast, dock.
+- `--elev-modal`: anel a 50 %, `0 8px 20px` a 25 %, `0 32px 80px` a 50 %, topo aceso. Modal, switcher.
+- **Vidro** (`--bg-glass` + `--glass-blur`) só em sobreposição pequena: menus, popovers, toasts, barra de ações da mensagem. Nunca em tela cheia nem no dock que fica sobre vídeo (custo de GPU durante o encode): o dock é sólido a 96 %.
+
+## 2b. Ícones
+
+**Decisão: Phosphor (`@phosphor-icons/react`), um sistema só, sempre pelo wrapper `ui/Icon`.** O Lucide saiu.
+
+- **Por quê.** Comparamos os dois a 16 px sobre `#0f1011`, em 100 % e 125 % (Lucide 1,75 e 1,5 absoluto; Phosphor regular, bold, fill, duotone). O Lucide é o ícone padrão de meio mundo (shadcn), e é isso que o dono leu como "genérico". O Phosphor tem geometria mais redonda e macia, o **bold** desenha 1,5 px a 16 px (o peso dos ícones da Linear) e, principalmente, tem **pesos de verdade**: `fill` para o estado sólido de "você está aqui / está ligado" e `duotone` para arte de estado vazio. O Lucide não tem variante preenchida.
+- **Vocabulário.** `ui/icons.tsx` reexporta os glifos com os nomes do app (`Mic`, `Search`, `Settings`, `PhoneOff`…), então nenhuma feature importa o Phosphor direto; trocar um glifo é uma linha. Faltavam fones e monitor riscados: `slashed()` desenha o glifo base com o traço de risco do próprio Phosphor (48,48 → 208,224) recortado por máscara, nos mesmos pesos.
+- **Peso por tamanho** (`Icon`): bold até 18 px (≈ 1,1–1,7 px de traço), regular a partir de 20 px (1,25–1,5 px). Tamanhos no grid de 2: 12 · 14 · 16 · 18 · 20 · 24.
+- **Estados.** `filled`: item atual da sidebar (`#`, alto-falante, Amigos), da navegação de configurações e o Home do rail, sempre em `--accent`; `IconButton` com `aria-pressed` desenha o glifo sólido automaticamente (mudo, ensurdecido, membros). `duotone`: ícone do `EmptyState`.
+- **Cor.** Ícone em repouso = `--text-tertiary`; hover sobe para `--text-primary`; atual = `--accent`. Nunca colorir ícone para decorar.
 
 ## 3. Movimento
 
 | Token | Duração | Curva | Uso |
 |---|---|---|---|
-| `--dur-fast` | 100 ms | out-quad | cor/fundo no hover, press |
+| `--dur-fast` | 100 ms | out-quad `(.25,.46,.45,.94)` | cor/fundo no hover, press, tooltip |
 | `--dur-hover-out` | 120 ms | out-quad | saída do highlight (entrada é 0 ms) |
-| `--dur-base` | 160 ms | out-quad | switch, seta de card |
-| `--dur-pop` | 180 ms | out-quart | menu, tooltip, popover (scale .97 → 1 + fade) |
+| `--dur-base` | 160 ms | out-quad | switch, escala do press nos controles da chamada |
+| `--dur-pop` | 180 ms | out-quart `(.165,.84,.44,1)` | menu e popover (scale .97 + 2 px para cima → 1, com fade) |
 | `--dur-morph` | 220 ms | out-quart | pílula do rail, segmented control |
 | `--dur-panel` | 300 ms | sheet `(.32,.72,0,1)` | modal |
 
 - Saída ≈ 0,75× a entrada, curva in-quad.
+- **Press com corpo, sem demora:** controles da chamada escalam para .96 no `:active` (160 ms out-quart); botões preenchidos perdem o brilho de topo e ganham sombra interna. A cor responde no mesmo quadro.
 - **Troca de espaço:** a folha entra 10 px na direção do item do rail escolhido (continuidade espacial), 180 ms, sem animação de saída.
-- **Brilho de quem fala: luz embaixo d'água, não anel.** `useEnvelope(ref, getLevel)` aplica envelope tipo compressor (ataque 60 ms, release 240 ms) direto em `--speak`, num rAF, sem re-render. O tile do palco recebe o envelope e tudo dentro dele herda (`--speak` não é redefinido no avatar): uma luz interna `radial-gradient(60% 80% at 50% 45%, rgba(77,220,220,.12), transparent 70%)` com `opacity: var(--speak)`, um contorno interno de 2 px em `--accent` que nunca passa de 70 % (`min(.7, speak × 2)`) e, no avatar, um fio de 1,5–2 px mais um halo cujo spread (2 → 8 px) e alfa (até .35) crescem com a voz. Luz e contorno são camadas próprias animadas só por `opacity` (nenhum repaint por quadro). `--halo-k` encolhe o halo onde os avatares ficam juntos (linhas da sidebar, "Agora", faixa do palco, header do chat). O nível remoto já chega perceptual do motor (0..1); com movimento reduzido, o valor salta entre 0 e 1.
-- **A sala respira com a conversa.** A área do palco recebe o envelope da voz mais alta (`roomLevelNow`) e um `::before` com `radial-gradient(1200px 600px at 50% 110%, rgba(33,201,202,.10), transparent 60%)` usa `opacity: var(--speak)`: uma luz baixa, de baixo para cima, que sobe quando alguém fala. Uma variável, sem blur, atrás dos tiles (nunca sobre vídeo), desligada com movimento reduzido (um palco que pisca é pior que um parado).
-- **Frondes (`Fronds`) = a marca (Marca v1):** o glifo de 3 barras é o logo do app (ícone do Windows, bandeja, instalador; ver `apps/desktop/build/README.md`) e a linguagem de "vivo/falando". Geometria única: barras de `u` com intervalo `u`, alturas 3u/5u/3u, grupo quadrado de 5u, `u = max(2, round(tamanho/7))` px (14 px → `u` 2, as barras do ícone de 16). `LogoMark` renderiza `Fronds` em `--accent` (`mono` = `currentColor`). `getLevel` = barras seguem o envelope (sua sala); `breathing` = respiração lenta (`scaleY` 0,55 → 1, 1,6 s) para "tem gente aqui agora"; sem nada = ícone estático, que é o próprio logo.
+- **Quem fala: um anel calmo, não uma luz.** `useEnvelope(ref, getLevel)` aplica envelope tipo compressor (ataque 60 ms, release 240 ms) direto em `--speak`, num rAF, sem re-render. O rosto ganha um anel `--accent` de 2 px com `opacity: min(1, speak × 2,2)` e uma borda macia de 2 px a no máximo 16 % (encolhe com `--halo-k` onde os avatares ficam juntos). O tile do palco recebe um filete índigo de 1,5 px a 60 % com `opacity: min(1, speak × 2)`. Tudo é `opacity` em camada própria (nenhum repaint por quadro). Não há mais luz ambiente no palco nem luz interna no tile. Com movimento reduzido, o valor salta entre 0 e 1 (o anel aparece e some, sem animar).
+- **Frondes (`Fronds`) = a marca (Marca v2):** o glifo de 3 barras é o logo do app (ícone do Windows, bandeja, instalador; ver `apps/desktop/build/README.md`) e a linguagem de "vivo/falando". Geometria única: barras de `u` com intervalo `u`, alturas 3u/5u/3u, grupo quadrado de 5u, `u = max(2, round(tamanho/7))` px. `LogoMark` renderiza `Fronds brand`: as barras acendem em branco no topo e descem para o índigo `#9a9df9`, num gradiente só para o grupo (cada barra mostra a sua fatia de um gradiente de 5u centrado). `mono` = `currentColor`. Frondes de voz no cromo usam `--accent`. `getLevel` = barras seguem o envelope; `breathing` = respiração lenta (`scaleY` 0,55 → 1, 1,6 s); sem nada = ícone estático.
 - **Entrar/sair da chamada:** tile cresce de 96 % + fade em 180 ms (out-quart), sai em 130 ms; a grade se reorganiza com `layout` em 220 ms (in-out-cubic). Mudo/desmudo é resposta direta: muda no mesmo quadro.
-- `prefers-reduced-motion` **e** a opção "Reduzir animações" (classe `html.reduce-motion`, menu de configurações do painel do usuário) zeram durações CSS e mudam o `MotionConfig` para `always`.
+- `prefers-reduced-motion` **e** a opção "Reduzir animações" (classe `html.reduce-motion`) zeram durações CSS e mudam o `MotionConfig` para `always`.
 
 ## 4. Componentes (`src/renderer/src/ui`)
 
 | Componente | Notas |
 |---|---|
-| `Button` | `primary` (acento, texto escuro) · `secondary` · `secondary-danger` · `ghost` · `danger`; `sm/md/lg`; `loading` mantém a largura e põe spinner. `secondary-danger` = superfície secundária com texto `--danger`: ação destrutiva em repouso (Sair da conta, Sair de todas as outras sessões, Excluir espaço, Excluir cargo, Recusar chamada). O fill `danger` fica no modal de confirmação e em Desconectar. |
-| `IconButton` | Sempre com `label` (vira tooltip + `aria-label`). `disabledReason` mantém o foco e explica por quê (`aria-disabled`). `aria-pressed` para toggles (mudo/ensurdecido). |
-| `Icon` | Wrapper do lucide: tamanhos 12–24, traço 1,75 (2 em ≤14 px), `aria-hidden` por padrão. |
-| `TextField` | Rótulo, dica, erro (`role=alert`), ícone à esquerda, slot à direita; senha com mostrar/ocultar e aviso de Caps Lock (o aviso não some no blur para não deslocar o botão sob o cursor). |
-| `Avatar` | Imagem ou iniciais (matiz estável por id, croma baixo); recorte real sob o ponto de presença (máscara, funciona em qualquer fundo); `glowRef` para o brilho de fala. |
+| `Button` | `primary` (índigo `--accent-fill` + `--accent-sheen`, borda acesa no topo, anel escuro, texto branco 510) · `secondary` (branco 4 % + filete 8 %, topo aceso) · `secondary-danger` · `ghost` · `danger` (`--danger-fill` + brilho, texto branco); `sm/md/lg` (raio 6/6/8); `loading` mantém a largura e põe spinner. `secondary-danger` = superfície secundária com texto `--danger`: ação destrutiva em repouso. O fill `danger` fica no modal de confirmação e em Desconectar. |
+| `IconButton` | Sempre com `label` (vira tooltip + `aria-label`). `disabledReason` mantém o foco e explica por quê (`aria-disabled`). `aria-pressed` para toggles: o glifo fica sólido. |
+| `Icon` | Wrapper do Phosphor (§2b): peso por tamanho, `filled`, `duotone`, `aria-hidden` por padrão. |
+| `TextField` | Fundo branco 2,5 % + filete 8 % (funciona em qualquer superfície); foco = borda índigo a 75 % + halo de 3 px a 16 %. Rótulo, dica, erro (`role=alert`), ícone à esquerda, slot à direita; senha com mostrar/ocultar e aviso de Caps Lock. |
+| `Avatar` | Imagem ou iniciais (disco quase neutro com o matiz da pessoa); filete interno de 4 %; recorte real sob o ponto de presença; `glowRef` para o anel de fala. |
 | `PresenceGlyph` | Online = ponto · Ausente = lua · Não perturbe = barra · Offline = anel. |
-| `Tooltip` | 450 ms de atraso, instantâneo entre controles vizinhos (janela de 300 ms), aparece no foco por teclado, Esc fecha. |
-| `Menu` / `contextMenuHandler` / `MenuButton` | Dados (`MenuEntry[]`), setas/Home/End/typeahead, Enter/Espaço, Esc devolve o foco, separador e rótulo de grupo, item `danger`, `checked`. Um host global (`MenuHost`). Aberto por um gatilho com mais de 200 px, tem no mínimo a largura dele e as bordas alinhadas (cabeçalho do espaço, dispositivos). |
-| `Modal` | Portal, scrim, foco preso (Tab cicla), Esc fecha só o do topo, devolve o foco, `data-autofocus` escolhe o primeiro foco. |
-| `Popover` | Conteúdo rico ancorado (status, perfil). Fecha com Esc/clique fora. |
-| `toast` / `ToastHost` | `toast.info/success/error(texto, { action })`, pausa no hover. Só para feedback longe do ponto de ação. Canto inferior direito. **Uma regra, qualquer tamanho de janela:** com o dock da chamada na tela, a pilha sobe acima dele (`--toast-bottom` = topo do dock + 12 px, medido pelo próprio dock) e nunca cobre Desconectar. As capturas limpam os toasts antes de cada tela (`shot(..., { toasts: true })` quando o toast é o assunto). |
-| `Tabs` / `SegmentedControl` | Roving focus com setas; o segmented tem thumb deslizante. |
-| `Fronds` | Glifo vivo de 3 barras: `getLevel` (envelope), `breathing` (gente aqui agora) ou estático. |
-| `useEnvelope` / `useSpeakingGlow` | Envelope de voz em `--speak` no próprio elemento / no avatar (via `glowRef`). `Avatar glow` desenha o halo herdando `--speak` de um ancestral (tile). |
-| `Badge` | Neutro por padrão; `mention` = vermelho. |
-| `Switch`, `Kbd`, `Divider` (com rótulo), `Skeleton`, `Spinner`, `EmptyState`, `ScrollArea` | `EmptyState` usa halo bioluminescente atrás do ícone, sem caixa. Scrollbar: só `::-webkit-scrollbar` (thumb fino, sem trilha, sem setas). |
+| `Tooltip` | Sólido (`--bg-overlay`), 12/510 em `--text-secondary`, entra em 100 ms. 450 ms de atraso, instantâneo entre controles vizinhos (janela de 300 ms), aparece no foco por teclado, Esc fecha. |
+| `Menu` / `contextMenuHandler` / `MenuButton` | Vidro, raio 10, padding 4, itens de 28 px raio 6, destaque neutro (branco 7 %), ✓ em `--text-secondary`, grupos por rótulo (como o "Open in" da Linear). Setas/Home/End/typeahead, Enter/Espaço, Esc devolve o foco, separador, item `danger`, `checked`. Um host global (`MenuHost`). Aberto por um gatilho com mais de 200 px, tem no mínimo a largura dele. |
+| `Modal` | Portal, scrim 56 %, raio 16, `--elev-modal`, foco preso (Tab cicla), Esc fecha só o do topo, devolve o foco, `data-autofocus` escolhe o primeiro foco. |
+| `Popover` | Vidro. Conteúdo rico ancorado (status, perfil). Fecha com Esc/clique fora. |
+| `toast` / `ToastHost` | Vidro. `toast.info/success/error(texto, { action })`, pausa no hover. Só para feedback longe do ponto de ação. Canto inferior direito; com o dock da chamada na tela, a pilha sobe acima dele (`--toast-bottom`). |
+| `Tabs` / `SegmentedControl` | Tabs = pílulas como as da Linear (raio cheio, filete em repouso, a escolhida sobe de luminância). Segmented = trilho escurecido com thumb deslizante (branco 8 %, filete, topo aceso). Roving focus com setas. |
+| `Fronds` | Glifo vivo de 3 barras: `getLevel` (envelope), `breathing` (gente aqui agora), `brand` (gradiente da marca) ou estático. |
+| `useEnvelope` / `useSpeakingGlow` | Envelope de voz em `--speak` no próprio elemento / no avatar (via `glowRef`). `Avatar glow` desenha o anel herdando `--speak` de um ancestral (tile). |
+| `Badge` | Neutro por padrão (branco 10 %, texto secundário); `mention` = `--danger-fill`. |
+| `Switch`, `Kbd`, `Divider` (com rótulo), `Skeleton`, `Spinner`, `EmptyState`, `ScrollArea` | Switch ligado = índigo com brilho de topo e thumb branco. `EmptyState`: ícone duotone num quadro de 48 px (gradiente branco 5 → 2 %, filete, topo aceso). Scrollbar: só `::-webkit-scrollbar` (thumb de 10 %, 16 % no hover, sem trilha, sem setas). |
 
 ## 5. Padrões de tela
 
@@ -132,7 +165,7 @@ Profundidade no escuro = luminância + borda translúcida + anel escuro. `--elev
 - **Carregamento:** skeleton com o formato do conteúdo (mensagens), nunca spinner solto.
 - **Falha:** explicada no lugar (campo, mensagem, chip, splash), sempre com uma saída ("Tentar de novo", "Descartar", "Sair da conta").
 - **Conexão caiu:** um chip âmbar de 28 px substitui a busca na title bar ("Sem conexão. Tentando de novo em 3 s…" + "Tentar agora"); nada abaixo se move. Mesma frase no splash, com a causa provável. O composer avisa "Sem conexão. Sua mensagem sai quando voltar."
-- **Composer:** sem borda em repouso (só no foco). `@` abre o autocomplete (membros do espaço ou destinatários do DM; ↑↓, Enter/Tab, Esc; vira `<@id>` no envio). Emoji: seletor compacto e pesquisável (≈120 emojis curados, palavras-chave pt-BR sem acento, sem dependência).
+- **Composer:** filete de 5 % e topo aceso em repouso; no foco o filete sobe para 12 % e ganha uma sombra suave (como o "Leave a comment…" da Linear). `@` abre o autocomplete (membros do espaço ou destinatários do DM; ↑↓, Enter/Tab, Esc; vira `<@id>` no envio). Emoji: seletor compacto e pesquisável (≈120 emojis curados, palavras-chave pt-BR sem acento, sem dependência).
 - **Apelidos:** dentro de um espaço o nome que aparece é o apelido (`displayName(st, id, spaceId)`): mensagens, resposta, menção (`Markdown spaceId`), digitando, lista de membros, autocomplete, notificação.
 
 ### Anexos (`features/chat/Attachments.tsx`, `tray.ts`, `Lightbox.tsx`)
@@ -190,11 +223,11 @@ Só para a equipe: `Me` não diz quem é staff, então o shell pergunta uma vez 
 
 Configurações › Usuário › **Assinatura**. O Grátis é bom de verdade e a tela o trata assim: nada de modal, contador, selo piscando ou "oferta por tempo limitado".
 - **Aviso do provedor** no topo quando `catalog.provider.sandbox` ("SANDBOX" em âmbar + "a página de pagamento é simulada e nada é cobrado") ou quando pagamentos estão desligados (`provider: null`: botões desabilitados, "seu plano e seus itens continuam valendo"). Linhas sandbox do histórico levam o chip "TESTE".
-- **Seu plano:** cartão `--bg-raised` raio 12. Grátis: "Sem prazo e sem cartão…". Plus: "Mensal · renova em 1 de dez. de 2026 · R$ 14,90" + "Cancelar renovação" (ghost) e um fio de 1 px em acento a 30 % no topo (estado, não enfeite). Renovação cancelada: até quando vale e que nada comprado se perde. `past_due` em âmbar.
+- **Seu plano:** cartão `--bg-raised` raio 12. Grátis: "Sem prazo e sem cartão…". Plus: "Mensal · renova em 1 de dez. de 2026 · R$ 14,90" + "Cancelar renovação" (ghost) e uma luz índigo vinda de cima com filete índigo a 16 % e topo aceso (estado, não enfeite). Renovação cancelada: até quando vale e que nada comprado se perde. `past_due` em âmbar.
 - **Grátis e Alga Plus:** tabela de 3 colunas montada do catálogo (`plans`, presets, teto de anexo, coleção Plus), "· seu plano" no cabeçalho da coluna atual, voz "Igual para todos" nas duas. O "+" das qualidades extras é o único acento.
 - **Assinar:** Mensal/Anual (segmented), preço 24/32 `tnum`, "Equivale a R$ 12,42 por mês" no anual, botão primário grande e "O pagamento abre no seu navegador". **Antes do clique**, no mesmo cartão: renova sozinho, cancele quando quiser, "Você pode pedir reembolso em até 7 dias".
 - **Checkout:** `POST /billing/checkout` → `openExternal(url)` → **"Aguardando a confirmação do pagamento…"** (spinner com texto, "Abrir a página de novo", "Não vou pagar agora"). O app **nunca** marca nada como pago: só o `ENTITLEMENTS_UPDATE` (webhook verificado no servidor) muda o estado. Recusado ou abandonado aparece ao voltar para a janela (foco → `GET /billing/me`): "O pagamento não foi concluído. Nada foi cobrado."
-- **Momento de confirmação:** quando o `ENTITLEMENTS_UPDATE` traz o SKU esperado com a página aberta, uma faixa de luz atravessa o cartão uma vez (1,1 s, out-quart, só `transform`) e a linha vira "Pagamento confirmado. Obrigado por apoiar o Alga Meet." em `--success`; "Cancelar renovação" fica escondido nesse momento. Com movimento reduzido a faixa não roda (o último quadro fica fora do cartão) e a linha fica. Página fechada: um toast com "Ver".
+- **Momento de confirmação:** quando o `ENTITLEMENTS_UPDATE` traz o SKU esperado com a página aberta, uma faixa de luz índigo suave atravessa o cartão uma vez (1,1 s, out-quart, só `transform`) e a linha vira "Pagamento confirmado. Obrigado por apoiar o Alga Meet." em `--success`; "Cancelar renovação" fica escondido nesse momento. Com movimento reduzido a faixa não roda (o último quadro fica fora do cartão) e a linha fica. Página fechada: um toast com "Ver".
 - **Cancelar renovação:** modal honesto ("Nada muda até 1 de dez.… Depois, sua conta volta ao Grátis (transmissão até 1080p30, anexos até 25 MB). O que você comprou na loja continua na sua conta."), foco em "Manter o Plus", confirmação em `danger`.
 - **Retomar renovação:** com a renovação cancelada e o período ainda pago, o cartão diz até quando vale e, antes do clique, "Se retomar, ele renova em 1 de dez. de 2026 por R$ 14,90"; o botão secundário "Retomar renovação" (`POST /billing/subscription/resume`) volta a linha para "Mensal · renova em…" e devolve "Cancelar renovação". Sem modal: nada é cobrado na hora e o preço já está escrito.
 - **Histórico de compras:** assinaturas e pedidos juntos, do mais novo; disco de 28 px (✓ em `--success` para pago/ativa, relógio para pendente, traço para o resto), nome, data · estado por tipo (pedido recusado = "Pagamento não concluído"), valor `tnum` à direita.
@@ -208,13 +241,13 @@ Configurações › Usuário › **Assinatura**. O Grátis é bom de verdade e a
 - **O dos outros também aparece, ao vivo:** `useLook(id)` lê `PublicUser.cosmetics` do store (`lookOf`, testado: SKU desconhecido ou no lugar errado é ignorado), que `USER_UPDATE`/`ME_UPDATE` atualizam. Lista de membros (decoração e placa, discretas, movimento só no hover), popover de perfil (o cartão completo) e, no palco, só a decoração no avatar do tile (nunca na faixa de 40 px, nunca com movimento: o brilho da voz manda). A lista de membros usa o perfil de `users` (o `Member.user` não recebe `USER_UPDATE`). Autores no chat ainda não (o chat está com o agente de desempenho).
 - **Renderizadores (CSS/SVG, sem imagem),** cada um com a própria paleta, sempre contida:
   - *Folha de alga:* cinco folhas de kelp em gradiente verde-mar com nervura clara, abraçando o lado esquerdo e o topo do avatar, pontas soltas; fio fino de anel.
-  - *Coral:* recife de coral-chifre (galhos com pontas de pólipo claras) crescendo de uma base curva no canto inferior esquerdo, brilho estático de 2 px.
+  - *Coral:* recife de coral-chifre (galhos com pontas de pólipo claras) crescendo de uma base curva no canto inferior esquerdo, brilho estático de 2 px. Na Direção B os tons ficaram empoeirados (`#b5776d`, `#cf968c`, pontas `#e9c3ba`); a folha de alga virou sálvia (`#2f5a50 → #56877b → #abcdbf`).
   - Decorações ocupam 140 % do avatar e **nunca** o quadrante inferior direito (ponto de presença).
   - *Noite paulistana:* céu índigo, névoas magenta e âmbar baixas, prédios com janelas de luz de sódio; o cartão inteiro ganha tinta índigo.
-  - *Maré (Plus):* gradiente verde-água com duas linhas de onda a 9–14 %.
-  - *Bioluminescência:* 16 pontos de luz sobem ao abrir o perfil e assentam como plâncton a 55 %.
+  - *Maré (Plus):* mar noturno índigo (`#2e3175 → #1d1f4c → #111229`, luz `rgba(162,168,252,.22)`) com duas linhas de onda lavanda a 10–16 %.
+  - *Bioluminescência* (nome do SKU mantido): 16 pontos de luz índigo-pálido (`#dcdeff`, halo índigo a 50 %) sobem ao abrir o perfil e assentam a 55 %.
   - *Cardume:* placa azul-marinho com quatro peixinhos na cauda da placa, nunca sobre o nome.
-  - *Correnteza (Plus):* placa verde-água com uma faixa de luz que cruza uma vez.
+  - *Correnteza (Plus):* placa índigo (24 % → 6 %) com uma faixa de luz lavanda que cruza uma vez. O *Cardume* virou azul-índigo com peixes `rgba(214,218,255,.55)`.
 - **Movimento:** só ao abrir o perfil (uma vez) ou enquanto a linha da lista está sob o mouse (`data-cosmetic-hover`); só `transform`/`opacity`; nada contínuo, nada no chat. O último quadro de cada animação é o repouso, então o movimento reduzido (que colapsa as animações) mostra o item completo e parado.
 
 ### Palco de chamada (`features/voice/CallStage.tsx`)
@@ -228,7 +261,7 @@ Configurações › Usuário › **Assinatura**. O Grátis é bom de verdade e a
 - **Sua transmissão, no seu tile:** "Você está transmitindo", a melhor camada realmente enviada (resolução · fps · taxa · HW/SW), "Trocar fonte" e "Parar transmissão" (`Button secondary sm` com o ícone `Square`: parar não destrói nada, o vermelho é do Desconectar). Se o plano muda no meio, a frase do motor ("Seu plano não inclui 1080p 60 fps: a transmissão continua, em 720p 60 fps.") aparece **no tile**, 12/510 em `--warning`, por 8 s, e nada para; fora do palco ela continua um toast (`routeStreamNotice`). Com o palco à vista, o estado "ao vivo" fica em dois lugares só: o botão Tela preenchido no dock e o seu tile. O chip "Você está transmitindo · Parar" da title bar aparece fora do palco (outro canal, Home) ou com as configurações por cima dele.
 - **Estados honestos:** conectando = "Conectando…" no seu tile; reconectando = tiles em cinza a 40 %, `--speak` forçado a 0 e um chip de 32 px no topo do palco ("Reconectando à voz…" em âmbar + "Você não está ouvindo ninguém agora."), sem cobrir ninguém; desconectado = cartão com o motivo do motor + "Entrar de novo". O dock continua lá para você sair.
 - **Header do palco:** só o nome e o tema do canal. O status da chamada mora num lugar só, o painel "Voz conectada", e a contagem só na prévia.
-- **Prévia (antes de entrar):** quem está na sala, contagem e um botão primário "Entrar em <canal>". Vazio: frondes com halo, "Ninguém aqui ainda / Entre e chame alguém. Quem chegar já te ouve."
+- **Prévia (antes de entrar):** quem está na sala, contagem e um botão primário "Entrar em <canal>". Vazio: frondes em `--accent` num quadro de 56 px (filete, topo aceso), "Ninguém aqui ainda / Entre e chame alguém. Quem chegar já te ouve."
 
 ### Dock de controles
 
@@ -242,12 +275,12 @@ Modal de 836 px em duas colunas. À esquerda (464 px): abas Telas / Janelas e a 
 
 ### Presença de voz no cromo
 
-- **Agora (Home):** salas com gente agora em todos os seus espaços e chamadas de DM; sua sala primeiro, depois as com mais amigos. Linha de 44 px: pilha de até 3 avatares de 20 px (com brilho real se for a sua sala), nome, onde ("Estúdio Alga" / "Chamada"), "ao vivo" se alguém transmite. Um clique entra.
+- **Agora (Home):** salas com gente agora em todos os seus espaços e chamadas de DM; sua sala primeiro, depois as com mais amigos. Linha de 44 px: pilha de até 3 avatares de 20 px (com o anel de fala real se for a sua sala), nome, onde ("Estúdio Alga" / "Chamada"), "ao vivo" se alguém transmite. Um clique entra.
 - **Rail, cantos separados:** frondes de 12 px no canto inferior direito (vivas se você está lá, respirando se não) e o badge de menção de 16 px no canto superior direito (−4/−4). A frase do produto ("tem gente falando ali") nunca some atrás de um contador. Home ganha frondes quando há chamada de DM e o badge neutro em cima.
-- **Header do chat (voz dentro do chat):** num canal de texto, quando um canal de voz do espaço tem gente, o header mostra a pilha de avatares de 20 px (com o brilho real se é a sua sala), frondes e "3 em Sala de foco", com "Entrar" (ghost sm) ou "Abrir" se você já está lá. A sala em que você está ganha; senão, a mais cheia (`VoiceHere`).
+- **Header do chat (voz dentro do chat):** num canal de texto, quando um canal de voz do espaço tem gente, o header mostra a pilha de avatares de 20 px (com o anel de fala real se é a sua sala), frondes e "3 em Sala de foco", com "Entrar" (ghost sm) ou "Abrir" se você já está lá. A sala em que você está ganha; senão, a mais cheia (`VoiceHere`).
 - **Lista de membros:** abre com **Em voz · N** (frondes de 12 px no rótulo; cada linha com o nome do canal embaixo), depois Online e Offline. Presença efetiva: quem tem `voiceState` nunca aparece como Offline (`presenceOf`).
-- **Cartão de perfil (300 px):** banner, avatar de 80, nome 17/590, @usuário em terciário, cargos em chips de 20 px com ponto de 6 na cor do cargo, a linha "Em Sala de foco" (tinta de acento, frondes, "Entrar") se a pessoa está em voz, e o rodapé: **Mensagem** (primário, flex 1), Ligar (abre o DM e chama), Adicionar amigo / Aceitar / pedido enviado conforme o estado, e ⋯ com o resto (amizade, bloquear, copiar nome de usuário, Denunciar por último em vermelho). Bloqueado: só "Desbloquear". O seu: "Editar perfil". Abre pela lista de membros e pelo autor no chat.
-- **Sidebar:** canal de voz ocupado troca o alto-falante pelas frondes em acento; ocupantes em linhas de 26 px com avatar de 20 px e o mesmo brilho, "AO VIVO" e ícones de estado. **Um clique num canal de voz entra nele** (hábito do Discord mantido).
+- **Cartão de perfil (300 px):** banner, avatar de 80, nome 17/590, @usuário em terciário, cargos em chips de 20 px com ponto de 6 na cor do cargo, a linha "Em Sala de foco" (tinta índigo com filete, frondes, "Entrar") se a pessoa está em voz, e o rodapé: **Mensagem** (primário, flex 1), Ligar (abre o DM e chama), Adicionar amigo / Aceitar / pedido enviado conforme o estado, e ⋯ com o resto (amizade, bloquear, copiar nome de usuário, Denunciar por último em vermelho). Bloqueado: só "Desbloquear". O seu: "Editar perfil". Abre pela lista de membros e pelo autor no chat.
+- **Sidebar:** canal de voz ocupado troca o alto-falante pelas frondes em acento; ocupantes em linhas de 26 px com avatar de 20 px e o mesmo anel de fala, "AO VIVO" e ícones de estado. **Um clique num canal de voz entra nele** (hábito do Discord mantido).
 - **Painel "Voz conectada" (o único lugar do status):** acima da sua linha no dock: frondes vivas + estado (13/590 acento; âmbar quando não conectado; o rótulo nunca trunca, `flex-shrink: 0`) + qualidade em 3 barras de 12 px à direita (a nota do SFU, senão o ping), com os números no tooltip ("34 ms · perda 0,0 %"; abaixo de 5 ms, "< 5 ms"); canal · espaço em 12 terciário; ações Tela e Desconectar.
 - **Chamada de DM:** botão de telefone no header do DM (vira "Entrar na chamada" em acento quando já há alguém); o palco ocupa o topo da conversa (clamp 240–460 px) e o chat continua embaixo. Com a chamada em curso, a abertura da conversa troca "Ligar" por "Em chamada". Chamada recebida: cartão de 360 px no canto superior direito, logo abaixo do header (`--elev-overlay`, `--z-call-overlay`), sem cobrir nenhum título (avatar que respira, nome, e embaixo Recusar em `secondary-danger` / Atender com foco em Atender, Esc recusa, some em 30 s ou quando quem ligou desiste) + notificação do Windows e piscar na barra de tarefas se a janela não está em foco. **Som:** toque sintetizado na mesma voz dos outros sons (seno + triângulo uma oitava acima): mi–sol♯–si leve, duas vezes, a cada 3,2 s; para ao atender, recusar, expirar ou quando quem ligou desiste. Quem liga ouve um tom de chamada baixo (lá–dó♯ em crescendo, a cada 3 s, volume 0,07) até alguém entrar, você sair ou 30 s. Os dois obedecem "Sons de chamada".
 
@@ -262,10 +295,10 @@ Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, bo
 
 ## 5b. Identidade além do matiz (rodada 3)
 
-A crítica r2 (§4) mostrou que, num print do chat, o esqueleto ainda é o do Discord e que o próprio brilho de fala, no pico, vira o anel do Discord em outra cor. Escolhemos três movimentos que mudam a sensação sem mexer no esqueleto que o migrante conhece (espaços à esquerda, canais, chat, palco), mais os cantos separados do rail que a crítica pediu como correção:
+*Histórico da rodada 3, revisto pela Direção B.* A crítica r2 (§4) mostrou que, num print do chat, o esqueleto ainda é o do Discord e que o próprio brilho de fala, no pico, vira o anel do Discord em outra cor. Escolhemos três movimentos que mudam a sensação sem mexer no esqueleto que o migrante conhece (espaços à esquerda, canais, chat, palco), mais os cantos separados do rail que a crítica pediu como correção:
 
-1. **Luz, não anel.** O brilho de quem fala é luz embaixo d'água (luz interna + halo que cresce, contorno nunca acima de 70 %) e **a sala respira**: uma luz baixa no fundo do palco sobe com a voz mais alta. Por quê: é o ponto mais citado como "cópia" no palco, e o envelope de voz já é a nossa assinatura (§3); estendê-lo do tile para a sala dá ao palco um tempo próprio que nenhum concorrente tem, a custo de duas camadas de `opacity`.
-2. **Voz dentro do chat.** O header de um canal de texto diz onde o espaço está falando agora ("3 em Sala de foco", rostos com brilho real, Entrar) e a lista de membros abre com "Em voz". Por quê: o chat é 80 % do tempo; "voz e presença primeiro" tem de aparecer na tela mais vista, não só no palco. Para o migrante, é informação a mais no mesmo lugar, não um lugar novo.
+1. ~~**Luz, não anel.**~~ *Substituído na Direção B:* o dono pediu calma em vez de efeito; quem fala ganha um anel índigo de 2 px que segue o envelope (§3), sem luz interna e sem a sala que respira. O envelope continua sendo a nossa assinatura. Texto original: O brilho de quem fala é luz embaixo d'água (luz interna + halo que cresce, contorno nunca acima de 70 %) e **a sala respira**: uma luz baixa no fundo do palco sobe com a voz mais alta. Por quê: é o ponto mais citado como "cópia" no palco, e o envelope de voz já é a nossa assinatura (§3); estendê-lo do tile para a sala dá ao palco um tempo próprio que nenhum concorrente tem, a custo de duas camadas de `opacity`.
+2. **Voz dentro do chat.** O header de um canal de texto diz onde o espaço está falando agora ("3 em Sala de foco", rostos com o anel real, Entrar) e a lista de membros abre com "Em voz". Por quê: o chat é 80 % do tempo; "voz e presença primeiro" tem de aparecer na tela mais vista, não só no palco. Para o migrante, é informação a mais no mesmo lugar, não um lugar novo.
 3. **Ritmo vertical na resposta.** A resposta é uma linha 12/510 com uma haste reta na coluna do avatar, sem o conector curvo. Por quê: é o detalhe que mais denuncia "Discord" num print do chat; a haste reta conversa com as barras da marca e mantém a função (clicar leva à original).
 
 Também da rodada: uma marca só (as frondes, Marca v1), presente do ícone do Windows ao glifo que se move com a voz. Ficaram para depois, por custo de migração ou de implementação: a folha que nasce do espaço escolhido no lugar da pílula branca do rail e a bandeja que respira enquanto você está em voz (precisa do processo principal).
@@ -275,14 +308,14 @@ Também da rodada: uma marca só (as frondes, Marca v1), presente do ícone do W
 | Faça | Não faça |
 |---|---|
 | Use tokens (`var(--…)`) para toda cor, espaço, raio, duração | Hex solto em componente |
-| Seleção neutra (`--state-selected`) | Pintar item ativo com acento |
+| Hover/pressionado/destaque de menu neutros; "você está aqui" com `--state-current` + glifo sólido | Preencher item ativo com o índigo cheio, ou tingir hover |
 | Bordas brancas translúcidas | Cinza sólido como borda |
 | Raio externo = interno + padding | Mesmo raio no contêiner e no filho |
 | Feedback no ponto da ação | Toast para algo que já está na tela |
 | Uma pessoa, um tile (o "ao vivo" é um selo no tile) | Segundo tile repetindo o avatar de quem transmite |
 | Status da chamada só no painel "Voz conectada" | Repetir "Voz conectada"/ping no header |
 | Vermelho cheio só em Desconectar e na confirmação | Fill vermelho em Parar transmissão, Sair da conta, Excluir em repouso |
-| Cor de cargo da paleta `ROLE_COLORS` | Cargo em teal, verde de online ou âmbar de aviso |
+| Cor de cargo da paleta `ROLE_COLORS` | Cargo saturado, verde de online, âmbar de aviso ou o índigo do acento |
 | `IconButton` com `label` | Ícone clicável sem nome acessível |
 | Badge neutro para contagem; vermelho só para @menção | Vermelho para "tem coisa nova" |
 | Estado degradado visível (cinza, "Reconectando…") | Mostrar pessoas "bem" sem mídia |
@@ -292,6 +325,12 @@ Também da rodada: uma marca só (as frondes, Marca v1), presente do ícone do W
 | Textos pt-BR no `strings.ts` da feature | String solta no JSX de componente compartilhado |
 | Esperar o `ENTITLEMENTS_UPDATE` para mostrar algo como pago | Marcar como pago ao abrir o checkout ou ao voltar do navegador |
 | Renovação e reembolso em 7 dias ditos antes do clique | Letra miúda depois do pagamento, "para sempre", contagem regressiva |
+| **Direção B:** índigo em poucos lugares (atual, primário, foco, voz, menção) | Índigo em fundo de área, título, borda decorativa ou ícone de enfeite |
+| **Direção B:** ícones pelo `ui/Icon` (Phosphor via `ui/icons.tsx`), sólido só para atual/ligado | Importar `@phosphor-icons/react` (ou outro pacote) direto numa feature; ícone sólido decorativo |
+| **Direção B:** anel de fala de 2 px que segue o envelope | Brilho, halo largo, `drop-shadow` colorido, luz ambiente, neon |
+| **Direção B:** gradiente só no primário (brilho de topo), no cartão de upgrade e na marca | Gradiente em fundo de tela, em texto ou em cartão comum |
+| **Direção B:** vidro (`--bg-glass`) só em menu, popover, toast e barra de ações | Blur em tela cheia ou sobre vídeo/compartilhamento |
+| **Direção B:** texto branco sobre preenchimento índigo, vermelho ou rosa (≥ 4,5:1, `tokens.test.ts`) | Texto escuro sobre o acento (era a regra do teal) ou cor nova sem par no teste |
 | Cosmético que se move uma vez, ao abrir, com repouso = movimento reduzido | Animação contínua em lista, no chat ou fora da tela |
 
 ## 6b. Acessibilidade: teclado, leitor de tela, alto contraste
@@ -300,7 +339,7 @@ Verificado no app real por `apps/desktop/scripts/a11y-audit.mjs` (regras no DOM 
 
 - **Todo controle tem nome.** `IconButton` sempre com `label`; ícone é `aria-hidden`. `aria-label` só vale em elemento com papel: num `div`/`span` sem `role` o leitor ignora (a lista de membros é `role="complementary"` "Membros").
 - **Sem `tabindex` positivo.** A ordem de Tab é a do DOM.
-- **Foco visível.** Anel `:focus-visible` de 2 px em acento. Quem tira o outline (input dentro de uma caixa) mostra o foco na caixa (`:focus-within`). Em alto contraste o outline volta em `Highlight`. Exceção aceita: a busca do "Ir para" (único controle do diálogo, sempre focada; o cursor é o indicador).
+- **Foco visível.** Anel `:focus-visible` de 2 px em `--accent` (índigo), offset 2 px. Campos mostram o foco na caixa (borda índigo + halo de 3 px). Quem tira o outline (input dentro de uma caixa) mostra o foco na caixa (`:focus-within`). Em alto contraste o outline volta em `Highlight`. Exceção aceita: a busca do "Ir para" (único controle do diálogo, sempre focada; o cursor é o indicador).
 - **Lista = uma parada de Tab + setas.** Rail e lista de canais/conversas: ↑ ↓ Home End movem (`arrowFocus` + `data-arrow-nav`, `ui/floating.ts`); um gatilho de menu dentro dessas listas abre com Enter/Espaço e ↓ continua andando. Histórico: uma parada (a mensagem itinerante), ↑ ↓ PageUp PageDown Home End andam entre mensagens, Tab percorre os controles da mensagem focada e depois sai da lista. Rádios (fontes do seletor de tela, segmented, abas): uma parada, setas escolhem.
 - **Menu de contexto pelo teclado.** Shift+F10 e a tecla Menu abrem o mesmo menu do clique direito (também numa mensagem focada), com o 1º item ativo. Todo menu tem nome (`label`, senão o `aria-label` do gatilho). Painel flutuante só recebe foco depois de posicionado: com `visibility: hidden` o `focus()` falha em silêncio (era o caso de `Menu` e `Popover`).
 - **Diálogo:** `role="dialog"` + `aria-modal="true"` + nome; Esc fecha só o de cima; o foco volta ao gatilho. Gatilho que muda de estado durante o diálogo continua sendo o mesmo elemento (Compartilhar tela → Parar transmissão: `MenuButton off`). Popover fechado por uma escolha (emoji, status) devolve o foco ao gatilho.
@@ -308,10 +347,49 @@ Verificado no app real por `apps/desktop/scripts/a11y-audit.mjs` (regras no DOM 
 - **Região viva existe antes do texto.** Uma `role="status"` criada já com o texto costuma não ser lida (NVDA/Narrador). Toasts: região `aria-live="polite"` permanente, erro = `role="alert"`; "digitando" e "nova mensagem" idem; quem entra e sai da chamada em que você está: `VoiceAnnouncer` (uma `role="status"` fixa no shell). O histórico (`role="log"`) fica `aria-live="off"`: linhas montam ao rolar.
 - **Toast pausa no hover e no foco** (WCAG 2.2.1).
 - **Contraste** sobre o fundo composto real: texto ≥ 4,5:1, ≥ 3:1 a partir de 24 px (ou 18,66 px em negrito). `--text-disabled` só em desabilitado. Placeholder global = `--text-tertiary` (o cinza padrão do Chromium dá 2,9:1 no overlay).
-- **Movimento reduzido** (SO ou "Reduzir animações"): `--speak` só 0/1 (indicador estático de quem fala), luz da sala desligada, nenhuma animação em execução (`document.getAnimations()`).
+- **Movimento reduzido** (SO ou "Reduzir animações"): `--speak` só 0/1 (o anel de quem fala aparece e some, sem animar), nenhuma animação em execução (`document.getAnimations()`).
 - **Alto contraste (`forced-colors`).** Fundos viram Canvas e sombras somem, então estado desenhado como tinta ou anel ganha cor de sistema (`base.css`): página atual, selecionado, pressionado, rádio escolhido e item ativo de menu = `Highlight`/`HighlightText` com `!important` (sem ele a regra do componente, mais específica, devolve a tinta quase branca sobre Canvas); switch ganha borda e trilho; menus, diálogos, tooltips e toasts ganham borda `CanvasText`; tile ganha borda e a fala vira contorno `Highlight` com opacidade `--speak`. Cor nova de estado = conferir no passe forced do script.
 
 ## 7. Telas (versões mais recentes)
+
+### Direção B · Índigo suave (2026-11-01)
+
+Capturas do app real (API e LiveKit próprios, perfis `shots*`), com a comparação lado a lado com a captura mais próxima da Linear quando há uma. Evidência das decisões: [ícones Lucide × Phosphor](compare/2026-11-01-icons-lucide-vs-phosphor.png), [marca v2 (todos os tamanhos)](compare/2026-11-01-brand-v2-preview.png).
+
+| Tela | Screenshot | Lado a lado com a Linear |
+|---|---|---|
+| Shell + chat: L invertido, item atual índigo com glifo sólido, nomes de cargo quase brancos | [2026-11-01-chat-channel-v2-indigo-v4.png](../screenshots/2026-11-01-chat-channel-v2-indigo-v4.png) | [2026-11-01-chat-channel.png](compare/2026-11-01-chat-channel.png) |
+| Home: "Agora", Amigos com abas em pílula | [2026-11-01-home-agora-v2-indigo-v2.png](../screenshots/2026-11-01-home-agora-v2-indigo-v2.png) | [2026-11-01-home-agora.png](compare/2026-11-01-home-agora.png) |
+| Menu de contexto de vidro, grupos por rótulo | [2026-11-01-chat-context-menu-v2-indigo-v2.png](../screenshots/2026-11-01-chat-context-menu-v2-indigo-v2.png) | [2026-11-01-chat-context-menu.png](compare/2026-11-01-chat-context-menu.png) |
+| Menu de membro | [2026-11-01-member-menu-v2-indigo-v2.png](../screenshots/2026-11-01-member-menu-v2-indigo-v2.png) | [2026-11-01-member-menu.png](compare/2026-11-01-member-menu.png) |
+| Status do usuário (popover) | [2026-11-01-user-status-v2-indigo-v1.png](../screenshots/2026-11-01-user-status-v2-indigo-v1.png) | [2026-11-01-user-status.png](compare/2026-11-01-user-status.png) |
+| Ir para (Ctrl K) | [2026-11-01-switcher-query-v2-indigo-v2.png](../screenshots/2026-11-01-switcher-query-v2-indigo-v2.png) | [2026-11-01-switcher-query.png](compare/2026-11-01-switcher-query.png) |
+| Cartão de perfil | [2026-11-01-profile-popover-others-v2-indigo-v3.png](../screenshots/2026-11-01-profile-popover-others-v2-indigo-v3.png) | [2026-11-01-profile-popover-others.png](compare/2026-11-01-profile-popover-others.png) |
+| Palco: Bruno falando, anel índigo de 2 px que segue a voz | [2026-11-01-voice-stage-v2-indigo-v3.png](../screenshots/2026-11-01-voice-stage-v2-indigo-v3.png) | [2026-11-01-voice-stage.png](compare/2026-11-01-voice-stage.png) |
+| Palco: você falando (anel no próprio microfone) | [2026-11-01-voice-stage-self-speaking-v2-indigo-v3.png](../screenshots/2026-11-01-voice-stage-self-speaking-v2-indigo-v3.png) | [2026-11-01-voice-stage-self-speaking.png](compare/2026-11-01-voice-stage-self-speaking.png) |
+| Seletor de tela | [2026-11-01-screen-picker-v2-indigo-v2.png](../screenshots/2026-11-01-screen-picker-v2-indigo-v2.png) | [2026-11-01-screen-picker.png](compare/2026-11-01-screen-picker.png) |
+| Transmissão assistida, selo AO VIVO rosa | [2026-11-01-stream-watching-v2-indigo-v2.png](../screenshots/2026-11-01-stream-watching-v2-indigo-v2.png) | [2026-11-01-stream-watching.png](compare/2026-11-01-stream-watching.png) |
+| Configurações › Aparência (linhas em cartão) | [2026-11-01-settings-appearance-v2-indigo-v2.png](../screenshots/2026-11-01-settings-appearance-v2-indigo-v2.png) | [2026-11-01-settings-appearance.png](compare/2026-11-01-settings-appearance.png) |
+| Configurações › Voz e vídeo | [2026-11-01-settings-voice-devices-v2-indigo-v2.png](../screenshots/2026-11-01-settings-voice-devices-v2-indigo-v2.png) | [2026-11-01-settings-voice-devices.png](compare/2026-11-01-settings-voice-devices.png) |
+| Assinatura (Grátis), cartão de upgrade com o único gradiente | [2026-11-01-billing-plan-free-v2-indigo-v1.png](../screenshots/2026-11-01-billing-plan-free-v2-indigo-v1.png) | [2026-11-01-billing-plan-free.png](compare/2026-11-01-billing-plan-free.png) |
+| Personalização (cosméticos re-tunados) | [2026-11-01-shop-v2-indigo-v2.png](../screenshots/2026-11-01-shop-v2-indigo-v2.png) | [2026-11-01-shop.png](compare/2026-11-01-shop.png) |
+| Configurações do espaço › cargo | [2026-11-01-space-settings-role-editor-v2-indigo-v4.png](../screenshots/2026-11-01-space-settings-role-editor-v2-indigo-v4.png) | [2026-11-01-space-settings-role-editor.png](compare/2026-11-01-space-settings-role-editor.png) |
+| Login | [2026-11-01-auth-login-v2-indigo-v2.png](../screenshots/2026-11-01-auth-login-v2-indigo-v2.png) | [2026-11-01-auth-login.png](compare/2026-11-01-auth-login.png) |
+| Onboarding | [2026-11-01-onboarding-v2-indigo-v2.png](../screenshots/2026-11-01-onboarding-v2-indigo-v2.png) | [2026-11-01-onboarding.png](compare/2026-11-01-onboarding.png) |
+| Termos mudaram (gate) | [2026-11-01-gate-terms-v2-indigo-v2.png](../screenshots/2026-11-01-gate-terms-v2-indigo-v2.png) | [2026-11-01-gate-terms.png](compare/2026-11-01-gate-terms.png) |
+| Conta restrita | [2026-11-01-restricted-underage-v2-indigo-v2.png](../screenshots/2026-11-01-restricted-underage-v2-indigo-v2.png) | — |
+| Denúncia: motivo | [2026-11-01-report-reason-v2-indigo-v1.png](../screenshots/2026-11-01-report-reason-v2-indigo-v1.png) | [2026-11-01-report-reason.png](compare/2026-11-01-report-reason.png) |
+| Painel da equipe: fila | [2026-11-01-staff-queue-csam-v2-indigo-v2.png](../screenshots/2026-11-01-staff-queue-csam-v2-indigo-v2.png) | [2026-11-01-staff-queue-csam.png](compare/2026-11-01-staff-queue-csam.png) |
+| Painel da equipe: suspender | [2026-11-01-staff-decision-suspend-v2-indigo-v2.png](../screenshots/2026-11-01-staff-decision-suspend-v2-indigo-v2.png) | [2026-11-01-staff-decision-suspend.png](compare/2026-11-01-staff-decision-suspend.png) |
+| 960×600: shell | [2026-11-01-shell-960x600-v2-indigo-v2.png](../screenshots/2026-11-01-shell-960x600-v2-indigo-v2.png) | [2026-11-01-shell-960x600.png](compare/2026-11-01-shell-960x600.png) |
+| 960×600: palco | [2026-11-01-voice-stage-960x600-v2-indigo-v3.png](../screenshots/2026-11-01-voice-stage-960x600-v2-indigo-v3.png) | [2026-11-01-voice-stage-960x600.png](compare/2026-11-01-voice-stage-960x600.png) |
+| 960×600: configurações | [2026-11-01-settings-960x600-v2-indigo-v2.png](../screenshots/2026-11-01-settings-960x600-v2-indigo-v2.png) | [2026-11-01-settings-960x600.png](compare/2026-11-01-settings-960x600.png) |
+| 1920×1080 @125 %: shell | [2026-11-01-shell-1920x1080@125-v2-indigo-v2.png](../screenshots/2026-11-01-shell-1920x1080@125-v2-indigo-v2.png) | [2026-11-01-shell-1920x1080@125.png](compare/2026-11-01-shell-1920x1080@125.png) |
+| 1920×1080 @125 %: palco | [2026-11-01-voice-stage-1920x1080@125-v2-indigo-v2.png](../screenshots/2026-11-01-voice-stage-1920x1080@125-v2-indigo-v2.png) | [2026-11-01-voice-stage-1920x1080@125.png](compare/2026-11-01-voice-stage-1920x1080@125.png) |
+| 1920×1080 @125 %: configurações | [2026-11-01-settings-1920x1080@125-v2-indigo-v2.png](../screenshots/2026-11-01-settings-1920x1080@125-v2-indigo-v2.png) | [2026-11-01-settings-1920x1080@125.png](compare/2026-11-01-settings-1920x1080@125.png) |
+| 1920×1080 @125 %: home | [2026-11-01-home-1920x1080@125-v2-indigo-v2.png](../screenshots/2026-11-01-home-1920x1080@125-v2-indigo-v2.png) | [2026-11-01-home-1920x1080@125.png](compare/2026-11-01-home-1920x1080@125.png) |
+
+Como reproduzir: `QA_WORK=<dir> QA_API_PORT=4460 QA_LK_PORT=7960 node scripts/qa-stack.mjs start`, depois `ALGA_API_URL=http://127.0.0.1:4460 LIVEKIT_HTTP=http://127.0.0.1:7960 ALGA_OUTBOX_DIR=<dir>/outbox ALGA_SHOTS_OUT=<dir>/app ALGA_SHOTS_TAG=v2-indigo node scripts/screenshot.mjs --only=r3` (e `home,chat`, `trust`, `auth,spacesettings`, `W6_PARTS=staff,settings --only=wave6`). Os lados a lados são `ffmpeg hstack` na mesma altura (900 px), nosso à esquerda. As rodadas abaixo são o histórico da direção anterior (teal).
 
 ### Rodada 3 (crítica r2)
 

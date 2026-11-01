@@ -36,7 +36,6 @@
   --border-subtle: rgba(255, 255, 255, 0.05);
   --border-default: rgba(255, 255, 255, 0.08); /* ≈ #1f2023 on the chrome */
   --border-strong: rgba(255, 255, 255, 0.12);
-  --hairline: 0.5px; /* one device pixel at 100–150 % scale, a true hairline at 200 % */
 
   /* ── Accent: soft indigo (OKLCH H 279) ─────────────────── */
   --accent: #8b8ef7; /* L .69 C .15  text, icons, focus, speaking ring */

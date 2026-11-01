@@ -37,10 +37,12 @@ const LK_HTTP = process.env.LIVEKIT_HTTP ?? 'http://127.0.0.1:7880'
 // ── output naming ─────────────────────────────────────────────
 mkdirSync(outDir, { recursive: true })
 const existing = readdirSync(outDir)
+// ALGA_SHOTS_TAG=v2-indigo names a design pass: <date>-<screen>-v2-indigo-v<n>.png, numbered apart from plain runs.
+const TAG = process.env.ALGA_SHOTS_TAG ? `-${process.env.ALGA_SHOTS_TAG}` : ''
 function nextPath(screen) {
-  const re = new RegExp(`^${today}-${screen}-v(\\d+)\\.png$`)
+  const re = new RegExp(`^${today}-${screen}${TAG}-v(\\d+)\\.png$`)
   const n = Math.max(0, ...existing.map((f) => Number(re.exec(f)?.[1] ?? 0))) + 1
-  return join(outDir, `${today}-${screen}-v${n}.png`)
+  return join(outDir, `${today}-${screen}${TAG}-v${n}.png`)
 }
 const shots = []
 /** Toasts from earlier steps never leak into a capture (pass { toasts: true } when the toast is the subject). */
@@ -301,10 +303,10 @@ async function seed(saved) {
   // Coordenação > Moderação > Design > Convidados.
   const P = { CHANNELS: 4, INVITES: 32, ROLES: 16, KICK: 64, BAN: 128, MESSAGES: 512, MUTE: 1 << 15, DEAFEN: 1 << 16, MOVE: 1 << 17, NICKS: 1 << 19 }
   const role = (body) => api(T('ana'), 'POST', `/spaces/${s1.id}/roles`, body)
-  const coord = await role({ name: 'Coordenação', color: '#e3b47d', permissions: P.ROLES | P.KICK | P.BAN | P.NICKS | P.MUTE | P.DEAFEN | P.MOVE | P.MESSAGES | P.CHANNELS | P.INVITES })
-  const mod = await role({ name: 'Moderação', color: '#91c3f6', permissions: P.ROLES | P.KICK | P.NICKS | P.MUTE | P.MESSAGES | P.INVITES })
-  const des = await role({ name: 'Design', color: '#e6a7d0' })
-  await role({ name: 'Convidados', color: '#bbc581' })
+  const coord = await role({ name: 'Coordenação', color: '#dec1ab', permissions: P.ROLES | P.KICK | P.BAN | P.NICKS | P.MUTE | P.DEAFEN | P.MOVE | P.MESSAGES | P.CHANNELS | P.INVITES })
+  const mod = await role({ name: 'Moderação', color: '#b0cbe3', permissions: P.ROLES | P.KICK | P.NICKS | P.MUTE | P.MESSAGES | P.INVITES })
+  const des = await role({ name: 'Design', color: '#e1bcc6' })
+  await role({ name: 'Convidados', color: '#c3ccac' })
   for (const [k, r] of [['diego', coord], ['carla', mod], ['bruno', des]]) await api(T('ana'), 'PUT', `/spaces/${s1.id}/members/${id(k)}/roles/${r.id}`)
   await api(T('ana'), 'PATCH', `/spaces/${s1.id}/members/${id('carla')}`, { nickname: 'Carlinha' })
   for (const k of ['elisa', 'fabio']) await api(T(k), 'POST', `/invites/${inv.code}`)
@@ -618,7 +620,7 @@ async function chatShots(page, saved, ids) {
   await page.keyboard.press('Escape')
 
   // Status popover
-  await page.locator('button[aria-haspopup="dialog"]').filter({ hasText: 'Ana Ribeiro' }).click()
+  await page.locator('button[aria-haspopup="dialog"]').filter({ hasText: 'Ana Ribeiro' }).first().click()
   await page.getByRole('dialog', { name: 'Definir status' }).waitFor()
   await shot(page, 'user-status')
   await page.keyboard.press('Escape')
@@ -1682,10 +1684,12 @@ async function trustShots() {
     const member = page.locator('button[aria-haspopup="dialog"]').filter({ hasText: 'Caio Freitas' }).last()
     await member.waitFor({ timeout: 15_000 })
     await member.click()
-    await page.getByRole('dialog', { name: 'Caio Freitas' }).getByRole('button', { name: 'Denunciar' }).waitFor()
+    // Report lives in the card's ⋯ menu (last, in red), so the card never reads as hostile.
+    await page.getByRole('dialog', { name: 'Caio Freitas' }).getByRole('button', { name: 'Mais opções' }).click()
+    await page.getByRole('menuitem', { name: 'Denunciar perfil' }).waitFor()
     await sleep(400)
     await shot(page, 'profile-popover-report')
-    await page.getByRole('dialog', { name: 'Caio Freitas' }).getByRole('button', { name: 'Denunciar' }).click()
+    await page.getByRole('menuitem', { name: 'Denunciar perfil' }).click()
     const report = page.getByRole('dialog', { name: 'Denunciar perfil' })
     await report.waitFor()
     await sleep(300)
