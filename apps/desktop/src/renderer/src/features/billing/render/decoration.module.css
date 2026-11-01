@@ -1,0 +1,134 @@
+/*
+ * Avatar decorations. Keyframes never state the last frame: the end of each animation is the element's own style,
+ * which is the resting look (reduced motion, rows at rest and skipped runs show exactly that). Fill: backwards.
+ */
+.deco {
+  /* On a call tile the voice envelope rewrites --speak every frame; stop it here so the art is not restyled. */
+  --speak: 0;
+  position: absolute;
+  inset: -20%;
+  width: 140%;
+  height: 140%;
+  pointer-events: none;
+  /* Its own layer: the speaking ring under it repaints every frame, the decoration's raster must not
+     (measured: 8 tiles with still decorations went from +1.26 ms to ~0 per frame). */
+  will-change: transform;
+}
+.art,
+.glint {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.art * {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+/* HA-01: the specular glint (its own layer, turning about the centre) runs in from 8 h and settles at 11 h. */
+.deco[data-run] .glint {
+  animation: haGlint 900ms var(--ease-out-quart) backwards;
+}
+
+/* HA-02: the bead of light, resting at 10 h; a run slides it along its last 70° of orbit (Web Animations). */
+.bead {
+  position: absolute;
+  width: var(--d);
+  height: var(--d);
+  border-radius: 50%;
+  background: #f7f8f8;
+  box-shadow: 0 0 0 0.75px rgba(36, 37, 90, 0.5);
+  transform: translate(-50%, -50%);
+}
+@keyframes haGlint {
+  from {
+    transform: rotate(-90deg);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+}
+
+/* HA-03: seven stars light in sequence (60 ms apart) and blink once: 0.6 → 1 → rest at 0.8. */
+.links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.star {
+  position: absolute;
+  width: var(--d);
+  height: var(--d);
+  border-radius: 50%;
+  background: #f7f8f8;
+  opacity: 0.8;
+  transform: translate(-50%, -50%);
+}
+.lilac {
+  background: #b9b2f9;
+}
+.bright::before,
+.bright::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--d) * 6.4);
+  height: 0.5px;
+  background: linear-gradient(90deg, rgba(247, 248, 248, 0), rgba(247, 248, 248, 0.6), rgba(247, 248, 248, 0));
+  transform: translate(-50%, -50%);
+}
+.bright::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+.constellation[data-run] .star {
+  animation: haStar 520ms var(--ease-out-quad) backwards;
+  animation-delay: calc(var(--i) * 60ms);
+}
+.constellation[data-run] .links {
+  animation: haLinks 1000ms linear backwards;
+}
+@keyframes haStar {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  35% {
+    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  65% {
+    opacity: 1;
+  }
+}
+@keyframes haLinks {
+  from {
+    opacity: 0;
+  }
+  55% {
+    opacity: 0;
+  }
+}
+
+/* HA-04: one band of light runs the silk from 7 h to 1 h (the wedge rotates under the ribbon's clip). */
+.shine {
+  transform: rotate(312deg);
+  opacity: 0;
+}
+.deco[data-run] .shine {
+  animation: haShine 1100ms var(--ease-in-out-cubic) backwards;
+}
+@keyframes haShine {
+  from {
+    transform: rotate(108deg);
+    opacity: 1;
+  }
+  86% {
+    opacity: 1;
+  }
+}

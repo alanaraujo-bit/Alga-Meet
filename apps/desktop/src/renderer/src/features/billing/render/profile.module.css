@@ -1,0 +1,219 @@
+/*
+ * Nameplates and profile effects (Hora Azul). Light from 11 h, 0.5–1 px hairlines, OKLab gradient steps.
+ * Keyframes never state their last frame: the element's own style is the resting look (see engine.ts).
+ */
+
+/* ── Nameplates ── */
+.plate {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  margin-left: -8px;
+  padding: 2px 8px;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  isolation: isolate;
+}
+.plateRow {
+  /* Lists clip at the row edge: no outdent, the name just sits inside its plate. */
+  margin-left: 0;
+  padding: 1px 6px;
+}
+.plateText {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plate::before,
+.plate::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+/* HA-09 Crepúsculo: dusk from the left, the last of the sun as a 1 px ember line under the first 40 %. */
+.plate[data-plate='nameplate_ha_crepusculo'] {
+  background:
+    linear-gradient(90deg, rgba(247, 248, 248, 0.07), rgba(247, 248, 248, 0) 60%) top / 100% 1px no-repeat,
+    linear-gradient(in oklab 90deg, rgba(36, 37, 90, 0.7), rgba(97, 99, 208, 0.35) 48%, rgba(97, 99, 208, 0) 85%);
+}
+.plate[data-plate='nameplate_ha_crepusculo']::after {
+  left: 0;
+  bottom: 0;
+  width: 40%;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(232, 168, 152, 0.6), rgba(232, 168, 152, 0.35) 55%, rgba(232, 168, 152, 0));
+}
+/* One 24 px band of light crosses once per hover (and once when the card opens). */
+.plate[data-plate='nameplate_ha_crepusculo']::before {
+  inset: 0;
+  background: linear-gradient(90deg, rgba(247, 248, 248, 0), rgba(247, 248, 248, 0.1) 50%, rgba(247, 248, 248, 0)) 0 0 / 24px 100% no-repeat;
+  transform: translateX(100%);
+}
+.plate[data-plate='nameplate_ha_crepusculo'][data-run]::before {
+  animation: haBand 700ms var(--ease-in-out-cubic) backwards;
+}
+@keyframes haBand {
+  from {
+    transform: translateX(-24px);
+  }
+}
+
+/* HA-10 Vidro fosco: frosted by a static grain, never by backdrop-filter. */
+.plate[data-plate='nameplate_ha_vidro_fosco'] {
+  background: var(--grain) 0 0 / 64px 64px, rgba(247, 248, 248, 0.05);
+  box-shadow: inset 0 1px 0 rgba(247, 248, 248, 0.1);
+}
+
+/* HA-11 Fio de luz: a transparent plate over one 1 px line; a 16 px spark runs it once per hover. */
+.plate[data-plate='nameplate_ha_fio_luz'] {
+  padding-bottom: 3px;
+}
+.plate[data-plate='nameplate_ha_fio_luz']::after {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(139, 142, 247, 0.5), rgba(139, 142, 247, 0.5) 70%, rgba(139, 142, 247, 0.12));
+}
+.plate[data-plate='nameplate_ha_fio_luz']::before {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(247, 248, 248, 0), rgba(247, 248, 248, 0.8) 50%, rgba(247, 248, 248, 0)) 0 0 / 16px 1px no-repeat;
+  transform: translateX(100%);
+}
+.plate[data-plate='nameplate_ha_fio_luz'][data-run]::before {
+  animation: haSpark 900ms var(--ease-in-out-cubic) backwards;
+}
+@keyframes haSpark {
+  from {
+    transform: translateX(-16px);
+  }
+}
+
+/* HA-12 Nanquim: ink laid down on the left, pooled where the brush landed, bleeding out soft. */
+.plate[data-plate='nameplate_ha_nanquim'] {
+  background:
+    radial-gradient(38% 80% at 12% 62%, rgba(36, 37, 90, 0.34), rgba(36, 37, 90, 0) 100%),
+    radial-gradient(70% 140% at 0% 50%, rgba(36, 37, 90, 0.62), rgba(36, 37, 90, 0.4) 45%, rgba(36, 37, 90, 0) 70%);
+}
+
+/* ── HA-06 Hora azul: dusk gives way to night over the banner ── */
+/* The sky owns the banner and keeps going 44 px into the card, fading out behind the avatar and the name. */
+.sky {
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(var(--banner-h, 72px) + 44px);
+  overflow: hidden;
+  pointer-events: none;
+  mask: linear-gradient(180deg, #000 0, #000 var(--banner-h, 72px), transparent 100%);
+}
+.night,
+.dusk,
+.stars {
+  position: absolute;
+  inset: 0;
+}
+.night {
+  background:
+    radial-gradient(110% 46% at 34% 62%, rgba(97, 99, 208, 0.22), rgba(97, 99, 208, 0) 70%),
+    linear-gradient(in oklab 180deg, #0f0f1a 0%, #17183a 34%, #24255a 62%, #24255a 100%);
+}
+/* Dusk: deep indigo above, the last light low; the horizon's ember stays a thin line (≤ 8 % of the area). */
+.dusk {
+  opacity: 0;
+  background:
+    radial-gradient(70% 34% at 70% 50%, rgba(232, 168, 152, 0.3), rgba(232, 168, 152, 0) 70%),
+    linear-gradient(in oklab 180deg, #24255a 0%, #34368a 26%, #5557bf 44%, #7a6aa8 50%, #3d3f99 70%, #24255a 100%);
+}
+.horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--banner-h, 72px) * 0.78);
+  height: 1px;
+  background: linear-gradient(90deg, rgba(232, 168, 152, 0), rgba(232, 168, 152, 0.9) 35%, rgba(232, 168, 152, 0.7) 70%, rgba(232, 168, 152, 0));
+  opacity: 0.2;
+  transform: translateY(6px);
+}
+/* Stars rest at their own opacity attribute. */
+.sky[data-run] .dusk {
+  animation: haDusk 1600ms var(--ease-out-quad) backwards;
+}
+.sky[data-run] .horizon {
+  animation: haHorizon 1600ms var(--ease-out-quad) backwards;
+}
+.sky[data-run] .stars > g {
+  animation: haLight 160ms var(--ease-out-quad) backwards;
+  animation-delay: calc(1560ms + var(--i) * 40ms);
+}
+@keyframes haDusk {
+  from {
+    opacity: 1;
+  }
+}
+@keyframes haHorizon {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes haLight {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ── HA-07 Poeira de luz ── */
+.dust {
+  position: absolute;
+  inset: 0 0 auto;
+  width: 100%;
+  height: 128px;
+  pointer-events: none;
+}
+
+/* ── HA-08 Cortina de vidro: seven glass slats turn away and reveal the banner ── */
+.curtain {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  height: var(--banner-h, 72px);
+  perspective: 520px;
+  pointer-events: none;
+}
+.slat {
+  flex: 1;
+  background: linear-gradient(100deg, rgba(247, 248, 248, 0.09), rgba(247, 248, 248, 0.04) 60%, rgba(247, 248, 248, 0.06));
+  box-shadow:
+    inset 0 1px 0 rgba(247, 248, 248, 0.12),
+    inset 1px 0 0 rgba(247, 248, 248, 0.08),
+    inset -1px 0 0 rgba(15, 15, 26, 0.35);
+  transform-origin: 0 50%;
+  transform: rotateY(80deg);
+  opacity: 0;
+}
+.pose .slat {
+  transform: rotateY(34deg);
+  opacity: 1;
+}
+.curtain[data-run] .slat {
+  animation: haSlat 700ms var(--ease-in-out-cubic) backwards;
+  animation-delay: calc(var(--i) * 50ms);
+}
+@keyframes haSlat {
+  from {
+    transform: rotateY(0);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+}

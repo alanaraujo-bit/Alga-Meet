@@ -7,7 +7,7 @@ import { useData } from '@/store/data'
 import { onDispatch, useSession } from '@/store/session'
 import { toast } from '@/ui'
 import { openSettings, useSettings } from '../settings/store'
-import { granted, lookOf, SLOT_KEY, skuFor, type CosmeticId, type Look, type Slot } from './look'
+import { COSMETICS, granted, lookOf, SLOT_KEY, skuFor, type CosmeticId, type Look, type Slot } from './look'
 import { t } from './strings'
 
 interface Waiting {
@@ -121,4 +121,24 @@ function celebrate(p: Product) {
 export function useLook(userId: string | undefined): Look {
   const equipped = useData((x) => (userId ? x.users[userId]?.cosmetics : undefined))
   return useMemo(() => lookOf(equipped), [equipped])
+}
+
+/** Items being tried on (local only, never sent): one per slot, over what is equipped. */
+const useTrying = create<{ look: Look }>()(() => ({ look: {} }))
+const tryOn = (id: CosmeticId) => useTrying.setState((st) => ({ look: { ...st.look, [COSMETICS[id]]: id } }))
+const clearTry = (slot?: Slot) => useTrying.setState((st) => ({ look: slot ? { ...st.look, [slot]: undefined } : {} }))
+
+/**
+ * Try-on for the store/provador UI: `look` = what `userId` (you) wears with the tried items on top. `tryOn(id)`
+ * puts an item in its slot, `clear(slot?)` takes one (or all) off. Render `look` with ProfileCard / <Cosmetic>.
+ */
+export function useCosmeticPreview(userId: string | undefined) {
+  const equipped = useLook(userId)
+  const trying = useTrying((st) => st.look)
+  const look = useMemo<Look>(() => {
+    const out: Look = { ...equipped }
+    for (const [slot, id] of Object.entries(trying) as [Slot, CosmeticId | undefined][]) if (id) out[slot] = id
+    return out
+  }, [equipped, trying])
+  return { look, equipped, trying, tryOn, clear: clearTry }
 }

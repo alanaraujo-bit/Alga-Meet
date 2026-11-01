@@ -1,29 +1,37 @@
-import type { BillingMe, CosmeticSlot, Entitlement, EquippedCosmetics, Order, Product, Subscription } from '@alga/shared'
+import type { BillingMe, CosmeticSlot, Entitlement, Order, Product, Subscription } from '@alga/shared'
+import { HORA_AZUL, type CosmeticId, type Slot } from './hora-azul'
 
-/** Where a cosmetic shows on a profile. One item per slot. */
-export type Slot = 'decoration' | 'theme' | 'effect' | 'nameplate'
-export const SLOTS: Slot[] = ['decoration', 'theme', 'effect', 'nameplate']
-/** The server's name for each slot (COSMETIC_SLOTS, PublicUser.cosmetics, PUT /users/@me/cosmetics). */
-export const SLOT_KEY: Record<Slot, CosmeticSlot> = { decoration: 'avatarDecoration', theme: 'profileTheme', effect: 'profileEffect', nameplate: 'nameplate' }
+export type { CosmeticId, Slot }
+/** Where a cosmetic shows. One item per slot; profile slots first (the shop's shelf order). */
+export const SLOTS: Slot[] = ['decoration', 'nameplate', 'effect', 'theme', 'aura', 'frame', 'reactions', 'sound', 'icon']
+/**
+ * The server's name for each slot (COSMETIC_SLOTS, PublicUser.cosmetics, PUT /users/@me/cosmetics). appIcon only ever
+ * comes in Me, never in PublicUser. appAccent (Plus app colors) has no renderer here: it recolors the whole UI.
+ */
+export const SLOT_KEY: Record<Slot, CosmeticSlot> = {
+  decoration: 'avatarDecoration',
+  theme: 'profileTheme',
+  effect: 'profileEffect',
+  nameplate: 'nameplate',
+  aura: 'voiceAura',
+  sound: 'entranceSound',
+  reactions: 'callReactions',
+  frame: 'streamFrame',
+  icon: 'appIcon',
+}
 
-/** Catalog SKUs this client can draw (apps/server/src/billing/catalog.ts). An SKU without a renderer is ignored. */
-export const COSMETICS = {
-  deco_folha_de_alga: 'decoration',
-  deco_coral: 'decoration',
-  theme_noite_paulistana: 'theme',
-  theme_plus_mare: 'theme',
-  effect_bioluminescencia: 'effect',
-  nameplate_cardume: 'nameplate',
-  nameplate_plus_correnteza: 'nameplate',
-} as const satisfies Record<string, Slot>
-export type CosmeticId = keyof typeof COSMETICS
+/** Catalog SKUs this client can draw (hora-azul.ts). An SKU without a renderer is ignored. */
+export const COSMETICS = Object.fromEntries(Object.entries(HORA_AZUL).map(([id, m]) => [id, m.slot])) as Record<CosmeticId, Slot>
 export const isCosmeticId = (id: string): id is CosmeticId => Object.hasOwn(COSMETICS, id)
 
 /** What a profile wears: at most one item per slot. */
 export type Look = Partial<Record<Slot, CosmeticId>>
 
-/** The look of what someone equipped (PublicUser.cosmetics). Unknown SKUs or an item in the wrong slot are skipped. */
-export function lookOf(equipped: EquippedCosmetics | undefined): Look {
+/**
+ * The look of what someone equipped (PublicUser.cosmetics, keyed by server slot name). Unknown SKUs, unknown slots
+ * and an item in the wrong slot are skipped, so an older client simply draws less.
+ */
+export function lookOf(equipped: Readonly<Record<string, string | undefined>> | undefined): Look {
   const look: Look = {}
   for (const slot of SLOTS) {
     const id = equipped?.[SLOT_KEY[slot]]

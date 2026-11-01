@@ -8,13 +8,15 @@ import { Button, Icon } from '@/ui'
 import { needsVerification, openVerifyEmail } from '../auth/VerifyEmail'
 import { openSettings } from '../settings/store'
 import { TeenPurchaseNotice, useIsTeen } from '../trust/Privacy'
-import { CosmeticThumb, DecoratedAvatar, Nameplate, ProfileCard, type ProfileUser } from './Cosmetics'
-import { COSMETICS, isCosmeticId, itemState, money, SLOTS, type CosmeticId, type ItemState, type Look } from './look'
+import { Cosmetic, CosmeticThumb, DecoratedAvatar, Nameplate, ProfileCard, type ProfileUser } from './Cosmetics'
+import { COSMETICS, isCosmeticId, itemState, money, SLOTS, type CosmeticId, type ItemState, type Look, type Slot } from './look'
 import { BillingGate, ProviderNotice, useBillingReady, Waiting } from './Plan'
 import { equip, loadBilling, startCheckout, useBilling, useLook } from './store'
 import { t } from './strings'
 import st from '../settings/settings.module.css'
 import s from './billing.module.css'
+
+const PROFILE_SLOTS = new Set<Slot>(['decoration', 'nameplate', 'effect', 'theme'])
 
 export function ShopSection() {
   const ready = useBillingReady()
@@ -85,10 +87,19 @@ function Shop({ catalog, billing, user }: { catalog: BillingCatalog; billing: Bi
           {slot === 'decoration' && (
             <figure className={s.previewCol}>
               <div className={s.sampleStage}>
-                <DecoratedAvatar user={user} size={96} decoration={preview.decoration} decorative />
+                <DecoratedAvatar user={user} size={96} decoration={preview.decoration} decorative motion="rest" />
                 <span className={s.sampleLabel}>{user.displayName}</span>
               </div>
               <figcaption className={s.caption}>{t.shop.where.stage}</figcaption>
+            </figure>
+          )}
+          {/* Call and app slots: the item in its own place (speaking tile, stream, reactions, sound, icon). */}
+          {product && slot && !PROFILE_SLOTS.has(slot) && (
+            <figure className={s.previewCol}>
+              <div className={s.sampleStage}>
+                <Cosmetic key={product.id} id={product.id as CosmeticId} size={80} state="play" user={user} />
+              </div>
+              <figcaption className={s.caption}>{slot === 'icon' ? t.shop.where.onlyYou : t.shop.where.call}</figcaption>
             </figure>
           )}
           {product && <Detail product={product} state={state(product)} look={look} names={names} arrived={arrived === product.id} enabled={!!catalog.provider} />}

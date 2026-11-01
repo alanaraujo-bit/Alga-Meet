@@ -1,0 +1,233 @@
+/*
+ * Voice auras, call reactions, stream frames (Hora Azul). Auras read --speak (0..1) inherited from the tile; every
+ * per-frame change is opacity/transform on its own layer (no repaint). Keyframes never state their last frame.
+ */
+
+/* ── Voice auras ── */
+.aura {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+/* The ring that carries "is speaking": 2 px indigo, opacity min(1, speak × 2.2), like the default ring. */
+.inner {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 2px #8b8ef7;
+  opacity: min(1, calc(var(--speak, 0) * 2.2));
+  will-change: opacity;
+}
+
+/* HA-16 Respiro: a 1 px lilac ring 5 px out, brightest at 11 h, breathing out 5 % with the voice. */
+.respiroOut {
+  position: absolute;
+  inset: -6px;
+  width: calc(100% + 12px);
+  height: calc(100% + 12px);
+  overflow: visible;
+  opacity: min(1, calc(var(--speak, 0) * 1.2));
+  transform: scale(calc(1 + 0.05 * var(--speak, 0)));
+  will-change: transform, opacity;
+}
+
+/* HA-17 Prisma: a 2 px ring in prism colors; the voice turns it (transform written by the aura's speak callback). */
+.prisma {
+  position: absolute;
+  inset: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+  overflow: visible;
+  opacity: min(1, calc(var(--speak, 0) * 2.2));
+  will-change: transform, opacity;
+}
+
+/* HA-18 Ondas: pooled 1 px rings, sent out by the speak callback (Web Animations: transform + opacity). */
+.wave {
+  --speak: 0; /* driven by Web Animations, not the envelope: no restyle per frame */
+  position: absolute;
+  inset: -3px;
+  border: 1px solid #8b8ef7;
+  border-radius: 50%;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+/* HA-19 Frondes: the brand glyph (u = 2 px, 3u/5u/3u) on the name pill, bars riding the envelope. */
+.fronds {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: 10px;
+  height: 12px;
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+.fronds i {
+  width: 2px;
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #ffffff, #9a9df9) center / 100% 10px;
+  transform: scaleY(calc(0.42 + 0.58 * var(--speak, 0)));
+}
+.fronds i:nth-child(2) {
+  height: 10px;
+}
+:global(.reduce-motion) .fronds i {
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fronds i {
+    transform: none;
+  }
+}
+
+/* ── HA-23 Reactions: rise 40 px from the tile, 0.9 → 1, fade; reduced motion = a still badge ── */
+.reactions {
+  position: absolute;
+  left: 50%;
+  bottom: 24%;
+  z-index: 3;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.rise,
+.still {
+  position: absolute;
+  bottom: 0;
+  left: var(--x, 0);
+  display: block;
+  line-height: 0;
+}
+.rise {
+  opacity: 0;
+  transform: translate(-50%, -40px);
+  animation: haRise 1200ms var(--ease-out-quart) backwards;
+}
+.still {
+  transform: translate(-50%, 0);
+}
+@keyframes haRise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.9);
+  }
+  14% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 1;
+  }
+}
+.emote {
+  display: block;
+  overflow: visible;
+}
+
+/* ── Stream frames: outside the video's content rect, never over a pixel of it ── */
+/* Doubled attribute: wins over the stage's `.stream video` whatever the stylesheet order. */
+:global([data-cosmetic-frame][data-cosmetic-frame]) > video {
+  inset: 8px;
+  width: calc(100% - 16px);
+  height: calc(100% - 16px);
+}
+:global([data-cosmetic-frame][data-cosmetic-frame]:fullscreen) > video {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.cinema,
+.glassFrame {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+.cinema[hidden],
+.glassFrame[hidden] {
+  display: none;
+}
+
+/* HA-24 Moldura Cinema: 2 px indigo border, four 12 px porcelain brackets, one turn of light on the first frame. */
+.cinema {
+  border-radius: 1px;
+  box-shadow: 0 0 0 2px rgba(97, 99, 208, 0.7);
+}
+.cinema::before {
+  --c: rgba(247, 248, 248, 0.6);
+  content: '';
+  position: absolute;
+  inset: -5.5px;
+  background:
+    linear-gradient(var(--c) 0 0) left top / 12px 1.5px,
+    linear-gradient(var(--c) 0 0) left top / 1.5px 12px,
+    linear-gradient(var(--c) 0 0) right top / 12px 1.5px,
+    linear-gradient(var(--c) 0 0) right top / 1.5px 12px,
+    linear-gradient(var(--c) 0 0) left bottom / 12px 1.5px,
+    linear-gradient(var(--c) 0 0) left bottom / 1.5px 12px,
+    linear-gradient(var(--c) 0 0) right bottom / 12px 1.5px,
+    linear-gradient(var(--c) 0 0) right bottom / 1.5px 12px;
+  background-repeat: no-repeat;
+}
+.sweep {
+  position: absolute;
+  inset: -2px;
+  padding: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+}
+/* At rest the light (a masked layer the size of the stream) does not exist at all. */
+.cinema:not([data-run]) .sweep {
+  display: none;
+}
+.sweep::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 130%;
+  aspect-ratio: 1;
+  background: conic-gradient(rgba(247, 248, 248, 0) 0deg, rgba(247, 248, 248, 0) 290deg, rgba(247, 248, 248, 0.95) 352deg, rgba(247, 248, 248, 0) 360deg);
+  transform: translate(-50%, -50%) rotate(360deg);
+}
+.cinema[data-run] .sweep {
+  animation: haSweepOn 1200ms linear backwards;
+}
+.cinema[data-run] .sweep::before {
+  animation: haSweep 1200ms var(--ease-in-out-cubic) backwards;
+}
+@keyframes haSweepOn {
+  from {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+}
+@keyframes haSweep {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+}
+
+/* HA-25 Moldura de vidro: a 3 px bevel (2 px silver fading in, 1 px porcelain edge), its top edge lit. */
+.glassFrame {
+  border-radius: 1px;
+  box-shadow:
+    0 0 0 1px rgba(201, 204, 214, 0.04),
+    0 0 0 2px rgba(201, 204, 214, 0.1),
+    0 0 0 3px rgba(247, 248, 248, 0.18);
+}
+.glassFrame::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  top: -3px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(247, 248, 248, 0.06), rgba(247, 248, 248, 0.25) 18%, rgba(247, 248, 248, 0.25) 82%, rgba(247, 248, 248, 0.06));
+}
