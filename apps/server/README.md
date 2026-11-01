@@ -74,8 +74,8 @@ Falha fechada:
 | `src/voice.ts` | tokens/grants LiveKit, webhook (assinatura + dedupe), `VoiceState` autoritativo, limite de usuários, moderação no SFU |
 | `src/billing/` | `catalog.ts` (planos, preços, cosméticos; versionado), `billing.ts` (motor: checkout, webhooks idempotentes, recompute de direitos, job de expiração), `provider.ts` (interface `PaymentProvider` + `SandboxProvider`), `mercadopago.ts` (Checkout Pro + preapproval, `x-signature`) |
 | `src/legal.ts` | catálogo `LEGAL_VERSIONS` (versão + `changeSummary`; a do topo é `TERMS_VERSION`), faixa etária (`ageBracketOf`), prioridade e rótulos pt-BR dos motivos, prazos |
-| `src/trust-safety.ts` | medidas na conta (`applyAction`: warn/suspend/ban/lift aplicados em login, sessões, gateway 4010 e voz), token de recurso, quarentena de anexos com cópia em `evidence/` + SHA-256, retenção legal, `setStaffRole` |
-| `src/privacy.ts` | registros de acesso (Marco Civil art. 15), exclusão de conta (carência + expurgo), exportação (zip + link assinado por e-mail e na lista do app), job de retenção |
+| `src/trust-safety.ts` | medidas na conta (`applyAction`: warn/suspend/ban/lift aplicados em login, sessões, gateway 4010 e voz), token de recurso, quarentena de anexos com cópia em `evidence/` + SHA-256 e liberação (falso positivo), retenção legal, `setStaffRole` |
+| `src/privacy.ts` | registros de acesso (Marco Civil art. 15), exclusão de conta (carência + expurgo), exportação (zip + link assinado por e-mail; no app, só com a senha), job de retenção |
 | `src/zip.ts` | escritor de ZIP mínimo (deflate, sem zip64) para a exportação |
 | `scripts/grant-staff.ts` | único jeito de dar/tirar `staff_role` (`npx tsx scripts/grant-staff.ts <username> <admin\|moderator\|none>`; com PGlite, pare o servidor antes) |
 | `src/routes/` | `auth` (inclui verificação de e-mail e redefinição de senha), `users` (perfil, relacionamentos, DMs), `spaces` (espaços, membros, canais, convites, listar/revogar convites), `roles` (cargos, apelidos), `moderation` (bans, voz), `messages` (inclui envio multipart), `files` (download assinado, avatares/ícones), `voice`, `billing`, `privacy` (idade, aceite, exclusão, exportação, `/legal`), `reports` (denúncias, medidas da própria conta, recursos), `admin` (equipe, auditado), `telemetry` (relatório de qualidade de chamada) |
@@ -226,7 +226,11 @@ Falha fechada:
     devolve para a tela de novo aceite (texto em rascunho até o advogado revisar).
   - **Denúncias** (`POST /reports`, 10/h): retrato do alvo na hora (sobrevive à exclusão), sem autodenúncia, mensagem
     só se o denunciante a vê, duplicada aberta = a mesma (200 com `duplicate: true`; nova = 201 com `duplicate: false`).
-    `csam` = prioridade 100 + quarentena automática dos anexos + retenção legal do autor.
+    `csam` = prioridade 100 + quarentena automática dos anexos (reversível) + expurgo do autor segurado enquanto a
+    denúncia está aberta; no máximo `CSAM_REPORTS_PER_DAY` (5) por denunciante em 24 h, contadas no banco (429). A
+    retenção legal vem só da equipe: denúncia `csam` decidida como `resolved` (ou quarentena manual, ou
+    `PATCH /admin/users/:id`). Denúncia `dismissed` soma 1 em `users.false_reports` do denunciante
+    (`AdminReport.reporterFalseReports`); a equipe age sobre quem abusa com `POST /admin/users/:id/actions`.
   - **Medidas** (equipe): warn / suspend até / ban / lift. Suspensão e banimento apagam as sessões, fecham o gateway com
     **4010**, tiram da voz (`removeParticipant`); o login (senha certa) responde 403 com `error.restriction` e um token
     de recurso (1 h); `restriction.createdAt` = quando a medida foi decidida (o prazo do recurso conta dele). E-mail com a categoria, só para endereço verificado; `csam` não avisa e aparece como `other`.
@@ -235,10 +239,15 @@ Falha fechada:
     para `staff_audit_log` antes de executar (status depois); moderador não age sobre contas da equipe.
   - **Quarentena**: anexo some na hora (404, `MESSAGE_UPDATE`), bytes copiados para `evidence/<id>` (nenhuma rota
     serve) com SHA-256, original apagado só depois da cópia (falha → retido e retentado); `receiptConfirmed` com
-    protocolo apaga o material.
+    protocolo apaga o material. Falso positivo: `POST /admin/quarantine/:id/release` devolve o arquivo à mensagem com
+    um id novo (`MESSAGE_UPDATE`; pode ir de novo à quarentena), apaga a cópia e marca `released_at`; 409 depois do
+    `receiptConfirmed`, na segunda vez ou com a cópia pendente; não mexe na retenção legal.
   - **Exclusão** (`DELETE /users/@me`, senha): para a renovação da assinatura, 4004 em todas as sessões, expurgo em 7
-    dias (login cancela; retenção legal ou recurso aberto seguram). Espaços → maior cargo / mais antigo, ou excluídos;
-    mensagens `anonymize` (autor `REMOVED_USER_ID`, "Usuário removido", criado pela migração 0005) ou `delete`;
+    dias (login cancela; retenção legal, recurso aberto ou denúncia `csam` aberta contra a conta seguram). E-mails de
+    "exclusão marcada" e "exclusão cancelada": 1 de cada por conta a cada 24 h (em memória). Espaços → maior cargo /
+    mais antigo, ou excluídos; mensagens `anonymize` (autor `REMOVED_USER_ID`, "Usuário removido", criado pela migração
+    0005) ou `delete` (os clientes abertos recebem `MESSAGE_DELETE` de cada uma, 100 por canal a cada 100 ms, em
+    segundo plano);
     anexos/avatar/exportações sempre apagados; `subscriptions`/`orders` passam para `REMOVED_USER_ID` (FK `restrict`
     mantida de propósito); `deleted_accounts` (username + SHA-256 do e-mail) 6 meses. `REMOVED_USER_ID` só aparece como
     `Message.author` (REST, eventos, retrato de denúncia; `GET /users/:id` o resolve); no expurgo os clientes abertos
@@ -247,12 +256,13 @@ Falha fechada:
     mostram nenhum dos dois ids.
   - **Exportação** (`POST /users/@me/export`, e-mail verificado, 1/24 h no banco): zip (`dados.json` + `LEIA-ME.txt`)
     em `exports/`, link HMAC de 7 dias por e-mail (`GET /exports/:id`), anexos com URL assinada de 7 dias.
-    `GET /users/@me/exports` (30/min) lista os 20 últimos pedidos (`queued`/`processing`/`ready`/`expired`/`failed`) e,
-    quando pronto, um `downloadUrl` com a mesma assinatura e validade de URL de anexo (`FILE_URL_TTL_SECONDS`, nunca
-    além do zip). Troca consciente: antes só o e-mail levava o link; agora uma sessão roubada também baixa (o dono
-    ainda recebe o e-mail e o pedido continua limitado a 1/24 h).
+    `GET /users/@me/exports` (30/min) lista os 20 últimos pedidos (`queued`/`processing`/`ready`/`expired`/`failed`),
+    só o estado: `downloadUrl` é sempre `null` (campo mantido por compatibilidade). O app baixa com
+    `POST /users/@me/exports/:id/download {password}` → `{ downloadUrl }`: senha de novo, link de 10 min
+    (`EXPORT_DOWNLOAD_TTL_MINUTES`, nunca além do zip), 5/15 min, linha `export_download` em `access_logs`. Assim uma
+    sessão roubada sozinha não leva os dados.
   - **Registros de acesso** (`access_logs`, sem FK): todo login/cadastro + 1º uso do dia por IP e user agent (hash),
-    REST e gateway; IP pela regra de `TRUST_PROXY`; expurgo aos 6 meses salvo retenção legal; sem porta de origem.
+    REST e gateway, + cada link de exportação emitido no app (`export_download`); IP pela regra de `TRUST_PROXY`; expurgo aos 6 meses salvo retenção legal; sem porta de origem.
   - **Job** (`Privacy.sweep`, a cada minuto): expurgos devidos, retenção (acesso 6 meses, casos decididos 6 meses salvo
     `csam`, exportações vencidas), exportações pendentes; `TrustSafety.sweep` retenta cópias de prova.
 - **Sessões** expiram após 30 dias sem uso ou 90 dias do login; `POST /auth/password` revoga as outras;
@@ -264,8 +274,10 @@ Falha fechada:
   `password-reset/request` 5/15 min/IP; reenvio da verificação 3/15 min; e-mails 3/h por endereço e fluxo; preview de convite 30/min/IP; equipar cosméticos 10/min; checkout 10/h e cancelar/retomar assinatura 10/h cada (cada chamada cria ou muda um objeto no
   provedor); lista de exportações 30/min; relatórios de qualidade de chamada 20/h; espaços 10/h; convites
   20/h; troca de senha 5/15 min; 30 arquivos anexados/10 min por usuário; avatar/ícone 5/min; downloads de
-  arquivo/avatar/ícone 1200/min/IP (uma página de chat carrega muitos de uma vez); denúncias 10/h; recursos 10/h/IP;
-  `DELETE /users/@me` 5/15 min; exportação 1/24 h (no banco); data de nascimento 5/min. Webhook do LiveKit, `/health` e
+  arquivo/avatar/ícone 1200/min/IP (uma página de chat carrega muitos de uma vez); denúncias 10/h (`csam` 5/24 h, no
+  banco); recursos 10/h/IP; `DELETE /users/@me` 5/15 min; exportação 1/24 h (no banco); link de exportação no app
+  5/15 min; data de nascimento 5/min. Store em memória de 5000 chaves por rota (LRU); chaves despejadas contam em
+  `alga_ratelimit_evictions_total` (por rota; `global` = o teto padrão). Webhook do LiveKit, `/health` e
   `/ready` sem limite (`/metrics` fica no teto global por IP).
 - **Gateway**: `identify` em até 10 s; 120 frames/60 s por socket e 10 sockets por usuário (senão 4008);
   `presence`/`voice_state` no máximo 1 fan-out/s por usuário (o último valor vence); cliente que não lê (buffer >
@@ -277,14 +289,15 @@ Falha fechada:
 - **Observabilidade** (`docs/infra/observability.md`: métricas, SLOs, painéis, alertas em `infra/monitoring/`):
   `/health` = liveness (healthcheck do Railway, sem mudança); `/ready` = `select 1` + `GET /` no LiveKit (2 s cada),
   503 se algum falhar; `/metrics` = Prometheus (HTTP por template de rota e classe de status, gateway, fan-out, READY,
-  voz, tokens, webhooks, banco por `op`, rate limit, e-mail, pagamentos, memória, event loop).
+  voz, tokens, webhooks, banco por `op`, rate limit e chaves despejadas do store, e-mail, pagamentos, memória, event
+  loop).
 - **Telemetria de chamada** (`POST /telemetry/call-quality`, contrato em `packages/shared/src/telemetry.ts`): só com
   `Me.telemetryOptIn` (padrão `false`, `PATCH /users/@me`; `telemetry_opt_in_at` registra o consentimento). Schema
   estrito de agregados (enums e números, nada de texto livre, sala ou IP), 20/h. Guarda o dia (não a hora), id v4
   aleatório e `user_hash` com sal aleatório trocado todo dia e nunca gravado; expurgo aos 30 dias; vira histogramas
   `alga_call_*`.
 
-## Testes (`test/`, 165 casos)
+## Testes (`test/`, 167 casos)
 
 `npm test` roda em PGlite; `npm run test:pg` roda os mesmos casos num PostgreSQL 18 real (`test/pg-setup.ts`: um
 cluster UTF8 descartável por execução, um banco por `startServer`). Os dois passam.
@@ -320,23 +333,27 @@ saem no fim do plano e o comprado fica; reembolso tira) e, no Mercado Pago simul
 `/metrics` (aberto em test, bearer com token, 404 em produção sem token), `/health` × `/ready` (banco ok, LiveKit
 fechado → 503, LiveKit falso → 200), métricas de HTTP/gateway/banco (driver certo nas duas suítes)/voz/webhooks/rate
 limit/e-mail/pagamentos/processo, e a telemetria (403 sem opt-in, schema estrito, linha só com o dia e hash diário,
-métricas, expurgo de 30 dias, retirada do consentimento, 20/h).
+métricas, expurgo de 30 dias, retirada do consentimento, 20/h) e o store do rate limit (chave despejada do LRU cheio
+conta em `alga_ratelimit_evictions_total` e recomeça do zero).
 `privacy.test.ts` (11): idade no cadastro (< 16 sem gravar nada, 16 hoje, 18, datas inválidas, sem data em dev,
 `REQUIRE_BIRTHDATE` e produção), declaração única e < 16 → suspensão + 4010 + exclusão segurada por recurso aceito,
 16–17 (DM só com amigos sem revelar idade, sem compra), aceite e novo aceite com histórico (`changeSummary` do catálogo, aceite repetido sem linha nova), registros de acesso (login,
 1º uso do dia por IP/app, gateway, expurgo de 6 meses salvo retenção legal, rota só de admin), exclusão (senha, 4004,
-cancelada pelo login, expurgo: herdeiro do espaço, espaço sozinho excluído, mensagens anonimizadas com anexos apagados
+cancelada pelo login, 1 e-mail de cada tipo por 24 h no vaivém, expurgo: herdeiro do espaço, espaço sozinho excluído, mensagens anonimizadas com anexos apagados
 no bucket, DM, pedido pago passa ao usuário removido, denúncia sem denunciante, `deleted_accounts`, eventos aos outros;
-`delete` e retenção legal) e exportação (e-mail verificado, 1/24 h, zip lido de volta, link e URLs de anexo de 7 dias,
-assinatura adulterada, expiração), a lista de exportações (estados, link curto que baixa o zip, só as próprias, expirada
-sem link) e a paridade do autor removido (`REMOVED_USER_ID` no REST, na DM, em `GET /users/:id` e no retrato;
+`delete` com `MESSAGE_DELETE` de cada mensagem em lotes e retenção legal) e exportação (e-mail verificado, 1/24 h, zip lido de volta, link e URLs de anexo de 7 dias,
+assinatura adulterada, expiração), a lista de exportações (só estados, `downloadUrl` sempre nulo, só as próprias) e o
+link no app (senha errada, de outra conta, falha, em preparo → 409, 10 min que baixa o zip, nunca além do zip, linha
+`export_download`, 5/15 min) e a paridade do autor removido (`REMOVED_USER_ID` no REST, na DM, em `GET /users/:id` e no retrato;
 `USER_UPDATE`/`MEMBER_REMOVE`/`REACTION_REMOVE`/`CHANNEL_UPDATE` com o id antigo; nenhum dos ids no READY seguinte).
-`trust-safety.test.ts` (6): papel de equipe só pelo script + auditoria com status,
+`trust-safety.test.ts` (7): papel de equipe só pelo script + auditoria com status,
 denúncias (retrato que sobrevive, autodenúncia, visibilidade, duplicada com `duplicate`, 10/h), suspensão (4010, `removeParticipant`,
 401, e-mail sem nota interna, login 403 com motivo, `createdAt` + prazo do recurso, token de recurso, recurso aceito), ban/lift/warn/expiração/guardas
 (equipe só por admin, `csam` sem aviso), quarentena `csam` (404, `MESSAGE_UPDATE`, prioridade, prova + SHA-256,
-original apagado, retenção que segura a exclusão, `receiptConfirmed` com protocolo) e quarentena manual (idempotente,
-cópia que falha fica retida e é retentada).
+original apagado, sem retenção legal automática, denúncia aberta que segura a exclusão, retenção quando a equipe
+confirma, `receiptConfirmed` com protocolo), quarentena manual (idempotente, cópia que falha fica retida e é
+retentada, retenção legal do autor) e abuso da denúncia (`dismissed` soma no denunciante, liberação com id novo e
+mesmos bytes, cópia apagada, auditada, uma vez só, nova quarentena possível; 5 `csam`/24 h → 429).
 
 ## Smoke com LiveKit real (server mute)
 
@@ -356,7 +373,11 @@ na sala com `livekit-client` e publica o microfone; o dono chama `PATCH /spaces/
 - Migrações rodam na subida sem lock: com mais de uma réplica, subir uma por vez (ou mover para `preDeploy`).
 - Overwrites de permissão por canal ainda não existem (permissões valem para o espaço inteiro).
 - Estado de voz, conexões, throttles e contadores de rate limit ficam em memória: uma instância só. Para escalar,
-  Redis (pub/sub + store do `@fastify/rate-limit`).
+  Redis (pub/sub + store do `@fastify/rate-limit`). **Plano do Redis para o rate limit**: trocar `RateLimitStore`
+  (`src/observability.ts`, que hoje embrulha o `LocalStore` do plugin para contar despejos) pela opção `redis` do
+  `@fastify/rate-limit` (contadores com TTL no Redis, sem teto de 5000 chaves nem despejo), junto com o pub/sub do
+  gateway; as cotas de e-mail e o "1º uso do dia" vão para o mesmo Redis. Enquanto isso, alerta se
+  `alga_ratelimit_evictions_total` subir.
 - Gateway sem `resume`: reconexão recebe um READY novo (como no contrato).
 - **E-mail sem fila nem retentativa**: falha do provedor fica só no log (`e-mail not sent`); a pessoa pede de novo
   (reenvio/redefinição). Contas não verificadas nunca expiram (limpeza periódica fica para depois). A lista de senhas
@@ -379,17 +400,18 @@ na sala com `livekit-client` e publica o microfone; o dono chama `PATCH /spaces/
   estorno manual. Pagamento duplo de um pedido é logado como erro (estorno manual).
 - Downloads de anexo passam pela API: o anexo de 100 MiB do Plus custa egress do Railway (ver lacuna acima).
 - **Trust & Safety** (detalhes em `docs/trust-safety/`): idade só autodeclarada; sem detecção por hash de material
-  conhecido nem envio automático ao Nidus/PF; quarentena sem "desfazer" (falsa denúncia → restauração manual); prova em
+  conhecido nem envio automático ao Nidus/PF; liberar a quarentena devolve o anexo com id novo (links antigos dão 404); prova em
   `evidence/` no mesmo bucket (recomendado bucket/política própria); denúncia comum preserva só os metadados dos
   anexos; sem expurgo fiscal automático de `subscriptions`/`orders`; exportação montada em memória (sem zip64); conta
   suspensa/banida não se autoexclui (pedido ao encarregado); registros de acesso sem porta de origem (D23); o cache de
   "1º uso do dia" fica em memória (mesma ressalva do Redis).
 - **Revisão de abuso (T&S + pagamentos, 2026-11-01)**: corrigidos o checkout e o cancelar/retomar (10/min → 10/h: cada
-  chamada vira objeto/chamada no provedor) e o aceite repetido. Em aberto, decisão do dono/advogado: (1) qualquer conta,
-  até recém-criada e sem e-mail verificado, faz denúncia `csam` e com ela põe em quarentena os anexos que vê e em
-  retenção legal o autor (segura a exclusão dele); contas descartáveis multiplicam o 10/h. Sugestão: automático só com
-  e-mail verificado (o resto vai para a fila com prioridade 100). (2) O `@fastify/rate-limit` em memória guarda 5000
-  chaves por rota (LRU): acima disso, no mesmo intervalo, contadores antigos somem e o limite vaza (resolve junto com o
-  Redis). (3) Exclusão em modo `delete` não anuncia `MESSAGE_DELETE` (podem ser milhares): clientes abertos mostram as
-  mensagens como "Usuário removido" até recarregar. (4) `DELETE /users/@me` + login que cancela podem ser repetidos
-  (5/15 min) e cada volta manda 2 e-mails ao próprio endereço, sem a cota por endereço dos outros fluxos.
+  chamada vira objeto/chamada no provedor) e o aceite repetido. Decisões do lead aplicadas depois: (1) denúncia `csam`
+  continua pondo os anexos em quarentena na hora (reversível, `POST /admin/quarantine/:id/release`), mas a retenção
+  legal só vem da equipe ao confirmar; 5 `csam`/24 h por denunciante; `users.false_reports` conta as arquivadas.
+  Continua: qualquer conta, até sem e-mail verificado, faz até 5 por dia (contas descartáveis multiplicam isso) e a
+  denúncia aberta segura a exclusão do denunciado até a equipe decidir. (2) O store em memória continua com 5000
+  chaves por rota (LRU): acima disso, no mesmo intervalo, contadores antigos somem e o limite vaza. Agora medido
+  (`alga_ratelimit_evictions_total`); resolve com o Redis (plano acima). (3) Exclusão em modo `delete` anuncia
+  `MESSAGE_DELETE` (um por mensagem, sem evento em lote no contrato). (4) E-mails de exclusão marcada/cancelada: 1 de
+  cada por conta a cada 24 h.

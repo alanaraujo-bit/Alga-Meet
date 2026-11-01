@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.js'
 import { callQualityReports, users } from '../src/db/schema.js'
 import { Registry } from '../src/metrics.js'
-import { logUserHash } from '../src/observability.js'
+import { RateLimitStore, logUserHash } from '../src/observability.js'
 import { api, connect, freshDatabaseUrl, onRealPostgres, postWebhook, register, startServer, type TestServer } from './helpers.js'
 
 let s: TestServer
@@ -172,6 +172,22 @@ describe('instrumentation', () => {
     expect(sample(after, 'process_resident_memory_bytes')).toBeGreaterThan(0)
     expect(after).toMatch(/^nodejs_eventloop_lag_seconds\{stat="p99"\} \d/m)
     gw.close()
+  })
+})
+
+describe('rate-limit store', () => {
+  it('counts keys evicted from the full in-memory LRU in alga_ratelimit_evictions_total, per route', async () => {
+    const before = await scrape()
+    const route = '/api/v1/test-evictions'
+    const store = new RateLimitStore().child({ cache: 3, routeInfo: { url: route } } as never)
+    const incr = (key: string) => new Promise<number>((resolve, reject) => {
+      store.incr(key, (err, r) => (err ? reject(err) : resolve(r!.current)), 60_000, 10)
+    })
+    for (const k of ['a', 'b', 'c']) await incr(k)
+    expect(await incr('a')).toBe(2)
+    await incr('d') // full: 'b', the least recently used, goes
+    expect(await incr('b')).toBe(1) // its count restarted (the leak the metric shows); 'c' goes
+    expect(sample(await scrape(), 'alga_ratelimit_evictions_total', { route }) - sample(before, 'alga_ratelimit_evictions_total', { route })).toBe(2)
   })
 })
 

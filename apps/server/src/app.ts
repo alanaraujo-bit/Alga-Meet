@@ -14,7 +14,7 @@ import { Files } from './files.js'
 import { Hub } from './gateway/hub.js'
 import { gatewayRoute } from './gateway/socket.js'
 import { metrics } from './metrics.js'
-import { installObservability, logUserHash, routeOf } from './observability.js'
+import { RateLimitStore, installObservability, logUserHash, routeOf } from './observability.js'
 import { Privacy } from './privacy.js'
 import { adminRoutes } from './routes/admin.js'
 import { authPublicRoutes, authRoutes } from './routes/auth.js'
@@ -117,8 +117,11 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   })
   // Every route gets this ceiling unless it sets its own `config.rateLimit` (which inherits the key below).
   // preHandler: runs after authentication, so authenticated routes are keyed per user, public ones per IP.
+  // In memory, 5000 keys per store (alga_ratelimit_evictions_total counts what falls out). shortcut: one instance only;
+  // the Redis store of @fastify/rate-limit is the plan for several (README, Lacunas).
   await app.register(rateLimit, {
     global: true,
+    store: RateLimitStore,
     hook: 'preHandler',
     max: 200,
     timeWindow: '1 minute',

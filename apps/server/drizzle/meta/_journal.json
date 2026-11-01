@@ -50,6 +50,13 @@
       "when": 1793521917527,
       "tag": "0006_observability",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793524593275,
+      "tag": "0007_trust_safety_abuse",
+      "breakpoints": true
     }
   ]
 }

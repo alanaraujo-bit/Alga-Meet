@@ -1,7 +1,7 @@
 /** Age gate, consent, account deletion and data export routes (src/privacy.ts; contract in packages/shared/src/trust-safety.ts). */
 import {
-  APPEAL_WINDOW_DAYS, AcceptTermsBody, BirthDateBody, DeleteAccountBody, MIN_AGE, ageOn, uuidv7,
-  type AccountDeletionScheduled, type DataExport, type DataExportRequested, type LegalInfo, type Me,
+  APPEAL_WINDOW_DAYS, AcceptTermsBody, BirthDateBody, DeleteAccountBody, ExportDownloadBody, MIN_AGE, ageOn, uuidv7,
+  type AccountDeletionScheduled, type DataExport, type DataExportDownload, type DataExportRequested, type LegalInfo, type Me,
 } from '@alga/shared'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
@@ -118,9 +118,24 @@ export function privacyRoutes(app: FastifyInstance, ctx: Ctx): void {
     return { id: row!.id, status: 'pending', createdAt: row!.createdAt.toISOString() }
   })
 
-  // Status for the app; a ready one carries a short-lived link (the e-mailed 7-day one still goes out).
+  // Status only: the in-app link takes the password again (below); the e-mailed 7-day one still goes out.
   app.get('/users/@me/exports', { config: perMinute(30) }, async (req): Promise<DataExport[]> => {
     const rows = await db.select().from(dataExports).where(eq(dataExports.userId, req.auth.user.id)).orderBy(desc(dataExports.createdAt)).limit(20)
     return rows.map((r) => privacy.exportView(r))
+  })
+
+  // A stolen session alone cannot take the data out: the password again, a 10-minute link, an access-log row.
+  app.post<{ Params: { id: string } }>('/users/@me/exports/:id/download', { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } }, async (req): Promise<DataExportDownload> => {
+    const { password } = parse(ExportDownloadBody, req.body)
+    const user = req.auth.user
+    if (!(await verifyPassword(user.passwordHash, password))) throw invalid({ password: 'Senha incorreta.' })
+    const [row] = await db.select().from(dataExports).where(and(eq(dataExports.id, idParam(req.params.id)), eq(dataExports.userId, user.id)))
+    if (!row) throw notFound('Exportação não encontrada.')
+    const view = privacy.exportView(row)
+    if (view.status === 'queued' || view.status === 'processing') throw conflict('Sua exportação ainda está sendo preparada.')
+    if (view.status !== 'ready' || !row.expiresAt) throw notFound('Exportação expirada. Peça outra no app.')
+    await privacy.recordUse(user.id, req.ip, req.headers['user-agent'], 'export_download')
+    req.log.info({ exportId: row.id }, 'privacy: export download link issued')
+    return { downloadUrl: privacy.downloadLink(row.id, row.expiresAt) }
   })
 }

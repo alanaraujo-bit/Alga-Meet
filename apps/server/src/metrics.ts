@@ -148,6 +148,7 @@ export const metrics = {
   httpRequests: r.counter('alga_http_requests_total', 'HTTP requests by method, route template and status class.'),
   httpDuration: r.histogram('alga_http_request_duration_seconds', 'HTTP request latency by method, route template and status class.', LATENCY),
   rateLimited: r.counter('alga_rate_limited_total', 'Requests refused by a rate limit (route template; "gateway" = socket closed with 4008).'),
+  rateLimitEvictions: r.counter('alga_ratelimit_evictions_total', 'Rate-limit keys pushed out of a full in-memory store (5000 keys; route template, "global" = the shared default). Nonzero = limits can leak.'),
 
   // Gateway (src/gateway/).
   gatewayConnections: r.gauge('alga_gateway_connections', 'Identified gateway sockets.'),

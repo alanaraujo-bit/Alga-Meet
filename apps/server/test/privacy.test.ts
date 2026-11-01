@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { inflateRawSync } from 'node:zlib'
 import {
-  GatewayClose, REMOVED_USER_ID, todayInBrazil, uuidv7,
-  type AuthResponse, type DataExport, type Invite, type LegalInfo, type Me, type Message, type SpaceSnapshot,
+  EXPORT_DOWNLOAD_TTL_MINUTES, GatewayClose, REMOVED_USER_ID, todayInBrazil, uuidv7,
+  type AuthResponse, type DataExport, type DataExportDownload, type Invite, type LegalInfo, type Me, type Message, type SpaceSnapshot,
 } from '@alga/shared'
 import { and, eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
@@ -288,6 +288,11 @@ describe('account deletion (LGPD art. 18 VI)', () => {
     expect(mailsTo(alice.user.email, 'account_deletion').length).toBe(2)
 
     await api(s.app, 'DELETE', '/users/@me', { token: back.body.token, body: { password: PASSWORD } })
+    // Delete + log in again in a loop: still 1 "scheduled" and 1 "canceled" mail per 24 h to the own address.
+    const again = await login(alice)
+    expect(again.body.deletionCanceled).toBe(true)
+    await api(s.app, 'DELETE', '/users/@me', { token: again.body.token, body: { password: PASSWORD } })
+    expect(mailsTo(alice.user.email, 'account_deletion').length).toBe(2)
     await s.app.ctx.privacy.retention(new Date(Date.now() + 6 * DAY))
     expect(await userRow(alice.user.id)).toBeDefined() // still in the grace period
     const bobGw = await connect(s.port, bob.token)
@@ -322,21 +327,30 @@ describe('account deletion (LGPD art. 18 VI)', () => {
     bobGw.close()
   })
 
-  it('"delete" removes the messages; a legal hold postpones the purge', async () => {
+  it('"delete" removes the messages and announces MESSAGE_DELETE in batches; a legal hold postpones the purge', async () => {
     const { db } = s.app.ctx
     const [dan, eve] = [await register(s.app), await register(s.app)]
     await befriend(s.app, dan, eve)
     const dm = (await api(s.app, 'POST', '/users/@me/channels', { token: dan.token, body: { recipientIds: [eve.user.id] } })).body
     const msg = (await api<Message>(s.app, 'POST', `/channels/${dm.id}/messages`, { token: dan.token, body: { content: 'apaga isso' } })).body
     await api(s.app, 'POST', `/channels/${dm.id}/messages`, { token: eve.token, body: { content: 'resposta da eve' } })
+    // More than one batch (100 per channel, then a pause).
+    const old = Array.from({ length: 150 }, (_, i) => ({ id: uuidv7(), channelId: dm.id, authorId: dan.user.id, content: `antiga ${i}` }))
+    await db.insert(messages).values(old)
     expect((await api(s.app, 'DELETE', '/users/@me', { token: dan.token, body: { password: PASSWORD, messages: 'delete' } })).status).toBe(202)
     await db.update(users).set({ legalHoldAt: new Date() }).where(eq(users.id, dan.user.id))
     await s.app.ctx.privacy.retention(new Date(Date.now() + 8 * DAY))
     expect(await userRow(dan.user.id)).toBeDefined()
     await db.update(users).set({ legalHoldAt: null }).where(eq(users.id, dan.user.id))
+    const eveGw = await connect(s.port, eve.token)
     await s.app.ctx.privacy.retention(new Date(Date.now() + 8 * DAY))
     expect(await userRow(dan.user.id)).toBeUndefined()
     expect((await db.select().from(messages).where(eq(messages.id, msg.id))).length).toBe(0)
+    const all = [msg.id, ...old.map((m) => m.id)].sort() // announced in id order: the last one comes in the 2nd batch
+    await eveGw.waitFor('MESSAGE_DELETE', (d) => d.id === all.at(-1) && d.channelId === dm.id)
+    const announced = eveGw.events.filter((e) => e.t === 'MESSAGE_DELETE').map((e) => (e.d as { id: string }).id)
+    expect(announced).toEqual(all) // each once, never Eve's own
+    eveGw.close()
     expect((await api<Message[]>(s.app, 'GET', `/channels/${dm.id}/messages`, { token: eve.token })).body.map((m) => m.content)).toEqual(['resposta da eve'])
     expect((await db.select().from(channels).where(eq(channels.id, dm.id))).length).toBe(1) // Eve keeps the DM
   })
@@ -428,6 +442,7 @@ describe('data export (LGPD art. 18 II/V)', () => {
     expect(Number(fileUrl.searchParams.get('exp')) * 1000).toBeGreaterThan(Date.now() + 6 * DAY) // lives as long as the link
     expect((await s.app.inject({ method: 'GET', url: fileUrl.pathname + fileUrl.search })).statusCode).toBe(200)
     expect(data.accessLogs.length).toBeGreaterThan(0)
+    expect(data.moderation.falseReports).toBe(0)
 
     const tampered = new URL(link)
     tampered.searchParams.set('sig', 'x'.repeat(43))
@@ -440,10 +455,12 @@ describe('data export (LGPD art. 18 II/V)', () => {
     expect((await s.app.inject({ method: 'GET', url: link.pathname + link.search })).statusCode).toBe(404)
   })
 
-  it('GET /users/@me/exports: status of your own requests; a ready one carries a short-lived link to the zip', async () => {
+  it('GET /users/@me/exports is status only; the in-app link needs the password, lasts 10 min, is limited and logged', async () => {
     const { db, privacy } = s.app.ctx
     const [u, other] = [await register(s.app), await register(s.app)]
     const list = async (token = u.token) => (await api<DataExport[]>(s.app, 'GET', '/users/@me/exports', { token })).body
+    const download = (id: string, password = PASSWORD, token = u.token) =>
+      api<DataExportDownload>(s.app, 'POST', `/users/@me/exports/${id}/download`, { token, body: { password } })
     expect(await list()).toEqual([])
     const [failed] = await db.insert(dataExports).values({ id: uuidv7(), userId: u.user.id, status: 'failed', error: 'x', createdAt: new Date(Date.now() - 2 * DAY) }).returning()
     const res = await api(s.app, 'POST', '/users/@me/export', { token: u.token })
@@ -452,16 +469,36 @@ describe('data export (LGPD art. 18 II/V)', () => {
 
     const [ready, fail] = await list()
     expect(fail).toEqual({ id: failed!.id, status: 'failed', createdAt: failed!.createdAt.toISOString(), expiresAt: null, downloadUrl: null })
-    expect(ready).toMatchObject({ id: res.body.id, status: 'ready', createdAt: res.body.createdAt })
+    expect(ready).toMatchObject({ id: res.body.id, status: 'ready', createdAt: res.body.createdAt, downloadUrl: null })
     expect(new Date(ready!.expiresAt!).getTime()).toBeGreaterThan(Date.now() + 6 * DAY)
-    const link = new URL(ready!.downloadUrl!)
+    expect(await list(other.token)).toEqual([])
+
+    expect((await download(ready!.id, 'senha errada aqui')).status).toBe(400)
+    expect((await download(ready!.id, PASSWORD, other.token)).status).toBe(404) // not yours
+    expect((await download(failed!.id)).status).toBe(404)
+    const [building] = await db.insert(dataExports).values({ id: uuidv7(), userId: u.user.id, status: 'building', startedAt: new Date() }).returning()
+    expect((await download(building!.id)).status).toBe(409)
+    await db.delete(dataExports).where(eq(dataExports.id, building!.id))
+
+    const got = await download(ready!.id)
+    expect(got.status).toBe(200)
+    expect(Object.keys(got.body)).toEqual(['downloadUrl'])
+    const link = new URL(got.body.downloadUrl)
     expect(link.pathname).toBe(`/api/v1/exports/${ready!.id}`)
     const exp = Number(link.searchParams.get('exp')) * 1000
     expect(exp).toBeGreaterThan(Date.now())
-    expect(exp).toBeLessThanOrEqual(Date.now() + s.config.files.urlTtlSeconds * 1000)
+    expect(exp).toBeLessThanOrEqual(Date.now() + EXPORT_DOWNLOAD_TTL_MINUTES * 60_000)
     const zip = await s.app.inject({ method: 'GET', url: link.pathname + link.search })
     expect([zip.statusCode, zip.headers['content-type']]).toEqual([200, 'application/zip'])
-    expect(await list(other.token)).toEqual([])
+    const logged = () => db.select().from(accessLogs).where(and(eq(accessLogs.userId, u.user.id), eq(accessLogs.event, 'export_download')))
+    expect((await logged()).length).toBe(1)
+    // Never past the zip itself.
+    const near = new URL(privacy.downloadLink(ready!.id, new Date(Date.now() + 60_000)))
+    expect(Number(near.searchParams.get('exp')) * 1000).toBeLessThanOrEqual(Date.now() + 60_000)
+    // 5 per 15 min (the wrong password, the 404 and the 409 counted too).
+    expect((await download(ready!.id, 'senha errada aqui')).status).toBe(400)
+    expect((await download(ready!.id)).status).toBe(429)
+    expect((await logged()).length).toBe(1)
 
     // The other stages, and a ready row the sweep has not expired yet.
     const [row] = await db.select().from(dataExports).where(eq(dataExports.id, ready!.id))

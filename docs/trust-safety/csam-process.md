@@ -20,7 +20,7 @@ advogado.
 | # | O quê | Prazo | Como (API, com papel de equipe) |
 |---|---|---|---|
 | 1 | **Tirar de circulação** | Imediato | Denúncia `csam` já põe os anexos em quarentena sozinha. Senão: `POST /admin/attachments/:id/quarantine` |
-| 2 | **Preservar** | Imediato (automático) | Bytes vão para `evidence/<id>` com SHA-256. A conta do autor fica em retenção legal |
+| 2 | **Confirmar e preservar** | Imediato | Bytes já foram para `evidence/<id>` com SHA-256. Ao confirmar, `PATCH /admin/reports/:id {status:"resolved", ...}` põe a conta do autor em retenção legal (a quarentena manual também). **Falso:** `{status:"dismissed"}` e `POST /admin/quarantine/:id/release` |
 | 3 | **Remover o resto** | Mesmo dia | `PATCH /admin/reports/:id` `{status:"resolved", action:"remove_content"}`. Depois banir: `{action:"ban"}` em outra denúncia ou `POST /admin/users/:id/actions` |
 | 4 | **Comunicar à Polícia Federal** | 12 h / 72 h / 7 dias (seção 4) | Sistema Nidus (CNCA). Anotar o protocolo: `PATCH /admin/quarantine/:id {authorityProtocol}` |
 | 5 | **Apagar o material** depois do recebimento confirmado | Assim que a PF confirmar | `PATCH /admin/quarantine/:id {receiptConfirmed:true}`. O registro (hash, ids, protocolo) fica |
@@ -38,17 +38,41 @@ Quando alguém denuncia uma mensagem com o motivo `csam`, o servidor (`src/route
    - o objeto original sai da fila de exclusão e é copiado para `evidence/<attachmentId>`;
    - o SHA-256 da cópia é gravado em `quarantined_files.sha256`;
    - só depois disso o original é apagado. Se a cópia falhar, o original fica retido e o job tenta de novo a cada minuto.
-3. Põe a **conta do autor em retenção legal** (`users.legal_hold_at`). Com isso:
-   - a conta não é excluída, nem se o autor pedir;
-   - os registros de acesso dela não são expurgados aos 6 meses;
-   - mensagens e metadados continuam no banco (art. 39, §1º: preservar "os demais conteúdos da conta").
+3. **Segura a exclusão da conta do autor enquanto a denúncia estiver aberta.** Se o autor pedir a exclusão, o
+   expurgo espera a decisão da equipe. Mensagens e metadados continuam no banco nesse tempo (art. 39, §1º).
 4. Registra um `warn` no log do servidor só com ids, sem conteúdo.
 
-O autor apagar a mensagem ou a conta **não destrói a prova**: a quarentena não depende da mensagem, e a retenção legal
-bloqueia a exclusão.
+**O que a denúncia sozinha não faz: retenção legal.** Qualquer conta pode denunciar, e uma denúncia falsa não pode
+prender a conta de um inocente sem prazo. A retenção legal (`users.legal_hold_at`) entra só por decisão da equipe:
+
+- quando a denúncia `csam` é decidida como `resolved` (confirmada);
+- quando a equipe põe um anexo em quarentena à mão (`POST /admin/attachments/:id/quarantine`);
+- ou com `PATCH /admin/users/:id {legalHold:true}`.
+
+Com a retenção:
+
+- a conta não é excluída, nem se o autor pedir;
+- os registros de acesso dela não são expurgados aos 6 meses;
+- mensagens e metadados continuam no banco (art. 39, §1º: preservar "os demais conteúdos da conta").
+
+O autor apagar a mensagem ou a conta **não destrói a prova**: a quarentena não depende da mensagem, a denúncia aberta
+segura o expurgo e, depois da confirmação, a retenção legal o bloqueia. **Decida a denúncia antes de 7 dias** (a
+carência da exclusão). Os prazos da seção 4 já são menores que isso.
 
 Denúncia `csam` de um **perfil** ou de um **espaço** não tem anexo para isolar. Nesses casos ela só entra no topo da
-fila e põe em retenção a conta denunciada (ou a do dono do espaço). A equipe isola os arquivos à mão (passo 1).
+fila e segura o expurgo da conta denunciada (ou da do dono do espaço). A equipe isola os arquivos à mão (passo 1).
+
+### Contra o uso da denúncia como arma
+
+- **5 denúncias `csam` por conta em 24 horas** (`CSAM_REPORTS_PER_DAY`), contadas no banco. A sexta responde 429. O
+  limite geral de 10 denúncias por hora continua valendo.
+- **Denúncia arquivada conta contra quem denunciou.** `PATCH /admin/reports/:id {status:"dismissed"}` soma 1 em
+  `users.false_reports`, e a fila mostra o número em `reporterFalseReports`. Diante de abuso, a equipe aplica uma medida
+  ao denunciante (`POST /admin/users/:id/actions`, por exemplo `suspend` com o motivo `spam`).
+- **Falso positivo:** `POST /admin/quarantine/:id/release` devolve o arquivo à mensagem com um id novo (os clientes
+  recebem `MESSAGE_UPDATE`), apaga a cópia em `evidence/` e grava `releasedAt`. Fica no `staff_audit_log`. Só funciona
+  antes do `receiptConfirmed` e depois que a cópia terminou. **Não** tira a retenção legal: isso é sempre um passo à
+  parte, com o advogado.
 
 ## 3. Quem faz o quê
 
@@ -156,8 +180,9 @@ Ver esse tipo de material faz mal. As regras mínimas:
   denúncia (F13).
 - **Sem envio automático ao Nidus.** O art. 42 do decreto prevê sistemas automatizados, e a integração depende do ato
   técnico da PF ainda não publicado.
-- **Sem desfazer a quarentena** quando a denúncia for falsa. A restauração do anexo é manual, por SQL e cópia no
-  bucket. O controle de denúncias abusivas fica para depois (F11).
+- **A quarentena se desfaz com um id novo** para o anexo (`release`): links antigos do arquivo continuam dando 404.
+- **Denúncia `csam` ainda vem de qualquer conta**, até sem e-mail verificado. Contas descartáveis multiplicam o limite de
+  5 por dia. O contador de denúncias falsas não tem efeito automático.
 - **Sem visualizador seguro** no painel (seção 7).
 - **Vídeo e voz ao vivo não são gravados.** Em chamada não há o que preservar além dos registros de acesso e de quem
   estava no canal.

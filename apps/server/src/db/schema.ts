@@ -47,6 +47,8 @@ export const users = pgTable('users', {
   /** Call-quality telemetry opt-in (Me.telemetryOptIn) and when it was given (LGPD art. 8 §2: proof of consent). */
   telemetryOptIn: boolean('telemetry_opt_in').notNull().default(false),
   telemetryOptInAt: ts('telemetry_opt_in_at'),
+  /** Reports by this account that staff dismissed (reporter reliability, AdminReport.reporterFalseReports). */
+  falseReports: integer('false_reports').notNull().default(0),
 }, (t) => [
   // An address belongs to at most one verified account; unverified accounts may claim a taken one.
   uniqueIndex('users_verified_email_key').on(t.email).where(sql`${t.emailVerifiedAt} is not null`),
@@ -348,7 +350,7 @@ export const accessLogs = pgTable('access_logs', {
   userId: uuid('user_id').notNull(),
   ip: text('ip').notNull(),
   userAgentSha256: text('user_agent_sha256').notNull(),
-  event: text('event', { enum: ['login', 'session_use'] }).notNull(),
+  event: text('event', { enum: ['login', 'session_use', 'export_download'] }).notNull(),
   /** UTC day of `at`: one session_use row per user, day, IP and user agent. */
   day: date('day', { mode: 'string' }).notNull(),
   at: ts('at').notNull().defaultNow(),
@@ -380,6 +382,7 @@ export const reports = pgTable('reports', {
 }, (t) => [
   index('reports_queue_idx').on(t.status, t.priority, t.createdAt),
   index('reports_target_user_id_idx').on(t.targetUserId),
+  index('reports_reporter_created_idx').on(t.reporterId, t.createdAt),
   // A second report of the same target by the same person while the first is open is the same report.
   uniqueIndex('reports_open_dedupe_key').on(t.reporterId, t.targetType, t.targetId).where(sql`${t.status} = 'open'`),
 ])
@@ -427,6 +430,9 @@ export const quarantinedFiles = pgTable('quarantined_files', {
   filename: text('filename').notNull(),
   contentType: text('content_type').notNull(),
   size: integer('size').notNull(),
+  /** Kept to restore the attachment as it was (POST /admin/quarantine/:id/release). */
+  width: integer('width'),
+  height: integer('height'),
   sha256: text('sha256'),
   originalKey: text('original_key').notNull(),
   evidenceKey: text('evidence_key').notNull(),
@@ -438,6 +444,8 @@ export const quarantinedFiles = pgTable('quarantined_files', {
   authorityProtocol: text('authority_protocol'),
   receiptConfirmedAt: ts('receipt_confirmed_at'),
   purgedAt: ts('purged_at'),
+  /** False positive: restored to the message (under a new attachment id) and the evidence copy deleted. */
+  releasedAt: ts('released_at'),
   createdAt: ts('created_at').notNull().defaultNow(),
 }, (t) => [uniqueIndex('quarantined_files_attachment_id_key').on(t.attachmentId)])
 

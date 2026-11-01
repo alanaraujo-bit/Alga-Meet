@@ -147,20 +147,24 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  *                                                          7 days later unless you log in before)
  * POST   /users/@me/export                               -> 202 DataExportRequested (verified e-mail; 1 per 24 h, else
  *                                                          429): a zip (JSON + attachment links) whose signed link
- *                                                          (7 days) goes to your e-mail; the app also gets one
- *                                                          from GET /users/@me/exports
- * GET    /users/@me/exports                              -> DataExport[] (newest first, last 20; ready ones carry a
- *                                                          short-lived signed downloadUrl; 30/min)
+ *                                                          (7 days) goes to your e-mail; in the app, see below
+ * GET    /users/@me/exports                              -> DataExport[] (newest first, last 20; status only:
+ *                                                          downloadUrl is always null; 30/min)
+ * POST   /users/@me/exports/:id/download ExportDownloadBody -> DataExportDownload (password re-check; ready only,
+ *                                                          else 409 / 404; link valid EXPORT_DOWNLOAD_TTL_MINUTES;
+ *                                                          5 per 15 min; recorded in the access logs)
  * GET    /exports/:id?exp=&sig=                          -> application/zip (no auth: the e-mailed link and
- *                                                          DataExport.downloadUrl are signed)
+ *                                                          DataExportDownload.downloadUrl are signed)
  * POST   /reports                  CreateReportBody      -> 201 ReportReceipt (200 + duplicate: true for your open report;
- *                                                          10 per hour; not your own content; you must see the message)
+ *                                                          10 per hour, csam CSAM_REPORTS_PER_DAY per 24 h; not your
+ *                                                          own content; you must see the message)
  * GET    /users/@me/actions                              -> AccountAction[]
  * POST   /appeals                  CreateAppealBody      -> 201 AppealView (session or appealToken; one per action,
  *                                                          within APPEAL_WINDOW_DAYS; 10 per hour per IP)
  * Staff only (users.staff_role, never settable through the API; every call is audit-logged; 403 otherwise):
  * GET    /admin/reports?status=open|resolved|dismissed&limit= -> AdminReport[] (priority, then oldest first)
- * PATCH  /admin/reports/:id        PatchReportBody       -> AdminReport
+ * PATCH  /admin/reports/:id        PatchReportBody       -> AdminReport (dismissed: +1 reporterFalseReports; csam
+ *                                                          resolved: legal hold on targetUserId)
  * POST   /admin/users/:id/actions  AccountActionBody     -> AccountAction (warn | suspend until | ban | lift; e-mail
  *                                                          to the user with the reason category; suspend/ban revoke
  *                                                          sessions, close sockets with ACCOUNT_RESTRICTED, leave voice)
@@ -170,6 +174,9 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  * POST   /admin/attachments/:id/quarantine QuarantineBody -> QuarantinedFile (unservable at once, preserved apart)
  * GET    /admin/quarantine                               -> QuarantinedFile[]
  * PATCH  /admin/quarantine/:id     PatchQuarantineBody   -> QuarantinedFile
+ * POST   /admin/quarantine/:id/release                   -> QuarantinedFile (false positive: attachment restored with a
+ *                                                          new id, MESSAGE_UPDATE, copy deleted; 409 once purged,
+ *                                                          released or while the copy is pending; legal hold untouched)
  * GET    /admin/access-logs?userId=|username=&from=&to=&limit= -> AccessLogEntry[] (admin role only)
  * POST   /telemetry/call-quality   CallQualityReport     -> 204 (telemetry.ts; 403 unless Me.telemetryOptIn; 20/h;
  *                                                          400 for any unknown field)

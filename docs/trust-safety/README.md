@@ -10,9 +10,9 @@
 | L10 / P3 16–17 anos | DM só com amigos, sem compras | 1 |
 | L7 aceite | Versão e data no cadastro, histórico em `consent_records`, novo aceite quando a versão muda | 2 |
 | L2 denúncia e moderação | `POST /reports`, fila da equipe, aviso, suspensão e banimento da conta, recurso | 3, 4 |
-| L3 abuso infantil | Quarentena automática com preservação e retenção legal. Procedimento em `csam-process.md` | 5 |
+| L3 abuso infantil | Quarentena automática (reversível) com preservação; retenção legal quando a equipe confirma. Procedimento em `csam-process.md` | 5 |
 | L4 exclusão | `DELETE /users/@me`, 7 dias de carência, expurgo | 6 |
-| L5 exportação | `POST /users/@me/export`: zip com link assinado enviado por e-mail | 7 |
+| L5 exportação | `POST /users/@me/export`: zip com link assinado enviado por e-mail; no app, só com a senha | 7 |
 | L6 registros de acesso | `access_logs`, 6 meses, só admin | 8 |
 | F3 auditoria da equipe | `staff_audit_log` em toda chamada `/admin/*` | 4 |
 
@@ -89,6 +89,9 @@ suspensão por indícios, recurso e, a seguir, o sinal de idade do sistema opera
   caracteres.
 - Regras:
   - 10 denúncias por hora por conta;
+  - **`csam`: no máximo 5 em 24 horas por conta** (`CSAM_REPORTS_PER_DAY`), contadas no banco. A sexta responde 429.
+    Cada denúncia `csam` tira anexos de circulação na hora, então o teto limita o que uma pessoa mal-intencionada
+    consegue esconder;
   - ninguém denuncia a própria mensagem, a si mesmo ou o próprio espaço;
   - para denunciar uma mensagem, a pessoa precisa conseguir vê-la. Se não consegue, a resposta é 404, igual à de uma
     mensagem que não existe.
@@ -104,6 +107,10 @@ suspensão por indícios, recurso e, a seguir, o sinal de idade do sistema opera
   autolesão, imagem íntima sem consentimento) e **10** (o resto).
 - **Quem denunciou nunca é revelado** ao denunciado. Só a equipe vê `reporterId`, necessário para tratar denúncias
   abusivas (F11) e para o art. 29 (D17).
+- **Confiabilidade de quem denuncia (F11):** cada denúncia que a equipe arquiva (`dismissed`, "sem fundamento") soma 1
+  em `users.false_reports` do denunciante. A fila mostra esse número em `AdminReport.reporterFalseReports`. Diante de
+  abuso, a equipe aplica uma medida ao denunciante com `POST /admin/users/:id/actions` (por exemplo `warn` ou `suspend`
+  com o motivo `spam`). O número não tem efeito automático; ele entra na exportação da própria pessoa.
 
 ## 4. Medidas na conta, equipe e recursos
 
@@ -158,7 +165,17 @@ O processo completo está em [`csam-process.md`](csam-process.md). O mecanismo:
   `MESSAGE_UPDATE`.
 - Os bytes vão para `evidence/<id>` com o SHA-256 em `quarantined_files`, uma tabela sem FK para a mensagem.
 - O original só é apagado depois da cópia. Se a cópia falhar, o job tenta de novo.
-- A conta do autor entra em **retenção legal**.
+- **Retenção legal da conta do autor só por decisão da equipe**, nunca pela denúncia sozinha (uma denúncia pode ser
+  falsa e a retenção seguraria a exclusão de um inocente sem prazo). Ela entra quando:
+  - a equipe decide uma denúncia `csam` como `resolved` (confirmada);
+  - a equipe põe o anexo em quarentena à mão;
+  - ou com `PATCH /admin/users/:id {legalHold:true}`.
+- Enquanto uma denúncia `csam` contra a conta está **aberta**, o expurgo da conta espera (como um recurso aberto). Se a
+  equipe arquiva a denúncia, a exclusão pedida segue.
+- **Falso positivo:** `POST /admin/quarantine/:id/release` devolve o arquivo à mensagem, com um id novo, e os clientes
+  recebem `MESSAGE_UPDATE`. A cópia em `evidence/` é apagada e o registro fica com `releasedAt`. A chamada vai para o
+  `staff_audit_log`. A rota recusa (409) depois do `receiptConfirmed`, na segunda vez e enquanto a cópia não terminou.
+  Ela não tira a retenção legal: isso é sempre um passo à parte. Se a mensagem já foi apagada, só a cópia é apagada.
 - `PATCH /admin/quarantine/:id {authorityProtocol, receiptConfirmed: true}` apaga o material depois de a PF confirmar o
   recebimento (Decreto 12.880/2026, art. 39, §2º).
 
@@ -179,12 +196,17 @@ O processo completo está em [`csam-process.md`](csam-process.md). O mecanismo:
 4. **Entrar de novo nesse prazo cancela a exclusão.** A resposta traz `AuthResponse.deletionCanceled` e um e-mail
    avisa.
 
-O expurgo é feito pelo job `Privacy.retention`, a cada minuto. Ele pula contas com retenção legal ou recurso aberto.
+Os e-mails de "exclusão marcada" e "exclusão cancelada" saem **no máximo 1 de cada por conta a cada 24 horas**. Sem
+isso, excluir e entrar de novo em loop (5 a cada 15 minutos) enchia a caixa da própria pessoa. O primeiro aviso de
+cada tipo sempre sai.
+
+O expurgo é feito pelo job `Privacy.retention`, a cada minuto. Ele pula contas com retenção legal, recurso aberto ou
+denúncia `csam` aberta contra elas.
 
 | O quê | O que acontece |
 |---|---|
 | **Espaços próprios** | Vão para o membro com o cargo mais alto e, no empate, para o mais antigo. Membro banido ou que também está saindo não herda. Sem herdeiro, o espaço é excluído |
-| **Mensagens (D13)** | A pessoa escolhe. **Padrão: `anonymize`.** O texto fica, com o autor "Usuário removido" (`REMOVED_USER_ID`), para as conversas dos outros continuarem legíveis. Com `delete`, as mensagens são apagadas, nos espaços e nas DMs |
+| **Mensagens (D13)** | A pessoa escolhe. **Padrão: `anonymize`.** O texto fica, com o autor "Usuário removido" (`REMOVED_USER_ID`), para as conversas dos outros continuarem legíveis. Com `delete`, as mensagens são apagadas, nos espaços e nas DMs, e os apps abertos recebem `MESSAGE_DELETE` de cada uma (100 por canal a cada 100 ms, em segundo plano) |
 | **Anexos e avatar** | **Sempre apagados** do storage. Fotos são o conteúdo que mais identifica |
 | Exportações | Apagadas do storage |
 | Sessões, e-mails pendentes, amizades, bloqueios, participação em espaços, cargos, reações, leituras, convites, aceites | Apagados (cascade) |
@@ -212,8 +234,16 @@ analisado para não destruir prova. Ver as pendências.
   - registros de acesso dos últimos 6 meses;
   - medidas, recursos e denúncias **feitas** pela pessoa.
 - Fica de fora o que é de terceiros: denúncias contra a pessoa e quem as fez.
-- O **link vai só por e-mail**, assinado (HMAC) e válido por 7 dias. Quem rouba a sessão sozinho não consegue levar
-  os dados. Depois de 7 dias o zip é apagado e o link responde 404.
+- O **link de 7 dias vai só por e-mail**, assinado (HMAC). Depois de 7 dias o zip é apagado e o link responde 404.
+- **No app, baixar exige a senha de novo.** `GET /users/@me/exports` mostra só o estado de cada pedido. O campo
+  `DataExport.downloadUrl` continua no contrato para apps antigos, mas vem sempre `null`. O link sai de
+  `POST /users/@me/exports/:id/download {password}`, que devolve `{ downloadUrl }`:
+  - confere a senha, como a exclusão de conta;
+  - o link vale **10 minutos** (`EXPORT_DOWNLOAD_TTL_MINUTES`) e nunca passa da validade do zip;
+  - aceita 5 chamadas a cada 15 minutos por conta;
+  - cada link emitido vira uma linha `export_download` em `access_logs`, com IP e hash do user agent (seção 8);
+  - pedido em preparo responde 409; falho, expirado ou de outra conta, 404.
+- **A garantia:** quem rouba só a sessão não leva os dados. Precisa também da senha ou da caixa de e-mail.
 - Limite conhecido: o zip é montado em memória, sem zip64, então serve até alguns GB.
 
 ## 8. Registros de acesso (Marco Civil, art. 15)
@@ -221,7 +251,8 @@ analisado para não destruir prova. Ver as pendências.
 - A tabela `access_logs` guarda id da conta, IP, SHA-256 do user agent, evento e data e hora, em UTC.
 - O que vira linha:
   - **todo login e cadastro**;
-  - o **primeiro uso de cada dia** por conta, IP e app, seja em REST ou no gateway.
+  - o **primeiro uso de cada dia** por conta, IP e app, seja em REST ou no gateway;
+  - **cada link de exportação emitido no app** (`export_download`, seção 7).
 - O IP vem de `req.ip`, com a regra de proxy confiável de `TRUST_PROXY`.
 - **Sem FK:** os registros ficam 6 meses mesmo depois da exclusão da conta. Depois são expurgados pelo job, salvo com
   retenção legal.
@@ -256,8 +287,12 @@ analisado para não destruir prova. Ver as pendências.
   - Com PGlite local, **pare o servidor antes**: dois processos no mesmo diretório travam.
 - **Fila**:
   - leia com `GET /admin/reports`, em ordem de prioridade e, dentro dela, da mais antiga;
-  - decida com `PATCH /admin/reports/:id`;
+  - decida com `PATCH /admin/reports/:id`. `dismissed` conta contra quem denunciou; `csam` como `resolved` põe a conta
+    em retenção legal;
+  - olhe `reporterFalseReports` antes de confiar numa denúncia `csam` de quem já errou muito;
   - os recursos estão em `GET /admin/appeals`.
+- **Denúncia `csam` falsa:** arquive (`dismissed`) e libere cada arquivo com `POST /admin/quarantine/:id/release`
+  (ids em `GET /admin/quarantine`, campo `reportId`).
 - **Ordem judicial pedindo dados:** registre o número do processo em `note` e use `GET /admin/access-logs`. Se houver
   pedido de guarda, use `PATCH /admin/users/:id {legalHold:true}`.
 - **Exportação falhou:** a linha fica com `status='failed'` e `error`. A pessoa pode pedir de novo.

@@ -18,7 +18,7 @@ import { and, eq, isNull, ne, or } from 'drizzle-orm'
 import { channelAudience } from './access.js'
 import type { Ctx } from './app.js'
 import { isRestricted, revokeAllSessions } from './auth.js'
-import type { Db } from './db/index.js'
+import type { Db, Tx } from './db/index.js'
 import {
   accountActions, appeals, attachments, messages, quarantinedFiles, staffAuditLog, storageDeletions, users,
   type AccountActionRow, type AppealRow, type QuarantinedFileRow, type UserRow,
@@ -58,8 +58,8 @@ export function accountActionView(a: AccountActionRow, appeal?: AppealRow, now =
 export const quarantineView = (q: QuarantinedFileRow): QuarantinedFile => ({
   id: q.id, attachmentId: q.attachmentId, messageId: q.messageId, channelId: q.channelId, authorId: q.authorId,
   filename: q.filename, contentType: q.contentType, size: q.size, sha256: q.sha256, reportId: q.reportId, staffId: q.staffId,
-  evidenceStored: q.evidenceStoredAt !== null && q.purgedAt === null, authorityProtocol: q.authorityProtocol,
-  receiptConfirmedAt: iso(q.receiptConfirmedAt), purgedAt: iso(q.purgedAt), createdAt: q.createdAt.toISOString(),
+  evidenceStored: q.evidenceStoredAt !== null && q.purgedAt === null && q.releasedAt === null, authorityProtocol: q.authorityProtocol,
+  receiptConfirmedAt: iso(q.receiptConfirmedAt), purgedAt: iso(q.purgedAt), releasedAt: iso(q.releasedAt), createdAt: q.createdAt.toISOString(),
 })
 
 /** 403 for a suspended/banned account; clients read ApiError.error.restriction. */
@@ -202,11 +202,12 @@ export class TrustSafety {
   /**
    * Takes an attachment out of circulation at once: its row goes (GET /files/:id → 404; MESSAGE_UPDATE without it), its
    * object is held out of the deletion queue and copied to `evidence/<attachmentId>` (never served by any route), then
-   * the original is deleted. The author's account goes on legal hold (preserved, Decreto 12.880/2026 art. 39 §1).
+   * the original is deleted. Reversible (release). Done by staff (`staffId`), it also puts the author's account on legal
+   * hold (Decreto 12.880/2026 art. 39 §1); a csam report alone never does (docs/trust-safety/csam-process.md, section 2).
    * Idempotent: an attachment already quarantined returns its record; an unknown one returns null.
    */
   async quarantine(attachmentId: string, o: { reportId?: string | null; staffId?: string | null; note?: string } = {}): Promise<QuarantinedFileRow | null> {
-    const { db, hub, files } = this.ctx
+    const { db } = this.ctx
     const existing = async () => (await db.select().from(quarantinedFiles).where(eq(quarantinedFiles.attachmentId, attachmentId)))[0] ?? null
     const [row] = await db.select({ a: attachments, m: messages }).from(attachments)
       .innerJoin(messages, eq(messages.id, attachments.messageId)).where(eq(attachments.id, attachmentId))
@@ -215,28 +216,98 @@ export class TrustSafety {
     const q = await db.transaction(async (tx) => {
       const [q] = await tx.insert(quarantinedFiles).values({
         id: uuidv7(), attachmentId: a.id, messageId: m.id, channelId: m.channelId, authorId: m.authorId, filename: a.filename,
-        contentType: a.contentType, size: a.size, originalKey: a.storageKey, evidenceKey: `evidence/${a.id}`,
+        contentType: a.contentType, size: a.size, width: a.width, height: a.height, originalKey: a.storageKey, evidenceKey: `evidence/${a.id}`,
         reportId: o.reportId ?? null, staffId: o.staffId ?? null, note: o.note ?? '',
       }).onConflictDoNothing().returning()
       if (!q) return null
       await tx.delete(attachments).where(eq(attachments.id, a.id))
       // The delete trigger queued the object; it stays until the evidence copy exists.
       await tx.delete(storageDeletions).where(eq(storageDeletions.key, a.storageKey))
-      if (m.authorId !== REMOVED_USER_ID) {
-        await tx.update(users).set({ legalHoldAt: new Date() }).where(and(eq(users.id, m.authorId), isNull(users.legalHoldAt)))
-      }
+      if (o.staffId) await this.hold(tx, m.authorId)
       return q
     })
     if (!q) return existing()
     this.ctx.log.warn({ quarantineId: q.id, attachmentId, reportId: q.reportId, staffId: q.staffId }, 'trust-safety: attachment quarantined')
-    const ch = await loadChannel(db, m.channelId)
-    const [msg] = await db.select().from(messages).where(eq(messages.id, m.id))
-    if (ch && msg) {
-      const [view] = await messageViews(db, [msg])
-      hub.dispatch(await channelAudience(db, ch.row, ch.recipientIds), 'MESSAGE_UPDATE', (uid) => messageFor(view!, uid, (id, u) => files.url(id, u)))
-    }
+    await this.announceMessage(m.id)
     await this.storeEvidence(q)
     return existing()
+  }
+
+  /** Legal hold (never purged, access logs kept): staff decisions only. */
+  async hold(db: Db | Tx, userId: string): Promise<void> {
+    if (userId === REMOVED_USER_ID) return
+    await db.update(users).set({ legalHoldAt: new Date() }).where(and(eq(users.id, userId), isNull(users.legalHoldAt)))
+  }
+
+  /** MESSAGE_UPDATE of a message as it is now (its attachments changed). */
+  private async announceMessage(messageId: string): Promise<void> {
+    const { db, hub, files } = this.ctx
+    const [msg] = await db.select().from(messages).where(eq(messages.id, messageId))
+    const ch = msg && await loadChannel(db, msg.channelId)
+    if (!msg || !ch) return
+    const [view] = await messageViews(db, [msg])
+    hub.dispatch(await channelAudience(db, ch.row, ch.recipientIds), 'MESSAGE_UPDATE', (uid) => messageFor(view!, uid, (id, u) => files.url(id, u)))
+  }
+
+  /** Streams an object to `tmp`, hashing it; null when it does not exist. */
+  private async spool(key: string, tmp: string): Promise<{ size: number; sha256: string } | null> {
+    const src = await this.ctx.files.storage.get(key)
+    if (!src) return null
+    const hash = createHash('sha256')
+    let size = 0
+    await pipeline(src, async function* (s: AsyncIterable<Buffer>) {
+      for await (const c of s) {
+        hash.update(c)
+        size += c.length
+        yield c
+      }
+    }, createWriteStream(tmp))
+    return { size, sha256: hash.digest('hex') }
+  }
+
+  /**
+   * False positive (POST /admin/quarantine/:id/release): the preserved copy goes back into its message as a new
+   * attachment (new id, so it can be quarantined again; MESSAGE_UPDATE), then the copy is deleted. The record stays
+   * with released_at. A legal hold is left as is (staff lift it). Refused once purged, twice, or while the copy is pending.
+   */
+  async release(q: QuarantinedFileRow): Promise<QuarantinedFileRow> {
+    const { db, files, log } = this.ctx
+    if (q.purgedAt || q.releasedAt) throw conflict('Este arquivo já foi liberado ou apagado.')
+    const missing = q.copyError === MISSING
+    if (!q.evidenceStoredAt && !missing) throw conflict('A cópia de preservação ainda não terminou. Tente de novo em instantes.')
+    const id = uuidv7()
+    const key = `attachments/${q.channelId}/${id}`
+    let stored = false
+    if (!missing) {
+      const tmp = join(tmpdir(), `alga-release-${randomUUID()}`)
+      try {
+        const got = await this.spool(q.evidenceKey, tmp)
+        if (!got) throw new Error('evidence object missing')
+        // Queued for deletion until the row below keeps it (the upload pattern of Files.store).
+        await files.store([{ key, path: tmp, contentType: q.contentType, ...got }])
+        stored = true
+      } finally {
+        await rm(tmp, { force: true })
+      }
+    }
+    const row = await db.transaction(async (tx) => {
+      const [row] = await tx.update(quarantinedFiles).set({ releasedAt: new Date() })
+        .where(and(eq(quarantinedFiles.id, q.id), isNull(quarantinedFiles.releasedAt), isNull(quarantinedFiles.purgedAt))).returning()
+      if (!row) throw conflict('Este arquivo já foi liberado ou apagado.')
+      const [m] = stored ? await tx.select({ id: messages.id }).from(messages).where(eq(messages.id, q.messageId)) : []
+      if (m) {
+        await tx.insert(attachments).values({
+          id, messageId: m.id, storageKey: key, filename: q.filename, contentType: q.contentType, size: q.size, width: q.width, height: q.height,
+        })
+        await files.keep(tx, [key])
+      }
+      await files.queueDelete(tx, [q.evidenceKey])
+      return { ...row, restored: !!m }
+    })
+    files.kick()
+    log.warn({ quarantineId: q.id, attachmentId: row.restored ? id : null }, 'trust-safety: quarantine released (false positive)')
+    if (row.restored) await this.announceMessage(q.messageId)
+    return row
   }
 
   /** Copies the held original to the evidence key (recording its SHA-256), then lets the original go. Retried by the sweep. */
@@ -244,22 +315,13 @@ export class TrustSafety {
     const { db, files, log } = this.ctx
     const tmp = join(tmpdir(), `alga-evidence-${randomUUID()}`)
     try {
-      const src = await files.storage.get(q.originalKey)
-      if (!src) {
+      const got = await this.spool(q.originalKey, tmp)
+      if (!got) {
         log.error({ quarantineId: q.id }, 'quarantine: original object missing, nothing could be preserved')
         await db.update(quarantinedFiles).set({ copyError: MISSING }).where(eq(quarantinedFiles.id, q.id))
         return
       }
-      const hash = createHash('sha256')
-      let size = 0
-      await pipeline(src, async function* (s: AsyncIterable<Buffer>) {
-        for await (const c of s) {
-          hash.update(c)
-          size += c.length
-          yield c
-        }
-      }, createWriteStream(tmp))
-      const sha256 = hash.digest('hex')
+      const { size, sha256 } = got
       await files.storage.put(q.evidenceKey, tmp, { size, sha256, contentType: 'application/octet-stream' })
       await db.update(quarantinedFiles).set({ evidenceStoredAt: new Date(), sha256, copyError: null }).where(eq(quarantinedFiles.id, q.id))
       await files.queueDelete(db, [q.originalKey])

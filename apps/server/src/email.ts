@@ -88,7 +88,7 @@ export function createEmailSender(config: EmailConfig, log: FastifyBaseLogger, p
  * Sliding-window count per key. shortcut: process memory, like the rate limits (one instance); with several, move it
  * to Redis together with the @fastify/rate-limit store.
  */
-class Quota {
+export class Quota {
   private readonly hits = new Map<string, number[]>()
 
   constructor(private readonly max: number, private readonly windowMs: number) {}

@@ -7,7 +7,7 @@ import {
   REMOVED_USER_ID, uuidv7,
   type AccessLogEntry, type AccountAction, type AdminAppeal, type AdminReport, type QuarantinedFile, type StaffRole,
 } from '@alga/shared'
-import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Ctx } from '../app.js'
@@ -31,11 +31,11 @@ declare module 'fastify' {
 const iso = (d: Date | null) => d?.toISOString() ?? null
 const limitQ = z.coerce.number().int().min(1).max(500).default(100)
 
-const reportView = (r: ReportRow): AdminReport => ({
+const reportView = (r: ReportRow, reporterFalseReports: number | null): AdminReport => ({
   id: r.id, status: r.status, priority: r.priority, reason: r.reason, details: r.details, targetType: r.targetType,
   targetId: r.targetId, targetUserId: r.targetUserId, spaceId: r.spaceId, channelId: r.channelId, reporterId: r.reporterId,
-  snapshot: r.snapshot, action: r.action, staffId: r.staffId, staffNote: r.staffNote, createdAt: r.createdAt.toISOString(),
-  resolvedAt: iso(r.resolvedAt),
+  reporterFalseReports, snapshot: r.snapshot, action: r.action, staffId: r.staffId, staffNote: r.staffNote,
+  createdAt: r.createdAt.toISOString(), resolvedAt: iso(r.resolvedAt),
 })
 
 export function adminRoutes(app: FastifyInstance, ctx: Ctx): void {
@@ -43,6 +43,7 @@ export function adminRoutes(app: FastifyInstance, ctx: Ctx): void {
   const audits = new WeakMap<FastifyRequest, string>()
   const staffId = (req: FastifyRequest) => req.auth.user.id
   const until = (s: string | undefined) => (s ? new Date(s) : null)
+  const withReporter = () => db.select({ r: reports, falseReports: users.falseReports }).from(reports).leftJoin(users, eq(users.id, reports.reporterId))
   /** Only an admin may act on another staff account (a moderator cannot ban the team). */
   async function assertMayAct(req: FastifyRequest, userId: string): Promise<void> {
     const [t] = await db.select({ role: users.staffRole }).from(users).where(eq(users.id, userId))
@@ -68,9 +69,9 @@ export function adminRoutes(app: FastifyInstance, ctx: Ctx): void {
 
   app.get('/admin/reports', async (req): Promise<AdminReport[]> => {
     const q = parse(z.object({ status: z.enum(['open', 'resolved', 'dismissed']).default('open'), limit: limitQ }), req.query)
-    const rows = await db.select().from(reports).where(eq(reports.status, q.status))
+    const rows = await withReporter().where(eq(reports.status, q.status))
       .orderBy(desc(reports.priority), q.status === 'open' ? asc(reports.createdAt) : desc(reports.resolvedAt)).limit(q.limit)
-    return rows.map(reportView)
+    return rows.map((x) => reportView(x.r, x.falseReports))
   })
 
   app.patch<{ Params: { id: string } }>('/admin/reports/:id', async (req): Promise<AdminReport> => {
@@ -95,10 +96,18 @@ export function adminRoutes(app: FastifyInstance, ctx: Ctx): void {
       case 'none':
         break
     }
-    const [row] = await db.update(reports).set({
+    const [done] = await db.update(reports).set({
       status: body.status, action: body.action, staffId: staffId(req), staffNote: body.note ?? null, resolvedAt: new Date(),
-    }).where(eq(reports.id, r.id)).returning()
-    return reportView(row!)
+    }).where(and(eq(reports.id, r.id), eq(reports.status, 'open'))).returning({ id: reports.id })
+    if (!done) throw conflict('Esta denúncia já foi analisada.')
+    // Confirmed csam: the account is preserved for the authority (csam-process.md, step 2). Never from the report alone.
+    if (body.status === 'resolved' && r.reason === 'csam' && r.targetUserId) await trust.hold(db, r.targetUserId)
+    // Judged unfounded: counts against the reporter (AdminReport.reporterFalseReports).
+    if (body.status === 'dismissed' && r.reporterId) {
+      await db.update(users).set({ falseReports: sql`${users.falseReports} + 1` }).where(eq(users.id, r.reporterId))
+    }
+    const [row] = await withReporter().where(eq(reports.id, r.id))
+    return reportView(row!.r, row!.falseReports)
   })
 
   // ---- accounts ---------------------------------------------------------------------------------------------------
@@ -167,6 +176,13 @@ export function adminRoutes(app: FastifyInstance, ctx: Ctx): void {
     if (!q) throw notFound('Anexo não encontrado.')
     reply.code(201)
     return quarantineView(q)
+  })
+
+  // False positive: back into the message, copy deleted (staff_audit_log has who and when).
+  app.post<{ Params: { id: string } }>('/admin/quarantine/:id/release', async (req): Promise<QuarantinedFile> => {
+    const [q] = await db.select().from(quarantinedFiles).where(eq(quarantinedFiles.id, idParam(req.params.id)))
+    if (!q) throw notFound('Registro não encontrado.')
+    return quarantineView(await trust.release(q))
   })
 
   app.get('/admin/quarantine', async (req): Promise<QuarantinedFile[]> => {

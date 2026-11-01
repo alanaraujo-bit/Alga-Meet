@@ -1,16 +1,16 @@
 /** Reports by users, their enforcement history and appeals (contract in packages/shared/src/trust-safety.ts). */
 import {
-  CreateAppealBody, CreateReportBody, Permission, REMOVED_USER_ID, uuidv7,
+  CSAM_REPORTS_PER_DAY, CreateAppealBody, CreateReportBody, Permission, REMOVED_USER_ID, uuidv7,
   type AccountAction, type AppealView, type ReportReceipt,
 } from '@alga/shared'
-import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, count, desc, eq, gt, inArray } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { requireChannel } from '../access.js'
 import type { Ctx } from '../app.js'
 import { bearerToken, resolveToken } from '../auth.js'
 import { accountActions, appeals, attachments, messages, reports, spaceMembers, spaces, users } from '../db/schema.js'
 import { HttpError, badRequest, conflict, notFound, parse } from '../errors.js'
-import { REPORT_PRIORITY } from '../legal.js'
+import { DAY_MS, REPORT_PRIORITY } from '../legal.js'
 import { accountActionView, appealDeadline, appealView } from '../trust-safety.js'
 import { loadChannel, messageViews, publicUser } from '../views.js'
 
@@ -91,6 +91,15 @@ export function reportRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.post('/reports', { config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (req, reply): Promise<ReportReceipt> => {
     const body = parse(CreateReportBody, req.body)
     const me = req.auth.user.id
+    if (body.reason === 'csam') {
+      // shortcut: count then insert can race; the 10/h limit above bounds such a burst.
+      const [c] = await db.select({ n: count() }).from(reports).where(and(
+        eq(reports.reporterId, me), eq(reports.reason, 'csam'), gt(reports.createdAt, new Date(Date.now() - DAY_MS)),
+      ))
+      if ((c?.n ?? 0) >= CSAM_REPORTS_PER_DAY) {
+        throw new HttpError('rate_limited', 'Você atingiu o limite de denúncias deste tipo por hoje. As anteriores já estão no topo da fila da equipe.')
+      }
+    }
     const t = await target(me, body.targetType, body.targetId)
     const [row] = await db.insert(reports).values({
       id: uuidv7(), reporterId: me, targetType: body.targetType, targetId: body.targetId, targetUserId: t.targetUserId,
@@ -105,11 +114,9 @@ export function reportRoutes(app: FastifyInstance, ctx: Ctx): void {
       return { id: open.id, createdAt: open.createdAt.toISOString(), duplicate: true }
     }
     if (body.reason === 'csam') {
-      // docs/trust-safety/csam-process.md: out of circulation at once, preserved, account kept (legal hold).
+      // docs/trust-safety/csam-process.md: out of circulation at once and preserved (reversible). The open report holds
+      // the author's purge; the legal hold comes only from staff confirming it (a report can be false).
       for (const id of t.attachmentIds) await trust.quarantine(id, { reportId: row.id })
-      if (t.targetUserId && t.targetUserId !== REMOVED_USER_ID) {
-        await db.update(users).set({ legalHoldAt: new Date() }).where(and(eq(users.id, t.targetUserId), isNull(users.legalHoldAt)))
-      }
       ctx.log.warn({ reportId: row.id, attachments: t.attachmentIds.length }, 'trust-safety: csam report received, highest priority')
     }
     reply.code(201)

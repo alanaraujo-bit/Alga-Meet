@@ -6,8 +6,11 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto
 import { rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { GatewayClose, REMOVED_USER_ID, uuidv7, type DataExport, type DataExportStatus, type PublicUser } from '@alga/shared'
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, ne, notExists, notInArray, or, sql } from 'drizzle-orm'
+import { setTimeout as sleep } from 'node:timers/promises'
+import {
+  EXPORT_DOWNLOAD_TTL_MINUTES, GatewayClose, REMOVED_USER_ID, uuidv7, type DataExport, type DataExportStatus, type PublicUser,
+} from '@alga/shared'
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, ne, notExists, notInArray, or, sql, type SQLWrapper } from 'drizzle-orm'
 import { channelAudience, profileAudience, spaceMemberIds } from './access.js'
 import type { Ctx } from './app.js'
 import { revokeAllSessions, sha256Hex } from './auth.js'
@@ -17,11 +20,23 @@ import {
   spaces, subscriptions, users, type DataExportRow, type UserRow,
 } from './db/schema.js'
 import { accountDeletedMail, dataExportMail, deletionCanceledMail, deletionScheduledMail } from './email-templates.js'
+import { Quota } from './email.js'
 import { safeErr } from './errors.js'
 import { DAY_MS, DELETION_GRACE_MS, EXPORT_TTL_MS, ageBracketOf, dateBr, sixMonthsBefore } from './legal.js'
 import { deleteSpace } from './routes/spaces.js'
 import { privateChannelsOf, spaceView } from './views.js'
 import { zip } from './zip.js'
+
+/**
+ * An open csam report against the account holds its purge until staff decide (the report alone never sets the legal
+ * hold: docs/trust-safety/csam-process.md, section 2). Dismissing it lets the deletion proceed.
+ */
+const openCsamAgainst = (userId: string | SQLWrapper) =>
+  and(eq(reports.targetUserId, userId), eq(reports.reason, 'csam'), eq(reports.status, 'open'))
+
+/** Purge in 'delete' mode: MESSAGE_DELETE per message, this many per channel at a time, then a pause. */
+const ANNOUNCE_BATCH = 100
+const ANNOUNCE_PAUSE_MS = 100
 
 /** Profile clients show for a purged account (USER_UPDATE with the old id; messages kept point to REMOVED_USER_ID). */
 export const removedProfile = (id: string): PublicUser =>
@@ -52,6 +67,8 @@ export class Privacy {
   // shortcut: per-process memory, like the rate limits; one row per (user, IP, app) and day reaches the DB.
   private seen = new Set<string>()
   private seenDay = ''
+  // Deletion scheduled / canceled mails to the account's own address: 1 of each per 24 h (DELETE + login can loop).
+  private readonly selfMails = new Quota(1, DAY_MS)
 
   constructor(private readonly ctx: Ctx) {}
 
@@ -59,7 +76,7 @@ export class Privacy {
    * Marco Civil art. 15 record: every login, plus the first use per UTC day of each (user, IP, user agent) by a session
    * (REST or gateway). A failure is logged, never fails the request.
    */
-  async recordUse(userId: string, ip: string, userAgent: string | undefined, event: 'login' | 'session_use', now = new Date()): Promise<void> {
+  async recordUse(userId: string, ip: string, userAgent: string | undefined, event: 'login' | 'session_use' | 'export_download', now = new Date()): Promise<void> {
     const day = now.toISOString().slice(0, 10)
     const userAgentSha256 = sha256Hex(userAgent ?? '')
     const key = `${userId}|${ip}|${userAgentSha256}`
@@ -86,14 +103,14 @@ export class Privacy {
     const purgeAfter = new Date(now.getTime() + DELETION_GRACE_MS)
     await this.ctx.db.update(users).set({ deletionRequestedAt: now, deletionPurgeAfter: purgeAfter, deletionMessages: mode }).where(eq(users.id, user.id))
     await revokeAllSessions(this.ctx, user.id, GatewayClose.SESSION_REVOKED, 'account deletion requested')
-    this.ctx.trust.notify(user, 'account_deletion', deletionScheduledMail(dateBr(purgeAfter)))
+    if (this.selfMails.take(`scheduled:${user.id}`)) this.ctx.trust.notify(user, 'account_deletion', deletionScheduledMail(dateBr(purgeAfter)))
     return purgeAfter
   }
 
   /** A successful login during the grace period. */
   async cancelDeletion(user: UserRow): Promise<void> {
     await this.ctx.db.update(users).set({ deletionRequestedAt: null, deletionPurgeAfter: null, deletionMessages: null }).where(eq(users.id, user.id))
-    this.ctx.trust.notify(user, 'account_deletion', deletionCanceledMail())
+    if (this.selfMails.take(`canceled:${user.id}`)) this.ctx.trust.notify(user, 'account_deletion', deletionCanceledMail())
   }
 
   /** Member who inherits a space: highest role, then the longest member; never a banned or leaving account. */
@@ -126,6 +143,8 @@ export class Privacy {
     // An appeal still waiting for staff (e.g. a contested under-16 declaration) keeps the account.
     const [pending] = await db.select({ id: appeals.id }).from(appeals).where(and(eq(appeals.userId, userId), eq(appeals.status, 'open'))).limit(1)
     if (pending) return false
+    const [reported] = await db.select({ id: reports.id }).from(reports).where(openCsamAgainst(userId)).limit(1)
+    if (reported) return false
 
     for (const space of await db.select().from(spaces).where(eq(spaces.ownerId, userId))) {
       const heir = await this.heirOf(space.id, userId)
@@ -149,6 +168,23 @@ export class Privacy {
       .from(reactions).innerJoin(messages, eq(messages.id, reactions.messageId)).innerJoin(channels, eq(channels.id, messages.channelId))
       .where(eq(reactions.userId, userId))
     const dms = await privateChannelsOf(db, userId)
+    const audiences = new Map<string, string[]>()
+    const audienceOf = async (c: { id: string; spaceId: string | null }) => {
+      let to = audiences.get(c.id)
+      if (!to) audiences.set(c.id, to = (await channelAudience(db, c)).filter((id) => id !== userId))
+      return to
+    }
+    // 'delete': announced after the transaction, to the audiences as they are now (DMs lose their recipient rows).
+    const deleted = new Map<string, { to: string[]; ids: string[] }>()
+    if (user.deletionMessages === 'delete') {
+      const own = await db.select({ id: messages.id, channelId: messages.channelId, spaceId: channels.spaceId }).from(messages)
+        .innerJoin(channels, eq(channels.id, messages.channelId)).where(eq(messages.authorId, userId)).orderBy(asc(messages.id))
+      for (const m of own) {
+        let entry = deleted.get(m.channelId)
+        if (!entry) deleted.set(m.channelId, entry = { to: await audienceOf({ id: m.channelId, spaceId: m.spaceId }), ids: [] })
+        entry.ids.push(m.id)
+      }
+    }
 
     await db.transaction(async (tx) => {
       const own = tx.select({ id: messages.id }).from(messages).where(eq(messages.authorId, userId))
@@ -180,15 +216,27 @@ export class Privacy {
       const rest = (c.recipientIds ?? []).filter((id) => id !== userId)
       if (rest.length) hub.dispatch(rest, 'CHANNEL_UPDATE', { ...c, recipientIds: rest })
     }
-    const seen = new Map<string, string[]>()
     for (const r of ownReactions) {
-      let to = seen.get(r.channelId)
-      if (!to) seen.set(r.channelId, to = await channelAudience(db, { id: r.channelId, spaceId: r.spaceId }))
-      hub.dispatch(to, 'REACTION_REMOVE', { messageId: r.messageId, channelId: r.channelId, userId, emoji: r.emoji })
+      hub.dispatch(await audienceOf({ id: r.channelId, spaceId: r.spaceId }), 'REACTION_REMOVE', { messageId: r.messageId, channelId: r.channelId, userId, emoji: r.emoji })
     }
+    void this.announceDeleted(deleted).catch((err: unknown) => log.error({ err: safeErr(err), userId }, 'privacy: MESSAGE_DELETE announcement failed'))
     this.ctx.trust.notify(user, 'account_deletion', accountDeletedMail())
     log.info({ userId, messages: user.deletionMessages }, 'privacy: account purged')
     return true
+  }
+
+  /**
+   * MESSAGE_DELETE for the messages a 'delete' purge removed: ANNOUNCE_BATCH per channel, then a pause, in the
+   * background. shortcut: the contract has no bulk delete event, so one per message; add one if purges get slow.
+   */
+  private async announceDeleted(byChannel: Map<string, { to: string[]; ids: string[] }>): Promise<void> {
+    for (const [channelId, { to, ids }] of byChannel) {
+      for (let i = 0; i < ids.length; i += ANNOUNCE_BATCH) {
+        if (i) await sleep(ANNOUNCE_PAUSE_MS, undefined, { ref: false })
+        if (this.ctx.hub.closing) return
+        for (const id of ids.slice(i, i + ANNOUNCE_BATCH)) this.ctx.hub.dispatch(to, 'MESSAGE_DELETE', { id, channelId })
+      }
+    }
   }
 
   // ---- data export ------------------------------------------------------------------------------------------------
@@ -202,16 +250,20 @@ export class Privacy {
     return `${this.ctx.config.publicUrl}/api/v1/exports/${id}?exp=${exp}&sig=${this.mac(id, exp)}`
   }
 
-  /** GET /users/@me/exports. The in-app link lives like an attachment URL (FILE_URL_TTL_SECONDS), never past the zip. */
+  /** GET /users/@me/exports: status only (downloadUrl stays null); the in-app link needs the password (downloadLink). */
   exportView(e: DataExportRow, now = Date.now()): DataExport {
-    const live = e.status === 'ready' && e.expiresAt && e.expiresAt.getTime() > now ? e.expiresAt : null
+    const live = e.status === 'ready' && e.expiresAt && e.expiresAt.getTime() > now
     const status = live || e.status !== 'ready' ? EXPORT_STATUS[e.status] : 'expired'
-    const linkUntil = live && new Date(Math.min(live.getTime(), now + this.ctx.config.files.urlTtlSeconds * 1000))
     return {
       id: e.id, status, createdAt: e.createdAt.toISOString(),
       expiresAt: status === 'failed' ? null : e.expiresAt?.toISOString() ?? null,
-      downloadUrl: linkUntil ? this.exportUrl(e.id, linkUntil) : null,
+      downloadUrl: null,
     }
+  }
+
+  /** POST /users/@me/exports/:id/download, after the password check: EXPORT_DOWNLOAD_TTL_MINUTES, never past the zip. */
+  downloadLink(id: string, zipExpiresAt: Date, now = Date.now()): string {
+    return this.exportUrl(id, new Date(Math.min(zipExpiresAt.getTime(), now + EXPORT_DOWNLOAD_TTL_MINUTES * 60_000)))
   }
 
   verifyExport(id: string, exp: number, sig: string, now = Date.now()): boolean {
@@ -284,6 +336,7 @@ export class Privacy {
         actions: actions.map((a) => ({ id: a.id, type: a.type, reason: a.reason, until: iso(a.until), createdAt: a.createdAt.toISOString() })),
         appeals: myAppeals.map((a) => ({ actionId: a.actionId, message: a.message, status: a.status, createdAt: a.createdAt.toISOString(), decidedAt: iso(a.decidedAt) })),
         reportsMade: myReports.map((r) => ({ targetType: r.targetType, targetId: r.targetId, reason: r.reason, status: r.status, createdAt: r.createdAt.toISOString() })),
+        falseReports: u.falseReports,
       },
     }
   }
@@ -338,6 +391,7 @@ export class Privacy {
     const due = await db.select({ id: users.id }).from(users).where(and(
       lte(users.deletionPurgeAfter, now), isNull(users.legalHoldAt),
       notExists(db.select({ one: sql`1` }).from(appeals).where(and(eq(appeals.userId, users.id), eq(appeals.status, 'open')))),
+      notExists(db.select({ one: sql`1` }).from(reports).where(openCsamAgainst(users.id))),
     )).limit(20)
     for (const { id } of due) {
       await this.purgeAccount(id, now).catch((err: unknown) => this.ctx.log.error({ err: safeErr(err), userId: id }, 'account purge failed; will retry'))

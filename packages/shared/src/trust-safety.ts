@@ -96,8 +96,23 @@ export interface DataExport {
   createdAt: string
   /** When the zip is deleted (ready/expired); null before it is built and for failed ones. */
   expiresAt: string | null
-  /** ready only: signed link to the zip, short-lived (fetch the list again for a new one); the e-mailed link also works. */
+  /**
+   * @deprecated Always null since the in-app download needs the password again: POST /users/@me/exports/:id/download.
+   * Kept so older clients still parse the list; the e-mailed 7-day link keeps working.
+   */
   downloadUrl: string | null
+}
+
+/** POST /users/@me/exports/:id/download: the password again, so a stolen session alone cannot take the data out. */
+export const ExportDownloadBody = z.object({ password: z.string().min(1).max(256) })
+export type ExportDownloadBody = z.infer<typeof ExportDownloadBody>
+
+/** Minutes a link from POST /users/@me/exports/:id/download stays valid (never past the zip itself). */
+export const EXPORT_DOWNLOAD_TTL_MINUTES = 10
+
+export interface DataExportDownload {
+  /** Signed link to the zip (GET /exports/:id?exp=&sig=), valid EXPORT_DOWNLOAD_TTL_MINUTES. */
+  downloadUrl: string
 }
 
 // ---- reports --------------------------------------------------------------------------------------------------------
@@ -108,6 +123,11 @@ export const REPORT_REASONS = [
   'scam', 'malware', 'spam', 'impersonation', 'illegal_goods', 'piracy', 'ban_evasion', 'other',
 ] as const
 export type ReportReason = (typeof REPORT_REASONS)[number]
+/**
+ * csam reports one account may file per 24 h (429 after). Each one takes the reported attachments out of circulation
+ * at once, so the cap bounds what a false reporter can hide; staff see AdminReport.reporterFalseReports.
+ */
+export const CSAM_REPORTS_PER_DAY = 5
 export type ReportTargetType = 'message' | 'user' | 'space'
 
 export const CreateReportBody = z.object({
@@ -199,6 +219,8 @@ export interface AdminReport {
   channelId: string | null
   /** Never shown to the reported person. null once the reporter's account is deleted. */
   reporterId: string | null
+  /** The reporter's reports staff dismissed so far (reliability; null with reporterId). */
+  reporterFalseReports: number | null
   /** The target as it was when reported (message text, author, attachments metadata), kept if it is later deleted. */
   snapshot: unknown
   action: ReportAction | null
@@ -210,7 +232,11 @@ export interface AdminReport {
 
 export type ReportAction = 'none' | 'remove_content' | 'warn' | 'suspend' | 'ban'
 
-/** `action` other than 'none' requires status 'resolved'; warn/suspend/ban hit targetUserId with the report's reason. */
+/**
+ * `action` other than 'none' requires status 'resolved'; warn/suspend/ban hit targetUserId with the report's reason.
+ * 'dismissed' = judged unfounded: counts against the reporter (AdminReport.reporterFalseReports). A csam report
+ * 'resolved' puts targetUserId on legal hold (never automatic: a report alone only quarantines and holds the purge).
+ */
 export const PatchReportBody = z.object({
   status: z.enum(['resolved', 'dismissed']),
   action: z.enum(['none', 'remove_content', 'warn', 'suspend', 'ban']).default('none'),
@@ -274,6 +300,8 @@ export interface QuarantinedFile {
   authorityProtocol: string | null
   receiptConfirmedAt: string | null
   purgedAt: string | null
+  /** POST /admin/quarantine/:id/release (false positive): the attachment is back in its message and the copy deleted. */
+  releasedAt: string | null
   createdAt: string
 }
 
@@ -282,7 +310,7 @@ export interface AccessLogEntry {
   userId: string
   ip: string
   userAgentSha256: string
-  /** 'session_use' = first use of the day per IP and app. */
-  event: 'login' | 'session_use'
+  /** 'session_use' = first use of the day per IP and app; 'export_download' = POST /users/@me/exports/:id/download. */
+  event: 'login' | 'session_use' | 'export_download'
   at: string
 }

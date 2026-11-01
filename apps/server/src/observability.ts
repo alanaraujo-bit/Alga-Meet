@@ -5,7 +5,9 @@
  * (template, never the raw URL), method, statusCode, durationMs.
  */
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
+import { createRequire } from 'node:module'
 import { monitorEventLoopDelay } from 'node:perf_hooks'
+import type { FastifyRateLimitStore } from '@fastify/rate-limit'
 import { sql } from 'drizzle-orm'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import type { Ctx } from './app.js'
@@ -24,6 +26,44 @@ export const logUserHash = (secret: string, userId: string) =>
 export const routeOf = (req: FastifyRequest) => req.routeOptions?.url ?? 'unmatched'
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest()
+
+interface StoreOptions { continueExceeding?: boolean; exponentialBackoff?: boolean; cache?: number; routeInfo?: { url?: string } }
+type Store = FastifyRateLimitStore & { read: (...args: unknown[]) => void }
+// shortcut: deep import of the plugin's own LRU store (not exported) to count evictions; goes away with the Redis store.
+const LocalStore = createRequire(import.meta.url)('@fastify/rate-limit/store/LocalStore') as
+  new (continueExceeding?: boolean, exponentialBackoff?: boolean, cache?: number) => Store & { lru: { evict(): void } }
+
+/**
+ * @fastify/rate-limit's in-memory store (an LRU of `cache` keys, 5000 by default), counting the keys it evicts into
+ * alga_ratelimit_evictions_total: an evicted key's counter restarts, so a full store lets limits leak.
+ */
+export class RateLimitStore implements FastifyRateLimitStore {
+  private readonly inner: Store
+
+  constructor(o: StoreOptions = {}) {
+    const inner = new LocalStore(o.continueExceeding, o.exponentialBackoff, o.cache)
+    const route = o.routeInfo?.url ?? 'global'
+    const evict = inner.lru.evict.bind(inner.lru)
+    inner.lru.evict = () => {
+      metrics.rateLimitEvictions.inc({ route })
+      evict()
+    }
+    this.inner = inner
+  }
+
+  incr(...args: Parameters<FastifyRateLimitStore['incr']>): void {
+    this.inner.incr(...args)
+  }
+
+  read(...args: unknown[]): void {
+    this.inner.read(...args)
+  }
+
+  // Called per route with its merged options (`routeInfo` = the route).
+  child(o: Parameters<FastifyRateLimitStore['child']>[0]): FastifyRateLimitStore {
+    return new RateLimitStore(o as StoreOptions)
+  }
+}
 
 async function check(fn: () => Promise<unknown>): Promise<'ok' | 'fail'> {
   let timer: NodeJS.Timeout | undefined

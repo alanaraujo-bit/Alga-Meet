@@ -207,7 +207,7 @@ describe('account enforcement and appeals', () => {
 })
 
 describe('CSAM process: quarantine and evidence', () => {
-  it('a csam report quarantines at once (unservable, out of the message), preserves bytes + hash apart, holds the account', async () => {
+  it('a csam report quarantines at once (unservable, out of the message), preserves bytes + hash apart; staff confirm the hold', async () => {
     const { owner, member, text } = await setup()
     const { db, files } = s.app.ctx
     const low = (await report(owner.token, { targetType: 'user', targetId: member.user.id, reason: 'spam' })).body
@@ -233,13 +233,19 @@ describe('CSAM process: quarantine and evidence', () => {
     expect((await bytesOf(`evidence/${fileId}`)).equals(bytes)).toBe(true)
     await files.sweep()
     expect(await files.storage.get(originalKey)).toBeNull()
-    expect((await db.select().from(users).where(eq(users.id, member.user.id)))[0]!.legalHoldAt).not.toBeNull()
+    const holdOf = async () => (await db.select().from(users).where(eq(users.id, member.user.id)))[0]?.legalHoldAt
+    expect(await holdOf()).toBeNull() // a report alone never holds the account: it can be false
 
-    // The author deleting the message or the account destroys nothing.
+    // The author deleting the message or the account destroys nothing: the open csam report holds the purge.
     await api(s.app, 'DELETE', `/channels/${text.id}/messages/${msg.id}`, { token: member.token })
     await files.sweep()
     expect((await bytesOf(`evidence/${fileId}`)).length).toBe(bytes.length)
     await api(s.app, 'DELETE', '/users/@me', { token: member.token, body: { password: PASSWORD } })
+    await s.app.ctx.privacy.retention(new Date(Date.now() + 8 * DAY))
+    expect((await db.select().from(users).where(eq(users.id, member.user.id))).length).toBe(1)
+    // Staff confirm it: legal hold from now on (csam-process.md, step 2).
+    expect((await api(s.app, 'PATCH', `/admin/reports/${r.body.id}`, { token: mod.token, body: { status: 'resolved' } })).status).toBe(200)
+    expect(await holdOf()).not.toBeNull()
     await s.app.ctx.privacy.retention(new Date(Date.now() + 8 * DAY))
     expect((await db.select().from(users).where(eq(users.id, member.user.id))).length).toBe(1)
 
@@ -278,5 +284,56 @@ describe('CSAM process: quarantine and evidence', () => {
     const again = await api<QuarantinedFile>(s.app, 'POST', `/admin/attachments/${fileId}/quarantine`, { token: mod.token, body: {} })
     expect([again.status, again.body.id]).toEqual([201, first.body.id])
     expect((await api(s.app, 'POST', `/admin/attachments/${crypto.randomUUID()}/quarantine`, { token: mod.token, body: {} })).status).toBe(404)
+    // By staff: the author is on legal hold.
+    expect((await db.select().from(users).where(eq(users.id, member.user.id)))[0]!.legalHoldAt).not.toBeNull()
+  })
+
+  it('weaponization: csam reports capped per reporter, a dismissed one counts against the reporter, staff release the file', async () => {
+    const { owner, member, text } = await setup()
+    const { db, files } = s.app.ctx
+    const mod = await staff()
+    const gw = await connect(s.port, owner.token)
+    const { msg, bytes } = await messageWithFile(s.app, member.token, text.id, 'foto da praia')
+    const r = (await report(owner.token, { targetType: 'message', targetId: msg.id, reason: 'csam' })).body
+    await gw.waitFor('MESSAGE_UPDATE', (m) => m.id === msg.id && m.attachments.length === 0)
+    const [q] = (await api<QuarantinedFile[]>(s.app, 'GET', '/admin/quarantine', { token: mod.token })).body.filter((x) => x.reportId === r.id)
+    expect(q).toMatchObject({ evidenceStored: true, releasedAt: null })
+    expect((await api(s.app, 'POST', `/admin/quarantine/${q!.id}/release`, { token: owner.token })).status).toBe(403) // staff only
+
+    // Judged false: the reporter's counter goes up; nobody is put on hold.
+    const dismissed = await api<AdminReport>(s.app, 'PATCH', `/admin/reports/${r.id}`, { token: mod.token, body: { status: 'dismissed', note: 'adulto, praia' } })
+    expect(dismissed.body).toMatchObject({ status: 'dismissed', reporterId: owner.user.id, reporterFalseReports: 1 })
+    expect((await api(s.app, 'PATCH', `/admin/reports/${r.id}`, { token: mod.token, body: { status: 'dismissed' } })).status).toBe(409)
+    expect((await db.select().from(users).where(eq(users.id, member.user.id)))[0]!.legalHoldAt).toBeNull()
+
+    // Released: back in the message under a new id, same bytes; the evidence copy goes; once only.
+    const rel = await api<QuarantinedFile>(s.app, 'POST', `/admin/quarantine/${q!.id}/release`, { token: mod.token })
+    expect(rel.status).toBe(200)
+    expect(rel.body).toMatchObject({ id: q!.id, releasedAt: expect.any(String), evidenceStored: false, sha256: q!.sha256 })
+    const back = (await gw.waitFor('MESSAGE_UPDATE', (m) => m.id === msg.id && m.attachments.length === 1)).attachments[0]!
+    expect(back).toMatchObject({ filename: 'x.png', contentType: 'image/png', size: bytes.length, width: 8, height: 8 })
+    expect(back.id).not.toBe(q!.attachmentId)
+    await files.sweep()
+    expect(await files.storage.get(`evidence/${q!.attachmentId}`)).toBeNull()
+    const file = await fetchFile(back.url)
+    expect([file.statusCode, file.rawPayload.equals(bytes)]).toEqual([200, true])
+    expect((await api(s.app, 'POST', `/admin/quarantine/${q!.id}/release`, { token: mod.token })).status).toBe(409)
+    const audit = await db.select().from(staffAuditLog).where(and(eq(staffAuditLog.staffId, mod.user.id), eq(staffAuditLog.route, '/api/v1/admin/quarantine/:id/release')))
+    expect(audit.length).toBe(2)
+    // It can be quarantined again (new attachment id, new record).
+    const again = await api<QuarantinedFile>(s.app, 'POST', `/admin/attachments/${back.id}/quarantine`, { token: mod.token, body: {} })
+    expect(again.status).toBe(201)
+    expect(again.body.id).not.toBe(q!.id)
+
+    // CSAM_REPORTS_PER_DAY per reporter (the dismissed one counts too).
+    const targets = await Promise.all([1, 2, 3, 4, 5].map(() => register(s.app)))
+    for (const t of targets.slice(0, 4)) expect((await report(owner.token, { targetType: 'user', targetId: t.user.id, reason: 'csam' })).status).toBe(201)
+    const sixth = await report(owner.token, { targetType: 'user', targetId: targets[4]!.user.id, reason: 'csam' })
+    expect([sixth.status, sixth.body.error.code]).toEqual([429, 'rate_limited'])
+    expect((await report(owner.token, { targetType: 'user', targetId: targets[4]!.user.id, reason: 'spam' })).status).toBe(201)
+    const queue = (await api<AdminReport[]>(s.app, 'GET', '/admin/reports', { token: mod.token })).body.filter((x) => x.reporterId === owner.user.id)
+    expect(queue.length).toBe(5)
+    expect(queue.every((x) => x.reporterFalseReports === 1)).toBe(true)
+    gw.close()
   })
 })
