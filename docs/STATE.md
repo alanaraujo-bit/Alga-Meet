@@ -32,7 +32,8 @@
 | Rascunhos legais | `docs/legal` | **feito** (rascunho p/ advogado) |
 | Trust & Safety + LGPD (servidor) | `apps/server`, `docs/trust-safety` | **feito** — ver Validado |
 | UI onda 5 (telas de T&S/LGPD) | `apps/desktop/src/renderer` | **feito** — ver Validado |
-| Servidor: complementos de T&S (status de exportação, resumo de mudanças legais, datas de restrição, denúncia duplicada, revisão de rate limit) | `apps/server` | em andamento |
+| Servidor: complementos de T&S (1c059e2, 165 testes) | `apps/server` | **feito** |
+| Servidor: endurecimento de T&S (download de exportação com senha, CSAM sem legal hold automático, limites por denunciante, avisos de exclusão) | `apps/server`, `docs/trust-safety` | em andamento |
 | Desenho de E2EE (`docs/decisions/0004-e2ee.md`) | docs | em andamento |
 | Servidor: cosméticos equipáveis/públicos, eventos de convite, retomar renovação, observabilidade | `apps/server` | **feito** — ver Validado |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
@@ -93,6 +94,7 @@ Medições [MEDIDO] em `docs/benchmarks/media-baseline.md` — **localhost, duas
 Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não decodifica HEVC (backup **ainda não exercitado**); H.264 por hardware não engata no Electron 45 (sempre OpenH264). Decisão em `docs/decisions/0001-media-engine.md`.
 
 ## Problemas conhecidos
+- Decisões do Maestro (reversíveis) em 2026-11-01: download de exportação dentro do app exige redigitar a senha (sessão roubada não baixa os dados); denúncia `csam` coloca anexos em quarentena automaticamente, mas legal hold do autor só por decisão de staff (evita uso de denúncias falsas como arma).
 - **Bloqueios de conformidade para lançamento** (`docs/legal/review-notes.md`): sem verificação de idade (ECA Digital — idade mínima proposta 16+), sem denúncia/suspensão/apelação, sem processo CSAM, sem exclusão de conta nem exportação de dados (LGPD), sem logs de acesso de 6 meses (Marco Civil), sem registro de aceite de termos, sem DPAs/cláusulas-padrão ANPD com provedores, sem CNPJ/encarregado publicados. Os itens técnicos estão em desenvolvimento; os jurídicos dependem do dono.
 - Checagem de qualidade de transmissão confia nas dimensões reportadas pelo cliente (cliente modificado pode burlar); sem reembolso self-service; Pix ainda não em assinaturas.
 - PGlite aceita um processo por diretório: dois servidores no mesmo `PGLITE_DIR` travam (`postmaster.pid`). Aconteceu em 2026-11-01 com um servidor órfão de agente — Maestro matou o órfão e removeu o lock.
