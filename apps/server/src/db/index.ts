@@ -18,7 +18,7 @@ export interface Database {
 const migrationsFolder = join(serverRoot, 'drizzle')
 
 /** DATABASE_URL → node-postgres; otherwise embedded PGlite. Migrations are applied before returning. */
-export async function openDatabase(config: Config): Promise<Database> {
+export async function openDatabase(config: Pick<Config, 'databaseUrl' | 'pgliteDir'>): Promise<Database> {
   if (config.databaseUrl) {
     const { default: pg } = await import('pg')
     const { drizzle } = await import('drizzle-orm/node-postgres')

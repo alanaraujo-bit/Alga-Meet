@@ -67,6 +67,20 @@ export async function removeMember(ctx: Ctx, spaceId: string, userId: string, re
   hub.dispatch([userId], 'SPACE_DELETE', { id: spaceId })
 }
 
+/** Deletes a space for everyone (owner, staff removal, account purge): cascade, icon, SPACE_DELETE, voice rooms. */
+export async function deleteSpace(ctx: Ctx, space: SpaceRow): Promise<void> {
+  const { db, hub, voice } = ctx
+  const members = await spaceMemberIds(db, space.id)
+  const voiceChannels = await db.select({ id: channels.id }).from(channels)
+    .where(and(eq(channels.spaceId, space.id), eq(channels.type, 'voice')))
+  await db.delete(spaces).where(eq(spaces.id, space.id))
+  // Attachments were queued by the cascade's delete trigger; the icon is not a row.
+  await swapImageKeys(ctx, 'icons', space.id, space.iconUrl, null)
+  ctx.files.kick()
+  hub.dispatch(members, 'SPACE_DELETE', { id: space.id })
+  await voice.dropChannels(voiceChannels.map((c) => c.id), members)
+}
+
 export function invitePublicRoutes(app: FastifyInstance, { db }: Ctx): void {
   // Public: keyed per IP. Also slows down brute-forcing codes.
   app.get<{ Params: { code: string } }>('/invites/:code', { config: perMinute(30) }, async (req): Promise<Invite> => {
@@ -120,15 +134,7 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.delete<{ Params: { id: string } }>('/spaces/:id', async (req, reply) => {
     const { space } = await requireSpace(db, idParam(req.params.id), req.auth.user.id)
     if (space.ownerId !== req.auth.user.id) throw forbidden('Apenas o dono pode excluir o espaço.')
-    const members = await spaceMemberIds(db, space.id)
-    const voiceChannels = await db.select({ id: channels.id }).from(channels)
-      .where(and(eq(channels.spaceId, space.id), eq(channels.type, 'voice')))
-    await db.delete(spaces).where(eq(spaces.id, space.id))
-    // Attachments were queued by the cascade's delete trigger; the icon is not a row.
-    await swapImageKeys(ctx, 'icons', space.id, space.iconUrl, null)
-    ctx.files.kick()
-    hub.dispatch(members, 'SPACE_DELETE', { id: space.id })
-    await voice.dropChannels(voiceChannels.map((c) => c.id), members)
+    await deleteSpace(ctx, space)
     return reply.code(204).send()
   })
 

@@ -4,6 +4,7 @@ import type {
 } from '@alga/shared'
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { planSummary } from './billing/catalog.js'
+import { TERMS_VERSION, ageBracketOf } from './legal.js'
 import type { Db } from './db/index.js'
 import {
   attachments, channelRecipients, channels, memberRoles, reactions, relationships, roles, spaceMembers, spaces, users,
@@ -27,6 +28,8 @@ export const meView = (u: UserRow, defaultAttachmentBytes: number): Me => ({
   statusPreference: u.statusPreference,
   createdAt: u.createdAt.toISOString(),
   plan: planSummary(u.plan, defaultAttachmentBytes),
+  ageBracket: ageBracketOf(u),
+  needsTermsAcceptance: u.termsVersion !== TERMS_VERSION,
 })
 
 export const spaceView = (s: SpaceRow): Space => ({

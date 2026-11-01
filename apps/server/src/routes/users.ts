@@ -11,6 +11,7 @@ import { isUniqueViolation, type Db, type Tx } from '../db/index.js'
 import { channelRecipients, channels, relationships, users, type UserRow } from '../db/schema.js'
 import { badRequest, conflict, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
 import { broadcastPresence, exchangePresence } from '../gateway/hub.js'
+import { ageBracketOf } from '../legal.js'
 import { channelView, meView, publicUser, recipientsOf, relationshipsOf } from '../views.js'
 
 type RelType = 'friend' | 'incoming' | 'outgoing' | 'blocked'
@@ -203,7 +204,7 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
     const me = req.auth.user.id
     const ids = [...new Set(parse(OpenDmBody, req.body).recipientIds)].filter((id) => id !== me)
     if (!ids.length) throw invalid({ recipientIds: 'Informe ao menos um destinatário além de você.' })
-    const found = await db.select({ id: users.id }).from(users).where(inArray(users.id, ids))
+    const found = await db.select({ id: users.id, birthDate: users.birthDate }).from(users).where(inArray(users.id, ids))
     if (found.length !== ids.length) throw notFound('Usuário não encontrado.')
     for (const id of ids) {
       if (await isBlockedBetween(db, me, id)) throw forbidden('Você não pode iniciar uma conversa com este usuário.')
@@ -222,6 +223,10 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
     for (const id of ids) {
       if (await isFriend(db, me, id)) continue
       if (ids.length > 1) throw forbidden('Só é possível adicionar amigos a um grupo.')
+      // Protective default for 16-17 (Lei 15.211/2025, art. 7º): DMs only with friends, both ways. The message never
+      // reveals the other person's age.
+      if (ageBracketOf(req.auth.user) === 'teen') throw forbidden('Na sua conta, mensagens diretas são só com amigos. Envie um pedido de amizade.')
+      if (ageBracketOf(found.find((u) => u.id === id)!) === 'teen') throw forbidden('Esta pessoa só recebe mensagens diretas de amigos. Envie um pedido de amizade.')
       requireVerifiedEmail(req.auth.user, 'conversar com quem ainda não é seu amigo')
       if (!(await sharesSpace(db, me, id))) throw forbidden('Você só pode iniciar conversa com amigos ou membros de um espaço em comum.')
     }

@@ -5,7 +5,7 @@ import type { WebSocket } from 'ws'
 import { z } from 'zod'
 import { presenceAudience } from '../access.js'
 import type { Ctx } from '../app.js'
-import { resolveToken } from '../auth.js'
+import { isRestricted, resolveToken } from '../auth.js'
 import { safeErr } from '../errors.js'
 import { readStates, spaceMembers, users, type UserRow } from '../db/schema.js'
 import { afterMeUpdate } from '../routes/users.js'
@@ -115,6 +115,8 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
         if (conn) return close(GatewayClose.INVALID_PAYLOAD, 'already identified')
         const auth = await resolveToken(db, frame.token)
         if (!auth) return close(GatewayClose.AUTH_FAILED, 'authentication failed')
+        if (isRestricted(auth.user)) return close(GatewayClose.ACCOUNT_RESTRICTED, 'account restricted')
+        await ctx.privacy.recordUse(auth.user.id, req.ip, req.headers['user-agent'], 'session_use')
         if (socket.readyState !== socket.OPEN) return
         if (hub.connections(auth.user.id) >= MAX_SOCKETS_PER_USER) return close(GatewayClose.RATE_LIMITED, 'too many connections')
         arm()

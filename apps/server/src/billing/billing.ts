@@ -5,7 +5,7 @@
  */
 import { createHash } from 'node:crypto'
 import {
-  uuidv7,
+  REMOVED_USER_ID, uuidv7,
   type BillingCatalog, type BillingMe, type CheckoutResponse, type Entitlement, type Entitlements, type Order, type PlanId,
   type PlanSummary, type Subscription,
 } from '@alga/shared'
@@ -338,6 +338,8 @@ export class Billing {
 
   /** Rebuilds the user's entitlements and users.plan from subscriptions + paid orders. null = nothing changed. */
   private async recompute(tx: Tx, userId: string, now: Date): Promise<Change | null> {
+    // Payment rows of purged accounts move to the "removed user" (src/privacy.ts): they never grant anything again.
+    if (userId === REMOVED_USER_ID) return null
     const [u] = await tx.select({ plan: users.plan }).from(users).where(eq(users.id, userId)).for('update')
     if (!u) return null
     // Defense in depth: sandbox rows (e.g. a copied dev database) never grant anything in production.

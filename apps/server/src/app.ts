@@ -3,7 +3,7 @@ import multipart from '@fastify/multipart'
 import rateLimit from '@fastify/rate-limit'
 import websocket from '@fastify/websocket'
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify'
-import { authenticate, type AuthContext } from './auth.js'
+import { authenticate, isRestricted, type AuthContext } from './auth.js'
 import { Billing } from './billing/billing.js'
 import { maxPlanAttachmentBytes } from './billing/catalog.js'
 import type { Config } from './config.js'
@@ -13,16 +13,21 @@ import { HttpError, installErrorHandling, safeUrl } from './errors.js'
 import { Files } from './files.js'
 import { Hub } from './gateway/hub.js'
 import { gatewayRoute } from './gateway/socket.js'
+import { Privacy } from './privacy.js'
+import { adminRoutes } from './routes/admin.js'
 import { authPublicRoutes, authRoutes } from './routes/auth.js'
 import { billingPublicRoutes, billingRoutes } from './routes/billing.js'
 import { filePublicRoutes, fileRoutes } from './routes/files.js'
 import { messageRoutes } from './routes/messages.js'
 import { moderationRoutes } from './routes/moderation.js'
+import { privacyPublicRoutes, privacyRoutes } from './routes/privacy.js'
+import { reportPublicRoutes, reportRoutes } from './routes/reports.js'
 import { roleRoutes } from './routes/roles.js'
 import { invitePublicRoutes, spaceRoutes } from './routes/spaces.js'
 import { userRoutes } from './routes/users.js'
 import { livekitWebhookRoute, voiceRoutes } from './routes/voice.js'
 import { createStorage } from './storage.js'
+import { TrustSafety, restrictedError } from './trust-safety.js'
 import { Voice } from './voice.js'
 
 /** Shared services handed to every route module. */
@@ -34,6 +39,8 @@ export interface Ctx {
   files: Files
   mail: Mailer
   billing: Billing
+  trust: TrustSafety
+  privacy: Privacy
   log: FastifyBaseLogger
 }
 
@@ -68,10 +75,15 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   const voice = new Voice(config, database.db, hub, app.log)
   const billing = new Billing(config, database.db, hub, voice, app.log)
   await billing.syncCatalog()
-  const ctx: Ctx = { config, db: database.db, hub, voice, files, mail, billing, log: app.log }
+  // trust/privacy take the whole Ctx (they use every other service); assigned right below.
+  const ctx = { config, db: database.db, hub, voice, files, mail, billing, log: app.log } as Ctx
+  ctx.trust = new TrustSafety(ctx)
+  ctx.privacy = new Privacy(ctx)
   app.decorate('ctx', ctx)
   files.start()
   billing.start()
+  ctx.trust.start()
+  ctx.privacy.start()
   app.log.info({ provider: config.billing.provider }, 'billing ready')
 
   // preClose runs before @fastify/websocket's own client shutdown, so socket close handlers see hub.closing.
@@ -80,6 +92,8 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     hub.closeAll(1001, 'server shutting down')
   })
   app.addHook('onClose', async () => {
+    await ctx.privacy.stop()
+    await ctx.trust.stop()
     await files.stop()
     await billing.stop()
     await database.close()
@@ -123,9 +137,16 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     await livekitWebhookRoute(api, ctx)
     filePublicRoutes(api, ctx)
     await billingPublicRoutes(api, ctx)
+    privacyPublicRoutes(api, ctx)
+    reportPublicRoutes(api, ctx)
 
     await api.register(async (authed) => {
       authed.addHook('onRequest', authenticate(ctx.db))
+      authed.addHook('onRequest', async (req) => {
+        // Sessions are deleted when an account is restricted; this covers a request racing that.
+        if (isRestricted(req.auth.user)) throw restrictedError((await ctx.trust.restrictionOf(req.auth.user))!)
+        await ctx.privacy.recordUse(req.auth.user.id, req.ip, req.headers['user-agent'], 'session_use')
+      })
       authRoutes(authed, ctx)
       userRoutes(authed, ctx)
       spaceRoutes(authed, ctx)
@@ -135,6 +156,9 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       voiceRoutes(authed, ctx)
       fileRoutes(authed, ctx)
       billingRoutes(authed, ctx)
+      privacyRoutes(authed, ctx)
+      reportRoutes(authed, ctx)
+      await authed.register(async (admin) => adminRoutes(admin, ctx))
     })
   }, { prefix: '/api/v1' })
 

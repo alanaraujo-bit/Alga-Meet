@@ -1,5 +1,5 @@
 import {
-  ChangePasswordBody, GatewayClose, LoginBody, PasswordResetConfirmBody, PasswordResetRequestBody, RegisterBody, VerifyEmailBody,
+  ChangePasswordBody, GatewayClose, LoginBody, MIN_AGE, ageOn, PasswordResetConfirmBody, PasswordResetRequestBody, RegisterBody, VerifyEmailBody,
   uuidv7, type AuthResponse, type Session,
 } from '@alga/shared'
 import { and, desc, eq, isNotNull, isNull, ne, or, sql } from 'drizzle-orm'
@@ -9,11 +9,14 @@ import {
   consumeEmailToken, createSession, hasSession, hashPassword, issueEmailToken, peekEmailToken, verifyPassword,
 } from '../auth.js'
 import { isUniqueViolation } from '../db/index.js'
-import { emailTokens, sessions, users, type UserRow } from '../db/schema.js'
+import { consentRecords, emailTokens, sessions, users, type UserRow } from '../db/schema.js'
 import { accountExistsMail, passwordResetMail, verifyEmailMail } from '../email-templates.js'
 import { HttpError, conflict, idParam, invalid, notFound, parse, safeErr } from '../errors.js'
+import { TERMS_VERSION } from '../legal.js'
 import { assertStrongPassword } from '../passwords.js'
+import { restrictedError } from '../trust-safety.js'
 import { meView } from '../views.js'
+import { UNDER_AGE_MESSAGE, oldTerms } from './privacy.js'
 
 /** Per client IP (see TRUST_PROXY). */
 const authLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } }
@@ -59,25 +62,45 @@ export function authPublicRoutes(app: FastifyInstance, ctx: Ctx): void {
   // created unverified and the address gets either a verification link or a "you already have an account" mail.
   app.post('/auth/register', { config: authLimit }, async (req, reply): Promise<AuthResponse> => {
     const body = parse(RegisterBody, req.body)
+    // Age gate (Lei 15.211/2025): nothing is stored for someone under MIN_AGE.
+    if (ctx.config.legal.requireBirthDate) {
+      const missing = {
+        ...(!body.birthDate ? { birthDate: 'Informe sua data de nascimento.' } : {}),
+        ...(!body.termsVersion ? { termsVersion: 'Aceite os Termos de Uso e a Política de Privacidade.' } : {}),
+      }
+      if (Object.keys(missing).length) throw invalid(missing)
+    } else if (!body.birthDate || !body.termsVersion) {
+      req.log.warn('register without birthDate/termsVersion: accepted outside production until the client sends them (REQUIRE_BIRTHDATE=1 enforces)')
+    }
+    if (body.birthDate && ageOn(body.birthDate) < MIN_AGE) throw new HttpError('validation', UNDER_AGE_MESSAGE, { birthDate: UNDER_AGE_MESSAGE })
+    if (body.termsVersion && body.termsVersion !== TERMS_VERSION) throw oldTerms()
     assertStrongPassword(body.password, body, 'password')
     const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.username, body.username))
     if (taken) throw usernameTaken()
     const passwordHash = await hashPassword(body.password)
     let user: UserRow | undefined
+    const now = new Date()
     try {
-      ;[user] = await db.insert(users).values({
-        id: uuidv7(),
-        email: body.email,
-        username: body.username,
-        displayName: body.displayName ?? body.username,
-        passwordHash,
-      }).returning()
+      user = await db.transaction(async (tx) => {
+        const [row] = await tx.insert(users).values({
+          id: uuidv7(),
+          email: body.email,
+          username: body.username,
+          displayName: body.displayName ?? body.username,
+          passwordHash,
+          ...(body.birthDate ? { birthDate: body.birthDate, birthDateSetAt: now } : {}),
+          ...(body.termsVersion ? { termsVersion: body.termsVersion, termsAcceptedAt: now } : {}),
+        }).returning()
+        if (body.termsVersion) await tx.insert(consentRecords).values({ id: uuidv7(), userId: row!.id, termsVersion: body.termsVersion, acceptedAt: now })
+        return row
+      })
     } catch (err) {
       // users_verified_email_key never fires here (new accounts are unverified): only the username can collide.
       if (isUniqueViolation(err)) throw usernameTaken()
       throw err
     }
     const { token } = await createSession(db, user!.id, req.headers['user-agent'] ?? '')
+    await ctx.privacy.recordUse(user!.id, req.ip, req.headers['user-agent'], 'login')
     sendVerification(ctx, user!)
     reply.code(201)
     return { token, user: meView(user!, ctx.config.files.maxAttachmentBytes) }
@@ -99,8 +122,14 @@ export function authPublicRoutes(app: FastifyInstance, ctx: Ctx): void {
       await failedLogins(req)
       throw new HttpError('unauthorized', 'Login ou senha inválidos.')
     }
+    // Right password: a suspended/banned account learns why and gets a token that only lets it appeal.
+    const restriction = await ctx.trust.restrictionOf(user, true)
+    if (restriction) throw restrictedError(restriction)
+    const canceled = user.deletionPurgeAfter !== null
+    if (canceled) await ctx.privacy.cancelDeletion(user)
     const { token } = await createSession(db, user.id, req.headers['user-agent'] ?? '')
-    return { token, user: meView(user, ctx.config.files.maxAttachmentBytes) }
+    await ctx.privacy.recordUse(user.id, req.ip, req.headers['user-agent'], 'login')
+    return { token, user: meView(user, ctx.config.files.maxAttachmentBytes), ...(canceled ? { deletionCanceled: true } : {}) }
   })
 
   // No auth: the link may be opened on another device or after logging out; the token is the proof.

@@ -1,6 +1,7 @@
+import { ACCOUNT_ACTION_REASONS, REPORT_REASONS } from '@alga/shared'
 import { sql } from 'drizzle-orm'
 import {
-  boolean, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid,
+  boolean, date, foreignKey, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid,
 } from 'drizzle-orm/pg-core'
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' })
@@ -22,11 +23,31 @@ export const users = pgTable('users', {
   emailVerifiedAt: ts('email_verified_at'),
   /** Cache of the plan entitlement (hot paths read it with the session), written only by Billing.recompute. */
   plan: text('plan', { enum: ['free', 'plus'] }).notNull().default('free'),
+  /** Self-declared at signup (or once later). Used only to compute the age bracket (Lei 15.211/2025, art. 13). */
+  birthDate: date('birth_date', { mode: 'string' }),
+  birthDateSetAt: ts('birth_date_set_at'),
+  /** Legal bundle version last accepted (history in consent_records). */
+  termsVersion: text('terms_version'),
+  termsAcceptedAt: ts('terms_accepted_at'),
+  /** Set only by scripts/grant-staff.ts. */
+  staffRole: text('staff_role', { enum: ['admin', 'moderator'] }),
+  /** Account enforcement (history in account_actions): login and sessions are refused while either applies. */
+  suspendedUntil: ts('suspended_until'),
+  bannedAt: ts('banned_at'),
+  /** The account_actions row behind the current suspension/ban. */
+  restrictionId: uuid('restriction_id'),
+  /** Preservation order or CSAM case: never purged, access logs kept past 6 months. */
+  legalHoldAt: ts('legal_hold_at'),
+  /** DELETE /users/@me (or an under-16 declaration): purged by Privacy.sweep after deletion_purge_after. */
+  deletionRequestedAt: ts('deletion_requested_at'),
+  deletionPurgeAfter: ts('deletion_purge_after'),
+  deletionMessages: text('deletion_messages', { enum: ['anonymize', 'delete'] }),
 }, (t) => [
   // An address belongs to at most one verified account; unverified accounts may claim a taken one.
   uniqueIndex('users_verified_email_key').on(t.email).where(sql`${t.emailVerifiedAt} is not null`),
   index('users_email_idx').on(t.email),
   uniqueIndex('users_username_key').on(t.username),
+  index('users_deletion_purge_after_idx').on(t.deletionPurgeAfter).where(sql`${t.deletionPurgeAfter} is not null`),
 ])
 
 /** Single-use tokens sent by e-mail. Only the SHA-256 is stored; the row is deleted when used. */
@@ -302,3 +323,157 @@ export const billingEvents = pgTable('billing_events', {
 export type SubscriptionRow = typeof subscriptions.$inferSelect
 export type OrderRow = typeof orders.$inferSelect
 export type EntitlementRow = typeof entitlements.$inferSelect
+
+// ---- trust & safety, privacy (src/trust-safety.ts, src/privacy.ts) -------------------------------------------------
+
+/** Every acceptance of the legal bundle (proof of what was accepted and when). */
+export const consentRecords = pgTable('consent_records', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  termsVersion: text('terms_version').notNull(),
+  acceptedAt: ts('accepted_at').notNull().defaultNow(),
+}, (t) => [index('consent_records_user_id_idx').on(t.userId)])
+
+/**
+ * Marco Civil art. 15 access records: every login plus the first use per day of each (IP, app). No FK: they must
+ * outlive a deleted account for 6 months (then Privacy.sweep purges them, unless the account is on legal hold).
+ */
+export const accessLogs = pgTable('access_logs', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id').notNull(),
+  ip: text('ip').notNull(),
+  userAgentSha256: text('user_agent_sha256').notNull(),
+  event: text('event', { enum: ['login', 'session_use'] }).notNull(),
+  /** UTC day of `at`: one session_use row per user, day, IP and user agent. */
+  day: date('day', { mode: 'string' }).notNull(),
+  at: ts('at').notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex('access_logs_daily_key').on(t.userId, t.day, t.ip, t.userAgentSha256).where(sql`${t.event} = 'session_use'`),
+  index('access_logs_user_id_at_idx').on(t.userId, t.at),
+  index('access_logs_at_idx').on(t.at),
+])
+
+/** Reports with a snapshot of the target taken at report time. Target/user ids have no FK: evidence outlives them. */
+export const reports = pgTable('reports', {
+  id: uuid('id').primaryKey(),
+  reporterId: uuid('reporter_id').references(() => users.id, { onDelete: 'set null' }),
+  targetType: text('target_type', { enum: ['message', 'user', 'space'] }).notNull(),
+  targetId: uuid('target_id').notNull(),
+  targetUserId: uuid('target_user_id'),
+  spaceId: uuid('space_id'),
+  channelId: uuid('channel_id'),
+  reason: text('reason', { enum: REPORT_REASONS }).notNull(),
+  details: text('details').notNull().default(''),
+  snapshot: jsonb('snapshot').notNull(),
+  priority: integer('priority').notNull(),
+  status: text('status', { enum: ['open', 'resolved', 'dismissed'] }).notNull().default('open'),
+  action: text('action', { enum: ['none', 'remove_content', 'warn', 'suspend', 'ban'] }),
+  staffId: uuid('staff_id'),
+  staffNote: text('staff_note'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  resolvedAt: ts('resolved_at'),
+}, (t) => [
+  index('reports_queue_idx').on(t.status, t.priority, t.createdAt),
+  index('reports_target_user_id_idx').on(t.targetUserId),
+  // A second report of the same target by the same person while the first is open is the same report.
+  uniqueIndex('reports_open_dedupe_key').on(t.reporterId, t.targetType, t.targetId).where(sql`${t.status} = 'open'`),
+])
+
+/** Platform-level enforcement history (warn / suspend / ban / lift). No FK on user_id: kept with the case. */
+export const accountActions = pgTable('account_actions', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id').notNull(),
+  type: text('type', { enum: ['warn', 'suspend', 'ban', 'lift'] }).notNull(),
+  reason: text('reason', { enum: ACCOUNT_ACTION_REASONS }).notNull(),
+  until: ts('until'),
+  /** Internal staff note; never sent to the user. */
+  note: text('note').notNull().default(''),
+  reportId: uuid('report_id'),
+  /** null = automatic (e.g. an under-16 declaration). */
+  staffId: uuid('staff_id'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [index('account_actions_user_id_idx').on(t.userId)])
+
+export const appeals = pgTable('appeals', {
+  id: uuid('id').primaryKey(),
+  actionId: uuid('action_id').notNull().references(() => accountActions.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull(),
+  message: text('message').notNull(),
+  status: text('status', { enum: ['open', 'upheld', 'rejected'] }).notNull().default('open'),
+  staffId: uuid('staff_id'),
+  staffNote: text('staff_note'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  decidedAt: ts('decided_at'),
+}, (t) => [
+  uniqueIndex('appeals_action_id_key').on(t.actionId),
+  index('appeals_status_created_idx').on(t.status, t.createdAt),
+])
+
+/**
+ * Attachments pulled out of circulation (by staff, or automatically on a csam report). Independent of messages, so
+ * the author deleting the message cannot destroy the evidence. Bytes move to `evidence/<attachmentId>` (never served).
+ */
+export const quarantinedFiles = pgTable('quarantined_files', {
+  id: uuid('id').primaryKey(),
+  attachmentId: uuid('attachment_id').notNull(),
+  messageId: uuid('message_id').notNull(),
+  channelId: uuid('channel_id').notNull(),
+  authorId: uuid('author_id').notNull(),
+  filename: text('filename').notNull(),
+  contentType: text('content_type').notNull(),
+  size: integer('size').notNull(),
+  sha256: text('sha256'),
+  originalKey: text('original_key').notNull(),
+  evidenceKey: text('evidence_key').notNull(),
+  evidenceStoredAt: ts('evidence_stored_at'),
+  copyError: text('copy_error'),
+  reportId: uuid('report_id'),
+  staffId: uuid('staff_id'),
+  note: text('note').notNull().default(''),
+  authorityProtocol: text('authority_protocol'),
+  receiptConfirmedAt: ts('receipt_confirmed_at'),
+  purgedAt: ts('purged_at'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [uniqueIndex('quarantined_files_attachment_id_key').on(t.attachmentId)])
+
+/** POST /users/@me/export jobs. The zip lives at storage_key until expires_at. */
+export const dataExports = pgTable('data_exports', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  status: text('status', { enum: ['pending', 'building', 'ready', 'failed', 'expired'] }).notNull().default('pending'),
+  storageKey: text('storage_key'),
+  error: text('error'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  startedAt: ts('started_at'),
+  readyAt: ts('ready_at'),
+  expiresAt: ts('expires_at'),
+}, (t) => [index('data_exports_user_id_created_idx').on(t.userId, t.createdAt), index('data_exports_status_idx').on(t.status)])
+
+/**
+ * Purged accounts, kept 6 months alongside the access logs so a court order naming the account can still be answered.
+ * The e-mail is kept only as a SHA-256 (a given address can be matched, not read back).
+ */
+export const deletedAccounts = pgTable('deleted_accounts', {
+  userId: uuid('user_id').primaryKey(),
+  username: text('username').notNull(),
+  emailSha256: text('email_sha256').notNull(),
+  deletedAt: ts('deleted_at').notNull().defaultNow(),
+}, (t) => [index('deleted_accounts_username_idx').on(t.username)])
+
+/** Every staff API call; staff role grants from the CLI have staff_id null. */
+export const staffAuditLog = pgTable('staff_audit_log', {
+  id: uuid('id').primaryKey(),
+  staffId: uuid('staff_id'),
+  method: text('method').notNull(),
+  route: text('route').notNull(),
+  params: jsonb('params'),
+  query: jsonb('query'),
+  body: jsonb('body'),
+  status: integer('status'),
+  at: ts('at').notNull().defaultNow(),
+}, (t) => [index('staff_audit_log_at_idx').on(t.at)])
+
+export type ReportRow = typeof reports.$inferSelect
+export type AccountActionRow = typeof accountActions.$inferSelect
+export type AppealRow = typeof appeals.$inferSelect
+export type QuarantinedFileRow = typeof quarantinedFiles.$inferSelect

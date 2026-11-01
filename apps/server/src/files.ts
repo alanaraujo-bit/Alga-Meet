@@ -246,8 +246,8 @@ export class Files {
    * Download URL for one viewer. `exp` is rounded up to 5 minutes so repeated fetches yield the same URL (cacheable);
    * the download re-checks that `uid` can still view the channel.
    */
-  url(id: string, uid: string, now = Date.now()): string {
-    const exp = Math.ceil((now / 1000 + this.config.files.urlTtlSeconds) / URL_BUCKET_S) * URL_BUCKET_S
+  url(id: string, uid: string, now = Date.now(), ttlSeconds = this.config.files.urlTtlSeconds): string {
+    const exp = Math.ceil((now / 1000 + ttlSeconds) / URL_BUCKET_S) * URL_BUCKET_S
     return `${this.config.publicUrl}/api/v1/files/${id}?uid=${uid}&exp=${exp}&sig=${this.mac(id, uid, exp)}`
   }
 

@@ -10,13 +10,15 @@ type Content = Pick<EmailMessage, 'subject' | 'text' | 'html'>
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
-function html(paragraphs: string[], action?: { label: string; href: string; code: string }): string {
+function html(paragraphs: string[], action?: { label: string; href: string; code?: string }): string {
   const p = (t: string) => `<p style="margin:0 0 16px">${t}</p>`
   const button = action
     ? `<p style="margin:24px 0"><a href="${esc(action.href)}" style="display:inline-block;background:#21c9ca;color:#061415;` +
       `padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">${esc(action.label)}</a></p>` +
-      `<p style="margin:0 0 16px;font-size:13px;color:#5b6166">Se o botão não abrir o app, cole este código nele:<br>` +
-      `<code style="font-size:13px;word-break:break-all;color:#121517">${esc(action.code)}</code></p>`
+      (action.code
+        ? `<p style="margin:0 0 16px;font-size:13px;color:#5b6166">Se o botão não abrir o app, cole este código nele:<br>` +
+          `<code style="font-size:13px;word-break:break-all;color:#121517">${esc(action.code)}</code></p>`
+        : '')
     : ''
   const [first, ...rest] = paragraphs
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">` +
@@ -63,5 +65,66 @@ export function passwordResetMail(link: string, token: string): Content {
     subject: 'Redefinir sua senha do Alga Meet',
     text: text([intro, `Abra este link:\n${link}`, `Ou cole este código no app:\n${token}`, after, ignore]),
     html: html([intro, after, ignore], { label: 'Redefinir senha', href: link, code: token }),
+  }
+}
+
+// ---- trust & safety and privacy (only to verified addresses; no user-chosen text) ----------------------------------
+
+const APPEAL_HOW = 'Para contestar, entre no Alga Meet com seu e-mail e senha e use "Contestar decisão". Uma pessoa da ' +
+  'equipe revisa cada recurso.'
+
+/** Account action notice (Termos 8.4): the rule that was broken and how and until when to appeal. */
+export function enforcementMail(type: 'warn' | 'suspend' | 'ban', reason: string, opts: { until?: string | null; appealBy?: string | null; deletionOn?: string | null } = {}): Content {
+  const what = type === 'warn'
+    ? 'Sua conta no Alga Meet recebeu um aviso.'
+    : type === 'ban'
+      ? 'Sua conta no Alga Meet foi encerrada.'
+      : `Sua conta no Alga Meet foi suspensa${opts.until ? ` até ${opts.until}` : ''}.`
+  const lines = [what, `Motivo: ${reason}.`]
+  if (opts.deletionOn) lines.push(`Se a decisão não for revertida, a conta e os dados dela serão excluídos em ${opts.deletionOn}.`)
+  if (opts.appealBy) lines.push(`${APPEAL_HOW} Prazo: até ${opts.appealBy}.`)
+  return { subject: type === 'warn' ? 'Aviso sobre sua conta no Alga Meet' : 'Medida aplicada à sua conta no Alga Meet', text: text(lines), html: html(lines) }
+}
+
+export function appealDecisionMail(upheld: boolean): Content {
+  const lines = upheld
+    ? ['Revisamos seu recurso e revertemos a decisão sobre sua conta no Alga Meet.', 'Se a conta estava suspensa ou encerrada, você já pode entrar de novo.']
+    : ['Revisamos seu recurso e mantivemos a decisão sobre sua conta no Alga Meet.', 'Se discordar, responda pelo canal de atendimento indicado nos Termos de Uso.']
+  return { subject: 'Resultado do seu recurso no Alga Meet', text: text(lines), html: html(lines) }
+}
+
+export function deletionScheduledMail(purgeOn: string): Content {
+  const lines = [
+    `Recebemos o pedido para excluir sua conta no Alga Meet. Ela será excluída em ${purgeOn}.`,
+    'Todas as sessões foram encerradas. Para desistir, basta entrar no app de novo antes dessa data.',
+    'Se não foi você, entre agora e troque sua senha.',
+  ]
+  return { subject: 'Exclusão da sua conta no Alga Meet', text: text(lines), html: html(lines) }
+}
+
+export function deletionCanceledMail(): Content {
+  const lines = ['Você entrou de novo no Alga Meet, então a exclusão da sua conta foi cancelada.', 'Se não foi você, troque sua senha agora.']
+  return { subject: 'Exclusão da conta cancelada', text: text(lines), html: html(lines) }
+}
+
+export function accountDeletedMail(): Content {
+  const lines = [
+    'Sua conta no Alga Meet foi excluída, como você pediu.',
+    'Guardamos só o que a lei exige, pelo prazo legal: registros de acesso (6 meses), registros fiscais de pagamentos sem ' +
+      'vínculo com a sua identidade e casos de moderação em andamento. Detalhes na Política de Privacidade.',
+  ]
+  return { subject: 'Sua conta no Alga Meet foi excluída', text: text(lines), html: html(lines) }
+}
+
+export function dataExportMail(link: string, expiresOn: string): Content {
+  const lines = [
+    'A cópia dos seus dados do Alga Meet está pronta: um arquivo .zip com seus dados em JSON e links para os seus anexos.',
+    `O link vale até ${expiresOn}. Não o encaminhe: quem tiver o link consegue baixar o arquivo.`,
+    'Se não foi você que pediu, troque sua senha.',
+  ]
+  return {
+    subject: 'Seus dados do Alga Meet estão prontos',
+    text: text([lines[0]!, `Baixe aqui:\n${link}`, ...lines.slice(1)]),
+    html: html(lines, { label: 'Baixar meus dados', href: link }),
   }
 }

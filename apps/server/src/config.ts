@@ -81,6 +81,10 @@ const EnvSchema = z
     MP_API_URL: z.url().default('https://api.mercadopago.com'),
     /** Page the provider sends the buyer back to after paying (https; e.g. a site page that opens algameet://). */
     BILLING_RETURN_URL: z.url().optional(),
+    /** Makes RegisterBody.birthDate and termsVersion mandatory outside production (production always requires them). */
+    REQUIRE_BIRTHDATE: bool,
+    /** Where the published Termos/Política/Diretrizes live (GET /legal links). */
+    LEGAL_URL: z.url().default('https://algameet.com.br/legal'),
   })
   .superRefine((env, ctx) => {
     const devMode = env.ALGA_ALLOW_DEV_SECRETS || (env.NODE_ENV !== 'production' && LOOPBACK.has(env.HOST))
@@ -146,6 +150,7 @@ export interface Config {
   storage: StorageConfig
   email: EmailConfig
   billing: BillingConfig
+  legal: { requireBirthDate: boolean; url: string }
 }
 
 export interface BillingConfig {
@@ -218,5 +223,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
         ? { mercadopago: { accessToken: e.MP_ACCESS_TOKEN!, webhookSecret: e.MP_WEBHOOK_SECRET!, apiUrl: e.MP_API_URL.replace(/\/+$/, '') } }
         : {}),
     },
+    legal: { requireBirthDate: e.NODE_ENV === 'production' || e.REQUIRE_BIRTHDATE, url: e.LEGAL_URL.replace(/\/+$/, '') },
   }
 }

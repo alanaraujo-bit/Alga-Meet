@@ -1,18 +1,19 @@
 import { createHash } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { AuthResponse, Dispatch, DispatchOf, DispatchType, ServerFrame } from '@alga/shared'
+import { uuidv7, type AuthResponse, type Dispatch, type DispatchOf, type DispatchType, type Message, type ServerFrame } from '@alga/shared'
 import type { FastifyInstance } from 'fastify'
 import { AccessToken } from 'livekit-server-sdk'
 import { eq } from 'drizzle-orm'
 import pg from 'pg'
+import sharp from 'sharp'
 import { inject } from 'vitest'
 import WebSocket from 'ws'
 import { buildApp } from '../src/app.js'
 import { loadConfig, type Config } from '../src/config.js'
-import { users } from '../src/db/schema.js'
+import { attachments, users } from '../src/db/schema.js'
 
 export interface TestServer {
   app: FastifyInstance
@@ -90,12 +91,12 @@ export async function api<T = any>(
 
 let userCounter = 0
 /** Registers a user; unless `verified: false`, marks the e-mail verified directly in the DB (the flow is in email.test.ts). */
-export async function register(app: FastifyInstance, name?: string, { verified = true } = {}): Promise<AuthResponse & { password: string }> {
+export async function register(app: FastifyInstance, name?: string, { verified = true, extra = {} as Record<string, unknown> } = {}): Promise<AuthResponse & { password: string }> {
   const username = name ?? `user${++userCounter}_${Math.random().toString(36).slice(2, 6)}`
   const password = 'correct horse battery'
   const res = await api<AuthResponse>(app, 'POST', '/auth/register', {
     ip: freshIp(),
-    body: { email: `${username}@example.com`, username, displayName: username.toUpperCase(), password },
+    body: { email: `${username}@example.com`, username, displayName: username.toUpperCase(), password, ...extra },
   })
   if (res.status !== 201) throw new Error(`register failed: ${res.status} ${JSON.stringify(res.body)}`)
   if (verified) {
@@ -103,6 +104,29 @@ export async function register(app: FastifyInstance, name?: string, { verified =
     res.body.user.emailVerified = true
   }
   return { ...res.body, password }
+}
+
+/**
+ * A message with one 8×8 PNG attachment, written straight to storage and the DB. Not through multipart on purpose:
+ * uploads.test.ts asserts that no `alga-upload-*` spool file is left in the shared temp dir, and test files run in
+ * parallel.
+ */
+export async function messageWithFile(app: FastifyInstance, token: string, channelId: string, content: string): Promise<{ msg: Message; bytes: Buffer }> {
+  const sent = await api<Message>(app, 'POST', `/channels/${channelId}/messages`, { token, body: { content } })
+  if (sent.status !== 200) throw new Error(`send failed: ${sent.status}`)
+  const bytes = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#2a9' } }).png().toBuffer()
+  const id = uuidv7()
+  const key = `attachments/${channelId}/${id}`
+  const tmp = join(tmpdir(), `alga-test-file-${id}`)
+  writeFileSync(tmp, bytes)
+  try {
+    await app.ctx.files.storage.put(key, tmp, { size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), contentType: 'image/png' })
+  } finally {
+    rmSync(tmp, { force: true })
+  }
+  await app.ctx.db.insert(attachments).values({ id, messageId: sent.body.id, storageKey: key, filename: 'x.png', contentType: 'image/png', size: bytes.length, width: 8, height: 8 })
+  const history = await api<Message[]>(app, 'GET', `/channels/${channelId}/messages?limit=100`, { token })
+  return { msg: history.body.find((m) => m.id === sent.body.id)!, bytes }
 }
 
 /** Makes `a` and `b` friends (request + accept). */

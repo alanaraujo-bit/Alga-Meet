@@ -4,6 +4,8 @@ import { uuidv7 } from '@alga/shared'
 import { and, eq, gt, lte, or } from 'drizzle-orm'
 import type { FastifyRequest } from 'fastify'
 import type { Db } from './db/index.js'
+import type { Hub } from './gateway/hub.js'
+import type { Voice } from './voice.js'
 import { emailTokens, sessions, users, type UserRow } from './db/schema.js'
 import { HttpError } from './errors.js'
 
@@ -89,6 +91,17 @@ export function authenticate(db: Db) {
 
 export async function hasSession(db: Db, userId: string): Promise<boolean> {
   return (await db.select({ id: sessions.id }).from(sessions).where(eq(sessions.userId, userId)).limit(1)).length > 0
+}
+
+/** Suspended (until a future date) or banned: no login, no session (src/trust-safety.ts). */
+export const isRestricted = (u: Pick<UserRow, 'bannedAt' | 'suspendedUntil'>, now = Date.now()) =>
+  u.bannedAt !== null || (u.suspendedUntil !== null && u.suspendedUntil.getTime() > now)
+
+/** Deletes every session of `userId`, closes their sockets with `code` and takes them out of voice (LiveKit too). */
+export async function revokeAllSessions(deps: { db: Db; hub: Hub; voice: Voice }, userId: string, code: number, reason: string): Promise<void> {
+  const deleted = await deps.db.delete(sessions).where(eq(sessions.userId, userId)).returning({ id: sessions.id })
+  for (const s of deleted) deps.hub.closeSession(s.id, code, reason)
+  await deps.voice.disconnect(userId)
 }
 
 /** 403 while the account's e-mail is unverified (api.ts lists what needs a verified e-mail). */

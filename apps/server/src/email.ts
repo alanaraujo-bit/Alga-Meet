@@ -14,6 +14,7 @@ import type { EmailConfig } from './config.js'
 import { safeErr } from './errors.js'
 
 export type EmailKind = 'verify_email' | 'account_exists' | 'password_reset'
+  | 'enforcement' | 'appeal_decision' | 'account_deletion' | 'data_export'
 
 export interface EmailMessage {
   to: string

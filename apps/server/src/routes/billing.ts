@@ -2,8 +2,9 @@ import { CheckoutBody, type BillingCatalog, type BillingMe, type CheckoutRespons
 import type { FastifyInstance } from 'fastify'
 import type { Ctx } from '../app.js'
 import { requireVerifiedEmail } from '../auth.js'
+import { ageBracketOf } from '../legal.js'
 import { WebhookRejected } from '../billing/provider.js'
-import { HttpError, idParam, parse } from '../errors.js'
+import { HttpError, forbidden, idParam, parse } from '../errors.js'
 import { perMinute } from './users.js'
 
 /** Catalog, provider webhooks (encapsulated raw-body parser) and the sandbox's fake payment page. */
@@ -45,12 +46,16 @@ export async function billingPublicRoutes(app: FastifyInstance, { billing }: Ctx
     })
 }
 
-export function billingRoutes(app: FastifyInstance, { billing }: Ctx): void {
+export function billingRoutes(app: FastifyInstance, { billing, config }: Ctx): void {
   app.get('/billing/me', async (req): Promise<BillingMe> => billing.me(req.auth.user))
 
   app.post('/billing/checkout', { config: perMinute(10) }, async (req, reply): Promise<CheckoutResponse> => {
     const { productId } = parse(CheckoutBody, req.body)
     requireVerifiedEmail(req.auth.user, 'fazer compras')
+    // Código Civil art. 4º: 16-17 are relatively incapable; until a guardian flow exists, purchases are 18+ only.
+    const age = ageBracketOf(req.auth.user)
+    if (age === 'teen') throw forbidden('Compras no Alga Meet exigem 18 anos ou mais.')
+    if (age === 'unknown' && config.legal.requireBirthDate) throw forbidden('Informe sua data de nascimento antes de comprar.')
     const res = await billing.checkout(req.auth.user, productId)
     reply.code(201)
     return res

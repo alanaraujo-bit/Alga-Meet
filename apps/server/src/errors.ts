@@ -15,8 +15,12 @@ const STATUS: Record<ApiErrorCode, number> = {
 
 export class HttpError extends Error {
   readonly statusCode: number
-  /** `status` overrides the code's default (e.g. 413 for a `validation` error on an oversized upload). */
-  constructor(readonly code: ApiErrorCode, message: string, readonly fields?: Record<string, string>, status?: number) {
+  /**
+   * `status` overrides the code's default (e.g. 413 for a `validation` error on an oversized upload); `extra` adds
+   * contract fields to ApiError.error (e.g. `restriction`).
+   */
+  constructor(readonly code: ApiErrorCode, message: string, readonly fields?: Record<string, string>, status?: number,
+    readonly extra?: Omit<ApiError['error'], 'code' | 'message' | 'fields'>) {
     super(message)
     this.statusCode = status ?? STATUS[code]
   }
@@ -70,8 +74,8 @@ export function safeErr(err: unknown): Record<string, unknown> {
 export const safeUrl = (url: string) =>
   url.replace(/(\/invites\/)[^/?#]+/, '$1<redacted>').replace(/([?&]sig=)[^&#]+/, '$1<redacted>')
 
-const body = (code: ApiErrorCode, message: string, fields?: Record<string, string>): ApiError =>
-  ({ error: fields ? { code, message, fields } : { code, message } })
+const body = (code: ApiErrorCode, message: string, fields?: Record<string, string>, extra?: object): ApiError =>
+  ({ error: { code, message, ...(fields ? { fields } : {}), ...extra } })
 
 export function installErrorHandling(app: FastifyInstance): void {
   app.setNotFoundHandler((_req, reply) => {
@@ -80,7 +84,7 @@ export function installErrorHandling(app: FastifyInstance): void {
 
   app.setErrorHandler((err: FastifyError | HttpError | ZodError, req, reply) => {
     if (err instanceof HttpError) {
-      return reply.code(err.statusCode).send(body(err.code, err.message, err.fields))
+      return reply.code(err.statusCode).send(body(err.code, err.message, err.fields, err.extra))
     }
     if (err instanceof ZodError) {
       return reply.code(400).send(body('validation', 'Dados inválidos.', fieldsOf(err)))
