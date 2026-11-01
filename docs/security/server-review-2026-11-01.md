@@ -315,6 +315,9 @@ O servidor devolve **cru** e o renderer precisa tratar como texto:
 Cada achado ganhou primeiro um teste de regressão que falhava no código revisado (`apps/server/test/security.test.ts`,
 um `describe` por achado; M8 em `moderation.test.ts`), depois a correção. Suíte: `npm test -w apps/server` → **87/87**.
 
+Atualização (2026-11-01, onda de uploads): `npm test -w apps/server` → **104/104** em PGlite e
+`npm run test:pg -w apps/server` → **104/104** num PostgreSQL 18 real (embedded-postgres). M9 e B2 revisados abaixo.
+
 | Achado | Correção | Commit | Teste | Status |
 |---|---|---|---|---|
 | A1 rate limit de login | `TRUST_PROXY` = IPs/CIDRs ou nº de saltos (`true` recusado); 10 logins falhos/15 min por conta, conferido antes do argon2, além de 10/min/IP | `d02ab89` | `A1 trusted proxy + login limits` | Corrigido. Store em memória: com mais de uma instância, usar Redis |
@@ -327,10 +330,10 @@ um `describe` por achado; M8 em `moderation.test.ts`), depois a correção. Suí
 | M6 edição após bloqueio | PATCH de mensagem exige `SEND_MESSAGES` + `assertDmNotBlocked` | `da7d8f3` | `M6 blocks and SEND_MESSAGES…` | Corrigido |
 | M7 reações ilimitadas | Um emoji RGI (`\p{RGI_Emoji}`), até 20 distintos por mensagem, 10 reações/5 s | `da7d8f3`, `d02ab89` | `M7 reactions…` | Corrigido (checagem do teto não é atômica: concorrência pode passar de 20 por poucas) |
 | M8 kick sem ban | `space_bans`; `PUT/DELETE/GET /spaces/:id/bans`; convite recusa banido; ban/kick derrubam a voz no LiveKit | `f3861a5` | `moderation.test.ts › bans and kicks` | Corrigido |
-| M9 `avatarUrl`/`iconUrl` | Só `https:` | `da7d8f3` | `M9/B4 input bounds` | Mitigado: o pixel de rastreio via https continua possível até existir upload próprio |
+| M9 `avatarUrl`/`iconUrl` | Upload próprio (`PUT /users/@me/avatar`, `PUT /spaces/:id/icon`: png/jpeg/webp/gif pelos bytes, SVG recusado, ≤ 8 MiB, ≤ 4096 px), servido pela própria API; `avatarUrl`/`iconUrl` só aceitam `null` ou uma URL nossa do mesmo usuário/espaço; a migração 0002 apagou as URLs externas já gravadas | `da7d8f3`, `f84df38` | `M9/B4 input bounds`, `uploads.test.ts › avatars and space icons` | Corrigido: sem host de terceiros não há pixel de rastreio |
 | M10 rotas sem limite | `global: true` (200/min por usuário, por IP em rotas públicas) + limites por rota (amizade, DM, espaço, convite, preview, join, `voice/join`, reações) | `d02ab89` | `M10/A2 write routes…` | Corrigido |
 | B1 sala fantasma | `kick` quando o canal não existe | `7b7e0b8` | `M4/B1/B7/B8/B9 voice` | Corrigido |
-| B2 corrida no bloqueio | Upsert com `setWhere: type <> 'blocked'` (só um bloqueio substitui um bloqueio) | `da7d8f3` | `B2/B3/B6` | Corrigido |
+| B2 corrida no bloqueio | Upsert com `setWhere: type <> 'blocked'` (só um bloqueio substitui um bloqueio). Reproduzido depois no PostgreSQL real com 20 pares concorrentes: pedido × bloqueio deixava `outgoing` pendente para o bloqueado (20/20) e pedidos simultâneos dos dois lados davam deadlock (500). Agora cada `POST/PUT/DELETE /relationships` lê e grava os dois sentidos numa transação com `pg_advisory_xact_lock` do par | `da7d8f3`, `d00beba` | `B2/B3/B6` (2 casos concorrentes) | Corrigido e confirmado em PostgreSQL 18 |
 | B3 logs com dados | `safeErr` (sem `params`, sem `detail` do pg) em todos os logs de erro; `safeUrl` redige `/invites/<código>` | `da7d8f3` | `B2/B3/B6` | Corrigido |
 | B4 `position` sem teto | `.max(10_000)` (canais e cargos) | `da7d8f3` | `M9/B4 input bounds` | Corrigido |
 | B5 enumeração no registro | — | — | — | Adiado: exige verificação de e-mail e muda a UX do cadastro (o desktop mostra o erro por campo) |
