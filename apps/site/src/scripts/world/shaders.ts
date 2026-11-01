@@ -92,7 +92,7 @@ void main() {
   // profundidade: em cima clareia (superfície), embaixo afunda no quase preto
   float k = clamp(uv.y + disp.y * 2.0, 0.0, 1.0);
   vec3 deep = vec3(0.010, 0.010, 0.018);
-  vec3 col = mix(deep, uTint * 0.22, smoothstep(0.0, 0.75, k));
+  vec3 col = mix(deep, uTint * 0.22 * (1.0 - uDepth * 0.75), smoothstep(0.0, 0.75, k));
   col = mix(col, uTint * 0.62, smoothstep(0.6, 1.08, k) * (1.0 - uDepth * 0.85));
 
   // raios: nascem acima da tela e abrem em leque

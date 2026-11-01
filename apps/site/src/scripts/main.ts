@@ -124,6 +124,4 @@ if (tier !== 'c') {
   } else {
     initTierB();
   }
-  const { initVoiceRoom } = await import('./voice-room');
-  initVoiceRoom(tier);
 }

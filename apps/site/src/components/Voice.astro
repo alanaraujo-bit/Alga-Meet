@@ -1,7 +1,7 @@
 ---
 import { facts } from '../data/facts';
-const sentence = 'Quando a Carlinha ri, você ouve a risada dela. Não um eco, não um robô, não meio segundo depois.';
-const words = sentence.split(' ');
+import { people, lines } from '../data/conversation';
+const dots = (w: number) => `background:linear-gradient(135deg,${people[w].grad[0]},${people[w].grad[1]})`;
 const lost = facts.packetsSent.toLocaleString('pt-BR');
 
 // Onda desenhada no build: fala em rajadas (sílabas) e, na versão com ruído, chiado por baixo de tudo.
@@ -27,11 +27,36 @@ const hiss = () => line(true);
 const speech = () => line(false);
 ---
 <section class="voice" id="voz" aria-labelledby="voz-t">
-  <div class="wrap">
-    <p class="eyebrow" data-reveal>Voz</p>
-    <h2 id="voz-t" data-reveal>A voz parece de perto.</h2>
-    <p class="lit" data-lit>{words.map((w, i) => <span class="w" style={`--i:${i}`}>{w} </span>)}</p>
+  <!-- A sala: capítulo preso no nível A (WebGL); B/C mostram a mesma conversa parada. -->
+  <div class="room-ch" data-room-ch>
+    <span class="anchor" id="sala" aria-hidden="true"></span>
+    <div class="room-stage" data-room-stage>
+      <div class="room-gl" data-room-gl aria-hidden="true"></div>
+      <div class="room-head wrap">
+        <p class="eyebrow">A sala</p>
+        <h2 id="voz-t" class="chapter-t">Fala que a gente <em>vê.</em></h2>
+        <p class="room-lede">Cada voz vira luz no chão. Role, e a conversa anda.</p>
+      </div>
+      <div class="names" aria-hidden="true">{people.map((p, i) => <span class="name" data-name={i}>{p.name}</span>)}</div>
+      <p class="caption" data-caption aria-hidden="true"><b data-cap-who></b><span data-cap-text></span></p>
+      <button type="button" class="listen" data-listen aria-pressed="false">
+        <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span class="l-off">Ouvir a sala</span><span class="l-on">Silenciar</span>
+      </button>
+      <p class="latency" data-latency><span class="tnum">{facts.voiceLatencyMs} ms</span> da boca de um ao ouvido do outro.</p>
+      <ol class="transcript" aria-label="A conversa da sala">
+        {lines.map((l) => (
+          <li class:list={[l.laugh && 'laugh']}>
+            <span class="dots" aria-hidden="true">{l.who.map((w) => <i style={dots(w)}></i>)}</span>
+            <b>{l.laugh ? 'Todo mundo' : people[l.who[0]].name}</b> <span>{l.text}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </div>
 
+  <div class="wrap">
+    <p class="lit" data-reveal>Quando alguém ri, você ouve a risada. <span>Não um eco. Não um robô. Não meio segundo depois.</span></p>
     <div class="grid">
       <article class="stat big" data-reveal>
         <p class="num tnum"><span data-count={facts.voiceLatencyMs}>{facts.voiceLatencyMs}</span><small> ms</small></p>
@@ -79,20 +104,73 @@ const speech = () => line(false);
 </section>
 
 <style>
-  .voice { position: relative; padding-block: clamp(96px, 16vh, 180px) clamp(64px, 10vh, 120px); }
+  .voice { position: relative; padding-bottom: clamp(64px, 10vh, 120px); }
+
+  /* ---- A sala ---- B/C (e sem JS): cabeçalho + a conversa como transcrição ---- */
+  .room-ch { position: relative; }
+  .anchor { position: absolute; left: 0; top: 0; }
+  .room-stage { position: relative; padding-block: clamp(96px, 14vh, 160px) 24px; }
+  .room-gl, .names, .caption, .latency, .listen { display: none; }
+  .room-head { position: relative; z-index: 2; }
+  .chapter-t em { font-style: normal; color: #a9acff; }
+  .room-lede { margin-top: 12px; color: var(--text-3); font-size: clamp(16px, 1.4vw, 19px); }
+  .transcript { list-style: none; margin: clamp(32px, 5vh, 56px) auto 0; padding: 0 var(--gutter); max-width: var(--maxw); display: grid; gap: 10px; }
+  .transcript li { display: flex; align-items: baseline; gap: 10px; font-size: clamp(18px, 2.2vw, 28px); line-height: 1.3; letter-spacing: -0.02em; color: var(--text-2); }
+  .transcript b { color: var(--text-1); font-weight: 600; flex: none; }
+  .transcript .dots { display: inline-flex; flex: none; transform: translateY(2px); }
+  .transcript .dots i { width: 18px; height: 18px; border-radius: 50%; margin-right: -5px; box-shadow: 0 0 0 2px var(--bg-1); }
+  .transcript .laugh span { color: #a9acff; }
+
+  /* ---- Nível A: palco preso de tela cheia com o WebGL ---- */
+  :global(html.tier-a) .room-ch { height: 460vh; }
+  :global(html.tier-a) .anchor { top: calc(0.16 * 360vh); }
+  :global(html.tier-a) .room-stage { position: sticky; top: 0; height: 100vh; height: 100lvh; overflow: hidden; padding: 0; background: #010102; }
+  :global(html.tier-a) .room-gl { display: block; position: absolute; inset: 0; }
+  :global(html.tier-a) .room-gl :global(canvas) { display: block; width: 100%; height: 100%; }
+  :global(html.tier-a) .room-head { position: absolute; left: 0; right: 0; top: clamp(88px, 13vh, 132px); pointer-events: none; }
+  :global(html.tier-a) .transcript { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0; padding: 0; }
+  :global(html.tier-a) .names { display: block; position: absolute; inset: 0; pointer-events: none; }
+  .name {
+    position: absolute; left: 0; top: 0; padding: 3px 9px; border-radius: 999px; font-size: 13px; font-weight: 560; color: var(--text-3);
+    background: rgba(10, 10, 16, 0.6); white-space: nowrap; opacity: 0; transition: color 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+  }
+  .name:global(.on) { color: var(--text-1); box-shadow: inset 0 0 0 1px rgba(160, 165, 255, 0.5); }
+  :global(html.tier-a) .caption {
+    display: block; position: absolute; left: 50%; bottom: clamp(76px, 9vh, 104px); transform: translateX(-50%); width: min(92vw, 860px); text-align: center;
+    font-size: clamp(22px, 2.8vw, 38px); line-height: 1.2; letter-spacing: -0.025em; font-weight: 580; color: var(--text-1); text-wrap: balance;
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.8); min-height: 2.4em;
+  }
+  .caption b { display: block; margin-bottom: 6px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: #a9acff; font-weight: 600; }
+  :global(html.tier-a) .listen {
+    display: inline-flex; align-items: center; gap: 10px; position: absolute; right: max(var(--gutter), calc(50vw - 600px)); bottom: clamp(24px, 4vh, 40px); z-index: 3;
+    height: 44px; padding: 0 18px 0 14px; border: 0; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 560; color: var(--text-1);
+    background: rgba(255, 255, 255, 0.06); box-shadow: inset 0 0 0 1px rgba(160, 165, 255, 0.35); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  }
+  .listen:hover { background: rgba(139, 142, 247, 0.16); }
+  .eq { display: inline-flex; align-items: center; gap: 2px; height: 16px; }
+  .eq i { width: 2px; height: 100%; border-radius: 1px; background: #a9acff; transform: scaleY(0.3); }
+  .listen[aria-pressed='true'] .eq i { animation: eq 700ms ease-in-out infinite alternate; }
+  .eq i:nth-child(2) { animation-delay: -200ms; } .eq i:nth-child(3) { animation-delay: -450ms; } .eq i:nth-child(4) { animation-delay: -100ms; }
+  @keyframes eq { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+  .l-on, .listen[aria-pressed='true'] .l-off { display: none; }
+  .listen[aria-pressed='true'] .l-on { display: inline; }
+  :global(html.tier-a) .latency {
+    display: block; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; opacity: 0; pointer-events: none;
+    font-size: clamp(18px, 2vw, 26px); color: var(--text-2); font-weight: 520; letter-spacing: -0.01em;
+  }
+  :global(html.tier-a) .latency::before { content: ''; position: absolute; inset: -30vh -10vw; z-index: -1; background: radial-gradient(closest-side, rgba(1, 1, 2, 0.85), rgba(1, 1, 2, 0)); }
+  .latency span { display: block; font-size: clamp(96px, 17vw, 240px); line-height: 0.9; letter-spacing: -0.06em; font-weight: 640; color: var(--text-1); font-variation-settings: 'opsz' 32; text-shadow: 0 0 60px rgba(139, 142, 247, 0.5); }
   .voice::before {
     content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
     background: radial-gradient(50% 40% at 15% 30%, rgba(97, 99, 208, 0.12), transparent 70%);
   }
   h2 { margin-top: 14px; }
   .lit {
-    margin-top: clamp(28px, 5vh, 48px); max-width: 22em;
+    margin-top: clamp(64px, 10vh, 120px); max-width: 22em;
     font-size: clamp(26px, 3.6vw, 46px); line-height: 1.18; letter-spacing: -0.025em; font-weight: 560;
     font-variation-settings: 'opsz' 32; color: var(--text-1);
   }
-  :global(html.tier-a) .lit .w { opacity: 0.18; }
-  :global(html.tier-b) .lit .w { opacity: 0.18; transition: opacity 500ms var(--ease-out); transition-delay: calc(var(--i) * 45ms); }
-  :global(html.tier-b) .lit:global(.in) .w { opacity: 1; }
+  .lit span { color: var(--text-3); }
 
   .grid { margin-top: clamp(48px, 8vh, 88px); display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
   .stat, .noise {

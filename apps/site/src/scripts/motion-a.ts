@@ -4,6 +4,7 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
 import { World } from './world/world';
+import { initRoom } from './room/chapter';
 
 const fmt = (n: number, dec: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 const $ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document) => r.querySelector<T>(s);
@@ -71,6 +72,7 @@ export function initTierA() {
   }
 
   initHero(w, narrow);
+  initRoom(w);
   initMagnetic(fine);
   initRest();
 
@@ -138,7 +140,7 @@ function initHero(w: World | null, narrow: boolean) {
   tl.to(tilt, { rotateX: -30, duration: 1.4, ease: 'power2.in' }, 8.9)
     .to(win, { y: vh(0.55), scale: 0.7, duration: 1.4, ease: 'power2.in' }, 8.9)
     .to(scene, { opacity: 0, duration: 1.2, ease: 'power2.in' }, 9.0);
-  if (w) tl.to(w.state, { depth: 0.75, rays: 0.45, duration: 1.4 }, 8.9).to(w.state.pool, { i: 0, duration: 1 }, 8.9);
+  if (w) tl.to(w.state, { depth: 1, rays: 0.12, duration: 1.4 }, 8.9).to(w.state.pool, { i: 0, duration: 1 }, 8.9);
   tl.set({}, {}, 10.3);
 
   let clicked = false;
