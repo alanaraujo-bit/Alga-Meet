@@ -11,6 +11,8 @@ export interface Conn {
   sessionId: string
   send(data: string): void
   close(code: number, reason: string): void
+  /** E2EE device this socket speaks for (set by a valid e2ee_join): E2EE_* dispatches go only to its sockets. */
+  e2eeDevice?: string
 }
 
 type Payload<T extends DispatchType> = DispatchOf<T> | ((userId: string) => DispatchOf<T> | undefined)
@@ -72,6 +74,26 @@ export class Hub {
     if (!frames) return
     metrics.dispatches.inc({ type: t })
     metrics.framesSent.inc({ type: t }, frames)
+  }
+
+  /** Sends a dispatch only to the sockets bound to one E2EE device. Returns whether any socket got it. */
+  toDevice<T extends DispatchType>(userId: string, deviceId: string, t: T, d: DispatchOf<T>): boolean {
+    let frames = 0
+    let data: string | undefined
+    for (const c of this.byUser.get(userId) ?? []) {
+      if (c.e2eeDevice !== deviceId) continue
+      c.send(data ??= JSON.stringify({ op: 'dispatch', t, d }))
+      frames++
+    }
+    if (!frames) return false
+    metrics.dispatches.inc({ type: t })
+    metrics.framesSent.inc({ type: t }, frames)
+    return true
+  }
+
+  deviceOnline(userId: string, deviceId: string): boolean {
+    for (const c of this.byUser.get(userId) ?? []) if (c.e2eeDevice === deviceId) return true
+    return false
   }
 
   closeSession(sessionId: string, code: number, reason: string): void {

@@ -57,6 +57,13 @@
       "when": 1793524593275,
       "tag": "0007_trust_safety_abuse",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793529417769,
+      "tag": "0008_e2ee",
+      "breakpoints": true
     }
   ]
 }

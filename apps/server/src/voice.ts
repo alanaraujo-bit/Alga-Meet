@@ -70,6 +70,11 @@ export class Voice {
   private readonly rechecks = new Map<string, NodeJS.Timeout>()
   /** Grace before that re-check; tests shorten it. */
   planRecheckMs = PLAN_RECHECK_MS
+  /**
+   * A user's voice state in a channel ended (left, kicked, banned, moved, lost access, channel deleted). src/e2ee.ts
+   * hooks it to remove their MLS leaf at once, without waiting for LiveKit's webhook.
+   */
+  onLeave: (userId: string, channelId: string) => void = () => {}
 
   constructor(
     private readonly config: Config,
@@ -199,6 +204,7 @@ export class Voice {
     this.states.set(userId, state)
     metrics.voiceJoins.inc({ result: 'joined' })
     if (prev) {
+      this.onLeave(userId, prev.channelId)
       this.hub.dispatch([...await this.audience(prev), userId], 'VOICE_STATE_REMOVE', { userId, channelId: prev.channelId })
       await this.kick(prev.channelId, userId)
     }
@@ -294,6 +300,7 @@ export class Voice {
     for (const s of this.all()) {
       if (!channelIds.includes(s.channelId)) continue
       this.states.delete(s.userId)
+      this.onLeave(s.userId, s.channelId)
       this.hub.dispatch([...audience, s.userId], 'VOICE_STATE_REMOVE', { userId: s.userId, channelId: s.channelId })
     }
     for (const id of channelIds) {
@@ -325,6 +332,7 @@ export class Voice {
   private async remove(s: VoiceState): Promise<void> {
     if (this.states.get(s.userId)?.channelId !== s.channelId) return
     this.states.delete(s.userId)
+    this.onLeave(s.userId, s.channelId)
     this.hub.dispatch([...await this.audience(s), s.userId], 'VOICE_STATE_REMOVE', { userId: s.userId, channelId: s.channelId })
   }
 

@@ -87,6 +87,11 @@ const EnvSchema = z
     LEGAL_URL: z.url().default('https://algameet.com.br/legal'),
     /** Bearer token for GET /metrics. Production: /metrics is off without it; dev/test: open without it. */
     METRICS_TOKEN: z.string().min(32).optional(),
+    /** E2EE Delivery Service signing key (external sender of every call group): base64 Ed25519 seed (32 bytes).
+     * Production: required; dev/test: random per process. */
+    E2EE_DS_KEY: z.string().optional().refine((v) => v === undefined || Buffer.from(v, 'base64').length === 32, 'base64 of 32 random bytes'),
+    /** Directory of the MLS WASM build (alga_mls.js + alga_mls_bg.wasm). Default: native/mls/pkg of the monorepo. */
+    E2EE_MLS_PKG: z.string().min(1).default(join(serverRoot, '..', '..', 'native', 'mls', 'pkg')),
   })
   .superRefine((env, ctx) => {
     const devMode = env.ALGA_ALLOW_DEV_SECRETS || (env.NODE_ENV !== 'production' && LOOPBACK.has(env.HOST))
@@ -100,6 +105,8 @@ const EnvSchema = z
       if (!env.CORS_ORIGINS?.trim()) ctx.addIssue({ code: 'custom', path: ['CORS_ORIGINS'], message: 'required in production (no permissive default)' })
       if (!env.PUBLIC_URL?.startsWith('https://')) ctx.addIssue({ code: 'custom', path: ['PUBLIC_URL'], message: 'required in production, https://' })
       if (!env.FILES_SECRET) ctx.addIssue({ code: 'custom', path: ['FILES_SECRET'], message: 'required in production (≥ 32 random characters)' })
+      // A per-process key would change on every restart and differ between instances.
+      if (!env.E2EE_DS_KEY) ctx.addIssue({ code: 'custom', path: ['E2EE_DS_KEY'], message: 'required in production (base64 of 32 random bytes)' })
       // Container disks are ephemeral: picking local storage must be a deliberate choice (with a volume).
       if (!env.STORAGE_DRIVER) ctx.addIssue({ code: 'custom', path: ['STORAGE_DRIVER'], message: 'required in production: s3, or local with a persistent UPLOADS_DIR' })
     }
@@ -155,6 +162,8 @@ export interface Config {
   legal: { requireBirthDate: boolean; url: string }
   /** GET /metrics bearer token (src/observability.ts). */
   metricsToken: string | undefined
+  /** src/e2ee.ts. `dsSeed`: Ed25519 seed of the Delivery Service's external-sender key. */
+  e2ee: { dsSeed: Buffer; mlsPkg: string }
 }
 
 export interface BillingConfig {
@@ -229,5 +238,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     },
     legal: { requireBirthDate: e.NODE_ENV === 'production' || e.REQUIRE_BIRTHDATE, url: e.LEGAL_URL.replace(/\/+$/, '') },
     metricsToken: e.METRICS_TOKEN,
+    e2ee: { dsSeed: e.E2EE_DS_KEY ? Buffer.from(e.E2EE_DS_KEY, 'base64') : randomBytes(32), mlsPkg: e.E2EE_MLS_PKG },
   }
 }

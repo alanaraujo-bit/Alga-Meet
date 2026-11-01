@@ -129,6 +129,7 @@ export function installObservability(app: FastifyInstance, ctx: Ctx): void {
     const states = voice.all()
     m.voiceParticipants.set({}, states.length)
     m.voiceRooms.set({}, new Set(states.map((s) => s.channelId)).size)
+    m.e2eeGroups.set({}, ctx.e2ee.groupCount())
     const mem = process.memoryUsage()
     m.rss.set({}, mem.rss)
     m.heapUsed.set({}, mem.heapUsed)

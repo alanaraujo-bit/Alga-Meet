@@ -31,11 +31,12 @@ Ver `.env.example` (copie para `.env`; é carregado automaticamente). Validaçã
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_URL_STYLE` (`virtual` | `path`), `EMAIL_DRIVER` (`console` | `resend`),
 `ALGA_ALLOW_CONSOLE_EMAIL`, `EMAIL_OUTBOX_DIR`, `EMAIL_FROM`, `RESEND_API_KEY`, `EMAIL_LINK_URL`, `BILLING_PROVIDER`
 (`none` | `sandbox` | `mercadopago`), `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `MP_API_URL`, `BILLING_RETURN_URL`,
-`REQUIRE_BIRTHDATE`, `LEGAL_URL`, `METRICS_TOKEN`.
+`REQUIRE_BIRTHDATE`, `LEGAL_URL`, `METRICS_TOKEN`, `E2EE_DS_KEY`, `E2EE_MLS_PKG`.
 
 Falha fechada:
 - **Sem `NODE_ENV` o servidor é produção**: exige `DATABASE_URL`, `CORS_ORIGINS`, `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET`
-  reais, `PUBLIC_URL` https, `FILES_SECRET`, `STORAGE_DRIVER` explícito (`s3` exige as 4 variáveis `S3_*`) e
+  reais, `PUBLIC_URL` https, `FILES_SECRET`, `E2EE_DS_KEY` (base64 de 32 bytes aleatórios: a chave Ed25519 do Delivery
+  Service; em dev/test é aleatória por processo), `STORAGE_DRIVER` explícito (`s3` exige as 4 variáveis `S3_*`) e
   `EMAIL_DRIVER` explícito (`resend` exige `RESEND_API_KEY` e `EMAIL_FROM`; `console` só com
   `ALGA_ALLOW_CONSOLE_EMAIL=1`). O banco precisa ser UTF8 (a subida falha caso contrário). `npm run dev` passa `--dev`.
 - **Pagamentos**: em produção o padrão é `BILLING_PROVIDER=none` (checkout 503). `sandbox` é **recusado em produção**,
@@ -72,13 +73,14 @@ Falha fechada:
 | `src/files.ts` | spool do multipart em arquivo temporário, tipo real (`file-type`) e dimensões (`image-size`), re-encode de imagens (`sharp`, sem metadados), nome sanitizado, URL assinada (HMAC), cabeçalhos dos arquivos, fila `storage_deletions` + `sweep` |
 | `src/gateway/` | conexões, fan-out, presença, `Throttle`; handshake, heartbeat, limites, READY, ops `presence`/`voice_state` |
 | `src/voice.ts` | tokens/grants LiveKit, webhook (assinatura + dedupe), `VoiceState` autoritativo, limite de usuários, moderação no SFU |
+| `src/e2ee.ts` | **E2EE Delivery Service** (`docs/decisions/0004-e2ee.md`; contrato e fluxo em `packages/shared/src/e2ee.ts`; garantias e ataques em `docs/security/e2ee-delivery-service.md`): dispositivos e key packages (uso único, `SKIP LOCKED`), grupo MLS por chamada com o estado **público** (OpenMLS `PublicGroup` do `native/mls/pkg`, carregado em Node), proposals Add/Remove assinadas pelo DS, um commit por época conferido contra a árvore, Welcome só para o dispositivo adicionado, remoção imediata no hook `Voice.onLeave`, timeout do committer e reset. Sem `native/mls/pkg` a E2EE fica desligada (503) |
 | `src/billing/` | `catalog.ts` (planos, preços, cosméticos; versionado), `billing.ts` (motor: checkout, webhooks idempotentes, recompute de direitos, job de expiração), `provider.ts` (interface `PaymentProvider` + `SandboxProvider`), `mercadopago.ts` (Checkout Pro + preapproval, `x-signature`) |
 | `src/legal.ts` | catálogo `LEGAL_VERSIONS` (versão + `changeSummary`; a do topo é `TERMS_VERSION`), faixa etária (`ageBracketOf`), prioridade e rótulos pt-BR dos motivos, prazos |
 | `src/trust-safety.ts` | medidas na conta (`applyAction`: warn/suspend/ban/lift aplicados em login, sessões, gateway 4010 e voz), token de recurso, quarentena de anexos com cópia em `evidence/` + SHA-256 e liberação (falso positivo), retenção legal, `setStaffRole` |
 | `src/privacy.ts` | registros de acesso (Marco Civil art. 15), exclusão de conta (carência + expurgo), exportação (zip + link assinado por e-mail; no app, só com a senha), job de retenção |
 | `src/zip.ts` | escritor de ZIP mínimo (deflate, sem zip64) para a exportação |
 | `scripts/grant-staff.ts` | único jeito de dar/tirar `staff_role` (`npx tsx scripts/grant-staff.ts <username> <admin\|moderator\|none>`; com PGlite, pare o servidor antes) |
-| `src/routes/` | `auth` (inclui verificação de e-mail e redefinição de senha), `users` (perfil, relacionamentos, DMs), `spaces` (espaços, membros, canais, convites, listar/revogar convites), `roles` (cargos, apelidos), `moderation` (bans, voz), `messages` (inclui envio multipart), `files` (download assinado, avatares/ícones), `voice`, `billing`, `privacy` (idade, aceite, exclusão, exportação, `/legal`), `reports` (denúncias, medidas da própria conta, recursos), `admin` (equipe, auditado), `telemetry` (relatório de qualidade de chamada) |
+| `src/routes/` | `auth` (inclui verificação de e-mail e redefinição de senha), `users` (perfil, relacionamentos, DMs), `spaces` (espaços, membros, canais, convites, listar/revogar convites), `roles` (cargos, apelidos), `moderation` (bans, voz), `messages` (inclui envio multipart), `files` (download assinado, avatares/ícones), `voice`, `e2ee` (dispositivos e key packages), `billing`, `privacy` (idade, aceite, exclusão, exportação, `/legal`), `reports` (denúncias, medidas da própria conta, recursos), `admin` (equipe, auditado), `telemetry` (relatório de qualidade de chamada) |
 
 ## Regras principais
 
@@ -301,10 +303,23 @@ Falha fechada:
   aleatório e `user_hash` com sal aleatório trocado todo dia e nunca gravado; expurgo aos 30 dias; vira histogramas
   `alga_call_*`.
 
-## Testes (`test/`, 168 casos)
+## Testes (`test/`, 175 casos)
 
 `npm test` roda em PGlite; `npm run test:pg` roda os mesmos casos num PostgreSQL 18 real (`test/pg-setup.ts`: um
 cluster UTF8 descartável por execução, um banco por `startServer`). Os dois passam.
+
+`e2ee.test.ts` (7): dispositivos de verdade = o WASM de `native/mls/pkg` + o controlador do desktop
+(`apps/desktop/src/main/mls/session.ts`) falando com este servidor por REST e gateway. Três dispositivos entram numa
+chamada e instalam a mesma chave para cada remetente (mesmo `export_secret`, mesmo código da chamada, código par a
+par simétrico); expulsar um membro gera o Remove na hora, ele recebe `removed`, a chave nova é outra e ele não exporta
+mais nada; saída pelo webhook também remove; um dispositivo que perdeu o estado (registro de novo) volta com uma folha
+só. Corrida de commits na mesma época (um vence, o outro e uma réplica recebem `commit_rejected`; o Welcome vai uma
+vez, só ao novato; commit adulterado recusado); dispositivo desconhecido, canal sem acesso e não membro recusados;
+frame `e2ee_*` de 21 KB aceito e o mesmo tamanho em outra op fecha com 4003; cota própria de 60 frames (4008).
+Registro por sessão, key package de outro dispositivo/forjado/lixo recusado, teto de 100 por dispositivo, logout
+apaga dispositivo e key packages; 10 resgates concorrentes de um estoque de 5 levam 5 diferentes (no PG real é a
+prova do `SKIP LOCKED`) e o estoque vazio faz o dispositivo enviar mais e entrar. `E2EE_DS_KEY` obrigatória em
+produção (32 bytes), aleatória em dev/test.
 
 Auth, handshake do gateway, CORS, amizades, bloqueio, DMs, presença, espaços, convites, mensagens, voz (grants,
 limite, DM, webhook, VOICE_STATE_*, CALL_RING, kick derruba voz). `security.test.ts` (32): uma regressão por achado
@@ -398,6 +413,11 @@ na lacuna abaixo.
 - Downloads passam pela API (controle total dos cabeçalhos), o que conta como egress do serviço no Railway
   (US$ 0,05/GB); o egress do bucket é grátis. Otimização futura: redirect para uma URL pré-assinada do bucket.
 - Migrações rodam na subida sem lock: com mais de uma réplica, subir uma por vez (ou mover para `preDeploy`).
+- **E2EE**: os grupos do DS ficam em memória (uma instância; restart = grupos recriados quando os clientes reenviam
+  `e2ee_join`). `infra/server/Dockerfile` ainda não copia `native/mls/pkg` (falta `COPY native/mls/pkg
+  native/mls/pkg` no runtime; `E2EE_MLS_PKG` aponta para outro lugar se preciso): sem ela a imagem sobe com E2EE
+  desligada. O DS não confere as tags MAC do commit (só membros conseguem). Detalhes em
+  `docs/security/e2ee-delivery-service.md`.
 - Overwrites de permissão por canal ainda não existem (permissões valem para o espaço inteiro).
 - Estado de voz, conexões, throttles e contadores de rate limit ficam em memória: uma instância só. Para escalar,
   Redis (pub/sub + store do `@fastify/rate-limit`). **Plano do Redis para o rate limit**: trocar `RateLimitStore`

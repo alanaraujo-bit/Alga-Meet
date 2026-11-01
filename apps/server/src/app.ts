@@ -2,12 +2,14 @@ import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
 import rateLimit from '@fastify/rate-limit'
 import websocket from '@fastify/websocket'
+import { E2EE_MAX_FRAME_BYTES } from '@alga/shared'
 import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance } from 'fastify'
 import { authenticate, isRestricted, type AuthContext } from './auth.js'
 import { Billing } from './billing/billing.js'
 import { maxPlanAttachmentBytes } from './billing/catalog.js'
 import type { Config } from './config.js'
 import { openDatabase, type Db } from './db/index.js'
+import { E2ee } from './e2ee.js'
 import { Mailer, createEmailSender } from './email.js'
 import { HttpError, installErrorHandling, safeUrl } from './errors.js'
 import { Files } from './files.js'
@@ -19,6 +21,7 @@ import { Privacy } from './privacy.js'
 import { adminRoutes } from './routes/admin.js'
 import { authPublicRoutes, authRoutes } from './routes/auth.js'
 import { billingPublicRoutes, billingRoutes } from './routes/billing.js'
+import { e2eeRoutes } from './routes/e2ee.js'
 import { filePublicRoutes, fileRoutes } from './routes/files.js'
 import { messageRoutes } from './routes/messages.js'
 import { moderationRoutes } from './routes/moderation.js'
@@ -40,6 +43,7 @@ export interface Ctx {
   db: Db
   hub: Hub
   voice: Voice
+  e2ee: E2ee
   files: Files
   mail: Mailer
   billing: Billing
@@ -83,7 +87,8 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   const billing = new Billing(config, database.db, hub, voice, app.log)
   await billing.syncCatalog()
   // trust/privacy take the whole Ctx (they use every other service); assigned right below.
-  const ctx = { config, db: database.db, hub, voice, files, mail, billing, telemetry: new Telemetry(database.db, app.log), log: app.log } as Ctx
+  const e2ee = new E2ee(config, database.db, hub, voice, app.log)
+  const ctx = { config, db: database.db, hub, voice, e2ee, files, mail, billing, telemetry: new Telemetry(database.db, app.log), log: app.log } as Ctx
   ctx.trust = new TrustSafety(ctx)
   ctx.privacy = new Privacy(ctx)
   app.decorate('ctx', ctx)
@@ -106,6 +111,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     await files.stop()
     await billing.stop()
     voice.stop()
+    e2ee.stop()
     await database.close()
   })
 
@@ -135,7 +141,8 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       return new HttpError('rate_limited', 'Muitas requisições. Tente novamente em instantes.')
     },
   })
-  await app.register(websocket, { options: { maxPayload: 16 * 1024 } })
+  // e2ee_* frames carry MLS commits/Welcomes; every other op is held to 16 KiB in src/gateway/socket.ts.
+  await app.register(websocket, { options: { maxPayload: E2EE_MAX_FRAME_BYTES } })
   // Upload routes pass their own per-request limits; these are the ceilings for any multipart body.
   await app.register(multipart, {
     limits: { fileSize: maxPlanAttachmentBytes(config.files.maxAttachmentBytes), files: 1, fields: 4, fieldSize: 64 * 1024, parts: 16, headerPairs: 64 },
@@ -169,6 +176,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       moderationRoutes(authed, ctx)
       messageRoutes(authed, ctx)
       voiceRoutes(authed, ctx)
+      e2eeRoutes(authed, ctx)
       fileRoutes(authed, ctx)
       billingRoutes(authed, ctx)
       privacyRoutes(authed, ctx)

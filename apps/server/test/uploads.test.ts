@@ -411,7 +411,7 @@ describe('helpers and config', () => {
       NODE_ENV: 'production', DATABASE_URL: 'postgres://u:p@db:5432/alga', CORS_ORIGINS: 'null',
       LIVEKIT_API_KEY: 'k', LIVEKIT_API_SECRET: 'a-real-production-secret-0123456789abcdef',
       PUBLIC_URL: 'https://api.example.com', FILES_SECRET: 's'.repeat(32), STORAGE_DRIVER: 'local',
-      EMAIL_DRIVER: 'resend', RESEND_API_KEY: 're_test', EMAIL_FROM: 'Alga Meet <nao-responda@example.com>',
+      EMAIL_DRIVER: 'resend', RESEND_API_KEY: 're_test', EMAIL_FROM: 'Alga Meet <nao-responda@example.com>', E2EE_DS_KEY: 'A'.repeat(43) + '=',
     }
     expect(loadConfig(PROD).storage.driver).toBe('local')
     expect(() => loadConfig({ ...PROD, PUBLIC_URL: 'http://api.example.com' })).toThrow(/PUBLIC_URL/)

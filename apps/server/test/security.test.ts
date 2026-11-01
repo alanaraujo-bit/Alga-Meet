@@ -49,6 +49,7 @@ const PROD = {
   NODE_ENV: 'production', DATABASE_URL: 'postgres://u:p@db:5432/alga', CORS_ORIGINS: 'null,file://',
   PUBLIC_URL: 'https://api.example.com', FILES_SECRET: 'f'.repeat(32), STORAGE_DRIVER: 'local',
   EMAIL_DRIVER: 'resend', RESEND_API_KEY: 're_test', EMAIL_FROM: 'Alga Meet <nao-responda@example.com>',
+  E2EE_DS_KEY: 'A'.repeat(43) + '=',
 }
 const REAL_SECRET = 'a-real-production-secret-0123456789abcdef'
 

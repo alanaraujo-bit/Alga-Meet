@@ -1,4 +1,4 @@
-import { GatewayClose, type ClientFrame, type ReadyPayload } from '@alga/shared'
+import { E2EE_FRAME_LIMIT, E2eeClientFrameSchema, GatewayClose, type ClientFrame, type ReadyPayload } from '@alga/shared'
 import { eq, inArray } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import type { WebSocket } from 'ws'
@@ -14,8 +14,10 @@ import { afterMeUpdate } from '../routes/users.js'
 import { meView, privateChannelsOf, publicUser, relationshipsOf, spaceSnapshots } from '../views.js'
 import { Throttle, broadcastPresence, effectiveStatus, type Conn } from './hub.js'
 
-/** Discord's gateway figure. Also bounds the per-socket frame queue (each frame ≤ 16 KiB). */
+/** Discord's gateway figure. With E2EE_FRAME_LIMIT it bounds the per-socket frame queue (16 KiB / E2EE_MAX_FRAME_BYTES each). */
 const FRAME_LIMIT = 120
+/** Every op but e2ee_* (the socket's maxPayload is E2EE_MAX_FRAME_BYTES). */
+const MAX_FRAME_BYTES = 16 * 1024
 const FRAME_WINDOW_MS = 60_000
 const MAX_SOCKETS_PER_USER = 10
 const IDENTIFY_TIMEOUT_MS = 10_000
@@ -34,6 +36,7 @@ const ClientFrameSchema = z.discriminatedUnion('op', [
     op: z.literal('voice_state'),
     selfMute: z.boolean(), selfDeaf: z.boolean(), streaming: z.boolean(), video: z.boolean(),
   }),
+  ...E2eeClientFrameSchema.options,
 ]) satisfies z.ZodType<ClientFrame>
 
 export async function buildReady(ctx: Ctx, user: UserRow): Promise<ReadyPayload> {
@@ -93,6 +96,7 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
     let chain = Promise.resolve()
     let windowStart = Date.now()
     let frames = 0
+    let e2eeFrames = 0
 
     const close = (code: number, reason: string) => {
       if (socket.readyState === socket.OPEN || socket.readyState === socket.CONNECTING) socket.close(code, reason)
@@ -104,13 +108,7 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
     }
     arm(Math.min(IDENTIFY_TIMEOUT_MS, config.heartbeatIntervalMs * 2))
 
-    const handle = async (raw: string) => {
-      let json: unknown
-      try {
-        json = JSON.parse(raw)
-      } catch {
-        return close(GatewayClose.INVALID_PAYLOAD, 'invalid json')
-      }
+    const handle = async (json: unknown) => {
       const parsed = ClientFrameSchema.safeParse(json)
       if (!parsed.success) return close(GatewayClose.INVALID_PAYLOAD, 'invalid frame')
       const frame = parsed.data
@@ -173,21 +171,40 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
             selfMute: frame.selfMute, selfDeaf: frame.selfDeaf, streaming: frame.streaming, video: frame.video,
           }))
           break
+        case 'e2ee_join':
+        case 'e2ee_group_info':
+        case 'e2ee_commit':
+        case 'e2ee_welcome_ack':
+        case 'e2ee_resync':
+          await ctx.e2ee.handle(conn, frame)
+          break
       }
     }
 
     socket.on('message', (data, isBinary) => {
+      const raw = isBinary ? '' : data.toString()
+      let json: unknown
+      try {
+        json = JSON.parse(raw)
+      } catch {
+        return close(GatewayClose.INVALID_PAYLOAD, 'invalid json')
+      }
+      // e2ee_* frames (MLS handshakes, up to E2EE_MAX_FRAME_BYTES) have their own quota and size cap.
+      const op = (json as { op?: unknown } | null)?.op
+      const e2ee = typeof op === 'string' && op.startsWith('e2ee_')
+      if (!e2ee && raw.length > MAX_FRAME_BYTES) return close(GatewayClose.INVALID_PAYLOAD, 'frame too large')
       const now = Date.now()
       if (now - windowStart >= FRAME_WINDOW_MS) {
         windowStart = now
         frames = 0
+        e2eeFrames = 0
       }
-      if (++frames > FRAME_LIMIT) {
-        if (frames === FRAME_LIMIT + 1) metrics.rateLimited.inc({ route: 'gateway' })
+      const [n, limit] = e2ee ? [++e2eeFrames, E2EE_FRAME_LIMIT] : [++frames, FRAME_LIMIT]
+      if (n > limit) {
+        if (n === limit + 1) metrics.rateLimited.inc({ route: 'gateway' })
         return close(GatewayClose.RATE_LIMITED, 'rate limited')
       }
-      const raw = isBinary ? '' : data.toString()
-      chain = chain.then(() => handle(raw)).catch((err: unknown) => {
+      chain = chain.then(() => handle(json)).catch((err: unknown) => {
         log.error({ err: safeErr(err) }, 'gateway frame handling failed')
         close(1011, 'internal error')
       })

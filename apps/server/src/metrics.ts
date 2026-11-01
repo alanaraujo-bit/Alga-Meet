@@ -166,6 +166,11 @@ export const metrics = {
   livekitWebhookDuration: r.histogram('alga_livekit_webhook_duration_seconds', 'LiveKit webhook processing time by event.', LATENCY),
   livekitWebhookFailures: r.counter('alga_livekit_webhook_failures_total', 'LiveKit webhooks rejected (signature) or failed (handler).'),
 
+  // E2EE Delivery Service (src/e2ee.ts).
+  e2eeGroups: r.gauge('alga_e2ee_groups', 'Call MLS groups the DS is tracking.'),
+  e2eeCommits: r.counter('alga_e2ee_commits_total', 'Commits received, by result (accepted | rejected).'),
+  e2eeResyncs: r.counter('alga_e2ee_resyncs_total', 'E2EE_RESYNC_REQUIRED sent, by reason (reset = the DS restarted a stuck group).'),
+
   // Database (src/db/index.ts wraps the driver's query function).
   dbQueryDuration: r.histogram('alga_db_query_duration_seconds', 'Database query time by driver and statement kind.', LATENCY),
   dbQueryErrors: r.counter('alga_db_query_errors_total', 'Database queries that failed, by driver and statement kind.'),

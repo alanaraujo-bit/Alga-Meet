@@ -523,3 +523,39 @@ export const callQualityReports = pgTable('call_quality_reports', {
   cpuVendor: text('cpu_vendor').notNull(),
   gpuVendor: text('gpu_vendor').notNull(),
 }, (t) => [index('call_quality_reports_day_idx').on(t.day)])
+
+// ---- E2EE Delivery Service (src/e2ee.ts; docs/decisions/0004-e2ee.md) ---------------------------------------------
+// Public keys only: no MLS group secret, private key or media key ever reaches the server.
+
+/**
+ * A client device's MLS identity. Bound to the user and to the session that registered it (one device per session):
+ * deleting the session (logout, revoke, password change, suspension) deletes the device and its key packages.
+ */
+export const deviceKeys = pgTable('device_keys', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  deviceId: uuid('device_id').notNull(),
+  sessionId: uuid('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  /** Raw Ed25519 public key, base64: the leaf signature key of the device's key packages and MLS leaves. */
+  signatureKey: text('signature_key').notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [
+  primaryKey({ columns: [t.userId, t.deviceId] }),
+  uniqueIndex('device_keys_session_id_key').on(t.sessionId),
+])
+
+/** Single-use MLS key packages (public data), claimed with DELETE … FOR UPDATE SKIP LOCKED so no two joins share one. */
+export const keyPackages = pgTable('key_packages', {
+  /** KeyPackageRef (RFC 9420 §5.2), hex: what a Welcome names its recipient by. */
+  ref: text('ref').primaryKey(),
+  userId: uuid('user_id').notNull(),
+  deviceId: uuid('device_id').notNull(),
+  /** MLSMessage(KeyPackage), base64. */
+  keyPackage: text('key_package').notNull(),
+  notAfter: ts('not_after').notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ columns: [t.userId, t.deviceId], foreignColumns: [deviceKeys.userId, deviceKeys.deviceId] }).onDelete('cascade'),
+  index('key_packages_device_idx').on(t.userId, t.deviceId, t.createdAt),
+])
+
+export type DeviceKeyRow = typeof deviceKeys.$inferSelect

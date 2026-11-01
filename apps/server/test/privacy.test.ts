@@ -121,7 +121,7 @@ describe('age gate (Lei 15.211/2025)', () => {
     const PROD = {
       NODE_ENV: 'production', DATABASE_URL: 'postgres://u:p@db:5432/alga', CORS_ORIGINS: 'null', LIVEKIT_API_KEY: 'k',
       LIVEKIT_API_SECRET: 'a-real-production-secret-0123456789abcdef', PUBLIC_URL: 'https://api.example.com', FILES_SECRET: 's'.repeat(32),
-      STORAGE_DRIVER: 'local', EMAIL_DRIVER: 'console', ALGA_ALLOW_CONSOLE_EMAIL: '1',
+      STORAGE_DRIVER: 'local', EMAIL_DRIVER: 'console', ALGA_ALLOW_CONSOLE_EMAIL: '1', E2EE_DS_KEY: 'A'.repeat(43) + '=',
     }
     expect(loadConfig(PROD).legal.requireBirthDate).toBe(true)
     expect(loadConfig({ NODE_ENV: 'test' }).legal.requireBirthDate).toBe(false)

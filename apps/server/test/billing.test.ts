@@ -407,7 +407,7 @@ describe('enforcement', () => {
       expect(voice.stateOf(u.user.id)?.channelId).toBe(ch.id)
       return `ch_${ch.id}`
     }
-    const presetsSent = () => update.mock.calls.map((c) => [c[0], c[1], c[2]?.attributes?.[STREAM_PRESETS_ATTRIBUTE]])
+    const presetsSent = () => update.mock.calls.map((c) => [c[0], c[1], (c[2] as { attributes?: Record<string, string> } | undefined)?.attributes?.[STREAM_PRESETS_ATTRIBUTE]])
     const FREE = '720p30,720p60,1080p30'
 
     // Downgrade (refund): the attribute changes in the same request; the re-check mutes only what is still above.
@@ -446,7 +446,7 @@ describe('configuration', () => {
     NODE_ENV: 'production', DATABASE_URL: 'postgres://u:p@db:5432/alga', CORS_ORIGINS: 'null',
     LIVEKIT_API_KEY: 'k', LIVEKIT_API_SECRET: 'a-real-production-secret-0123456789abcdef',
     PUBLIC_URL: 'https://api.example.com', FILES_SECRET: 's'.repeat(32), STORAGE_DRIVER: 'local',
-    EMAIL_DRIVER: 'console', ALGA_ALLOW_CONSOLE_EMAIL: '1',
+    EMAIL_DRIVER: 'console', ALGA_ALLOW_CONSOLE_EMAIL: '1', E2EE_DS_KEY: 'A'.repeat(43) + '=',
   }
   const MP = { BILLING_PROVIDER: 'mercadopago', MP_ACCESS_TOKEN: 'fake-access-token', MP_WEBHOOK_SECRET: 'fake-secret', BILLING_RETURN_URL: 'https://algameet.com.br/billing/return' }
 
