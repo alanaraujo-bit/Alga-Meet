@@ -129,6 +129,30 @@ Profundidade no escuro = luminância + borda translúcida + anel escuro. `--elev
 - **Falha:** explicada no lugar (campo, mensagem, chip, splash), sempre com uma saída ("Tentar de novo", "Descartar", "Sair da conta").
 - **Conexão caiu:** um chip âmbar de 28 px substitui a busca na title bar ("Sem conexão. Tentando de novo em 3 s…" + "Tentar agora"); nada abaixo se move. Mesma frase no splash, com a causa provável. O composer avisa "Sem conexão. Sua mensagem sai quando voltar."
 - **Composer:** sem borda em repouso (só no foco). `@` abre o autocomplete (membros do espaço ou destinatários do DM; ↑↓, Enter/Tab, Esc; vira `<@id>` no envio). Emoji: seletor compacto e pesquisável (≈120 emojis curados, palavras-chave pt-BR sem acento, sem dependência).
+- **Apelidos:** dentro de um espaço o nome que aparece é o apelido (`displayName(st, id, spaceId)`): mensagens, resposta, menção (`Markdown spaceId`), digitando, lista de membros, autocomplete, notificação.
+
+### Anexos (`features/chat/Attachments.tsx`, `tray.ts`, `Lightbox.tsx`)
+
+- **Entrada:** clipe à esquerda do composer (`IconButton`, com `disabledReason` sem `ATTACH_FILES`), arrastar para a conversa (alvo de soltar: borda interna de 2 px em acento, "Solte para enviar em #canal", limites numa frase; sem permissão o alvo fica neutro e diz por quê) e colar imagem (só quando o clipboard não traz texto; o arquivo vira `imagem-colada-<data>.png`).
+- **Bandeja:** cartões de 120 px acima do campo (miniatura real de imagem/vídeo, ícone por tipo nos outros), nome, tamanho, ✕ que devolve o foco ao composer. Problemas aparecem **antes** do envio, no próprio cartão (contorno `--danger` + motivo): vazio, maior que 25 MB (`DEFAULT_MAX_ATTACHMENT_BYTES`), passou de 10 (`MAX_ATTACHMENTS`). Esses não vão. Enter envia só com arquivos.
+- **Envio:** o otimista de sempre (nonce) com as prévias locais (`blob:`) no lugar e o tamanho da imagem já lido (`createImageBitmap`), então nada pula quando o servidor responde. Multipart por XHR (`upload()` em `lib/api.ts`) com progresso: "Enviando 2 arquivos · 45%" + barra de 2 px em acento, mídia a 55 %. Falha = "Não enviada." + motivo do servidor quando há (413, 429) + Tentar de novo (reenvia os mesmos arquivos) / Descartar (libera as URLs).
+- **Exibição:** `contentType` manda (imagem/vídeo/áudio inline, `application/octet-stream` = cartão de download). Imagem única cabe em 420×320 sem ampliar, com `aspect-ratio` de `width/height` (sem deslocamento). Grade de 420 px, gutter de 2 px, raio 8 só por fora: `gridRows()` = 1 · 2 · 1+2 · 2×2 · e depois fileiras de 3 com o resto (1 ou 2) numa fileira mais larga em cima; altura 240/180/132 por 1/2/3 células, `object-fit: cover`. Vídeo 480 px 16:9 com controles nativos (`preload=metadata`), áudio num cartão com o player, arquivo = cartão de 400 px (ícone por extensão, nome, tamanho, baixar). Mensagem só com anexos não tem linha de texto; a prévia (resposta, notificação, excluir) diz "Imagem", "3 imagens" ou "2 anexos".
+- **URL assinada vencida (~1 h):** o primeiro erro de carga de um arquivo rebusca a página que termina na mensagem (`refreshMessage`, uma por canal por vez) e remonta o elemento; um segundo erro em menos de 1 min mostra "Não foi possível carregar · Tentar de novo" no mesmo tamanho. Salvar faz `fetch` → blob → "Salvar como" do sistema, e um 403 ali também renova a URL uma vez. Validado com um interceptador que responde 403 na primeira carga de cada arquivo: 11 recusas, 9 imagens na tela depois da renovação.
+- **Visualizador:** abaixo da title bar (como as configurações), fundo `rgba(4,6,7,.94)`; barra com nome, "2 de 5 · 1920×1080 · 39 KB", tamanho real/ajustar (`+`/`−` ou clique na imagem), abrir no navegador, salvar, fechar (Esc). Setas na tela e no teclado. Foco preso, volta para a miniatura.
+
+### Configurações do espaço (`features/spaceSettings`)
+
+Mesmo quadro das configurações do usuário (`settings/Frame.tsx`: `SettingsFrame`, `Group`, `Row`), aberto por "Configurações do espaço" no menu do espaço. As seções saem das permissões reais (`visibleSections(actorFor(...))`, recalculadas a cada `ROLE_UPSERT`/`MEMBER_UPDATE`: perdeu a permissão, a seção some):
+- **Visão geral** (`MANAGE_SPACE`): ícone (mesmo recorte do avatar, máscara de canto 22 %), nome, e "Excluir espaço" só para o dono, confirmando com o nome digitado.
+- **Cargos** (`MANAGE_ROLES`): do mais alto para o mais baixo, @everyone por último; ponto de cor, nome na cor, contagem, "Seu cargo mais alto", subir/descer (o cargo toma a posição do vizinho; o servidor reordena). Editor: ← volta (Esc também), nome, 9 cores + "sem cor", permissões em 4 grupos (Geral, Membros, Texto, Voz) com uma frase cada; cada chave salva na hora. **A regra do servidor está espelhada** (`permissions.ts`, testada): fora o dono, só se edita cargo abaixo do seu mais alto (@everyone é editável por qualquer gestor, só permissões) e só se concede o que se tem. O que não dá fica desabilitado com o motivo: cadeado com tooltip na lista, aviso no topo do editor ("Você só pode editar cargos abaixo do seu cargo mais alto (Moderação)"), e a dica da permissão diz "Você não tem esta permissão…".
+- **Membros:** busca, linhas de 48 px (apelido na cor do cargo, nome real e @usuário em terciário, coroa do dono), chips de cargo com ✕ e "+" (menu com marcação) para atribuir; ⋯ = mudar apelido, expulsar, banir com motivo. O menu só lista o que suas permissões permitem; se a pessoa está no seu nível ou acima, as ações aparecem desabilitadas e o motivo vem uma vez no topo do menu.
+- **Banimentos** (`BAN_MEMBERS`): quem, motivo, data, "Revogar banimento". **Convites** (`CREATE_INVITES`): prazo (1 h … 30 dias, nunca com aviso) e usos (sem limite, 1 … 100), copiar com "Copiado" no próprio botão (a API ainda não lista convites antigos; a tela diz isso).
+
+### Conta: foto, e-mail, senha
+
+- **Foto do perfil / ícone do espaço (`settings/ImagePicker.tsx`):** prévia de 80 px, "Enviar/Trocar imagem", "Remover" e a regra numa linha. PNG/JPEG/WebP/GIF até 8 MB (`checkAvatar`, antes de qualquer envio). Recorte quadrado de 280 px: arrastar, roda do mouse, controle de zoom 1–4×, setas (Shift = passo maior) e +/−; o que o círculo não mostra fica escurecido. Sai num canvas como WebP de no máximo 1024 px (EXIF e o que ficou fora não saem da máquina). GIF pula o recorte para manter a animação. Ninguém mais manda URL externa de avatar: só `PUT /users/@me/avatar`, `PUT /spaces/:id/icon` ou `null`.
+- **E-mail não confirmado:** uma faixa calma no topo da Home ("Confirme seu e-mail · Para convidar pessoas e criar mais espaços"), nunca modal, nunca vermelho; em Minha conta, a linha do e-mail diz o que fica bloqueado. Os 403 do servidor (convite, segundo espaço, DM com quem não é amigo) viram a frase do servidor + "Confirmar e-mail" no lugar do erro (`needsVerification`, `toastError`). O diálogo aceita o código ou o link inteiro (`parseEmailToken`: `?token=` ou o código puro), "Reenviar e-mail" com contagem ("Reenviar em 52 s"; 5 min depois de um 429) e fecha sozinho se a confirmação chegar por outro lado (`ME_UPDATE`).
+- **Senha:** mínimo `MIN_PASSWORD_LENGTH` (10). Força em 4 barras sob o campo (`passwordStrength`: comprimento pesa mais, variedade ajuda, repetição/nome/e-mail derrubam) e a frase no hint; o servidor ainda recusa senha comum, repetida ou com seu usuário, e essa frase aparece no campo como veio. "Esqueci minha senha" no rótulo da senha → e-mail → (sempre 204) "Se houver uma conta com…, o link vale 1 hora" → colar link ou código + nova senha → volta ao login com "Senha trocada". Login por e-mail só depois de confirmar; o erro sugere entrar pelo nome de usuário. "Sair de todas as outras sessões" (`DELETE /auth/sessions`) aparece sempre, desabilitado quando só há este dispositivo; trocar a senha recarrega a lista.
 
 ### Palco de chamada (`features/voice/CallStage.tsx`)
 
@@ -159,8 +183,8 @@ Modal de 800 px: abas Telas / Janelas com miniaturas ao vivo (atualizadas em cad
 
 ### Configurações (`features/settings`)
 
-Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, botões nativos, chip de transmissão). Navegação à esquerda no estilo Linear, agrupada por rótulo (Usuário / Aplicativo); Esc, o ✕ ou Ctrl+, fecham e o foco volta para quem abriu. Cada controle faz algo de verdade; o que não tem backend não aparece (privacidade, recuperação de senha, anexos, fixar, denunciar):
-- **Minha conta:** nome, usuário, bio (190), cor do perfil (PATCH /users/@me); trocar senha (POST /auth/password, encerra as outras sessões); sessões com "Encerrar" e "Encerrar todas as outras"; sair da conta.
+Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, botões nativos, chip de transmissão). Navegação à esquerda no estilo Linear, agrupada por rótulo (Usuário / Aplicativo); Esc, o ✕ ou Ctrl+, fecham e o foco volta para quem abriu. Cada controle faz algo de verdade; o que não tem backend não aparece (privacidade, fixar, denunciar):
+- **Minha conta:** foto (recorte + upload), nome, usuário, bio (190), cor do perfil (PATCH /users/@me); e-mail e se está confirmado; trocar senha com força (POST /auth/password, encerra as outras sessões); sessões com "Encerrar" e "Sair de todas as outras sessões"; sair da conta.
 - **Voz e vídeo:** microfone e saída, teste com medidor ao vivo e "ouvir a mim mesmo", processamento (Padrão / Supressão avançada / Desligado, uma frase honesta cada; aviso se a supressão avançada não carregou), detecção de voz vs aperte para falar, sensibilidade (automática ou manual: a linha do limiar sobre o nível em dB, arrastável), atraso ao soltar o PTT, sons de chamada.
 - **Atalhos:** gravar via `window.alga.hotkeys.record`, rótulo do sistema, salvos em `localStorage` (`alga.hotkeys.v1`) e reaplicados no boot.
 - **Notificações:** DMs e menções, chamadas, contador na barra de tarefas. **Aparência:** densidade Confortável/Compacta (linhas de 24 px, sem respiro entre grupos), reduzir animações. **Inicialização:** abrir com o Windows, fechar para a bandeja. **Avançado:** versão, procurar atualizações (com estados), abrir pasta de registros.
@@ -206,48 +230,89 @@ Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, bo
 | Chamada recebida (DM) | [2026-11-01-call-incoming-v3.png](../screenshots/2026-11-01-call-incoming-v3.png) |
 | Chamada no DM (palco no topo da conversa) | [2026-11-01-dm-call-v3.png](../screenshots/2026-11-01-dm-call-v3.png) |
 | **Configurações** | |
-| Minha conta (perfil, senha, sessões) | [2026-11-01-settings-account-v1.png](../screenshots/2026-11-01-settings-account-v1.png) |
+| Minha conta (foto enviada, perfil, e-mail) | [2026-11-01-settings-account-v3.png](../screenshots/2026-11-01-settings-account-v3.png) |
+| Recorte da foto (zoom + arrasto, círculo) | [2026-11-01-settings-avatar-crop-v2.png](../screenshots/2026-11-01-settings-avatar-crop-v2.png) |
+| Senha: força fraca + sair das outras sessões | [2026-11-01-settings-account-security-v2.png](../screenshots/2026-11-01-settings-account-security-v2.png) |
+| Senha: força forte | [2026-11-01-settings-password-strong-v2.png](../screenshots/2026-11-01-settings-password-strong-v2.png) |
 | Voz e vídeo (teste de microfone ao vivo) | [2026-11-01-settings-voice-v3.png](../screenshots/2026-11-01-settings-voice-v3.png) |
-| Atalhos globais | [2026-11-01-settings-hotkeys-v1.png](../screenshots/2026-11-01-settings-hotkeys-v1.png) |
-| Notificações | [2026-11-01-settings-notifications-v1.png](../screenshots/2026-11-01-settings-notifications-v1.png) |
-| Aparência | [2026-11-01-settings-appearance-v1.png](../screenshots/2026-11-01-settings-appearance-v1.png) |
-| Densidade compacta aplicada | [2026-11-01-density-compact-v1.png](../screenshots/2026-11-01-density-compact-v1.png) |
-| Inicialização | [2026-11-01-settings-startup-v1.png](../screenshots/2026-11-01-settings-startup-v1.png) |
-| Avançado (versão, atualizações, registros) | [2026-11-01-settings-advanced-v1.png](../screenshots/2026-11-01-settings-advanced-v1.png) |
+| Atalhos globais | [2026-11-01-settings-hotkeys-v3.png](../screenshots/2026-11-01-settings-hotkeys-v3.png) |
+| Notificações | [2026-11-01-settings-notifications-v3.png](../screenshots/2026-11-01-settings-notifications-v3.png) |
+| Aparência | [2026-11-01-settings-appearance-v3.png](../screenshots/2026-11-01-settings-appearance-v3.png) |
+| Densidade compacta aplicada | [2026-11-01-density-compact-v3.png](../screenshots/2026-11-01-density-compact-v3.png) |
+| Inicialização | [2026-11-01-settings-startup-v3.png](../screenshots/2026-11-01-settings-startup-v3.png) |
+| Avançado (versão, atualizações, registros) | [2026-11-01-settings-advanced-v3.png](../screenshots/2026-11-01-settings-advanced-v3.png) |
+| **Anexos** | |
+| Conversa com vídeo, áudio e arquivos | [2026-11-01-chat-attachments-v3.png](../screenshots/2026-11-01-chat-attachments-v3.png) |
+| Grade de 5 (2 + 3) e de 3 (1 + 2) | [2026-11-01-chat-attachments-grid-v3.png](../screenshots/2026-11-01-chat-attachments-grid-v3.png) |
+| Visualizador (ajustado) | [2026-11-01-chat-lightbox-v2.png](../screenshots/2026-11-01-chat-lightbox-v2.png) |
+| Visualizador (tamanho real) | [2026-11-01-chat-lightbox-actual-v2.png](../screenshots/2026-11-01-chat-lightbox-actual-v2.png) |
+| Bandeja: 4 arquivos + 1 grande demais (recusado antes do envio) | [2026-11-01-chat-attach-tray-v2.png](../screenshots/2026-11-01-chat-attach-tray-v2.png) |
+| Enviado | [2026-11-01-chat-attachments-sent-v2.png](../screenshots/2026-11-01-chat-attachments-sent-v2.png) |
+| Arrastar para a conversa | [2026-11-01-chat-drop-zone-v2.png](../screenshots/2026-11-01-chat-drop-zone-v2.png) |
+| Enviando (progresso real, link lento) | [2026-11-01-chat-upload-progress-v1.png](../screenshots/2026-11-01-chat-upload-progress-v1.png) |
+| Link caiu no meio do envio | [2026-11-01-chat-upload-failed-v1.png](../screenshots/2026-11-01-chat-upload-failed-v1.png) |
+| Reenviado | [2026-11-01-chat-upload-retried-v1.png](../screenshots/2026-11-01-chat-upload-retried-v1.png) |
+| Apelido + cor de cargo nas mensagens | [2026-11-01-chat-nicknames-v2.png](../screenshots/2026-11-01-chat-nicknames-v2.png) |
+| **Configurações do espaço** | |
+| Visão geral (ícone enviado) | [2026-11-01-space-settings-overview-v4.png](../screenshots/2026-11-01-space-settings-overview-v4.png) |
+| Recorte do ícone | [2026-11-01-space-settings-icon-crop-v4.png](../screenshots/2026-11-01-space-settings-icon-crop-v4.png) |
+| Ícone no rail | [2026-11-01-space-icon-rail-v2.png](../screenshots/2026-11-01-space-icon-rail-v2.png) |
+| Cargos (dono) | [2026-11-01-space-settings-roles-v4.png](../screenshots/2026-11-01-space-settings-roles-v4.png) |
+| Cargos reordenados | [2026-11-01-space-settings-roles-reordered-v3.png](../screenshots/2026-11-01-space-settings-roles-reordered-v3.png) |
+| Editor de cargo | [2026-11-01-space-settings-role-editor-v4.png](../screenshots/2026-11-01-space-settings-role-editor-v4.png) |
+| Cargos vistos pela Moderação (acima dela: cadeado) | [2026-11-01-space-settings-roles-limited-v2.png](../screenshots/2026-11-01-space-settings-roles-limited-v2.png) |
+| Cargo acima do seu: tudo desabilitado, com o motivo | [2026-11-01-space-settings-role-locked-v2.png](../screenshots/2026-11-01-space-settings-role-locked-v2.png) |
+| Membros | [2026-11-01-space-settings-members-v3.png](../screenshots/2026-11-01-space-settings-members-v3.png) |
+| Ações do membro | [2026-11-01-space-settings-member-menu-v3.png](../screenshots/2026-11-01-space-settings-member-menu-v3.png) |
+| Ações bloqueadas pela hierarquia | [2026-11-01-space-settings-members-limited-v2.png](../screenshots/2026-11-01-space-settings-members-limited-v2.png) |
+| Banir com motivo | [2026-11-01-space-settings-ban-v3.png](../screenshots/2026-11-01-space-settings-ban-v3.png) |
+| Banimentos | [2026-11-01-space-settings-bans-v2.png](../screenshots/2026-11-01-space-settings-bans-v2.png) |
+| Convites (prazo, usos, copiado) | [2026-11-01-space-settings-invites-v2.png](../screenshots/2026-11-01-space-settings-invites-v2.png) |
+| **E-mail e senha** | |
+| Faixa "Confirme seu e-mail" na Home | [2026-11-01-home-verify-strip-v1.png](../screenshots/2026-11-01-home-verify-strip-v1.png) |
+| Convite sem e-mail confirmado: frase + "Confirmar e-mail" | [2026-11-01-space-invite-unverified-v1.png](../screenshots/2026-11-01-space-invite-unverified-v1.png) |
+| Diálogo: código inválido | [2026-11-01-verify-email-dialog-v1.png](../screenshots/2026-11-01-verify-email-dialog-v1.png) |
+| Diálogo: reenviado, contagem, link colado | [2026-11-01-verify-email-resent-v1.png](../screenshots/2026-11-01-verify-email-resent-v1.png) |
+| Confirmado: o mesmo convite funciona | [2026-11-01-space-invite-verified-v1.png](../screenshots/2026-11-01-space-invite-verified-v1.png) |
+| Esqueci minha senha | [2026-11-01-auth-forgot-v1.png](../screenshots/2026-11-01-auth-forgot-v1.png) |
+| Nova senha recusada pelo servidor (repetição) | [2026-11-01-auth-reset-weak-v1.png](../screenshots/2026-11-01-auth-reset-weak-v1.png) |
+| Senha trocada, de volta ao login | [2026-11-01-auth-reset-done-v1.png](../screenshots/2026-11-01-auth-reset-done-v1.png) |
 | **Conversa** | |
-| Login | [2026-11-01-auth-login-v8.png](../screenshots/2026-11-01-auth-login-v8.png) |
-| Login: erro + Caps Lock (cartão ancorado no topo) | [2026-11-01-auth-login-error-v7.png](../screenshots/2026-11-01-auth-login-error-v7.png) |
-| Cadastro: erros por campo | [2026-11-01-auth-register-errors-v5.png](../screenshots/2026-11-01-auth-register-errors-v5.png) |
-| Primeira execução (passo 1 de 2) | [2026-11-01-onboarding-v4.png](../screenshots/2026-11-01-onboarding-v4.png) |
-| Primeira execução (criar espaço) | [2026-11-01-onboarding-create-space-v4.png](../screenshots/2026-11-01-onboarding-create-space-v4.png) |
+| Login ("Esqueci minha senha" no rótulo) | [2026-11-01-auth-login-v9.png](../screenshots/2026-11-01-auth-login-v9.png) |
+| Login: erro + Caps Lock (cartão ancorado no topo) | [2026-11-01-auth-login-error-v8.png](../screenshots/2026-11-01-auth-login-error-v8.png) |
+| Cadastro: erros por campo | [2026-11-01-auth-register-errors-v6.png](../screenshots/2026-11-01-auth-register-errors-v6.png) |
+| Primeira execução (passo 1 de 2) | [2026-11-01-onboarding-v5.png](../screenshots/2026-11-01-onboarding-v5.png) |
+| Primeira execução (criar espaço) | [2026-11-01-onboarding-create-space-v5.png](../screenshots/2026-11-01-onboarding-create-space-v5.png) |
 | Amigos: Online | [2026-11-01-friends-online-v3.png](../screenshots/2026-11-01-friends-online-v3.png) |
 | Foco por teclado visível | [2026-11-01-focus-visible-tabs-v2.png](../screenshots/2026-11-01-focus-visible-tabs-v2.png) |
 | Amigos: Todos | [2026-11-01-friends-all-v3.png](../screenshots/2026-11-01-friends-all-v3.png) |
 | Amigos: Pendentes (Aceitar ≠ Recusar) | [2026-11-01-friends-pending-v3.png](../screenshots/2026-11-01-friends-pending-v3.png) |
 | Amigos: menu de contexto | [2026-11-01-friends-context-menu-v3.png](../screenshots/2026-11-01-friends-context-menu-v3.png) |
 | Adicionar amigo: erro no lugar | [2026-11-01-friends-add-error-v3.png](../screenshots/2026-11-01-friends-add-error-v3.png) |
-| Mensagem direta | [2026-11-01-dm-v5.png](../screenshots/2026-11-01-dm-v5.png) |
-| Canal | [2026-11-01-chat-channel-v5.png](../screenshots/2026-11-01-chat-channel-v5.png) |
-| Barra de ações no hover (3 reações, +reação, responder, mais) | [2026-11-01-chat-hover-toolbar-v5.png](../screenshots/2026-11-01-chat-hover-toolbar-v5.png) |
-| Menu de contexto da mensagem (agrupado por rótulo) | [2026-11-01-chat-context-menu-v5.png](../screenshots/2026-11-01-chat-context-menu-v5.png) |
-| Respondendo no composer | [2026-11-01-chat-reply-composer-v5.png](../screenshots/2026-11-01-chat-reply-composer-v5.png) |
-| Edição inline (Kbd) | [2026-11-01-chat-inline-edit-v5.png](../screenshots/2026-11-01-chat-inline-edit-v5.png) |
-| @menção: autocomplete | [2026-11-01-chat-mention-autocomplete-v1.png](../screenshots/2026-11-01-chat-mention-autocomplete-v1.png) |
-| Seletor de emoji | [2026-11-01-chat-emoji-picker-v1.png](../screenshots/2026-11-01-chat-emoji-picker-v1.png) |
-| Pílula de novas mensagens | [2026-11-01-chat-jump-pill-v2.png](../screenshots/2026-11-01-chat-jump-pill-v2.png) |
+| Mensagem direta | [2026-11-01-dm-v6.png](../screenshots/2026-11-01-dm-v6.png) |
+| Canal | [2026-11-01-chat-channel-v6.png](../screenshots/2026-11-01-chat-channel-v6.png) |
+| Barra de ações no hover (3 reações, +reação, responder, mais) | [2026-11-01-chat-hover-toolbar-v6.png](../screenshots/2026-11-01-chat-hover-toolbar-v6.png) |
+| Menu de contexto da mensagem (agrupado por rótulo) | [2026-11-01-chat-context-menu-v6.png](../screenshots/2026-11-01-chat-context-menu-v6.png) |
+| Respondendo no composer | [2026-11-01-chat-reply-composer-v6.png](../screenshots/2026-11-01-chat-reply-composer-v6.png) |
+| Edição inline (Kbd) | [2026-11-01-chat-inline-edit-v6.png](../screenshots/2026-11-01-chat-inline-edit-v6.png) |
+| @menção: autocomplete | [2026-11-01-chat-mention-autocomplete-v2.png](../screenshots/2026-11-01-chat-mention-autocomplete-v2.png) |
+| Seletor de emoji | [2026-11-01-chat-emoji-picker-v2.png](../screenshots/2026-11-01-chat-emoji-picker-v2.png) |
+| Pílula de novas mensagens | [2026-11-01-chat-jump-pill-v3.png](../screenshots/2026-11-01-chat-jump-pill-v3.png) |
 | Carregando (rede lenta): skeleton | [2026-11-01-chat-loading-skeleton-v4.png](../screenshots/2026-11-01-chat-loading-skeleton-v4.png) |
 | Servidor fora: chip na title bar + envio com falha | [2026-11-01-banner-reconnecting-send-failed-v4.png](../screenshots/2026-11-01-banner-reconnecting-send-failed-v4.png) |
 | Reenvio após reconectar | [2026-11-01-chat-send-retried-v4.png](../screenshots/2026-11-01-chat-send-retried-v4.png) |
 | Boot sem servidor: splash com causa provável | [2026-11-01-splash-offline-v4.png](../screenshots/2026-11-01-splash-offline-v4.png) |
-| Ctrl+K | [2026-11-01-switcher-v4.png](../screenshots/2026-11-01-switcher-v4.png) |
-| Ctrl+K com busca | [2026-11-01-switcher-query-v4.png](../screenshots/2026-11-01-switcher-query-v4.png) |
-| Status e perfil | [2026-11-01-user-status-v3.png](../screenshots/2026-11-01-user-status-v3.png) |
-| Menu do espaço | [2026-11-01-space-menu-v4.png](../screenshots/2026-11-01-space-menu-v4.png) |
+| Ctrl+K: seções (Precisa de você, Conversas, Canais, Pessoas, Espaços) | [2026-11-01-switcher-v5.png](../screenshots/2026-11-01-switcher-v5.png) |
+| Ctrl+K com busca: agrupado por tipo, trecho que casou em 590 | [2026-11-01-switcher-query-v5.png](../screenshots/2026-11-01-switcher-query-v5.png) |
+| Status e perfil | [2026-11-01-user-status-v4.png](../screenshots/2026-11-01-user-status-v4.png) |
+| Menu do espaço (com "Configurações do espaço") | [2026-11-01-space-menu-v8.png](../screenshots/2026-11-01-space-menu-v8.png) |
 | Convite | [2026-11-01-space-invite-v4.png](../screenshots/2026-11-01-space-invite-v4.png) |
 | Criar canal (selecionado sobe em luminância) | [2026-11-01-space-create-channel-v3.png](../screenshots/2026-11-01-space-create-channel-v3.png) |
 | Entrar com convite: prévia | [2026-11-01-space-join-preview-v3.png](../screenshots/2026-11-01-space-join-preview-v3.png) |
 | Tamanho mínimo 960×600 | [2026-11-01-shell-960x600-v3.png](../screenshots/2026-11-01-shell-960x600-v3.png) |
 | 1920×1080 a 125% | [2026-11-01-shell-1920x1080@125-v3.png](../screenshots/2026-11-01-shell-1920x1080@125-v3.png) |
+
+Onda 3 (anexos, configurações do espaço, conta): API própria na porta 4100 (`ALGA_API_URL`, banco PGlite, uploads e caixa de e-mail em diretório temporário; `ALGA_OUTBOX_DIR` lê os tokens de confirmação e de redefinição), mídia sintética gerada com ffmpeg (gradientes, fractal, padrões de teste, vídeo e áudio de teste; nenhum arquivo pessoal), progresso e queda de upload por um proxy TCP com taxa limitada que depois é derrubado, URL vencida por um interceptador que responde 403 na primeira carga.
 
 Validação: cada tela foi capturada no app Electron real (`--profile=shots`) com dados criados pela API REST real; estados de rede (lento, servidor fora, boot sem servidor) vêm de um proxy TCP no script, não de dados falsos no app. Tamanhos: 1320×840 (padrão), 960×600 (mínimo) e 1920×1080 a 125%.
 

@@ -1,5 +1,6 @@
 // Visual validation loop: build → seed real data through the REST API → drive the REAL Electron app → PNGs.
-//   node scripts/screenshot.mjs [--skip-build] [--only=auth,home,chat,spaces,connection,sizes,settings,voice]
+//   node scripts/screenshot.mjs [--skip-build] [--only=auth,home,chat,spaces,attachments,uploads,spacesettings,connection,sizes,settings,voice]
+// Another API (ALGA_API_URL=http://127.0.0.1:4100) gets its own users file, so runs never mix accounts.
 // Voice runs two real app instances (profiles shots + shots-b) through the local LiveKit with Chromium fake
 // devices: a generated speech WAV is B's microphone (so the speaking glow moves for real) and A's screen share
 // is Chromium's fake desktop source (real WebRTC encode → SFU → decode, synthetic picture). Needs LiveKit on
@@ -8,11 +9,11 @@
 // Test users (generated credentials) live in scripts/.shots-users.json (git-ignored).
 import { execSync, spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { createServer, connect } from 'node:net'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
 
@@ -20,8 +21,8 @@ const here = dirname(fileURLToPath(import.meta.url))
 const appDir = join(here, '..')
 const repo = join(appDir, '..', '..')
 const outDir = join(repo, 'docs', 'screenshots')
-const usersFile = join(here, '.shots-users.json')
 const API = process.env.ALGA_API_URL ?? 'http://localhost:4000'
+const usersFile = join(here, process.env.ALGA_API_URL ? `.shots-users-${new URL(API).port || 80}.json` : '.shots-users.json')
 const PROFILE = 'shots'
 const args = process.argv.slice(2)
 const only = args.find((a) => a.startsWith('--only='))?.split('=')[1]?.split(',')
@@ -78,6 +79,24 @@ async function api(token, method, path, body, attempt = 0) {
   return data
 }
 
+/** Multipart REST call (attachments, avatars, icons). FormData is reusable across retries. */
+async function apiForm(token, method, path, form, attempt = 0) {
+  const res = await fetch(`${API}/api/v1${path}`, { method, headers: { authorization: `Bearer ${token}` }, body: form })
+  if (res.status === 429 && attempt < 8) {
+    await sleep(8000)
+    return apiForm(token, method, path, form, attempt + 1)
+  }
+  const data = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(`${method} ${path} → ${res.status} ${JSON.stringify(data)}`)
+  return data
+}
+const fileForm = (paths, payload) => {
+  const f = new FormData()
+  if (payload) f.append('payload_json', JSON.stringify(payload))
+  for (const p of paths) f.append(payload ? 'files' : 'file', new Blob([readFileSync(p)]), basename(p))
+  return f
+}
+
 const PEOPLE = [
   ['ana', 'Ana Ribeiro'],
   ['bruno', 'Bruno Costa'],
@@ -87,6 +106,47 @@ const PEOPLE = [
   ['fabio', 'Fábio Lima'],
   ['gui', 'Guilherme Rocha'],
 ]
+
+// Dev e-mail driver writes .eml files here (EMAIL_OUTBOX_DIR of the API you point at).
+const OUTBOX = process.env.ALGA_OUTBOX_DIR ?? join(repo, 'apps', 'server', 'data', 'outbox')
+/** Newest token mailed to `email` for `kind` (verify_email | password_reset), waiting for the mail to land. */
+async function mailedToken(email, kind, after = 0) {
+  const esc = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  for (let i = 0; i < 40; i++) {
+    const files = existsSync(OUTBOX) ? readdirSync(OUTBOX).filter((f) => f.includes(kind)).sort().reverse() : []
+    for (const f of files) {
+      const p = join(OUTBOX, f)
+      const eml = readFileSync(p, 'utf8')
+      if (statSync(p).mtimeMs < after || !new RegExp(`^To: .*${esc}`, 'mi').test(eml)) continue
+      const token = /[?&]token=([A-Za-z0-9_-]+)/.exec(eml)?.[1]
+      if (token) return token
+    }
+    await sleep(250)
+  }
+  throw new Error(`no ${kind} e-mail for ${email} in ${OUTBOX}`)
+}
+
+/** Test accounts need a verified e-mail (invites, a second space, DMs): use the token from the outbox mail. */
+async function verifyEmail(u) {
+  if (u.me.emailVerified !== false) return
+  const esc = u.me.email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  for (let i = 0; i < 40; i++) {
+    const files = existsSync(OUTBOX) ? readdirSync(OUTBOX).filter((f) => f.includes('verify_email')).sort().reverse() : []
+    for (const f of files) {
+      const eml = readFileSync(join(OUTBOX, f), 'utf8')
+      if (!new RegExp(`^To: .*${esc}`, 'mi').test(eml)) continue
+      const token = /[?&]token=([A-Za-z0-9_-]+)/.exec(eml)?.[1]
+      if (!token) continue
+      const ok = await api(null, 'POST', '/auth/verify-email', { token }).then(() => true, () => false)
+      if (ok) {
+        u.me = await api(u.token, 'GET', '/users/@me')
+        return
+      }
+    }
+    await sleep(250)
+  }
+  throw new Error(`no verification e-mail for ${u.username} in ${OUTBOX}`)
+}
 
 async function ensureUsers() {
   const saved = existsSync(usersFile) ? JSON.parse(readFileSync(usersFile, 'utf8')) : { users: {} }
@@ -112,6 +172,8 @@ async function ensureUsers() {
     saved.users[key] = { username, password, token: r.token, me: r.user }
     writeFileSync(usersFile, JSON.stringify(saved, null, 2))
   }
+  // Elisa stays unverified: she shows the calm "confirme seu e-mail" strip and the friendly 403 prompts.
+  for (const [key] of PEOPLE) if (key !== 'elisa') await verifyEmail(saved.users[key])
   writeFileSync(usersFile, JSON.stringify(saved, null, 2))
   return saved
 }
@@ -195,8 +257,32 @@ async function seed(saved) {
   await api(T('ana'), 'POST', `/channels/${dmB.id}/ack`, { messageId: last.id })
   await dm('carla', dmC, 'Te mandei o arquivo dos ícones novos 💌')
 
+  // Wave 3: real uploads (synthetic media from ffmpeg), roles, a nickname, people to moderate.
+  const media = testMedia()
+  await api(T('ana'), 'PATCH', '/users/@me', { avatarUrl: null })
+  await apiForm(T('bruno'), 'PUT', '/users/@me/avatar', fileForm([media('avatar-bruno.png')]))
+  await apiForm(T('carla'), 'PUT', '/users/@me/avatar', fileForm([media('avatar-carla.png')]))
+  const fotos = await api(T('ana'), 'POST', `/spaces/${s1.id}/channels`, { type: 'text', name: 'fotos', topic: 'Capturas, vídeos e arquivos do projeto' })
+  const post = (k, content, files) => apiForm(T(k), 'POST', `/channels/${fotos.id}/messages`, fileForm(files.map(media), { content }))
+  await post('bruno', 'Primeira luz da orla no protótipo novo 🌅', ['orla.jpg'])
+  await post('carla', 'Três fundos para a tela de chamada:', ['fractal.png', 'retrato.jpg', 'vida.png'])
+  await post('diego', '', ['padrao-720p.png', 'barras.png', 'orla.jpg', 'fractal.png', 'vida.png'])
+  await post('bruno', 'Gravação do ensaio de ontem', ['ensaio.mp4'])
+  await post('carla', 'Nota de voz e o roteiro para quem não estava', ['nota-de-voz.mp3', 'roteiro.txt'])
+  // Roles: each new one enters at position 1 and pushes the others up, so create top-down:
+  // Coordenação > Moderação > Design > Convidados.
+  const P = { CHANNELS: 4, INVITES: 32, ROLES: 16, KICK: 64, BAN: 128, MESSAGES: 512, MUTE: 1 << 15, DEAFEN: 1 << 16, MOVE: 1 << 17, NICKS: 1 << 19 }
+  const role = (body) => api(T('ana'), 'POST', `/spaces/${s1.id}/roles`, body)
+  const coord = await role({ name: 'Coordenação', color: '#f2c25c', permissions: P.ROLES | P.KICK | P.BAN | P.NICKS | P.MUTE | P.DEAFEN | P.MOVE | P.MESSAGES | P.CHANNELS | P.INVITES })
+  const mod = await role({ name: 'Moderação', color: '#7fd88f', permissions: P.ROLES | P.KICK | P.NICKS | P.MUTE | P.MESSAGES | P.INVITES })
+  const des = await role({ name: 'Design', color: '#ef87c4' })
+  await role({ name: 'Convidados', color: '#a7b0b4' })
+  for (const [k, r] of [['diego', coord], ['carla', mod], ['bruno', des]]) await api(T('ana'), 'PUT', `/spaces/${s1.id}/members/${id(k)}/roles/${r.id}`)
+  await api(T('ana'), 'PATCH', `/spaces/${s1.id}/members/${id('carla')}`, { nickname: 'Carlinha' })
+  for (const k of ['elisa', 'fabio']) await api(T(k), 'POST', `/invites/${inv.code}`)
+
   writeFileSync(usersFile, JSON.stringify(saved, null, 2))
-  return { s1, s2, geral, design, dmB, dmC, focus, jogo }
+  return { s1, s2, geral, design, dmB, dmC, focus, jogo, fotos }
 }
 
 /** Keep other test users online over the gateway (presence), with heartbeats. */
@@ -301,6 +387,79 @@ async function authShots(serverUp) {
   await page.getByRole('button', { name: /Criar um espaço/ }).click()
   await page.getByRole('dialog').waitFor()
   await shot(page, 'onboarding-create-space')
+  // Unverified account: one own space works; invites answer 403 and the app offers to confirm the e-mail.
+  const email = `${username}@shots.alga.test`
+  await page.getByLabel('Nome do espaço').fill('Ateliê da Marina')
+  await page.getByRole('button', { name: 'Criar espaço' }).click()
+  await page.getByRole('dialog').waitFor({ state: 'detached' })
+  await page.getByRole('button', { name: 'Conversas', exact: true }).click()
+  await page.getByRole('button', { name: 'Confirme seu e-mail' }).waitFor()
+  await sleep(400)
+  await shot(page, 'home-verify-strip')
+  await rail(page, /^Ateliê da Marina/).click()
+  await page.getByRole('complementary', { name: 'Canais' }).getByRole('button', { name: 'Ateliê da Marina' }).click()
+  await page.getByRole('menuitem', { name: 'Convidar pessoas' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Confirmar e-mail' }).waitFor()
+  await sleep(300)
+  await shot(page, 'space-invite-unverified')
+  await page.getByRole('dialog').getByRole('button', { name: 'Confirmar e-mail' }).click()
+  const verify = page.getByRole('dialog', { name: 'Confirme seu e-mail' })
+  await verify.waitFor()
+  await verify.getByLabel('Link ou código').fill('codigo-que-nao-existe')
+  await verify.getByRole('button', { name: 'Confirmar', exact: true }).click()
+  await verify.getByRole('alert').waitFor()
+  await sleep(200)
+  await shot(page, 'verify-email-dialog')
+  const before = Date.now() - 1000
+  await verify.getByRole('button', { name: 'Reenviar e-mail' }).click()
+  await verify.getByText(/Reenviar em/).waitFor()
+  const token = await mailedToken(email, 'verify_email', before)
+  await verify.getByLabel('Link ou código').fill(`algameet://auth/verify-email?token=${token}`)
+  await sleep(200)
+  await shot(page, 'verify-email-resent')
+  await verify.getByRole('button', { name: 'Confirmar', exact: true }).click()
+  await verify.waitFor({ state: 'detached' })
+  await page.getByText('E-mail confirmado.').waitFor()
+  // The same invite now works (Tentar de novo comes back as the copy button after a fresh attempt).
+  await page.keyboard.press('Escape')
+  await page.getByRole('complementary', { name: 'Canais' }).getByRole('button', { name: 'Ateliê da Marina' }).click()
+  await page.getByRole('menuitem', { name: 'Convidar pessoas' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Copiar' }).waitFor({ timeout: 10_000 })
+  await sleep(300)
+  await shot(page, 'space-invite-verified')
+  await close(app)
+}
+
+/** Forgot password: request → paste the mailed link + a new password → back to login with the new one. */
+async function recoveryShots(saved) {
+  console.log('password reset…')
+  const u = saved.users.gui
+  const { app, page } = await launch()
+  await page.getByLabel('E-mail ou nome de usuário').waitFor()
+  await page.getByRole('button', { name: 'Esqueci minha senha' }).click()
+  await page.getByLabel('E-mail', { exact: true }).fill(u.me.email)
+  await sleep(200)
+  await shot(page, 'auth-forgot')
+  const before = Date.now() - 1000
+  await page.getByRole('button', { name: 'Enviar link' }).click()
+  await page.getByLabel('Link ou código do e-mail').waitFor()
+  const token = await mailedToken(u.me.email, 'password_reset', before)
+  await page.getByLabel('Link ou código do e-mail').fill(`algameet://auth/reset-password?token=${token}`)
+  await page.getByLabel('Nova senha').fill('abcabcabcabc')
+  await page.getByRole('button', { name: 'Trocar senha' }).click()
+  await page.getByRole('alert').waitFor()
+  await sleep(200)
+  await shot(page, 'auth-reset-weak')
+  const password = `${randomBytes(9).toString('base64url')} lua cheia`
+  await page.getByLabel('Nova senha').fill(password)
+  await page.getByRole('button', { name: 'Trocar senha' }).click()
+  await page.getByText('Senha trocada.').waitFor()
+  await sleep(300)
+  await shot(page, 'auth-reset-done')
+  // Keep the harness able to log in as Gui (every session was revoked by the reset).
+  const r = await api(null, 'POST', '/auth/login', { login: u.username, password })
+  Object.assign(u, { password, token: r.token, me: r.user })
+  writeFileSync(usersFile, JSON.stringify(saved, null, 2))
   await close(app)
 }
 
@@ -308,15 +467,20 @@ async function mainShots(saved) {
   const offs = [connectPresence(saved.users.bruno.token), connectPresence(saved.users.carla.token), connectPresence(saved.users.diego.token, 'idle')]
   try {
     const ids = await seed(saved)
-    if (want('home') || want('chat') || want('spaces')) {
+    if (want('home') || want('chat') || want('spaces') || want('attachments') || want('spacesettings')) {
       console.log('shell…')
       const { app, page } = await launch()
       await login(page, saved.users.ana)
       if (want('home')) await homeShots(page)
       if (want('chat')) await chatShots(page, saved, ids)
       if (want('spaces')) await spaceShots(page, saved)
+      if (want('attachments')) await attachmentShots(page, saved, ids)
+      if (want('spacesettings')) await spaceSettingsShots(page, saved)
       await close(app)
     }
+    if (want('spacesettings')) await limitedSpaceSettingsShots(saved)
+    if (want('auth')) await recoveryShots(saved)
+    if (want('uploads')) await uploadShots(saved, ids)
     if (want('settings')) await settingsShots(saved, ids)
     if (want('voice')) await voiceShots(saved, ids)
     if (want('connection')) await connectionShots(saved, ids)
@@ -464,7 +628,29 @@ async function settingsShots(saved) {
   const dlg = page.getByRole('dialog', { name: 'Configurações' })
   await dlg.waitFor()
   await sleep(600)
+  // Avatar: a real file through the crop dialog (zoomed and panned), resized to ≤ 1024 px on a canvas, uploaded.
+  await dlg.locator('input[type=file]').setInputFiles(testMedia()('foto-perfil.jpg'))
+  const crop = page.getByRole('dialog', { name: 'Enquadrar imagem' })
+  await crop.waitFor()
+  await crop.getByRole('slider', { name: 'Zoom' }).fill('1.6')
+  await crop.getByRole('group', { name: /Área de recorte/ }).focus()
+  for (let i = 0; i < 6; i++) await page.keyboard.press('Shift+ArrowLeft')
+  await sleep(300)
+  await shot(page, 'settings-avatar-crop')
+  await crop.getByRole('button', { name: 'Aplicar' }).click()
+  await crop.waitFor({ state: 'detached' })
+  await dlg.locator('img').first().waitFor()
+  await sleep(500)
   await shot(page, 'settings-account')
+  // Security: strength hint as you type, and "Sair de todas as outras sessões".
+  await dlg.getByLabel('Nova senha').fill('cavalo azul')
+  await dlg.getByRole('button', { name: 'Sair de todas as outras sessões' }).scrollIntoViewIfNeeded()
+  await sleep(200)
+  await shot(page, 'settings-account-security')
+  await dlg.getByLabel('Nova senha').fill('Cavalo-Azul-Correndo-7')
+  await sleep(150)
+  await shot(page, 'settings-password-strong')
+  await dlg.getByLabel('Nova senha').fill('')
   for (const [name, key] of [
     ['Atalhos', 'hotkeys'],
     ['Notificações', 'notifications'],
@@ -492,6 +678,248 @@ async function settingsShots(saved) {
   await page.keyboard.press('Control+,')
   await dlg.getByRole('navigation').getByRole('button', { name: 'Aparência' }).click()
   await dlg.getByRole('radio', { name: 'Confortável' }).click()
+  await page.keyboard.press('Escape')
+  await close(app)
+}
+
+// ── wave 3: attachments, uploads, space settings ─────────────
+
+/** Synthetic media for uploads (ffmpeg test sources): never files from this machine. */
+function testMedia() {
+  const dir = join(work, 'media')
+  mkdirSync(dir, { recursive: true })
+  const out = (n) => join(dir, n)
+  const make = (name, args) => existsSync(out(name)) || ffmpeg([...args, out(name)])
+  const still = (name, src) => make(name, ['-f', 'lavfi', '-i', src, '-frames:v', '1'])
+  still('orla.jpg', 'gradients=s=1600x1000:c0=0x0b2a33:c1=0x21c9ca:c2=0xf2c25c:x0=0:y0=1000:x1=1600:y1=0:nb_colors=3')
+  still('fractal.png', 'mandelbrot=s=1200x800')
+  still('padrao-720p.png', 'testsrc2=s=1280x720')
+  still('retrato.jpg', 'gradients=s=900x1200:c0=0x1a1440:c1=0x8f9cff:c2=0xef87c4:nb_colors=3:type=radial')
+  still('vida.png', 'life=s=900x1200:mold=10:ratio=0.12:seed=7:death_color=0x0b2a33:life_color=0x4ddcdc')
+  still('barras.png', 'smptehdbars=s=1920x1080')
+  still('icone.png', 'gradients=s=600x600:c0=0x061415:c1=0x21c9ca:c2=0xc8fbff:nb_colors=3:type=circular')
+  still('foto-perfil.jpg', 'gradients=s=1600x1200:c0=0x3a1f4a:c1=0xef87c4:c2=0xf2c25c:nb_colors=3:type=spiral')
+  still('avatar-bruno.png', 'gradients=s=512x512:c0=0x123a5a:c1=0x5fb8f5:type=radial')
+  still('avatar-carla.png', 'gradients=s=512x512:c0=0x3d1a33:c1=0xf28b6b:c2=0xf2c25c:nb_colors=3')
+  make('ensaio.mp4', ['-f', 'lavfi', '-i', 'testsrc2=s=1280x720:d=4', '-f', 'lavfi', '-i', 'sine=f=440:d=4', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest'])
+  make('ensaio-longo.mp4', ['-f', 'lavfi', '-i', 'testsrc2=s=1280x720:d=16', '-c:v', 'libx264', '-b:v', '3M', '-pix_fmt', 'yuv420p'])
+  make('nota-de-voz.mp3', ['-f', 'lavfi', '-i', 'sine=f=220:d=6', '-c:a', 'libmp3lame'])
+  if (!existsSync(out('roteiro.txt'))) writeFileSync(out('roteiro.txt'), 'Roteiro do teste de voz\n1. Entrar na Sala de foco\n2. Compartilhar a tela\n')
+  if (!existsSync(out('pacote-grande.bin'))) writeFileSync(out('pacote-grande.bin'), Buffer.alloc(26 * 1024 * 1024, 7))
+  return out
+}
+
+const composerFile = (page) => page.locator('input[type=file]').first()
+
+async function attachmentShots(page, saved, ids) {
+  console.log('attachments…')
+  const media = testMedia()
+  // Expired signed URLs: the first request of each file answers 403 (as after ~1 h); the app must refetch the
+  // message page for fresh URLs and show the images anyway.
+  const seen = new Set()
+  let expired = 0
+  await page.route('**/api/v1/files/**', (route) => {
+    const u = new URL(route.request().url())
+    if (!seen.has(u.pathname)) {
+      seen.add(u.pathname)
+      expired++
+      return route.fulfill({ status: 403, body: '' })
+    }
+    return route.continue()
+  })
+  await rail(page, /^Estúdio Alga/).click()
+  await channels(page).getByRole('button', { name: /^fotos/ }).click()
+  await page.getByText('Nota de voz e o roteiro').waitFor()
+  page.on('console', (m) => m.type() === 'error' && console.log('  [renderer]', m.text().slice(0, 200)))
+  await page
+    .waitForFunction(() => [...document.querySelectorAll('[data-message-id] button > img')].filter((i) => i.naturalWidth > 0).length >= 9, null, { timeout: 20_000 })
+    .catch(async (e) => {
+      await page.screenshot({ path: join(work, 'fail-attachments.png') })
+      console.log('  imgs:', await page.evaluate(() => [...document.querySelectorAll('[data-message-id] img')].map((i) => `${i.naturalWidth}:${i.src.slice(0, 80)}`)))
+      throw e
+    })
+  const loaded = await page.evaluate(() => [...document.querySelectorAll('[data-message-id] button > img')].filter((i) => i.naturalWidth > 0).length)
+  console.log(`  · signed-URL refresh: ${expired} first loads answered 403, ${loaded} images on screen after the refetch`)
+  await page.unroute('**/api/v1/files/**')
+  await sleep(600)
+  await shot(page, 'chat-attachments')
+  await page.locator('[data-message-id]').filter({ has: page.getByRole('button', { name: 'Abrir barras.png' }) }).evaluate((el) => el.scrollIntoView({ block: 'center' }))
+  await sleep(400)
+  await shot(page, 'chat-attachments-grid')
+  // Lightbox: open the 2nd image of the 5-image message, go right once.
+  await page.getByRole('button', { name: 'Abrir barras.png' }).click()
+  await page.getByRole('dialog', { name: 'Visualizar imagem' }).waitFor()
+  await sleep(400)
+  await shot(page, 'chat-lightbox')
+  await page.keyboard.press('ArrowRight')
+  await page.keyboard.press('+')
+  await sleep(400)
+  await shot(page, 'chat-lightbox-actual')
+  await page.keyboard.press('Escape')
+  await page.getByRole('dialog', { name: 'Visualizar imagem' }).waitFor({ state: 'detached' })
+
+  // Tray: three real images, a text file and one too big (flagged before any upload).
+  await composerFile(page).setInputFiles([media('retrato.jpg'), media('vida.png'), media('padrao-720p.png'), media('roteiro.txt'), media('pacote-grande.bin')])
+  await page.getByRole('textbox', { name: /Mensagem para/ }).fill('Separei estes para a apresentação')
+  await sleep(500)
+  await shot(page, 'chat-attach-tray')
+  await page.getByRole('button', { name: 'Remover pacote-grande.bin' }).click()
+  // Removing a file hands focus back to the composer, so Enter sends right away.
+  await page.keyboard.press('Enter')
+  await page.locator('[data-message-id]').filter({ hasText: 'Separei estes para a apresentação' }).waitFor()
+  await page.waitForFunction(() => !document.querySelector('[role=progressbar]'), null, { timeout: 20_000 })
+  await sleep(800)
+  await shot(page, 'chat-attachments-sent')
+
+  // Drag and drop: a real DragEvent with a File over the conversation shows the drop target.
+  const col = page.getByRole('log')
+  await col.evaluate((el) => {
+    const dt = new DataTransfer()
+    dt.items.add(new File([new Uint8Array(64)], 'captura.png', { type: 'image/png' }))
+    el.dispatchEvent(new DragEvent('dragenter', { dataTransfer: dt, bubbles: true }))
+  })
+  await sleep(300)
+  await shot(page, 'chat-drop-zone')
+  await col.evaluate((el) => el.dispatchEvent(new DragEvent('dragleave', { dataTransfer: new DataTransfer(), bubbles: true })))
+  // Message with nickname + role color in a normal channel.
+  await channels(page).getByRole('button', { name: /^geral/ }).click()
+  await page.getByText('Eu topo testar também').waitFor()
+  await sleep(400)
+  await shot(page, 'chat-nicknames')
+}
+
+/** Upload progress and failure through a slow, then dead, link (proxy in front of the real API). */
+async function uploadShots(saved, ids) {
+  console.log('uploads…')
+  const PORT = 4112
+  let proxy = startProxy(PORT)
+  const { app, page } = await launch({ apiUrl: `http://localhost:${PORT}` })
+  await login(page, saved.users.ana)
+  await rail(page, /^Estúdio Alga/).click()
+  await channels(page).getByRole('button', { name: /^fotos/ }).click()
+  await page.getByText('Nota de voz e o roteiro').waitFor()
+  proxy.state.rateBps = 160 * 1024
+  await composerFile(page).setInputFiles([testMedia()('ensaio-longo.mp4'), testMedia()('orla.jpg')])
+  await page.getByRole('textbox', { name: /Mensagem para/ }).fill('Versão longa do ensaio')
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(() => Number(document.querySelector('[role=progressbar]')?.getAttribute('aria-valuenow') ?? 0) >= 15, null, { timeout: 60_000 })
+  await shot(page, 'chat-upload-progress')
+  // The link dies mid-upload: the message stays in place with the reason and a way out.
+  await proxy.stop()
+  await page.getByText('Não enviada.').waitFor({ timeout: 30_000 })
+  await sleep(400)
+  await shot(page, 'chat-upload-failed')
+  proxy = startProxy(PORT)
+  await page.getByRole('button', { name: 'Tentar agora' }).click().catch(() => undefined)
+  await page.getByText(/Sem conexão\. Tentando/).waitFor({ state: 'detached', timeout: 20_000 })
+  await page.getByRole('button', { name: 'Tentar de novo' }).click()
+  await page.getByText('Não enviada.').waitFor({ state: 'detached', timeout: 60_000 })
+  await page.waitForFunction(() => !document.querySelector('[role=progressbar]'), null, { timeout: 60_000 })
+  await sleep(1000)
+  await shot(page, 'chat-upload-retried')
+  await close(app)
+  await proxy.stop()
+}
+
+const spaceSettings = (page) => page.getByRole('dialog', { name: /^Configurações de / })
+async function openSpaceSettings(page) {
+  await rail(page, /^Estúdio Alga/).click()
+  await channels(page).getByRole('button', { name: 'Estúdio Alga' }).click()
+  await page.getByRole('menuitem', { name: 'Configurações do espaço' }).click()
+  await spaceSettings(page).waitFor()
+  await sleep(500)
+}
+const navTo = (page, name) => spaceSettings(page).getByRole('navigation').getByRole('button', { name, exact: true }).click()
+
+async function spaceSettingsShots(page, saved) {
+  console.log('space settings…')
+  await rail(page, /^Estúdio Alga/).click()
+  await channels(page).getByRole('button', { name: 'Estúdio Alga' }).click()
+  await page.getByRole('menu').waitFor()
+  await shot(page, 'space-menu')
+  await page.keyboard.press('Escape')
+  await openSpaceSettings(page)
+  const dlg = spaceSettings(page)
+  // Icon: real file → crop (rounded mask) → upload; the rail tile updates live.
+  await dlg.locator('input[type=file]').setInputFiles(testMedia()('icone.png'))
+  const crop = page.getByRole('dialog', { name: 'Enquadrar imagem' })
+  await crop.waitFor()
+  await sleep(300)
+  await shot(page, 'space-settings-icon-crop')
+  await crop.getByRole('button', { name: 'Aplicar' }).click()
+  await crop.waitFor({ state: 'detached' })
+  await sleep(600)
+  await shot(page, 'space-settings-overview')
+
+  await navTo(page, 'Cargos')
+  await sleep(300)
+  await shot(page, 'space-settings-roles')
+  await dlg.getByRole('button', { name: 'Editar Moderação' }).click()
+  await dlg.getByLabel('Nome do cargo').waitFor()
+  await sleep(300)
+  await shot(page, 'space-settings-role-editor')
+  await dlg.getByRole('button', { name: 'Voltar para cargos' }).click()
+  await dlg.getByRole('button', { name: 'Subir Convidados' }).click()
+  await sleep(600)
+  await shot(page, 'space-settings-roles-reordered')
+  await dlg.getByRole('button', { name: 'Descer Convidados' }).click()
+
+  await navTo(page, 'Membros')
+  await sleep(300)
+  await shot(page, 'space-settings-members')
+  const elisa = dlg.getByRole('listitem').filter({ hasText: 'Elisa Nogueira' })
+  await elisa.getByRole('button', { name: /^Ações para/ }).click()
+  await page.getByRole('menu').waitFor()
+  await shot(page, 'space-settings-member-menu')
+  await page.getByRole('menuitem', { name: 'Banir' }).click()
+  const ban = page.getByRole('dialog', { name: /^Banir/ })
+  await ban.waitFor()
+  await ban.getByLabel(/Motivo/).fill('Spam de convites em #geral')
+  await sleep(300)
+  await shot(page, 'space-settings-ban')
+  await ban.getByRole('button', { name: 'Banir' }).click()
+  await ban.waitFor({ state: 'detached' })
+  // Role chips: give Fábio "Convidados" from the + menu.
+  const fabio = dlg.getByRole('listitem').filter({ hasText: 'Fábio Lima' })
+  await fabio.getByRole('button', { name: 'Adicionar cargo' }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Convidados' }).click()
+  await sleep(500)
+  await navTo(page, 'Banimentos')
+  await dlg.getByText('Elisa Nogueira').waitFor()
+  await sleep(300)
+  await shot(page, 'space-settings-bans')
+  await navTo(page, 'Convites')
+  await dlg.getByRole('radio', { name: '1 dia' }).click()
+  await dlg.getByRole('radio', { name: '25' }).click()
+  await dlg.getByRole('button', { name: 'Gerar convite' }).click()
+  await dlg.getByRole('button', { name: 'Copiar' }).first().waitFor()
+  await dlg.getByRole('button', { name: 'Copiar' }).first().click()
+  await sleep(300)
+  await shot(page, 'space-settings-invites')
+  await page.keyboard.press('Escape')
+  await dlg.waitFor({ state: 'detached' })
+  await shot(page, 'space-icon-rail')
+}
+
+/** Carla (Moderação, below Coordenação): what she cannot touch is disabled and says why. */
+async function limitedSpaceSettingsShots(saved) {
+  console.log('space settings (moderator)…')
+  const { app, page } = await launch()
+  await login(page, saved.users.carla)
+  await openSpaceSettings(page)
+  const dlg = spaceSettings(page)
+  await sleep(300)
+  await shot(page, 'space-settings-roles-limited')
+  await dlg.getByRole('button', { name: 'Editar Coordenação' }).click()
+  await dlg.getByRole('note').waitFor()
+  await sleep(300)
+  await shot(page, 'space-settings-role-locked')
+  await navTo(page, 'Membros')
+  await sleep(300)
+  const diego = dlg.getByRole('listitem').filter({ hasText: 'Diego Alves' })
+  await diego.getByRole('button', { name: /^Ações para/ }).click()
+  await page.getByRole('menu').waitFor()
+  await shot(page, 'space-settings-members-limited')
   await page.keyboard.press('Escape')
   await close(app)
 }
@@ -733,11 +1161,18 @@ async function voiceShots(saved, ids) {
 /** TCP proxy in front of the API so the script can cut or slow the "network" for real. */
 function startProxy(port, target = new URL(API)) {
   const sockets = new Set()
-  const state = { delayMs: 0 }
+  const state = { delayMs: 0, rateBps: 0 }
   const server = createServer((client) => {
     const upstream = connect(Number(target.port || 80), target.hostname)
     sockets.add(client).add(upstream)
-    client.on('data', (b) => setTimeout(() => upstream.write(b), state.delayMs))
+    client.on('data', (b) => {
+      setTimeout(() => upstream.write(b), state.delayMs)
+      // Upload pacing: stop reading for as long as these bytes take at rateBps (TCP backpressure does the rest).
+      if (state.rateBps) {
+        client.pause()
+        setTimeout(() => client.resume(), (b.length / state.rateBps) * 1000)
+      }
+    })
     upstream.pipe(client)
     const end = () => {
       client.destroy()
@@ -827,7 +1262,7 @@ try {
   serverUp = false
 }
 if (want('auth')) await authShots(serverUp)
-if (serverUp && ['home', 'chat', 'spaces', 'connection', 'sizes', 'settings', 'voice'].some(want)) {
+if (serverUp && ['auth', 'home', 'chat', 'spaces', 'attachments', 'uploads', 'spacesettings', 'connection', 'sizes', 'settings', 'voice'].some(want)) {
   const saved = await ensureUsers()
   await mainShots(saved)
 } else console.warn(`API at ${API} is not reachable: only auth screens were captured.`)

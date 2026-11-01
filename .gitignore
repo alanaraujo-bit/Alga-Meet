@@ -20,4 +20,4 @@ docs/references/**/*.webp
 docs/references/**/*.gif
 
 # Generated test credentials for the screenshot script (apps/desktop/scripts/screenshot.mjs).
-apps/desktop/scripts/.shots-users.json
+apps/desktop/scripts/.shots-users*.json
