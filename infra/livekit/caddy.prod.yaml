@@ -1,0 +1,41 @@
+# TLS front for the production SFU (template; replace <LIVEKIT_DOMAIN> and <TURN_DOMAIN>). Needs the layer4 module:
+# image livekit/caddyl4 (docker-compose.prod.yaml). One public port, 443, split by SNI:
+#   <LIVEKIT_DOMAIN> → TLS terminated here → LiveKit signaling (HTTP/WebSocket) on localhost:7880
+#   <TURN_DOMAIN>    → TLS terminated here → LiveKit TURN (external_tls) on localhost:5349
+# Certificates: Let's Encrypt via ACME (port 80 must be open for the HTTP challenge), stored in /data.
+logging:
+  logs:
+    default:
+      level: INFO
+storage:
+  module: file_system
+  root: /data
+apps:
+  tls:
+    certificates:
+      automate:
+        - <LIVEKIT_DOMAIN>
+        - <TURN_DOMAIN>
+  layer4:
+    servers:
+      main:
+        listen: [":443"]
+        routes:
+          - match:
+              - tls:
+                  sni: ["<TURN_DOMAIN>"]
+            handle:
+              - handler: tls
+              - handler: proxy
+                upstreams:
+                  - dial: ["localhost:5349"]
+          - match:
+              - tls:
+                  sni: ["<LIVEKIT_DOMAIN>"]
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["localhost:7880"]

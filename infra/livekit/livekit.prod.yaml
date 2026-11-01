@@ -1,0 +1,42 @@
+# Production SFU — template for ONE node (VM in São Paulo, docs/infra/deploy.md). Replace every <...> value.
+# Runs next to Caddy (caddy.prod.yaml) with host networking (docker-compose.prod.yaml):
+#   443/tcp  Caddy: TLS for wss://<LIVEKIT_DOMAIN> (→ 7880) and TURN/TLS for <TURN_DOMAIN> (→ 5349), split by SNI.
+#            TURN on 443 gets through corporate/school firewalls that only allow HTTPS.
+#   7881/tcp ICE over TCP · 3478/udp TURN/UDP · 50000–60000/udp WebRTC media. 7880 and 5349 stay closed to the world.
+#
+# Keys are not in this file: the container gets LIVEKIT_KEYS="<API_KEY>: <API_SECRET>", the same pair as the API's
+# LIVEKIT_API_KEY / LIVEKIT_API_SECRET (the API refuses the public dev pair in production). Webhooks are signed with it.
+port: 7880
+# All interfaces: the firewall (not this file) keeps 7880 private; Caddy reaches it on localhost.
+bind_addresses:
+  - ""
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  # Advertise the VM's public IP (found via STUN). Vultr VMs have it on the NIC; behind NAT this is required.
+  use_external_ip: true
+  enable_loopback_candidate: false
+turn:
+  enabled: true
+  domain: <TURN_DOMAIN>            # e.g. turn.algameet.com.br (DNS A record → VM public IP)
+  # Caddy terminates TLS on 443 and forwards plain TCP here (external_tls), so no certificate files in LiveKit.
+  tls_port: 5349
+  external_tls: true
+  udp_port: 3478
+webhook:
+  # Key *name* (not the secret) used to sign webhooks; must be the key in LIVEKIT_KEYS.
+  api_key: <API_KEY>
+  urls:
+    - https://<API_DOMAIN>/api/v1/livekit/webhook   # e.g. api.algameet.com.br (Railway)
+room:
+  # Same as dev: rooms close quickly after the last participant leaves.
+  empty_timeout: 20
+  departure_timeout: 10
+logging:
+  level: info
+# Multi-node (phase 2 of docs/infra/cost-model.md, 2+ SFU nodes): every node needs the same Redis so rooms are routed
+# to one node and the API's RoomService calls reach it. One node needs nothing.
+# redis:
+#   address: <REDIS_HOST>:6379
+#   password: <REDIS_PASSWORD>

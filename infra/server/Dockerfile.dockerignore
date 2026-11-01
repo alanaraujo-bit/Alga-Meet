@@ -1,0 +1,18 @@
+# Build context filter for infra/server/Dockerfile (BuildKit reads <Dockerfile>.dockerignore next to the Dockerfile).
+# Allowlist: everything is excluded, then only what the Dockerfile copies is let back in.
+*
+!package.json
+!package-lock.json
+!tsconfig.base.json
+!packages/shared/package.json
+!packages/shared/src/**
+!apps/desktop/package.json
+!apps/server/package.json
+!apps/server/tsconfig.json
+!apps/server/src/**
+!apps/server/drizzle/**
+# Never, even inside allowed folders.
+**/.env
+**/.env.*
+**/node_modules
+**/*.test.ts

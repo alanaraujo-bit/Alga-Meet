@@ -1,0 +1,23 @@
+# Production SFU on one VM (docs/infra/deploy.md §4). In /opt/livekit on the VM, next to livekit.prod.yaml,
+# caddy.prod.yaml and a root-only .env with LIVEKIT_API_KEY / LIVEKIT_API_SECRET (same pair as the API):
+#   docker compose -f docker-compose.prod.yaml up -d
+# Host networking: WebRTC needs the real UDP range (50000–60000) and the VM's public IP, no NAT layer.
+services:
+  livekit:
+    # Pinned: the version the server's moderation/voice paths were validated against (scripts/livekit.mjs).
+    image: livekit/livekit-server:v1.13.11
+    command: --config /etc/livekit.yaml
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./livekit.prod.yaml:/etc/livekit.yaml:ro
+  caddy:
+    image: livekit/caddyl4
+    command: run --config /etc/caddy.yaml --adapter yaml
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./caddy.prod.yaml:/etc/caddy.yaml:ro
+      - ./caddy_data:/data
