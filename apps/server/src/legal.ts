@@ -3,10 +3,21 @@ import { ADULT_AGE, ageOn, type AccountActionReason, type AgeBracket, type Repor
 import type { UserRow } from './db/schema.js'
 
 /**
- * Version of the legal bundle (docs/legal: Termos + Política + Diretrizes, published together). Bump it in the release
- * that publishes a relevant change: every account then gets Me.needsTermsAcceptance until it accepts again.
+ * Versioned legal catalog (docs/legal: Termos + Política + Diretrizes, published together), newest first. Add an entry
+ * in the release that publishes a relevant change: its `version` becomes TERMS_VERSION (every account then gets
+ * Me.needsTermsAcceptance until it accepts again) and `changeSummary` (short pt-BR "o que mudou") goes out in
+ * GET /legal for the re-acceptance screen. Copy is a draft until the lawyer reviews it with the documents.
  */
-export const TERMS_VERSION = '2026-11-01'
+export const LEGAL_VERSIONS: readonly { version: string; changeSummary?: string }[] = [
+  {
+    version: '2026-11-01',
+    changeSummary: 'Primeira versão dos Termos de Uso, da Política de Privacidade e das Diretrizes da Comunidade: idade mínima de 16 anos, '
+      + 'regras de convivência, denúncias e recursos, exclusão e exportação dos seus dados e telemetria de chamadas só com o seu consentimento.',
+  },
+]
+
+/** Version of the legal bundle accepted at signup and by POST /users/@me/accept-terms. */
+export const TERMS_VERSION = LEGAL_VERSIONS[0]!.version
 
 export const ageBracketOf = (u: Pick<UserRow, 'birthDate'>, today?: string): AgeBracket =>
   !u.birthDate ? 'unknown' : ageOn(u.birthDate, today) >= ADULT_AGE ? 'adult' : 'teen'

@@ -6,15 +6,15 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto
 import { rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { GatewayClose, REMOVED_USER_ID, uuidv7, type PublicUser } from '@alga/shared'
+import { GatewayClose, REMOVED_USER_ID, uuidv7, type DataExport, type DataExportStatus, type PublicUser } from '@alga/shared'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, ne, notExists, notInArray, or, sql } from 'drizzle-orm'
-import { profileAudience, spaceMemberIds } from './access.js'
+import { channelAudience, profileAudience, spaceMemberIds } from './access.js'
 import type { Ctx } from './app.js'
 import { revokeAllSessions, sha256Hex } from './auth.js'
 import {
   accessLogs, accountActions, appeals, attachments, channelRecipients, channels, consentRecords, dataExports,
   deletedAccounts, memberRoles, messages, orders, reactions, relationships, reports, roles, sessions, spaceMembers,
-  spaces, subscriptions, users, type UserRow,
+  spaces, subscriptions, users, type DataExportRow, type UserRow,
 } from './db/schema.js'
 import { accountDeletedMail, dataExportMail, deletionCanceledMail, deletionScheduledMail } from './email-templates.js'
 import { safeErr } from './errors.js'
@@ -26,6 +26,10 @@ import { zip } from './zip.js'
 /** Profile clients show for a purged account (USER_UPDATE with the old id; messages kept point to REMOVED_USER_ID). */
 export const removedProfile = (id: string): PublicUser =>
   ({ id, username: 'deleted-user', displayName: 'Usuário removido', avatarUrl: null, accentColor: null, bio: '' })
+
+const EXPORT_STATUS: Record<DataExportRow['status'], DataExportStatus> = {
+  pending: 'queued', building: 'processing', ready: 'ready', expired: 'expired', failed: 'failed',
+}
 
 const README = `Exportação de dados do Alga Meet (LGPD, art. 18, II e V)
 
@@ -140,6 +144,11 @@ export class Privacy {
     const relatedTo = (await db.select({ id: relationships.userId }).from(relationships).where(eq(relationships.targetId, userId))).map((r) => r.id)
     const audience = (await profileAudience(db, userId)).filter((id) => id !== userId)
     const avatarKey = files.imageKey('avatars', userId, user.avatarUrl)
+    // Cascaded with the row below: announced like any other removal so open clients do not keep them.
+    const ownReactions = await db.select({ messageId: reactions.messageId, emoji: reactions.emoji, channelId: messages.channelId, spaceId: channels.spaceId })
+      .from(reactions).innerJoin(messages, eq(messages.id, reactions.messageId)).innerJoin(channels, eq(channels.id, messages.channelId))
+      .where(eq(reactions.userId, userId))
+    const dms = await privateChannelsOf(db, userId)
 
     await db.transaction(async (tx) => {
       const own = tx.select({ id: messages.id }).from(messages).where(eq(messages.authorId, userId))
@@ -167,6 +176,16 @@ export class Privacy {
     for (const [spaceId, ids] of coMembers) hub.dispatch(ids, 'MEMBER_REMOVE', { spaceId, userId })
     hub.dispatch(relatedTo, 'RELATIONSHIP_REMOVE', { userId })
     hub.dispatch(audience, 'USER_UPDATE', removedProfile(userId))
+    for (const c of dms) {
+      const rest = (c.recipientIds ?? []).filter((id) => id !== userId)
+      if (rest.length) hub.dispatch(rest, 'CHANNEL_UPDATE', { ...c, recipientIds: rest })
+    }
+    const seen = new Map<string, string[]>()
+    for (const r of ownReactions) {
+      let to = seen.get(r.channelId)
+      if (!to) seen.set(r.channelId, to = await channelAudience(db, { id: r.channelId, spaceId: r.spaceId }))
+      hub.dispatch(to, 'REACTION_REMOVE', { messageId: r.messageId, channelId: r.channelId, userId, emoji: r.emoji })
+    }
     this.ctx.trust.notify(user, 'account_deletion', accountDeletedMail())
     log.info({ userId, messages: user.deletionMessages }, 'privacy: account purged')
     return true
@@ -181,6 +200,18 @@ export class Privacy {
   exportUrl(id: string, expiresAt: Date): string {
     const exp = Math.floor(expiresAt.getTime() / 1000)
     return `${this.ctx.config.publicUrl}/api/v1/exports/${id}?exp=${exp}&sig=${this.mac(id, exp)}`
+  }
+
+  /** GET /users/@me/exports. The in-app link lives like an attachment URL (FILE_URL_TTL_SECONDS), never past the zip. */
+  exportView(e: DataExportRow, now = Date.now()): DataExport {
+    const live = e.status === 'ready' && e.expiresAt && e.expiresAt.getTime() > now ? e.expiresAt : null
+    const status = live || e.status !== 'ready' ? EXPORT_STATUS[e.status] : 'expired'
+    const linkUntil = live && new Date(Math.min(live.getTime(), now + this.ctx.config.files.urlTtlSeconds * 1000))
+    return {
+      id: e.id, status, createdAt: e.createdAt.toISOString(),
+      expiresAt: status === 'failed' ? null : e.expiresAt?.toISOString() ?? null,
+      downloadUrl: linkUntil ? this.exportUrl(e.id, linkUntil) : null,
+    }
   }
 
   verifyExport(id: string, exp: number, sig: string, now = Date.now()): boolean {

@@ -8,6 +8,8 @@ import { HttpError, forbidden, idParam, parse } from '../errors.js'
 import { metrics } from '../metrics.js'
 import { perMinute } from './users.js'
 
+const perHour = (max: number) => ({ rateLimit: { max, timeWindow: '1 hour' } })
+
 /** Catalog, provider webhooks (encapsulated raw-body parser) and the sandbox's fake payment page. */
 export async function billingPublicRoutes(app: FastifyInstance, { billing }: Ctx): Promise<void> {
   app.get('/billing/catalog', async (): Promise<BillingCatalog> => billing.catalog())
@@ -57,7 +59,8 @@ export async function billingPublicRoutes(app: FastifyInstance, { billing }: Ctx
 export function billingRoutes(app: FastifyInstance, { billing, config }: Ctx): void {
   app.get('/billing/me', async (req): Promise<BillingMe> => billing.me(req.auth.user))
 
-  app.post('/billing/checkout', { config: perMinute(10) }, async (req, reply): Promise<CheckoutResponse> => {
+  // Each call creates an object at the provider (preapproval / preference): per hour, not per minute.
+  app.post('/billing/checkout', { config: perHour(10) }, async (req, reply): Promise<CheckoutResponse> => {
     const { productId } = parse(CheckoutBody, req.body)
     requireVerifiedEmail(req.auth.user, 'fazer compras')
     // Código Civil art. 4º: 16-17 are relatively incapable; until a guardian flow exists, purchases are 18+ only.
@@ -69,6 +72,7 @@ export function billingRoutes(app: FastifyInstance, { billing, config }: Ctx): v
     return res
   })
 
-  app.post('/billing/subscription/cancel', { config: perMinute(10) }, async (req): Promise<Subscription> => billing.cancel(req.auth.user.id))
-  app.post('/billing/subscription/resume', { config: perMinute(10) }, async (req): Promise<Subscription> => billing.resume(req.auth.user.id))
+  // Every real change is a provider API call (idempotent repeats are not): a cancel/resume loop must not drain the quota.
+  app.post('/billing/subscription/cancel', { config: perHour(10) }, async (req): Promise<Subscription> => billing.cancel(req.auth.user.id))
+  app.post('/billing/subscription/resume', { config: perHour(10) }, async (req): Promise<Subscription> => billing.resume(req.auth.user.id))
 }

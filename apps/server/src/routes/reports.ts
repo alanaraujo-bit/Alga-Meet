@@ -102,7 +102,7 @@ export function reportRoutes(app: FastifyInstance, ctx: Ctx): void {
       const [open] = await db.select().from(reports).where(and(eq(reports.reporterId, me), eq(reports.targetType, body.targetType),
         eq(reports.targetId, body.targetId), eq(reports.status, 'open')))
       if (!open) throw conflict('Tente novamente.')
-      return { id: open.id, createdAt: open.createdAt.toISOString() }
+      return { id: open.id, createdAt: open.createdAt.toISOString(), duplicate: true }
     }
     if (body.reason === 'csam') {
       // docs/trust-safety/csam-process.md: out of circulation at once, preserved, account kept (legal hold).
@@ -113,7 +113,7 @@ export function reportRoutes(app: FastifyInstance, ctx: Ctx): void {
       ctx.log.warn({ reportId: row.id, attachments: t.attachmentIds.length }, 'trust-safety: csam report received, highest priority')
     }
     reply.code(201)
-    return { id: row.id, createdAt: row.createdAt.toISOString() }
+    return { id: row.id, createdAt: row.createdAt.toISOString(), duplicate: false }
   })
 
   app.get('/users/@me/actions', async (req): Promise<AccountAction[]> => {

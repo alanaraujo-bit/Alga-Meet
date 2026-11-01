@@ -482,6 +482,7 @@ export type ReportRow = typeof reports.$inferSelect
 export type AccountActionRow = typeof accountActions.$inferSelect
 export type AppealRow = typeof appeals.$inferSelect
 export type QuarantinedFileRow = typeof quarantinedFiles.$inferSelect
+export type DataExportRow = typeof dataExports.$inferSelect
 
 // ---- observability (src/telemetry.ts) ------------------------------------------------------------------------------
 

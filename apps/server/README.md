@@ -73,9 +73,9 @@ Falha fechada:
 | `src/gateway/` | conexões, fan-out, presença, `Throttle`; handshake, heartbeat, limites, READY, ops `presence`/`voice_state` |
 | `src/voice.ts` | tokens/grants LiveKit, webhook (assinatura + dedupe), `VoiceState` autoritativo, limite de usuários, moderação no SFU |
 | `src/billing/` | `catalog.ts` (planos, preços, cosméticos; versionado), `billing.ts` (motor: checkout, webhooks idempotentes, recompute de direitos, job de expiração), `provider.ts` (interface `PaymentProvider` + `SandboxProvider`), `mercadopago.ts` (Checkout Pro + preapproval, `x-signature`) |
-| `src/legal.ts` | `TERMS_VERSION`, faixa etária (`ageBracketOf`), prioridade e rótulos pt-BR dos motivos, prazos |
+| `src/legal.ts` | catálogo `LEGAL_VERSIONS` (versão + `changeSummary`; a do topo é `TERMS_VERSION`), faixa etária (`ageBracketOf`), prioridade e rótulos pt-BR dos motivos, prazos |
 | `src/trust-safety.ts` | medidas na conta (`applyAction`: warn/suspend/ban/lift aplicados em login, sessões, gateway 4010 e voz), token de recurso, quarentena de anexos com cópia em `evidence/` + SHA-256, retenção legal, `setStaffRole` |
-| `src/privacy.ts` | registros de acesso (Marco Civil art. 15), exclusão de conta (carência + expurgo), exportação (zip + link assinado por e-mail), job de retenção |
+| `src/privacy.ts` | registros de acesso (Marco Civil art. 15), exclusão de conta (carência + expurgo), exportação (zip + link assinado por e-mail e na lista do app), job de retenção |
 | `src/zip.ts` | escritor de ZIP mínimo (deflate, sem zip64) para a exportação |
 | `scripts/grant-staff.ts` | único jeito de dar/tirar `staff_role` (`npx tsx scripts/grant-staff.ts <username> <admin\|moderator\|none>`; com PGlite, pare o servidor antes) |
 | `src/routes/` | `auth` (inclui verificação de e-mail e redefinição de senha), `users` (perfil, relacionamentos, DMs), `spaces` (espaços, membros, canais, convites, listar/revogar convites), `roles` (cargos, apelidos), `moderation` (bans, voz), `messages` (inclui envio multipart), `files` (download assinado, avatares/ícones), `voice`, `billing`, `privacy` (idade, aceite, exclusão, exportação, `/legal`), `reports` (denúncias, medidas da própria conta, recursos), `admin` (equipe, auditado), `telemetry` (relatório de qualidade de chamada) |
@@ -221,13 +221,15 @@ Falha fechada:
     antiga declara uma vez (`PATCH /users/@me/birth-date`), < 16 → suspensa (`underage`) e exclusão em 30 dias salvo
     recurso. 16–17: DM só com amigos (nos dois sentidos) e sem compras.
   - **Aceite**: `TERMS_VERSION` (`src/legal.ts`) no cadastro + `consent_records`; versão nova → `Me.needsTermsAcceptance`
-    até `POST /users/@me/accept-terms`.
+    até `POST /users/@me/accept-terms` (idempotente: aceitar a versão em vigor de novo não grava outra linha). Versão
+    nova = entrada nova no topo de `LEGAL_VERSIONS`, com `changeSummary` (pt-BR curto, "o que mudou") que `GET /legal`
+    devolve para a tela de novo aceite (texto em rascunho até o advogado revisar).
   - **Denúncias** (`POST /reports`, 10/h): retrato do alvo na hora (sobrevive à exclusão), sem autodenúncia, mensagem
-    só se o denunciante a vê, duplicada aberta = a mesma. `csam` = prioridade 100 + quarentena automática dos anexos +
-    retenção legal do autor.
+    só se o denunciante a vê, duplicada aberta = a mesma (200 com `duplicate: true`; nova = 201 com `duplicate: false`).
+    `csam` = prioridade 100 + quarentena automática dos anexos + retenção legal do autor.
   - **Medidas** (equipe): warn / suspend até / ban / lift. Suspensão e banimento apagam as sessões, fecham o gateway com
     **4010**, tiram da voz (`removeParticipant`); o login (senha certa) responde 403 com `error.restriction` e um token
-    de recurso (1 h). E-mail com a categoria, só para endereço verificado; `csam` não avisa e aparece como `other`.
+    de recurso (1 h); `restriction.createdAt` = quando a medida foi decidida (o prazo do recurso conta dele). E-mail com a categoria, só para endereço verificado; `csam` não avisa e aparece como `other`.
   - **Recursos**: `POST /appeals` (sessão ou token; 30 dias; um por medida; 10/h por IP); "aceito" levanta a medida.
   - **Equipe**: `users.staff_role` só pelo script; `/admin/*` exige o papel (`access-logs`: admin); toda chamada vai
     para `staff_audit_log` antes de executar (status depois); moderador não age sobre contas da equipe.
@@ -238,9 +240,17 @@ Falha fechada:
     dias (login cancela; retenção legal ou recurso aberto seguram). Espaços → maior cargo / mais antigo, ou excluídos;
     mensagens `anonymize` (autor `REMOVED_USER_ID`, "Usuário removido", criado pela migração 0005) ou `delete`;
     anexos/avatar/exportações sempre apagados; `subscriptions`/`orders` passam para `REMOVED_USER_ID` (FK `restrict`
-    mantida de propósito); `deleted_accounts` (username + SHA-256 do e-mail) 6 meses.
+    mantida de propósito); `deleted_accounts` (username + SHA-256 do e-mail) 6 meses. `REMOVED_USER_ID` só aparece como
+    `Message.author` (REST, eventos, retrato de denúncia; `GET /users/:id` o resolve); no expurgo os clientes abertos
+    recebem, com o id antigo, `USER_UPDATE` (mesmo perfil "Usuário removido"), `MEMBER_REMOVE`, `RELATIONSHIP_REMOVE`,
+    `REACTION_REMOVE` de cada reação e `CHANNEL_UPDATE` das DMs sem a pessoa; membros, destinatários e digitação nunca
+    mostram nenhum dos dois ids.
   - **Exportação** (`POST /users/@me/export`, e-mail verificado, 1/24 h no banco): zip (`dados.json` + `LEIA-ME.txt`)
-    em `exports/`, link HMAC de 7 dias só por e-mail (`GET /exports/:id`), anexos com URL assinada de 7 dias.
+    em `exports/`, link HMAC de 7 dias por e-mail (`GET /exports/:id`), anexos com URL assinada de 7 dias.
+    `GET /users/@me/exports` (30/min) lista os 20 últimos pedidos (`queued`/`processing`/`ready`/`expired`/`failed`) e,
+    quando pronto, um `downloadUrl` com a mesma assinatura e validade de URL de anexo (`FILE_URL_TTL_SECONDS`, nunca
+    além do zip). Troca consciente: antes só o e-mail levava o link; agora uma sessão roubada também baixa (o dono
+    ainda recebe o e-mail e o pedido continua limitado a 1/24 h).
   - **Registros de acesso** (`access_logs`, sem FK): todo login/cadastro + 1º uso do dia por IP e user agent (hash),
     REST e gateway; IP pela regra de `TRUST_PROXY`; expurgo aos 6 meses salvo retenção legal; sem porta de origem.
   - **Job** (`Privacy.sweep`, a cada minuto): expurgos devidos, retenção (acesso 6 meses, casos decididos 6 meses salvo
@@ -251,7 +261,8 @@ Falha fechada:
 - **Rate limit** (chave = usuário autenticado, ou IP em rotas públicas): teto global 200/min; `register`/`login`
   10/min/IP + 10 logins falhos/15 min por conta; mensagens 10/10 s; reações 10/5 s; `PATCH /users/@me`, pedidos de
   amizade, DMs, `POST /invites/:code` e `/voice/join` 10/min; `verify-email` e `password-reset/confirm` 10/min/IP;
-  `password-reset/request` 5/15 min/IP; reenvio da verificação 3/15 min; e-mails 3/h por endereço e fluxo; preview de convite 30/min/IP; equipar cosméticos 10/min; retomar/cancelar assinatura 10/min; relatórios de qualidade de chamada 20/h; espaços 10/h; convites
+  `password-reset/request` 5/15 min/IP; reenvio da verificação 3/15 min; e-mails 3/h por endereço e fluxo; preview de convite 30/min/IP; equipar cosméticos 10/min; checkout 10/h e cancelar/retomar assinatura 10/h cada (cada chamada cria ou muda um objeto no
+  provedor); lista de exportações 30/min; relatórios de qualidade de chamada 20/h; espaços 10/h; convites
   20/h; troca de senha 5/15 min; 30 arquivos anexados/10 min por usuário; avatar/ícone 5/min; downloads de
   arquivo/avatar/ícone 1200/min/IP (uma página de chat carrega muitos de uma vez); denúncias 10/h; recursos 10/h/IP;
   `DELETE /users/@me` 5/15 min; exportação 1/24 h (no banco); data de nascimento 5/min. Webhook do LiveKit, `/health` e
@@ -273,7 +284,7 @@ Falha fechada:
   aleatório e `user_hash` com sal aleatório trocado todo dia e nunca gravado; expurgo aos 30 dias; vira histogramas
   `alga_call_*`.
 
-## Testes (`test/`, 163 casos)
+## Testes (`test/`, 165 casos)
 
 `npm test` roda em PGlite; `npm run test:pg` roda os mesmos casos num PostgreSQL 18 real (`test/pg-setup.ts`: um
 cluster UTF8 descartável por execução, um banco por `startServer`). Os dois passam.
@@ -310,16 +321,19 @@ saem no fim do plano e o comprado fica; reembolso tira) e, no Mercado Pago simul
 fechado → 503, LiveKit falso → 200), métricas de HTTP/gateway/banco (driver certo nas duas suítes)/voz/webhooks/rate
 limit/e-mail/pagamentos/processo, e a telemetria (403 sem opt-in, schema estrito, linha só com o dia e hash diário,
 métricas, expurgo de 30 dias, retirada do consentimento, 20/h).
-`privacy.test.ts` (9): idade no cadastro (< 16 sem gravar nada, 16 hoje, 18, datas inválidas, sem data em dev,
+`privacy.test.ts` (11): idade no cadastro (< 16 sem gravar nada, 16 hoje, 18, datas inválidas, sem data em dev,
 `REQUIRE_BIRTHDATE` e produção), declaração única e < 16 → suspensão + 4010 + exclusão segurada por recurso aceito,
-16–17 (DM só com amigos sem revelar idade, sem compra), aceite e novo aceite com histórico, registros de acesso (login,
+16–17 (DM só com amigos sem revelar idade, sem compra), aceite e novo aceite com histórico (`changeSummary` do catálogo, aceite repetido sem linha nova), registros de acesso (login,
 1º uso do dia por IP/app, gateway, expurgo de 6 meses salvo retenção legal, rota só de admin), exclusão (senha, 4004,
 cancelada pelo login, expurgo: herdeiro do espaço, espaço sozinho excluído, mensagens anonimizadas com anexos apagados
 no bucket, DM, pedido pago passa ao usuário removido, denúncia sem denunciante, `deleted_accounts`, eventos aos outros;
 `delete` e retenção legal) e exportação (e-mail verificado, 1/24 h, zip lido de volta, link e URLs de anexo de 7 dias,
-assinatura adulterada, expiração). `trust-safety.test.ts` (6): papel de equipe só pelo script + auditoria com status,
-denúncias (retrato que sobrevive, autodenúncia, visibilidade, duplicada, 10/h), suspensão (4010, `removeParticipant`,
-401, e-mail sem nota interna, login 403 com motivo, token de recurso, recurso aceito), ban/lift/warn/expiração/guardas
+assinatura adulterada, expiração), a lista de exportações (estados, link curto que baixa o zip, só as próprias, expirada
+sem link) e a paridade do autor removido (`REMOVED_USER_ID` no REST, na DM, em `GET /users/:id` e no retrato;
+`USER_UPDATE`/`MEMBER_REMOVE`/`REACTION_REMOVE`/`CHANNEL_UPDATE` com o id antigo; nenhum dos ids no READY seguinte).
+`trust-safety.test.ts` (6): papel de equipe só pelo script + auditoria com status,
+denúncias (retrato que sobrevive, autodenúncia, visibilidade, duplicada com `duplicate`, 10/h), suspensão (4010, `removeParticipant`,
+401, e-mail sem nota interna, login 403 com motivo, `createdAt` + prazo do recurso, token de recurso, recurso aceito), ban/lift/warn/expiração/guardas
 (equipe só por admin, `csam` sem aviso), quarentena `csam` (404, `MESSAGE_UPDATE`, prioridade, prova + SHA-256,
 original apagado, retenção que segura a exclusão, `receiptConfirmed` com protocolo) e quarentena manual (idempotente,
 cópia que falha fica retida e é retentada).
@@ -370,3 +384,12 @@ na sala com `livekit-client` e publica o microfone; o dono chama `PATCH /spaces/
   anexos; sem expurgo fiscal automático de `subscriptions`/`orders`; exportação montada em memória (sem zip64); conta
   suspensa/banida não se autoexclui (pedido ao encarregado); registros de acesso sem porta de origem (D23); o cache de
   "1º uso do dia" fica em memória (mesma ressalva do Redis).
+- **Revisão de abuso (T&S + pagamentos, 2026-11-01)**: corrigidos o checkout e o cancelar/retomar (10/min → 10/h: cada
+  chamada vira objeto/chamada no provedor) e o aceite repetido. Em aberto, decisão do dono/advogado: (1) qualquer conta,
+  até recém-criada e sem e-mail verificado, faz denúncia `csam` e com ela põe em quarentena os anexos que vê e em
+  retenção legal o autor (segura a exclusão dele); contas descartáveis multiplicam o 10/h. Sugestão: automático só com
+  e-mail verificado (o resto vai para a fila com prioridade 100). (2) O `@fastify/rate-limit` em memória guarda 5000
+  chaves por rota (LRU): acima disso, no mesmo intervalo, contadores antigos somem e o limite vaza (resolve junto com o
+  Redis). (3) Exclusão em modo `delete` não anuncia `MESSAGE_DELETE` (podem ser milhares): clientes abertos mostram as
+  mensagens como "Usuário removido" até recarregar. (4) `DELETE /users/@me` + login que cancela podem ser repetidos
+  (5/15 min) e cada volta manda 2 e-mails ao próprio endereço, sem a cota por endereço dos outros fluxos.

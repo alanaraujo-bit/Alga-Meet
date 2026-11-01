@@ -5,7 +5,13 @@
  */
 import { z } from 'zod'
 
-/** Author of messages kept after their account was deleted ("Usuário removido"); render it as such. */
+/**
+ * Author of messages kept after their account was deleted ("Usuário removido"); render it as such. Only Message.author
+ * (REST, events, report snapshots) ever carries it, as a PublicUser (GET /users/:id resolves it too). When the purge
+ * runs, open clients get, under the old id: USER_UPDATE with the same "Usuário removido" profile (for what they have
+ * cached), MEMBER_REMOVE, RELATIONSHIP_REMOVE, REACTION_REMOVE for each of its reactions and CHANNEL_UPDATE of its DMs
+ * without it (a 1:1 DM can be left with only you in recipientIds). Typing, members and recipients never show either id.
+ */
 export const REMOVED_USER_ID = '00000000-0000-4000-8000-000000000000'
 
 /** Accounts below this age are refused (no guardian linking yet: Lei 15.211/2025, art. 24). */
@@ -53,6 +59,8 @@ export interface LegalInfo {
   minAge: number
   /** Whether this server requires RegisterBody.birthDate and termsVersion (always true in production). */
   signupRequiresBirthDate: boolean
+  /** Short pt-BR "o que mudou" of this termsVersion, for the re-acceptance screen (Me.needsTermsAcceptance). */
+  changeSummary?: string
 }
 
 /**
@@ -74,8 +82,22 @@ export interface AccountDeletionScheduled {
 
 export interface DataExportRequested {
   id: string
+  /** Same as DataExport.status 'queued'. */
   status: 'pending'
   createdAt: string
+}
+
+export type DataExportStatus = 'queued' | 'processing' | 'ready' | 'expired' | 'failed'
+
+/** GET /users/@me/exports (newest first). 'failed': ask again (POST /users/@me/export). */
+export interface DataExport {
+  id: string
+  status: DataExportStatus
+  createdAt: string
+  /** When the zip is deleted (ready/expired); null before it is built and for failed ones. */
+  expiresAt: string | null
+  /** ready only: signed link to the zip, short-lived (fetch the list again for a new one); the e-mailed link also works. */
+  downloadUrl: string | null
 }
 
 // ---- reports --------------------------------------------------------------------------------------------------------
@@ -100,6 +122,8 @@ export type CreateReportBody = z.infer<typeof CreateReportBody>
 export interface ReportReceipt {
   id: string
   createdAt: string
+  /** true: you already had an open report of this target; this is that one (HTTP 200 instead of 201). */
+  duplicate: boolean
 }
 
 // ---- enforcement and appeals ----------------------------------------------------------------------------------------
@@ -140,6 +164,8 @@ export interface AccountRestriction {
   type: 'suspended' | 'banned'
   actionId: string | null
   reason: AccountActionReason
+  /** When the action was decided (null with actionId). */
+  createdAt: string | null
   until: string | null
   appealDeadline: string | null
   appealStatus: AppealView['status'] | null

@@ -81,6 +81,9 @@ describe('catalog and checkout', () => {
     expect(me.plan.id).toBe('free')
     expect(me.items).toEqual([])
     expect(me.subscriptions[0]).toMatchObject({ id: res.body.reference, status: 'pending', sandbox: true })
+    // Every checkout creates an object at the provider: 10 per hour (3 used above).
+    for (let i = 0; i < 7; i++) expect((await checkout(u.token, 'plus_monthly')).status).toBe(201)
+    expect((await checkout(u.token, 'plus_monthly')).status).toBe(429)
   })
 
   it('the sandbox page needs its signed link; approving activates Plus, buying a cosmetic grants it for good', async () => {

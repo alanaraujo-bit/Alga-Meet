@@ -118,16 +118,17 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  *   checks every screen-share publication against them (see VoiceJoinResponse.streamPresets).
  * GET    /billing/catalog                                -> BillingCatalog (public, no auth)
  * GET    /billing/me                                     -> BillingMe (plan, subscriptions, entitlements, orders)
- * POST   /billing/checkout         CheckoutBody          -> CheckoutResponse (201; verified e-mail required; 10/min)
+ * POST   /billing/checkout         CheckoutBody          -> CheckoutResponse (201; verified e-mail required; 10/h)
  *   Creates a pending subscription (plan products) or order (cosmetics) and returns the provider's page. Nothing is
  *   granted here: the provider's verified webhook (or an API re-fetch) confirms the payment, then ENTITLEMENTS_UPDATE
  *   (+ ME_UPDATE with the new Me.plan). 404 unknown/unsold product, 409 already subscribed / already owned, 503
  *   payments disabled on this server. `sandbox: true` = test provider (dev/test only), nothing is charged.
  * POST   /billing/subscription/cancel                    -> Subscription (renewals stop now, the plan lasts until
- *                                                          currentPeriodEnd; idempotent; 404 without an active one)
+ *                                                          currentPeriodEnd; idempotent; 404 without an active one;
+ *                                                          10/h)
  * POST   /billing/subscription/resume                    -> Subscription (undoes cancel while the period is still
  *                                                          paid: cancelAtPeriodEnd false, renewals resume at the
- *                                                          provider; idempotent; 404 without an active one; 10/min)
+ *                                                          provider; idempotent; 404 without an active one; 10/h)
  * POST   /billing/webhooks/:provider (provider-signed)   -> 200 (server-to-server; 401 bad signature, 404 unknown
  *                                                          provider; repeated events are acknowledged and ignored)
  * GET    /billing/sandbox/checkout/:reference?sig=&outcome=approve|decline -> HTML (sandbox provider only: the fake
@@ -135,19 +136,24 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  * POST   /livekit/webhook          (LiveKit-signed)      -> 200 (server-to-server only)
  *
  * Trust & Safety and privacy (bodies and models in trust-safety.ts; policies in docs/trust-safety/README.md):
- * GET    /legal                                          -> LegalInfo (public)
+ * GET    /legal                                          -> LegalInfo (public; changeSummary = "o que mudou" in this version)
  * PATCH  /users/@me/birth-date     BirthDateBody         -> Me (once, while Me.ageBracket is 'unknown'; 409 after; under
  *                                                          MIN_AGE -> 403 restriction 'underage': sessions revoked,
  *                                                          account deleted in APPEAL_WINDOW_DAYS unless an appeal wins)
- * POST   /users/@me/accept-terms   AcceptTermsBody       -> Me (400 `fields.termsVersion` for an old version)
+ * POST   /users/@me/accept-terms   AcceptTermsBody       -> Me (400 `fields.termsVersion` for an old version;
+ *                                                          idempotent once accepted)
  * DELETE /users/@me                DeleteAccountBody     -> 202 AccountDeletionScheduled (password re-check; stops a
  *                                                          renewing subscription; every session revoked (4004); purge
  *                                                          7 days later unless you log in before)
  * POST   /users/@me/export                               -> 202 DataExportRequested (verified e-mail; 1 per 24 h, else
  *                                                          429): a zip (JSON + attachment links) whose signed link
- *                                                          (7 days) goes to your e-mail only
- * GET    /exports/:id?exp=&sig=                          -> application/zip (no auth: the e-mailed link is signed)
- * POST   /reports                  CreateReportBody      -> 201 ReportReceipt (200 for a duplicate of your open report;
+ *                                                          (7 days) goes to your e-mail; the app also gets one
+ *                                                          from GET /users/@me/exports
+ * GET    /users/@me/exports                              -> DataExport[] (newest first, last 20; ready ones carry a
+ *                                                          short-lived signed downloadUrl; 30/min)
+ * GET    /exports/:id?exp=&sig=                          -> application/zip (no auth: the e-mailed link and
+ *                                                          DataExport.downloadUrl are signed)
+ * POST   /reports                  CreateReportBody      -> 201 ReportReceipt (200 + duplicate: true for your open report;
  *                                                          10 per hour; not your own content; you must see the message)
  * GET    /users/@me/actions                              -> AccountAction[]
  * POST   /appeals                  CreateAppealBody      -> 201 AppealView (session or appealToken; one per action,

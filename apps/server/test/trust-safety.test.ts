@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  GatewayClose,
+  APPEAL_WINDOW_DAYS, GatewayClose,
   type AdminAppeal, type AdminReport, type AuthResponse, type Invite, type Message, type QuarantinedFile, type SpaceSnapshot,
 } from '@alga/shared'
 import { and, asc, eq } from 'drizzle-orm'
@@ -91,9 +91,10 @@ describe('reports', () => {
     const { msg } = await messageWithFile(s.app, member.token, text.id, 'conteúdo ofensivo')
     const r = await report(owner.token, { targetType: 'message', targetId: msg.id, reason: 'harassment', details: 'me xingou' })
     expect(r.status).toBe(201)
-    expect(Object.keys(r.body).sort()).toEqual(['createdAt', 'id'])
+    expect(Object.keys(r.body).sort()).toEqual(['createdAt', 'duplicate', 'id'])
+    expect(r.body.duplicate).toBe(false)
     const dup = await report(owner.token, { targetType: 'message', targetId: msg.id, reason: 'harassment' })
-    expect([dup.status, dup.body.id]).toEqual([200, r.body.id])
+    expect([dup.status, dup.body.id, dup.body.duplicate]).toEqual([200, r.body.id, true])
     expect((await report(member.token, { targetType: 'message', targetId: msg.id, reason: 'spam' })).status).toBe(400)
     expect((await report(outsider.token, { targetType: 'message', targetId: msg.id, reason: 'spam' })).status).toBe(404)
     expect((await report(member.token, { targetType: 'user', targetId: member.user.id, reason: 'spam' })).status).toBe(400)
@@ -142,6 +143,10 @@ describe('account enforcement and appeals', () => {
     expect(denied.body.error.message).toMatch(/suspensa até .* por assédio/)
     const restriction = denied.body.error.restriction
     expect(restriction).toMatchObject({ type: 'suspended', reason: 'harassment', until: untilAt, appealStatus: null, appealToken: expect.any(String) })
+    // When it was decided, and the appeal window counted from then.
+    const decided = new Date(restriction.createdAt).getTime()
+    expect(Math.abs(decided - new Date(done.body.resolvedAt!).getTime())).toBeLessThan(5000)
+    expect(new Date(restriction.appealDeadline).getTime()).toBe(decided + APPEAL_WINDOW_DAYS * DAY)
     const gw2 = await openGateway(s.port)
     gw2.send({ op: 'identify', token: member.token })
     expect((await gw2.closed).code).toBe(GatewayClose.AUTH_FAILED) // no session survived

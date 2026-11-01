@@ -1,9 +1,9 @@
 /** Age gate, consent, account deletion and data export routes (src/privacy.ts; contract in packages/shared/src/trust-safety.ts). */
 import {
   APPEAL_WINDOW_DAYS, AcceptTermsBody, BirthDateBody, DeleteAccountBody, MIN_AGE, ageOn, uuidv7,
-  type AccountDeletionScheduled, type DataExportRequested, type LegalInfo, type Me,
+  type AccountDeletionScheduled, type DataExport, type DataExportRequested, type LegalInfo, type Me,
 } from '@alga/shared'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import type { Ctx } from '../app.js'
@@ -11,7 +11,7 @@ import { requireVerifiedEmail, verifyPassword } from '../auth.js'
 import { consentRecords, dataExports, users } from '../db/schema.js'
 import { FILE_HEADERS } from '../files.js'
 import { HttpError, conflict, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
-import { DAY_MS, TERMS_VERSION } from '../legal.js'
+import { DAY_MS, LEGAL_VERSIONS, TERMS_VERSION } from '../legal.js'
 import { restrictedError } from '../trust-safety.js'
 import { meView } from '../views.js'
 import { perMinute } from './users.js'
@@ -32,6 +32,7 @@ export function privacyPublicRoutes(app: FastifyInstance, ctx: Ctx): void {
     guidelinesUrl: `${legal}/diretrizes-da-comunidade`,
     minAge: MIN_AGE,
     signupRequiresBirthDate: config.legal.requireBirthDate,
+    ...(LEGAL_VERSIONS[0]!.changeSummary ? { changeSummary: LEGAL_VERSIONS[0]!.changeSummary } : {}),
   }))
 
   // Opened from the e-mail (browser, no auth header): the signature binds export and expiry.
@@ -77,6 +78,8 @@ export function privacyRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.post('/users/@me/accept-terms', { config: perMinute(10) }, async (req): Promise<Me> => {
     const { termsVersion } = parse(AcceptTermsBody, req.body)
     if (termsVersion !== TERMS_VERSION) throw oldTerms()
+    // Already on it: no second consent row (repeated calls would only grow the history).
+    if (req.auth.user.termsVersion === TERMS_VERSION) return me(req.auth.user)
     const now = new Date()
     const after = await db.transaction(async (tx) => {
       await tx.insert(consentRecords).values({ id: uuidv7(), userId: req.auth.user.id, termsVersion, acceptedAt: now })
@@ -113,5 +116,11 @@ export function privacyRoutes(app: FastifyInstance, ctx: Ctx): void {
     privacy.kickExports()
     reply.code(202)
     return { id: row!.id, status: 'pending', createdAt: row!.createdAt.toISOString() }
+  })
+
+  // Status for the app; a ready one carries a short-lived link (the e-mailed 7-day one still goes out).
+  app.get('/users/@me/exports', { config: perMinute(30) }, async (req): Promise<DataExport[]> => {
+    const rows = await db.select().from(dataExports).where(eq(dataExports.userId, req.auth.user.id)).orderBy(desc(dataExports.createdAt)).limit(20)
+    return rows.map((r) => privacy.exportView(r))
   })
 }

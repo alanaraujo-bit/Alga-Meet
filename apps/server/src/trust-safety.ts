@@ -119,6 +119,7 @@ export class TrustSafety {
       type: u.bannedAt ? 'banned' : 'suspended',
       actionId: action?.id ?? null,
       reason: shownReason(action?.reason ?? 'other'),
+      createdAt: iso(action?.createdAt ?? null),
       until: u.bannedAt ? null : iso(u.suspendedUntil),
       appealDeadline: appealable ? deadline.toISOString() : null,
       appealStatus: appeal?.status ?? null,
