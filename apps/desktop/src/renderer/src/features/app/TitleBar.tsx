@@ -23,6 +23,7 @@ export function TitleBar({ search }: { search?: boolean }) {
   const spaceSettings = useSpaceSettings((st) => st.spaceId !== null)
   const sharing = useMedia((st) => st.screen.active)
   const live = sharing && (!onStage || settings || spaceSettings)
+  const switcher = useUi((st) => st.switcherOpen)
   return (
     <header className={s.titlebar}>
       <div className={s.brand}>
@@ -44,7 +45,8 @@ export function TitleBar({ search }: { search?: boolean }) {
       {search && down ? (
         <ConnectionChip />
       ) : search ? (
-        <button type="button" className={s.search} onClick={() => useUi.getState().setSwitcher(true)} aria-keyshortcuts="Control+K">
+        // The palette grows out of this field (QuickSwitcher measures it); while it is open the field is the palette.
+        <button type="button" className={s.search} data-switcher-anchor style={switcher ? { visibility: 'hidden' } : undefined} onClick={() => useUi.getState().setSwitcher(true)} aria-keyshortcuts="Control+K">
           <Icon icon={Search} size={14} />
           <span className={s.searchLabel}>{t.search}</span>
           <Kbd>{t.searchShortcut}</Kbd>
