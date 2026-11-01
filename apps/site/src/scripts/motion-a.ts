@@ -12,7 +12,10 @@ const $$ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document
 
 export let world: World | null = null;
 
-export function initTierA() {
+// Cede a vez ao navegador entre as etapas: a montagem vira várias tarefas curtas em vez de uma longa.
+const breathe = () => new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+
+export async function initTierA() {
   gsap.registerPlugin(ScrollTrigger);
   const fine = matchMedia('(pointer: fine)').matches;
   const narrow = innerWidth < 760;
@@ -39,6 +42,7 @@ export function initTierA() {
   }
 
   // ---- A água ----
+  await breathe();
   try {
     world = new World();
   } catch {
@@ -71,12 +75,17 @@ export function initTierA() {
     addEventListener('pointerdown', (e) => w.ripple(e.clientX / innerWidth, e.clientY / innerHeight, 1.1), { passive: true });
   }
 
+  await breathe();
   initHero(w, narrow);
+  await breathe();
   initRoom(w);
+  await breathe();
   if (w) { initFloat(w, narrow); initMoods(w); initFinal(w); }
+  await breathe();
   initLightTitles();
   initMagnetic(fine);
   initRest();
+  await breathe();
 
   ScrollTrigger.refresh();
   if (document.readyState !== 'complete') addEventListener('load', () => ScrollTrigger.refresh(), { once: true });
@@ -90,10 +99,7 @@ function initHero(w: World | null, narrow: boolean) {
   const tilt = $('[data-tilt]');
   if (!hero || !win || !tilt) return;
   const scene = tilt.parentElement!;
-  const layers = $$('[data-layer]', win);
-  const pops = $$('[data-pop]', win);
   const tags = $$('[data-tag]', win);
-  const k = narrow ? 0.5 : 1;
   const X = narrow ? 44 : 54, R = narrow ? -16 : -32;
   const vh = (f: number) => () => innerHeight * f;
   const sheen = $('[data-sheen]', win)!;
@@ -116,7 +122,9 @@ function initHero(w: World | null, narrow: boolean) {
   tl.fromTo(tilt, { rotateX: 64 }, { rotateX: 0, duration: 2.4, ease: 'power2.out' }, 0.8)
     .fromTo(win, { y: vh(0.75), scale: 0.86, z: -220 }, { y: 0, scale: 1, z: 0, duration: 2.4, ease: 'power2.out' }, 0.8)
     .fromTo(scene, { opacity: 0 }, { opacity: 1, duration: 1.2, ease: 'power1.out' }, 0.8);
-  layers.forEach((l) => tl.fromTo(l, { z: Number(l.dataset.z) * 0.2 * k }, { z: 0, duration: 2.4, ease: 'power2.out' }, 0.8));
+  // camadas, rótulos e brilho das bordas leem duas variáveis da janela (--lift na subida, --ex na explosão):
+  // duas animações em vez de vinte, e nenhuma leitura de estilo na montagem
+  tl.fromTo(win, { '--lift': 1 }, { '--lift': 0, duration: 2.4, ease: 'power2.out' }, 0.8);
   tl.fromTo(sheen, { '--sx': '120%', opacity: 0 }, { '--sx': '-40%', opacity: 1, duration: 1.8, ease: 'power1.inOut' }, 1.6)
     .to(sheen, { opacity: 0, duration: 0.5 }, 3.2)
     .fromTo('[data-cap="1"]', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 3.2)
@@ -124,10 +132,8 @@ function initHero(w: World | null, narrow: boolean) {
   // 3) vista explodida: a janela deita, gira e as camadas sobem em pilha
   tl.to(tilt, { rotateX: X, duration: 2.2, ease: 'power2.inOut' }, 4.4)
     .to(win, { rotation: R, scale: narrow ? 0.8 : 0.56, x: narrow ? 0 : () => innerWidth * 0.08, y: vh(narrow ? 0.08 : 0.17), duration: 2.2, ease: 'power2.inOut' }, 4.4)
-    .to('[data-slab]', { '--edge': 1, duration: 2 }, 4.4).to('[data-slab]', { '--edge': 0, duration: 0.7, ease: 'expo.in' }, 7.7);
-  layers.forEach((l, i) => tl.to(l, { z: Number(l.dataset.z) * k, '--edge': 1, duration: 2.0, ease: 'power3.inOut' }, 4.6 + i * 0.07));
-  pops.forEach((p, i) => tl.fromTo(p, { z: 0, opacity: 0 }, { z: Number(p.dataset.z) * k, opacity: 1, '--edge': 1, duration: 1.8, ease: 'power3.inOut' }, 4.9 + i * 0.12));
-  tags.forEach((t, i) => tl.set(t, { '--tz': `${Number(t.dataset.z) * k}px` }, 4.4).fromTo(t, { opacity: 0 }, { opacity: 1, duration: 0.45, ease: 'power2.out' }, 6.0 + i * 0.2));
+    .fromTo(win, { '--ex': 0 }, { '--ex': 1, duration: 2.0, ease: 'power3.inOut', immediateRender: false }, 4.6);
+  tags.forEach((t, i) => tl.fromTo(t, { opacity: 0 }, { opacity: 1, duration: 0.45, ease: 'power2.out' }, 6.0 + i * 0.2));
   tl.fromTo('[data-cap="2"]', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 5.4)
     .to(win, { rotation: R + 8, duration: 1.3 }, 6.6);
   // 4) tudo se fecha de uma vez (clique), com um lampejo nas emendas
@@ -135,8 +141,7 @@ function initHero(w: World | null, narrow: boolean) {
     .to(tags, { opacity: 0, duration: 0.2 }, 7.6)
     .to(tilt, { rotateX: 0, duration: 0.7, ease: 'expo.in' }, 7.7)
     .to(win, { rotation: 0, scale: 1, x: 0, y: 0, duration: 0.7, ease: 'expo.in' }, 7.7);
-  layers.forEach((l) => tl.to(l, { z: 0, '--edge': 0, duration: 0.7, ease: 'expo.in' }, 7.7));
-  pops.forEach((p) => tl.to(p, { z: 0, opacity: 0, '--edge': 0, duration: 0.7, ease: 'expo.in' }, 7.7));
+  tl.to(win, { '--ex': 0, duration: 0.7, ease: 'expo.in' }, 7.7);
   tl.fromTo(flash, { opacity: 0 }, { opacity: 1, duration: 0.08 }, 8.4).to(flash, { opacity: 0, duration: 0.6, ease: 'power2.out' }, 8.48);
   // 5) a janela afunda e a água escurece: estamos descendo para a sala
   tl.to(tilt, { rotateX: -30, duration: 1.4, ease: 'power2.in' }, 8.9)

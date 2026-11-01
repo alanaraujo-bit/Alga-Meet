@@ -26,11 +26,16 @@ function maskTexture(): HTMLCanvasElement {
   g.setTransform(s, 0, 0, s, -MX0 * s, -MY0 * s);
   g.globalCompositeOperation = 'lighter';
   // B = "espessura" (máscara desfocada): o meio da fronde acende, a borda escurece.
-  g.filter = 'blur(26px)';
-  g.fillStyle = '#0000ff';
-  g.fill(new Path2D(WHITE));
-  g.fill(new Path2D(INDIGO));
-  g.filter = 'none';
+  // O desfoque roda numa tela 4× menor (o filtro de canvas é caro) e sobe ampliado: o resultado é o mesmo borrão.
+  const q = 4, bc = document.createElement('canvas');
+  bc.width = Math.ceil(c.width / q); bc.height = Math.ceil(c.height / q);
+  const bg = bc.getContext('2d')!;
+  bg.setTransform(s / q, 0, 0, s / q, (-MX0 * s) / q, (-MY0 * s) / q);
+  bg.filter = `blur(${26 / q}px)`;
+  bg.fillStyle = '#0000ff';
+  bg.fill(new Path2D(WHITE));
+  bg.fill(new Path2D(INDIGO));
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingQuality = 'high'; g.drawImage(bc, 0, 0, c.width, c.height); g.restore();
   g.fillStyle = '#ff0000';
   g.fill(new Path2D(WHITE));
   g.fillStyle = '#00ff00';

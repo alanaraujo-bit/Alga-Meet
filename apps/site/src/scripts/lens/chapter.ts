@@ -5,15 +5,18 @@ export async function initLens(tier: 'a' | 'b' | 'c') {
   if (!frame) return;
   const tag = frame.querySelector<HTMLElement>('[data-lens-tag]');
   let game: import('./game').Game | null = null;
-  if (tier === 'a') {
+  // O jogo (WebGL) só nasce quando a transmissão chega perto da tela: nada disso pesa no carregamento.
+  const makeGame = async () => {
     try {
       const { Game } = await import('./game');
       await document.fonts?.ready;
       frame.classList.add('gl'); // antes do Game: ele mede o tamanho do palco
       game = new Game(frame.querySelector<HTMLElement>('[data-game]')!);
       (frame as any).__game = game; // capturas das fotos dos níveis B/C (scripts/game-stills.mjs)
+      addEventListener('pagehide', () => game!.dispose(), { once: true });
     } catch { game = null; frame.classList.remove('gl'); }
-  }
+  };
+  let pending: Promise<void> | null = null;
   const pos = { x: 0.3, y: 0.2, tx: 0.3, ty: 0.2 };
   let user = false, idle = 0, raf = 0, visible = false;
   const radius = () => Math.max(64, Math.min(170, frame.clientWidth * 0.12));
@@ -48,10 +51,13 @@ export async function initLens(tier: 'a' | 'b' | 'c') {
     apply();
     raf = requestAnimationFrame(tick);
   };
-  const start = () => { if (game) game.start(); if (tier !== 'c') { cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); } };
+  const start = async () => {
+    if (tier === 'a' && !game) { pending ??= makeGame(); await pending; if (!visible) return; }
+    game?.start();
+    if (tier !== 'c') { cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); }
+  };
   const stop = () => { game?.stop(); cancelAnimationFrame(raf); };
   apply();
-  new IntersectionObserver(([e]) => { visible = e.isIntersecting; visible && !document.hidden ? start() : stop(); }, { rootMargin: '100px' }).observe(frame);
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; visible && !document.hidden ? start() : stop(); }, { rootMargin: '400px 0px' }).observe(frame);
   document.addEventListener('visibilitychange', () => (visible && !document.hidden ? start() : stop()));
-  if (game) addEventListener('pagehide', () => game!.dispose(), { once: true });
 }

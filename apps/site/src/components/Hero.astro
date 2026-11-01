@@ -88,7 +88,7 @@ const lines = title.map((line) => line.split(' ').map((word) => [...word].map((c
             </picture>
           </div>
         ))}
-        {tags.map((g) => <span class="tag" data-tag data-z={g.z} style={`--ax:${g.x}%;--ay:${g.y}%`} aria-hidden="true">{g.t}</span>)}
+        {tags.map((g) => <span class="tag" data-tag style={`--ax:${g.x}%;--ay:${g.y}%;--z:${g.z}px`} aria-hidden="true">{g.t}</span>)}
         <div class="sheen" data-sheen aria-hidden="true"></div>
         <div class="flash" data-flash aria-hidden="true"></div>
       </div>
@@ -131,7 +131,9 @@ const lines = title.map((line) => line.split(' ').map((word) => [...word].map((c
   .dl-note { margin-top: -10px; font-size: 12.5px; color: var(--text-3); max-width: 46ch; }
 
   /* Título que nasce da luz: cada letra sai do desfoque com brilho índigo (A e B). */
-  :global(html.tier-a) .ch, :global(html.tier-b) .ch { animation: from-light 1100ms var(--ease-out) both; }
+  :global(html.tier-a) .ch { animation: from-light 1100ms var(--ease-out) both; }
+  /* B: o mesmo nascer sem desfoque nem brilho (filtro animado repinta a cada quadro; caro em aparelho fraco) */
+  :global(html.tier-b) .ch { animation: rise 900ms var(--ease-out) both; }
   :global(html.tier-a) .rise, :global(html.tier-b) .rise { animation: rise 1000ms var(--ease-out) both; animation-delay: var(--d); }
   @keyframes from-light {
     from { opacity: 0.001; filter: blur(16px); transform: translateY(0.18em) scale(1.25); text-shadow: 0 0 28px rgba(139, 142, 247, 0.9); }
@@ -151,7 +153,7 @@ const lines = title.map((line) => line.split(' ').map((word) => [...word].map((c
   .scene { position: relative; z-index: 1; width: min(1120px, calc(100vw - 2 * var(--gutter))); margin: clamp(56px, 9vh, 96px) auto 0; padding-bottom: clamp(72px, 12vh, 140px); perspective: 2000px; }
   .tilt { transform-style: preserve-3d; }
   .win { position: relative; aspect-ratio: 16 / 9; transform-style: preserve-3d; border-radius: 14px; }
-  .slab { position: absolute; inset: 0; border-radius: 14px; background: linear-gradient(160deg, rgba(40, 42, 80, 0.55), rgba(10, 10, 16, 0.85)); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(160, 165, 255, calc(var(--edge, 0) * 0.5)), 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 140px rgba(97, 99, 208, 0.22); }
+  .slab { position: absolute; inset: 0; border-radius: 14px; background: linear-gradient(160deg, rgba(40, 42, 80, 0.55), rgba(10, 10, 16, 0.85)); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(160, 165, 255, calc(var(--ex, 0) * 0.5)), 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 140px rgba(97, 99, 208, 0.22); }
   .layer { position: absolute; left: var(--x); top: var(--y); width: var(--w); height: var(--h); overflow: hidden; transform-style: preserve-3d; backface-visibility: hidden; }
   .layer img { position: absolute; max-width: none; width: var(--iw); height: auto; left: var(--ix); top: var(--iy); aspect-ratio: 16 / 9; }
   .l-bar { border-radius: 14px 14px 0 0; }
@@ -172,14 +174,19 @@ const lines = title.map((line) => line.split(' ').map((word) => [...word].map((c
   :global(html.tier-a) .scene { opacity: 0; }
   :global(html.tier-a) .tilt { transform: rotateX(64deg); }
   :global(html.tier-a) .win { transform: translateY(75vh) scale(0.86); }
-  :global(html.tier-a) .layer { box-shadow: 0 0 0 1px rgba(170, 175, 255, calc(var(--edge, 0) * 0.85)), 0 0 24px rgba(139, 142, 247, calc(var(--edge, 0) * 0.35)), 0 30px 60px rgba(0, 0, 0, calc(var(--edge, 0) * 0.6)); }
+  :global(html.tier-a) .win { --zk: 1; }
+  :global(html.tier-a) .layer {
+    transform: translateZ(calc(var(--z) * var(--zk) * (var(--ex, 0) + var(--lift, 0) * 0.2)));
+    box-shadow: 0 0 0 1px rgba(170, 175, 255, calc(var(--ex, 0) * 0.85)), 0 0 24px rgba(139, 142, 247, calc(var(--ex, 0) * 0.35)), 0 30px 60px rgba(0, 0, 0, calc(var(--ex, 0) * 0.6));
+  }
+  :global(html.tier-a) .pop { opacity: var(--ex, 0); transform: translateZ(calc(var(--z) * var(--zk) * var(--ex, 0))); }
   /* Rótulos: ficam de frente para a câmera na pose explodida (desfazem o giro da janela) e descem uma linha até a camada. */
   :global(html.tier-a) .tag {
     display: block; position: absolute; left: var(--ax); top: var(--ay); z-index: 2; width: max-content; max-width: 24ch; opacity: 0;
     padding: 8px 12px; border-radius: 10px; font-size: 14px; line-height: 1.3; font-weight: 560; color: var(--text-1);
     background: rgba(16, 17, 34, 0.86); box-shadow: inset 0 0 0 1px rgba(160, 165, 255, 0.4), 0 12px 32px rgba(0, 0, 0, 0.5);
     transform-origin: 50% 100%;
-    transform: translate(-50%, -100%) translateZ(var(--tz, 0px)) rotateZ(var(--rz, 0deg)) rotateX(var(--rx, 0deg)) translateY(-60px);
+    transform: translate(-50%, -100%) translateZ(calc(var(--z) * var(--zk))) rotateZ(var(--rz, 0deg)) rotateX(var(--rx, 0deg)) translateY(-60px);
     pointer-events: none;
   }
   :global(html.tier-a) .tag::after { content: ''; position: absolute; left: 50%; top: 100%; width: 1px; height: 60px; background: linear-gradient(rgba(160, 165, 255, 0.8), rgba(160, 165, 255, 0)); }
@@ -207,6 +214,7 @@ const lines = title.map((line) => line.split(' ').map((word) => [...word].map((c
     .hero-media { right: 0; left: 0; top: auto; bottom: -40px; width: 100%; height: 52vh; position: absolute; }
     :global(html.tier-a) .scene { width: 92vw; top: 50%; }
     :global(html.tier-a) .tag, :global(html.tier-a) .cue { display: none; }
+    :global(html.tier-a) .win { --zk: 0.5; }
     :global(html.tier-a) .copy { padding-top: 104px; }
   }
 </style>

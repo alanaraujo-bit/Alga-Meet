@@ -1,4 +1,5 @@
 // Lighthouse no build de produção (astro preview), celular (Moto G Power, 4G lento simulado, CPU 4×) e desktop.
+// Com GPU de verdade (ANGLE/D3D11): todo celular tem GPU; o SwiftShader do headless puro mediria o WebGL na CPU.
 // Uso: npm run build -w apps/site && (astro preview --port 3102 &) && node apps/site/scripts/lighthouse.mjs [url] [--tier=a|b|c]
 // Saída: resumo no terminal + JSON em docs/site/lighthouse/<data>-<form>[-tier].json
 import lighthouse from 'lighthouse';
@@ -17,7 +18,7 @@ const outDir = path.join(root, 'docs/site/lighthouse');
 fs.mkdirSync(outDir, { recursive: true });
 const date = new Date().toISOString().slice(0, 10);
 
-const chrome = await chromeLauncher.launch({ chromePath: chromium.executablePath(), chromeFlags: ['--headless=new', '--no-sandbox'] });
+const chrome = await chromeLauncher.launch({ chromePath: chromium.executablePath(), chromeFlags: ['--headless=new', '--no-sandbox', '--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
 try {
   for (const form of ['mobile', 'desktop']) {
     const config = form === 'desktop'

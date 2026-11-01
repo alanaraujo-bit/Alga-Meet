@@ -6,15 +6,17 @@
   "accessibility": 100,
   "bestPractices": 100,
   "seo": 100,
-  "fcp": "0.3 s",
-  "lcp": "0.4 s",
-  "tbt": "0 ms",
+  "fcp": "0.2 s",
+  "lcp": "0.5 s",
+  "tbt": "10 ms",
   "cls": "0",
-  "si": "0.4 s",
-  "bytes": "204 KiB",
+  "si": "0.3 s",
+  "bytes": "174 KiB",
   "a11y": [],
   "failed": [
     "forced-reflow-insight",
+    "image-delivery-insight",
+    "lcp-discovery-insight",
     "network-dependency-tree-insight"
   ]
 }

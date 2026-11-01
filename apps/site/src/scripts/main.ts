@@ -4,6 +4,9 @@ const root = document.documentElement;
 type Tier = 'a' | 'b' | 'c';
 let tier = (root.dataset.tier || 'c') as Tier;
 const forced = new URLSearchParams(location.search).has('tier');
+// Trabalho que pode esperar: roda quando o navegador estiver ocioso (não disputa com a primeira pintura).
+const idle = (fn: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 200));
+
 
 function setTier(t: Tier) {
   root.classList.remove('tier-' + tier);
@@ -120,7 +123,7 @@ function initDownloadClick() {
 
 initNav();
 initInvite();
-initDownloadClick();
+idle(initDownloadClick);
 initCompare();
 initNoise();
 
@@ -145,7 +148,7 @@ if (tier !== 'c') {
 
 // Nível B: os momentos em vídeo gravado do próprio WebGL (public/media), só perto da tela e sem som.
 // A foto (nível C) fica por baixo como pôster. data-once = toca uma vez e para no último quadro.
-if (tier === 'b') {
+if (tier === 'b') idle(() => {
   const io = new IntersectionObserver((entries) => {
     for (const e of entries) {
       const host = e.target as HTMLElement;
@@ -165,8 +168,7 @@ if (tier === 'b') {
     }
   }, { rootMargin: '200px' });
   document.querySelectorAll('[data-video]').forEach((el) => io.observe(el));
-}
+});
 
 // A lente da transmissão vale para todos os níveis (A: WebGL; B/C: fotos + CSS).
-const { initLens } = await import('./lens/chapter');
-initLens(tier);
+idle(() => import('./lens/chapter').then(({ initLens }) => initLens(tier)));

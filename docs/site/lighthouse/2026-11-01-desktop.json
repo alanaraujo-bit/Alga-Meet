@@ -7,15 +7,17 @@
   "bestPractices": 100,
   "seo": 100,
   "fcp": "0.3 s",
-  "lcp": "0.4 s",
-  "tbt": "0 ms",
+  "lcp": "0.3 s",
+  "tbt": "60 ms",
   "cls": "0",
-  "si": "0.3 s",
-  "bytes": "254 KiB",
+  "si": "0.9 s",
+  "bytes": "231 KiB",
   "a11y": [],
   "failed": [
+    "mainthread-work-breakdown",
     "unused-javascript",
     "forced-reflow-insight",
+    "image-delivery-insight",
     "network-dependency-tree-insight"
   ]
 }
