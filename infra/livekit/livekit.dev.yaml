@@ -1,0 +1,21 @@
+# Local development SFU. Production config lives in infra/livekit/livekit.prod.yaml (TLS, TURN, real keys).
+port: 7880
+bind_addresses: ["127.0.0.1"]
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50200
+  use_external_ip: false
+  node_ip: 127.0.0.1
+keys:
+  # Dev-only credentials. Never reuse outside localhost.
+  devkey: alga-dev-secret-change-me-0123456789abcdef
+webhook:
+  api_key: devkey
+  urls:
+    - http://127.0.0.1:4000/api/v1/livekit/webhook
+room:
+  empty_timeout: 20
+  departure_timeout: 10
+logging:
+  level: info

@@ -1,0 +1,29 @@
+{
+  "name": "alga-meet",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Alga Meet — real-time voice, screen sharing and communities for Windows.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:server": "npm run dev -w apps/server",
+    "dev:desktop": "npm run dev -w apps/desktop",
+    "dev:livekit": "node scripts/livekit.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build:desktop": "npm run build -w apps/desktop",
+    "dist:win": "npm run dist -w apps/desktop"
+  },
+  "allowScripts": {
+    "uiohook-napi@1.5.5": true,
+    "esbuild@0.18.20": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true
+  }
+}

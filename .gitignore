@@ -1,0 +1,14 @@
+node_modules/
+out/
+dist/
+release/
+*.log
+.env
+.env.*
+!.env.example
+infra/livekit/bin/
+apps/server/data/
+.vite/
+coverage/
+test-results/
+playwright-report/
