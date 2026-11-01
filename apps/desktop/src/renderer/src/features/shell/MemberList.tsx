@@ -1,9 +1,12 @@
 import { Crown } from 'lucide-react'
-import { useMemo } from 'react'
+import type { Member, PresenceStatus } from '@alga/shared'
+import { useMemo, useState } from 'react'
 import { useData } from '@/store/data'
 import { presenceOf, roleColor } from '@/store/selectors'
 import { useSession } from '@/store/session'
-import { Avatar, Fronds, Icon, ScrollArea, Tooltip } from '@/ui'
+import { Fronds, Icon, Popover, ScrollArea, Tooltip } from '@/ui'
+import { DecoratedAvatar, Nameplate, ProfileCard } from '../billing/Cosmetics'
+import { useLook } from '../billing/store'
 import { t } from './strings'
 import s from './shell.module.css'
 
@@ -37,30 +40,53 @@ export function MemberList({ spaceId }: { spaceId: string }) {
               <span className={s.sectionLabel}>{k === 'online' ? t.members.online(groups[k].length) : t.members.offline(groups[k].length)}</span>
             </div>
             {groups[k].map(({ m, name, presence, color }) => (
-              <div key={m.user.id} className={`${s.member} ${presence === 'offline' ? s.memberOffline : ''}`}>
-                <Avatar user={m.user} size={32} presence={presence === 'offline' ? undefined : presence} />
-                <span className={s.memberName} style={color ? { color } : undefined}>
-                  {name}
-                </span>
-                {voice[m.user.id]?.spaceId === spaceId && (
-                  <Tooltip content={t.members.inVoice}>
-                    <span className={s.accent} role="img" aria-label={t.members.inVoice}>
-                      <Fronds size={14} breathing />
-                    </span>
-                  </Tooltip>
-                )}
-                {m.user.id === ownerId && (
-                  <Tooltip content={t.members.owner}>
-                    <span className={s.crown} role="img" aria-label={t.members.owner}>
-                      <Icon icon={Crown} size={14} />
-                    </span>
-                  </Tooltip>
-                )}
-              </div>
+              <MemberRow key={m.user.id} m={m} name={name} presence={presence} color={color} inVoice={voice[m.user.id]?.spaceId === spaceId} owner={m.user.id === ownerId} />
             ))}
           </section>
         ),
       )}
     </ScrollArea>
+  )
+}
+
+function MemberRow({ m, name, presence, color, inVoice, owner }: { m: Member; name: string; presence: PresenceStatus; color: string | null | undefined; inVoice: boolean; owner: boolean }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null)
+  // Cosmetics: subtle in a list (no motion unless hovered), the full card in the popover.
+  const look = useLook(m.user.id)
+  return (
+    <>
+      <button
+        type="button"
+        className={`${s.member} ${presence === 'offline' ? s.memberOffline : ''}`}
+        aria-haspopup="dialog"
+        aria-expanded={!!anchor}
+        data-cosmetic-hover
+        onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}
+      >
+        <DecoratedAvatar user={m.user} size={32} presence={presence === 'offline' ? undefined : presence} decoration={look.decoration} />
+        <span className={s.memberName} style={color ? { color } : undefined}>
+          <Nameplate id={look.nameplate} row>
+            {name}
+          </Nameplate>
+        </span>
+        {inVoice && (
+          <Tooltip content={t.members.inVoice}>
+            <span className={s.accent} role="img" aria-label={t.members.inVoice}>
+              <Fronds size={14} breathing />
+            </span>
+          </Tooltip>
+        )}
+        {owner && (
+          <Tooltip content={t.members.owner}>
+            <span className={s.crown} role="img" aria-label={t.members.owner}>
+              <Icon icon={Crown} size={14} />
+            </span>
+          </Tooltip>
+        )}
+      </button>
+      <Popover anchor={anchor} onClose={() => setAnchor(null)} side="left" align="start" gap={12} label={name} width={280}>
+        <ProfileCard user={m.user} look={look} name={name} presence={presence} />
+      </Popover>
+    </>
   )
 }

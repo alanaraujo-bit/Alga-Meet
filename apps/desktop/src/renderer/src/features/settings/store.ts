@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type SettingsSection = 'account' | 'voice' | 'hotkeys' | 'notifications' | 'appearance' | 'startup' | 'advanced'
+export type SettingsSection = 'account' | 'plan' | 'shop' | 'voice' | 'hotkeys' | 'notifications' | 'appearance' | 'startup' | 'advanced'
 
 /** Full-window settings overlay: null = closed. */
 export const useSettings = create<{ section: SettingsSection | null }>()(() => ({ section: null }))

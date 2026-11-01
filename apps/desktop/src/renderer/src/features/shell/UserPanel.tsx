@@ -6,8 +6,10 @@ import { setStatus } from '@/store/actions'
 import { useData } from '@/store/data'
 import { presenceOf } from '@/store/selectors'
 import { useSession } from '@/store/session'
-import { Avatar, Divider, Icon, IconButton, Popover, PresenceGlyph, toast } from '@/ui'
+import { Divider, Icon, IconButton, Popover, PresenceGlyph, toast } from '@/ui'
 import { openSettings } from '../settings/store'
+import { DecoratedAvatar, ProfileCard } from '../billing/Cosmetics'
+import { useLook } from '../billing/store'
 import { VoicePanel } from '../voice/VoicePanel'
 import { errorText } from '@/lib/errors'
 import { copyText } from '@/lib/clipboard'
@@ -36,6 +38,7 @@ function UserRow() {
   const offline = useSession((st) => st.gateway === 'reconnecting' || st.gateway === 'connecting')
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const btn = useRef<HTMLButtonElement>(null)
+  const look = useLook(me?.id)
   if (!me) return null
 
   const pick = (p: StatusPreference) => {
@@ -54,7 +57,7 @@ function UserRow() {
         aria-expanded={!!anchor}
         onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}
       >
-        <Avatar user={me} size={32} presence={presence} decorative />
+        <DecoratedAvatar user={me} size={32} presence={presence} decoration={look.decoration} decorative />
         <span className={s.meText}>
           <span className={s.meName}>{me.displayName}</span>
           {offline ? (
@@ -81,14 +84,8 @@ function UserRow() {
       />
       <IconButton icon={Settings} label={t.userPanel.settings} shortcut="Ctrl ," onClick={() => openSettings()} />
 
-      <Popover anchor={anchor} onClose={() => setAnchor(null)} side="top" align="start" gap={12} label={t.userPanel.setStatus} width={232}>
-        <div className={s.profileCard}>
-          <Avatar user={me} size={40} presence={presence} decorative />
-          <div style={{ minWidth: 0 }}>
-            <div className={s.profileName}>{me.displayName}</div>
-            <div className={s.profileUser}>@{me.username}</div>
-          </div>
-        </div>
+      <Popover anchor={anchor} onClose={() => setAnchor(null)} side="top" align="start" gap={12} label={t.userPanel.setStatus} width={280}>
+        <ProfileCard user={me} look={look} presence={presence} />
         <div className={s.statusMenu} role="radiogroup" aria-label={t.userPanel.setStatus}>
           {STATUSES.map((p) => (
             <button key={p} type="button" role="radio" aria-checked={me.statusPreference === p} className={s.statusItem} onClick={() => pick(p)}>

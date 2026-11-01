@@ -7,6 +7,8 @@ export const t = {
   groups: { user: 'Usuário', app: 'Aplicativo' },
   nav: {
     account: 'Minha conta',
+    plan: 'Assinatura',
+    shop: 'Personalização',
     voice: 'Voz e vídeo',
     hotkeys: 'Atalhos',
     notifications: 'Notificações',

@@ -1,5 +1,5 @@
 import type { Session } from '@alga/shared'
-import { Bell, Keyboard, LogOut, Mic, Monitor, Palette, Power, User, Wrench, X, type LucideIcon } from 'lucide-react'
+import { Bell, CreditCard, Gem, Keyboard, LogOut, Mic, Monitor, Palette, Power, User, Wrench, X, type LucideIcon } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -15,6 +15,8 @@ import { Avatar, Button, IconButton, Kbd, SegmentedControl, Spinner, Switch, Tex
 import { MIN_PASSWORD_LENGTH } from '@alga/shared'
 import { StrengthMeter, strengthHint } from '../auth/PasswordStrength'
 import { openVerifyEmail } from '../auth/VerifyEmail'
+import { PlanSection, StreamPlanGroup } from '../billing/Plan'
+import { ShopSection } from '../billing/Shop'
 import { Group, Row, SettingsFrame } from './Frame'
 import { HOTKEY_ACTIONS, loadBindings, saveBindings, type SavedBinding } from './hotkeys'
 import { ImagePicker } from './ImagePicker'
@@ -23,7 +25,14 @@ import { t } from './strings'
 import s from './settings.module.css'
 
 const NAV: Array<{ group: string; items: Array<{ id: SettingsSection; icon: LucideIcon }> }> = [
-  { group: t.groups.user, items: [{ id: 'account', icon: User }] },
+  {
+    group: t.groups.user,
+    items: [
+      { id: 'account', icon: User },
+      { id: 'plan', icon: CreditCard },
+      { id: 'shop', icon: Gem },
+    ],
+  },
   {
     group: t.groups.app,
     items: [
@@ -66,6 +75,8 @@ function Panel({ section }: { section: SettingsSection }) {
       closeLabel={t.close}
     >
       {section === 'account' && <Account />}
+      {section === 'plan' && <PlanSection />}
+      {section === 'shop' && <ShopSection />}
       {section === 'voice' && <Voice />}
       {section === 'hotkeys' && <Hotkeys />}
       {section === 'notifications' && <Notifications />}
@@ -442,6 +453,8 @@ function Voice() {
           />
         </Row>
       </Group>
+
+      <StreamPlanGroup />
     </>
   )
 }

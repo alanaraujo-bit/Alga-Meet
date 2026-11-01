@@ -1,0 +1,434 @@
+/* Assinatura + Personalização: built on settings.module.css (frame, groups, rows); only what is specific lives here. */
+
+/* ── Sandbox / payments off ── */
+.notice {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: var(--s-2) 0 var(--s-1);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font: var(--type-meta);
+}
+.sandboxChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 var(--s-1_5);
+  border-radius: var(--r-xs);
+  background: var(--warning-tint);
+  color: var(--warning);
+  font: var(--type-badge);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.testChip {
+  composes: sandboxChip;
+  height: 18px;
+}
+
+/* ── Current plan ── */
+.planCard {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-5);
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: var(--bg-raised);
+}
+.planPlus {
+  background: linear-gradient(180deg, rgba(77, 220, 220, 0.06), transparent 70%), var(--bg-raised);
+  box-shadow: inset 0 1px 0 rgba(77, 220, 220, 0.3);
+}
+.planText {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.planName {
+  color: var(--text-primary);
+  font: var(--type-title-sm);
+  letter-spacing: var(--track-title);
+}
+.planLine {
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+  text-wrap: pretty;
+}
+.warn {
+  color: var(--warning);
+}
+.declined {
+  margin-top: var(--s-2);
+  color: var(--text-secondary);
+  font: var(--type-meta);
+}
+
+/*
+ * The confirmation moment: once, when the provider's confirmation lands while you look at it. A band of light
+ * crosses the card (like bioluminescence passing) and the status line says what happened. Reduced motion: the band
+ * is skipped (its last frame is off-card), the line stays.
+ */
+.arrived::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(100deg, transparent 10%, rgba(120, 236, 232, 0.16) 50%, transparent 90%);
+  transform: translateX(260%);
+  animation: sweep 1.1s var(--ease-out-quart) both;
+  pointer-events: none;
+}
+@keyframes sweep {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+.arrivedLine {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1_5);
+  color: var(--success);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+  animation: fadeUp var(--dur-morph) var(--ease-out-quart) 0.25s both;
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+/* ── Waiting for the provider ── */
+.waiting {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  margin-top: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-lg);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+}
+.waiting > :first-child {
+  margin-top: 2px;
+}
+.waitingText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.waitingActions {
+  display: flex;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+
+/* ── Grátis × Plus ── */
+.compare {
+  width: 100%;
+  margin-top: var(--s-3);
+  border-collapse: collapse;
+  font: var(--type-ui);
+}
+.compare th,
+.compare td {
+  height: 40px;
+  padding: var(--s-2) var(--s-3) var(--s-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  vertical-align: middle;
+}
+.compare tr:last-child > * {
+  border-bottom: 0;
+}
+.compare thead th {
+  height: 28px;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.compare thead th[aria-current] {
+  color: var(--text-primary);
+}
+.compare thead th[aria-current]::after {
+  content: ' · seu plano';
+  color: var(--text-tertiary);
+  font-weight: var(--w-regular);
+}
+.compare tbody th {
+  width: 34%;
+  color: var(--text-tertiary);
+  font-weight: var(--w-regular);
+}
+.compare td {
+  width: 33%;
+  color: var(--text-secondary);
+}
+.plusMark {
+  color: var(--accent);
+  font-weight: var(--w-semibold);
+}
+
+/* ── Subscribe ── */
+.subscribe {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-5);
+  border-radius: var(--r-lg);
+  background: var(--bg-raised);
+}
+.priceBlock {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-1_5);
+}
+.price {
+  margin-top: var(--s-2);
+  color: var(--text-primary);
+  font: var(--type-title-lg);
+  letter-spacing: var(--track-title);
+}
+.per {
+  margin-left: 2px;
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+}
+.ctaBlock {
+  display: grid;
+  justify-items: end;
+  gap: var(--s-1_5);
+  max-width: 240px;
+  text-align: right;
+}
+.where {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.subscribeFine {
+  grid-column: 1 / -1;
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-wrap: pretty;
+}
+.fine {
+  margin-top: var(--s-3);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-wrap: pretty;
+}
+
+/* ── History ── */
+.empty {
+  padding: var(--s-3) 0;
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+}
+.historyRow {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: 48px;
+}
+.historyIcon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  background: var(--bg-raised);
+  color: var(--text-tertiary);
+}
+.historyIcon[data-ok] {
+  color: var(--success);
+}
+.amount {
+  min-width: 72px;
+  color: var(--text-secondary);
+  font: var(--type-ui);
+  text-align: right;
+}
+
+/* ── Shop ── */
+.intro {
+  margin: var(--s-4) 0 var(--s-6);
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+  text-wrap: pretty;
+}
+.shopLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 288px;
+  gap: var(--s-8);
+  align-items: start;
+}
+.aside {
+  position: sticky;
+  /* Below the settings header (sticky too). */
+  top: 76px;
+  display: grid;
+  gap: var(--s-5);
+}
+.previewCol {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+}
+.previewFrame {
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-default);
+}
+.caption {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-align: center;
+}
+.detail {
+  position: relative;
+  display: grid;
+  gap: var(--s-1);
+}
+/* The detail column has no card: the moment is the status line, the band would cross empty space. */
+.detail.arrived::after {
+  display: none;
+}
+.eyebrow {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.detailName {
+  color: var(--text-primary);
+  font: var(--type-title-sm);
+  letter-spacing: var(--track-title);
+}
+.detailDesc {
+  color: var(--text-secondary);
+  font: var(--type-ui);
+  text-wrap: pretty;
+}
+.detailAction {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+.detailAction .waiting {
+  margin-top: 0;
+}
+.detailAction .fine {
+  margin-top: 0;
+}
+.shelf + .shelf {
+  padding-top: var(--s-5);
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+.tile {
+  display: grid;
+  gap: 2px;
+  padding: var(--s-2);
+  border-radius: var(--r-lg);
+  text-align: left;
+  transition: background var(--dur-hover-out) var(--ease-out-quad);
+}
+.tile:hover {
+  background: var(--state-hover);
+  transition-duration: 0ms;
+}
+.tile[aria-pressed='true'] {
+  background: var(--state-selected);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.thumb {
+  display: grid;
+  place-items: center;
+  height: 64px;
+  margin-bottom: var(--s-1_5);
+  overflow: hidden;
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+}
+.thumb > span:only-child {
+  width: 100%;
+}
+.tileName {
+  overflow: hidden;
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tileMeta {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.metaOn {
+  color: var(--text-secondary);
+}
+.footnote {
+  margin-top: var(--s-6);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+
+/* ── Voz e vídeo: what the plan streams ── */
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1_5);
+  margin-top: var(--s-3);
+}
+.preset {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: 26px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.preset svg {
+  color: var(--text-tertiary);
+}
+.presetLocked {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  color: var(--text-tertiary);
+}
+.planHint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-top: var(--s-3);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}

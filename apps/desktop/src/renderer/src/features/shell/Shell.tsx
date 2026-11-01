@@ -7,6 +7,7 @@ import { EmptyState, Button } from '@/ui'
 import { Hash } from 'lucide-react'
 import { EASE_OUT_QUART } from '@/ui/motion'
 import { useDeepLink } from '../app/deepLinks'
+import { startBilling } from '../billing/store'
 import { startNotifications } from '../app/notifications'
 import { ChatView } from '../chat/ChatView'
 import { FriendsView } from '../friends/FriendsView'
@@ -31,6 +32,7 @@ export function Shell() {
   useViewGuard()
   useEffect(() => startVoiceSync(), [])
   useEffect(() => startNotifications(), [])
+  useEffect(() => startBilling(), [])
   useInviteLink()
   const view = useUi((st) => st.view)
   const order = useData((st) => st.spaceOrder)
