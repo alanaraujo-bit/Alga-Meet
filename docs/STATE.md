@@ -42,7 +42,7 @@
 | Servidor: downgrade de plano no meio da live (8f1854d, 2e3a0aa; 168 testes) | `apps/server`, `infra/livekit` | **feito** — atributo atualizado na hora; reverificação em 10 s muta transmissão acima do plano. Timeout de camada do LiveKit **mantido em 2 s** (1–1,5 s causou oscilação de camadas; detalhes em `infra/livekit/README.md`) |
 | Mídia: republicar a transmissão no downgrade (6a2d551) | `media/` | **feito** — nova publicação 720p60 em 124–171 ms; servidor não muta após a reverificação de 10 s; espectador continua inscrito (maior lacuna entre quadros 150–223 ms em Original, 356–512 ms em Auto); áudio da tela sem interrupção; memória −1,0 MB/ciclo no fluxo real |
 | Crítica de design rodada 2 (`docs/design/critique-2026-11-01-r2.md`) | docs | **feito**: **6,5/10** (antes 5) — shell 6,5 · chat 7 · chamada 7 · transmissão 6 · configurações 7 · billing 8 / loja 5 · T&S 8 · consistência 5,5; identidade ainda é sobretudo a cor |
-| UI onda 7 (correções r2, marca única de 3 barras, identidade além da cor) | renderer, `build/` | em andamento |
+| UI onda 7 (c3b95ae..73d270e, 135 testes) | renderer, `build/` | **feito** — todos os Alto/Médio da r2 exceto zoom da UI (precisa `setZoomFactor` no preload); marca v1 = 3 barras de voz em ícone, bandeja e instalador (Λ removido); identidade: brilho de fala como luz + palco que clareia com a voz mais alta, cabeçalho de canal de texto mostra quem está em voz, respostas com linha reta. Capturas `chat-channel-v8`, `voice-stage-v7`, `stream-watching-v5`… Maestro: badge com a cor de perigo do design system e miniaturas do seletor em 640×360 |
 | QA independente da jornada completa (3 instâncias) | `docs/qa` | em andamento |
 | Servidor: cosméticos equipáveis/públicos, eventos de convite, retomar renovação, observabilidade | `apps/server` | **feito** — ver Validado |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
@@ -146,6 +146,7 @@ Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não d
 | Segunda máquina independente | Validar voz/tela entre dispositivos reais e NATs diferentes | Instalar o build em outro PC e entrar num canal | Só temos medições em localhost |
 
 ## Próximos passos (fila do Maestro, em ordem)
+0. **Pequenos pendentes:** `setZoomFactor` no bridge (zoom da UI), bandeja "respirando" durante voz, avisos de mídia com `kind` (hoje a UI reconhece pelo texto), sessões com dispositivo/Windows no servidor, grades 5/7 recapturadas com 5–7 instâncias.
 1. **Aguardando agentes:** mídia onda 3, desempenho da UI e Trust & Safety/LGPD no servidor.
 2. **Servidor (fila):** expor papel de staff em `Me`; `staffId` em `AdminAppeal`; eventos de gateway para denúncias/apelações/exportações/usos de convite; visualizador seguro de quarentena; campos de protocolo/recibo CSAM; tela de logs de acesso (staff admin).
 3. **Pendências de mídia/servidor:** servidor só checa o preset da transmissão na publicação (downgrade no meio da live depende do cliente) → reavaliar faixas ativas quando `ENTITLEMENTS_UPDATE`; timeout de camada de tela menor na config do LiveKit; repetir o caso DTX num LiveKit mais novo; expor classe de CPU (intel/amd/outra) no bridge para a telemetria; montar o mini-player no `Shell.tsx` (hoje dentro de `IncomingCall`); toasts sobrepõem o botão Desconectar do dock.
