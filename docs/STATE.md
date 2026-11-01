@@ -35,7 +35,9 @@
 | UI onda 5 (telas de T&S/LGPD) | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Servidor: complementos de T&S (1c059e2, 165 testes) | `apps/server` | **feito** |
 | Servidor: endurecimento de T&S (0b08eec, 167 testes em PGlite e PG 18) | `apps/server` | **feito** |
-| Desenho de E2EE (`docs/decisions/0004-e2ee.md`) | docs | em andamento |
+| Desenho de E2EE (f753ac3) | `docs/decisions/0004-e2ee.md` | **feito** — opção A: MLS (RFC 9420) por chamada, OpenMLS (MIT, auditado) em WASM num `utilityProcess`, chaves por remetente via MLS-Exporter no frame cryptor do LiveKit |
+| E2EE fase 0: spike OpenMLS→WASM, medições n=2/10/25/99, go/no-go | `native/mls`, `src/main/mls` | em andamento |
+| Servidor: impor downgrade de plano no meio da live + ajuste de timeout de camada no LiveKit | `apps/server`, `infra/livekit` | em andamento |
 | Servidor: cosméticos equipáveis/públicos, eventos de convite, retomar renovação, observabilidade | `apps/server` | **feito** — ver Validado |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Crítica de design independente | `docs/design/critique-2026-11-01.md` | **feito**: nota 5/10 vs Linear (tela de chamada ausente, layout clone do Discord, excesso de vermelho e bordas) → corrigindo na UI onda 2 |
@@ -93,6 +95,8 @@ Medições [MEDIDO] em `docs/benchmarks/media-baseline.md` — **localhost, duas
 **Vazamento de memória corrigido:** transceivers do Chromium mantinham encoders vivos após parar a transmissão. Crescimento por ciclo: padrão 20,3 → 1,7 MB, VP9 172 → 0,1 MB (tolerância ≤ 2 MB/ciclo; resíduo ~1,3 MB/ciclo no processo de GPU com HEVC). Também corrigido: HEVC não engatava em janelas menores que o preset (caía para VP8 descartado pelo SFU). Unmute pós-moderação volta em ~1,06 s.
 
 **Interface com 10.010 mensagens** (`docs/benchmarks/ui-performance.md`): reabrir canal 2.156 → 23 ms; página antiga 568 → 20 ms; rolagem 47–57 → 179 fps (tela 180 Hz); sem pulo ao carregar histórico; memória 1.286 → 354 MB; JS na inicialização 3.004 → 1.333 kB; abrir o app → shell ~575 ms; ocioso 10 min: 229–233 MB, 0,01 % CPU. Correção do Maestro: o motor de mídia não inicia mais no boot ao receber o plano (diagnóstico do agente: +70 MB ocioso; **economia não re-medida**). Denunciar mensagem e "Usuário removido" ligados no chat.
+
+**E2EE (spike sem MLS, chaves por remetente, 2 instâncias, HEVC 1080p60):** entrada 130 vs 128 ms (sem mudança); CPU +0,5 %/+0,6 % de um núcleo por faixa de voz (envio/recebimento), tela +2,5 % transmissor / +1,9 % espectador; 55–58 fps sem congelar; cliente sem chave decodificou 0 quadros. **Lacunas do `livekit-client` 2.23 sob E2EE:** desliga RED (ocultação a 10 % de perda sobe de ~1 % para ~6 %; patch de uma linha restaura, +12 kbps) e não publica codec reserva H.264 (espectador sem HEVC fica sem vídeo) → fase 3 do plano.
 
 **Gating por plano (verificado ponta a ponta com billing sandbox):** grátis oferece 720p30/720p60/1080p30 e mostra 1080p60 bloqueado; upgrade durante a live libera em 302 ms (espectador em 1080p em 420 ms); downgrade re-limita em 93 ms sem mute do servidor. 720p60: 51 fps a ~2,8 % CPU. **Congelamento com uplink de 3 Mbit/s:** antes 7/12 execuções com congelamento > 2 s (pior 4,6 s); depois 0/12 (pior 1,2 s) — o espectador desce de camada sozinho. **DTX:** ~1 em 32 entradas volta sem DTX (causa no LiveKit 1.13.11; cliente detecta e republica o mic). Palco: grades equilibradas 3/5/7, transmissão assistida em destaque, mini-player arrastável, toque de chamada sintetizado (nunca ouvido por humano).
 
