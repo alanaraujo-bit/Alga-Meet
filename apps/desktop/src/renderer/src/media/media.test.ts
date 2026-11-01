@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_HANGOVER_MS, PttLatch, VadGate, perceptualLevel, rmsDb } from './vad'
 import { STREAM_PRESETS } from '@alga/shared'
-import { SCREEN_PRESETS, aboveContract, availablePresets, clampPreset, contentSettings, decodable, decodeName, decodeOf, defaultPreset, gatePresets, getPreset, pickCodec, recordSustain, roomCodec, simulcastFor } from './presets'
-import { mismatchOf, settled } from './e2ee'
+import { SCREEN_PRESETS, aboveContract, availablePresets, clampPreset, contentSettings, decodable, decodeName, decodeOf, defaultPreset, gatePresets, getPreset, peerDecode, pickCodec, recordSustain, roomCodec, simulcastFor } from './presets'
+import { callMode, mismatchOf, settled } from './e2ee'
 import { PrefsStore } from './prefs'
 import { stallStep, type StallState } from './stall'
 
@@ -247,6 +247,31 @@ describe('codec by room decode capability (0004 §4.4, QA BUG-02)', () => {
     expect(roomCodec('h265', big, [null], true)).toBe('h264')
     expect(roomCodec('vp9', big, [['vp9', 'h264'], null], true)).toBe('h264')
     expect(roomCodec('h264', big, [[]], true)).toBe('h264')
+  })
+  it('reads the server-set decode attribute first, minus what the mic name dropped at runtime', () => {
+    expect(peerDecode('h265,h264,vp8', undefined)).toEqual(['h265', 'h264', 'vp8'])
+    expect(peerDecode('', undefined)).toEqual([])
+    expect(peerDecode('h265,h264', decodeName(['h264']))).toEqual(['h264'])
+    // older peer: no attribute, the mic name only
+    expect(peerDecode(undefined, decodeName(['vp8', 'h264']))).toEqual(['vp8', 'h264'])
+    expect(peerDecode(undefined, 'microphone')).toBeNull()
+    // listen-only peer with the attribute is no longer "not advertised" under E2EE
+    expect(roomCodec('h265', big, [peerDecode('h265,h264', undefined)], true)).toBe('h265')
+  })
+})
+
+describe('per-call E2EE flag (VoiceJoinResponse.e2ee)', () => {
+  it('follows the server, not the build', () => {
+    expect(callMode(false, true)).toBe('plain') // space voice channel, E2EE off: no MLS join
+    expect(callMode(true, true)).toBe('e2ee')
+    expect(callMode(false, false)).toBe('plain')
+  })
+  it('fails closed when the call is E2EE and this client cannot do it', () => {
+    expect(callMode(true, false)).toBe('unsupported')
+  })
+  it('an older server without the flag: whenever this client can', () => {
+    expect(callMode(undefined, true)).toBe('e2ee')
+    expect(callMode(undefined, false)).toBe('plain')
   })
 })
 

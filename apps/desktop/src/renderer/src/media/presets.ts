@@ -177,15 +177,26 @@ const MIME_CODEC: Record<string, VideoCodecId> = { 'video/h264': 'h264', 'video/
 export const decodable = (mimes: readonly string[]): VideoCodecId[] => [...new Set(mimes.map((m) => MIME_CODEC[m.toLowerCase()]).filter((c) => !!c))]
 
 /**
- * What a client decodes rides in its mic publication's name: the token has no canUpdateOwnMetadata grant, so a
- * participant attribute is not ours to set. shortcut: listen-only and server-muted users publish no mic and count as
- * not advertised; replace with an `alga.decode` attribute the server sets from POST /voice/join.
+ * What a client decodes also rides in its mic publication's name (older peers read only that; the token has no
+ * canUpdateOwnMetadata grant, so we can't set an attribute ourselves). Listen-only and server-muted users publish no mic.
  */
 const DECODE_PREFIX = 'alga.decode='
 export const decodeName = (codecs: readonly VideoCodecId[]): string => DECODE_PREFIX + codecs.join(',')
 export function decodeOf(trackName: string | undefined): VideoCodecId[] | null {
   if (!trackName?.startsWith(DECODE_PREFIX)) return null
   return decodable(trackName.slice(DECODE_PREFIX.length).split(',').map((c) => `video/${c}`))
+}
+
+/**
+ * What a participant decodes: DECODE_ATTRIBUTE (`attr`, server-set from POST /voice/join, covers listen-only) when
+ * present, minus what its mic name no longer lists (a decoder that failed at runtime); else the mic name (older
+ * client). null = neither.
+ */
+export function peerDecode(attr: string | undefined, micName: string | undefined): VideoCodecId[] | null {
+  const mic = decodeOf(micName)
+  if (attr === undefined) return mic
+  const caps = decodable(attr.split(',').map((c) => `video/${c}`))
+  return mic ? caps.filter((c) => mic.includes(c)) : caps
 }
 
 /**

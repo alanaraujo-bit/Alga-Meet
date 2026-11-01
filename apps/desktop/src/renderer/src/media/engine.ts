@@ -21,13 +21,14 @@ import {
 } from 'livekit-client'
 // LiveKit's frame cryptor (AES-GCM per frame): its own chunk, loaded from 'self' (CSP worker-src 'self' blob:).
 import E2eeWorker from 'livekit-client/e2ee-worker?worker'
-import { STREAM_PRESETS_ATTRIBUTE } from '@alga/shared'
+import { DECODE_ATTRIBUTE, STREAM_PRESETS_ATTRIBUTE } from '@alga/shared'
+import { ApiRequestError } from '@/lib/api'
 import { onDispatch, useSession } from '@/store/session'
 import type { E2eeEpochInfo, E2eeFrameKey } from '../../../shared/bridge'
-import { AlgaKeyProvider, mismatchOf, settled } from './e2ee'
+import { AlgaKeyProvider, callMode, mismatchOf, settled } from './e2ee'
 import { PttLatch, perceptualLevel, rmsDb } from './vad'
 import { PrefsStore, type InputMode, type ProcessingMode } from './prefs'
-import { HEVC_MIN_SIDE, aboveContract, availablePresets, clampPreset, contentSettings, decodable, decodeName, decodeOf, gatePresets, isPresetId, pickCodec, recordSustain, roomCodec, simulcastFor, type ContentType, type ScreenPreset, type ScreenPresetId, type VideoCodecId } from './presets'
+import { HEVC_MIN_SIDE, aboveContract, availablePresets, clampPreset, contentSettings, decodable, decodeName, gatePresets, isPresetId, peerDecode, pickCodec, recordSustain, roomCodec, simulcastFor, type ContentType, type ScreenPreset, type ScreenPresetId, type VideoCodecId } from './presets'
 import { VoiceGraph, VoiceProcessor, captureConstraints } from './processing'
 import { playCue, setCueOutput, startRing, stopRing, type Cue, type RingKind } from './sounds'
 import { stallStep, type StallState } from './stall'
@@ -41,8 +42,10 @@ export interface JoinParams {
   /** Opus target for this channel (VoiceJoinResponse.bitrateKbps). Default 64. */
   bitrateKbps?: number
   channelId?: string
-  /** Fresh credentials for automatic rejoin (tokens are short-lived). */
-  refresh?: () => Promise<{ url: string; token: string }>
+  /** VoiceJoinResponse.e2ee: the server's call for this call. Omitted (older server, lab tokens) = whenever this client can. */
+  e2ee?: boolean
+  /** Fresh credentials (and E2EE flag) for automatic rejoin (tokens are short-lived) and VOICE_E2EE_CHANGED. */
+  refresh?: () => Promise<{ url: string; token: string; e2ee?: boolean }>
   /** false = join listen-only (no mic capture). */
   publishMic?: boolean
   /** Voice RED (each packet repeats the previous frame). Default true: measured in docs/benchmarks/media-network.md. */
@@ -207,10 +210,15 @@ class MediaEngine {
     void this.refreshDevices(false)
     this.syncPlan()
     void this.probeEncoder()
+    onDispatch((d) => {
+      if (d.t === 'VOICE_E2EE_CHANGED') void this.onE2eeChanged(d.d)
+    })
     // E2EE relay (main has the MLS state; the gateway is the renderer's): every E2EE_* dispatch in, every e2ee_* frame out.
     const e2ee = b?.e2ee
     if (e2ee) {
       onDispatch((d) => {
+        // Main would retry it until the call fails: the call is plain now and VOICE_E2EE_CHANGED (sent first) rejoins.
+        if (d.t === 'E2EE_RESYNC_REQUIRED' && d.d.reason === 'not_e2ee') return
         if (d.t.startsWith('E2EE_')) e2ee.handleDispatch(d.t, d.d)
         // A new gateway session: re-announce our epoch so the DS resends what we missed (0004 §3.6).
         else if (d.t === 'READY' && this.call && !this.userLeft) void e2ee.joinCall(this.call.channelId).catch(() => undefined)
@@ -250,7 +258,7 @@ class MediaEngine {
     let room: Room
     try {
       // In parallel with the LiveKit connection: the MLS join (0004 §3.4). null = this call is not E2EE.
-      e2ee = await this.e2eeStart(params.channelId)
+      e2ee = await this.e2eeStart(params.channelId, params.e2ee)
       room = new Room({
         adaptiveStream: ADAPTIVE,
         dynacast: true,
@@ -518,9 +526,40 @@ class MediaEngine {
     try {
       const fresh = last.refresh ? await last.refresh() : null
       await this.connect({ ...last, ...(fresh ?? {}) })
-    } catch {
+    } catch (e) {
+      // The call became E2EE and this client can't do it (409, VoiceJoinBody.capabilities): retrying can't help.
+      if (e instanceof ApiRequestError && e.status === 409 && e.fields?.['capabilities.e2ee']) {
+        return this.failClosed('Esta chamada passou a ser criptografada de ponta a ponta, e este app não tem suporte.', false)
+      }
       if (!this.userLeft) this.scheduleRejoin()
     }
+  }
+
+  /**
+   * The call's E2EE flag changed (Space.e2ee toggled, or our token predates the change): leave and rejoin through
+   * `refresh` (new token and flag), like an automatic rejoin. Mute/deafen carry over; a share of a picked source is
+   * captured again, any other one stops with a notice.
+   */
+  private async onE2eeChanged(d: { channelId: string; e2ee: boolean }): Promise<void> {
+    const last = this.last
+    if (!last?.refresh || this.userLeft || last.channelId !== d.channelId || last.e2ee === d.e2ee) return
+    const s = useMedia.getState().screen
+    const share = s.active ? { sourceId: s.sourceId, audio: s.audio } : null
+    this.clearRejoin()
+    this.setConn('reconnecting', d.e2ee ? 'Ativando a criptografia de ponta a ponta…' : 'Desativando a criptografia de ponta a ponta…')
+    const room = this.room
+    this.room = null
+    await this.teardown()
+    room?.removeAllListeners()
+    await room?.disconnect(true).catch(() => undefined)
+    this.rejoinAttempt = 0
+    await this.rejoin()
+    if (!share) return
+    if (share.sourceId && this.room && this.last?.channelId === d.channelId && useMedia.getState().connection.state === 'connected') {
+      const ok = await this.startScreenShare({ sourceId: share.sourceId, audio: share.audio }).then(() => true, () => false)
+      if (ok) return
+    }
+    this.notify('A criptografia da chamada mudou e a sua transmissão parou. Transmita de novo quando quiser.')
   }
 
   private clearRejoin(): void {
@@ -600,17 +639,21 @@ class MediaEngine {
   // ───────────────────────────── E2EE (decision 0004) ─────────────────────────────
 
   /**
-   * E2EE is expected unless main says it is off (build without ALGA_E2EE, signed out) or the lab asked for a baseline;
-   * an unknown status counts as expected. null = not E2EE. Otherwise: a fresh key provider + cryptor for the new Room
-   * (the newest keys replayed after an automatic rejoin), the MLS join sent, and its promise (rejects = fail closed).
+   * Whether this call is E2EE is the server's (`server` = VoiceJoinResponse.e2ee, see callMode); this client can do it
+   * unless main says it is off (build without ALGA_E2EE, signed out), an unknown status counting as able. The lab's
+   * baselines join plain. null = not E2EE. Otherwise: a fresh key provider + cryptor for the new Room (the newest keys
+   * replayed after an automatic rejoin), the MLS join sent, and its promise (rejects = fail closed).
    */
-  private async e2eeStart(channelId: string | undefined): Promise<{ joined: Promise<void> } | null> {
+  private async e2eeStart(channelId: string | undefined, server: boolean | undefined): Promise<{ joined: Promise<void> } | null> {
     const api = bridge()?.e2ee
-    if (this.labNoE2ee || !api || (await api.status().catch(() => null))?.state === 'off') {
+    const capable = !!api && (await api.status().catch(() => null))?.state !== 'off'
+    const mode = this.labNoE2ee ? 'plain' : callMode(server, capable)
+    if (mode === 'plain') {
       this.endE2ee()
       patch('e2ee', initialState().e2ee)
       return null
     }
+    if (mode === 'unsupported' || !api) throw new Error('esta chamada exige, e este app não a tem ligada')
     if (!channelId) throw new Error('canal desconhecido')
     if (this.call?.channelId !== channelId) {
       this.endE2ee()
@@ -1403,7 +1446,7 @@ class MediaEngine {
     const members = this.call ? new Set(useMedia.getState().e2ee.members.map((m) => m.userId)) : null
     // Under E2EE only MLS members count: someone without keys can't watch anyway (and must not force a codec).
     const viewers = [...(this.room?.remoteParticipants.values() ?? [])].filter((rp) => !members || members.has(rp.identity))
-    const caps = viewers.map((rp) => decodeOf(rp.getTrackPublication(Track.Source.Microphone)?.trackName))
+    const caps = viewers.map((rp) => peerDecode(rp.attributes[DECODE_ATTRIBUTE], rp.getTrackPublication(Track.Source.Microphone)?.trackName))
     return roomCodec(want, [...simulcastFor(preset, width, height), { width, height }], caps, !!this.call, this.hevcMinSide)
   }
 
@@ -1438,7 +1481,7 @@ class MediaEngine {
     this.brokenDecoders.add(codec)
     const room = this.room
     // The mic's name carries the list: publish it again (a short gap in our voice) so senders republish in H.264.
-    // shortcut: listen-only (no mic) can't re-advertise; goes away with a server-set decode attribute.
+    // shortcut: listen-only (no mic) can't re-advertise: DECODE_ATTRIBUTE is fixed at /voice/join; upgrade if that bites.
     if (!room || !this.mic) return
     this.micOp = this.micOp.then(async () => {
       if (this.room !== room || !this.mic) return

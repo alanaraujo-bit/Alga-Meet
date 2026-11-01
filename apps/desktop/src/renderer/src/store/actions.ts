@@ -1,8 +1,8 @@
 import type {
   Attachment, Ban, ChangePasswordBody, Channel, CreateChannelBody, CreateRoleBody, Invite, Me, Member, Message, PatchMeBody, PatchRoleBody,
-  PatchSpaceBody, Relationship, ReorderRolesBody, Role, Session, Space, SpaceSnapshot, StatusPreference, VoiceJoinResponse, VoiceModerationBody,
+  PatchSpaceBody, Relationship, ReorderRolesBody, Role, Session, Space, SpaceSnapshot, StatusPreference, VoiceJoinBody, VoiceJoinResponse, VoiceModerationBody,
 } from '@alga/shared'
-import { uuidv7 } from '@alga/shared'
+import { DECODE_CODECS, uuidv7 } from '@alga/shared'
 import { api, ApiRequestError, upload } from '@/lib/api'
 import { errorText } from '@/lib/errors'
 import { localKind } from '@/lib/files'
@@ -214,7 +214,18 @@ export async function openDm(recipientIds: string[]): Promise<Channel> {
   return ch
 }
 
-export const voiceJoin = (channelId: string) => api<VoiceJoinResponse>('POST', '/voice/join', { channelId })
+/**
+ * POST /voice/join with what this client can do: E2EE while main's MLS device is up (or coming up: joinCall waits for
+ * it), and the video codecs it decodes (the server's allowlist, for DECODE_ATTRIBUTE). The response says whether this
+ * call is E2EE.
+ */
+export async function voiceJoin(channelId: string): Promise<VoiceJoinResponse> {
+  const e2ee = (await window.alga?.e2ee?.status().catch(() => null))?.state
+  const mimes = typeof RTCRtpReceiver === 'undefined' ? [] : (RTCRtpReceiver.getCapabilities('video')?.codecs ?? []).map((c) => c.mimeType)
+  const decode = [...new Set(mimes.filter((m) => m.toLowerCase() in DECODE_CODECS))]
+  const body: VoiceJoinBody = { channelId, capabilities: { e2ee: e2ee === 'ready' || e2ee === 'starting', decode } }
+  return api<VoiceJoinResponse>('POST', '/voice/join', body)
+}
 
 /** Moderation: serverMute/serverDeaf (SFU-enforced), move (channelId) or disconnect (channelId: null). */
 export const moderateVoice = (spaceId: string, userId: string, body: VoiceModerationBody) =>

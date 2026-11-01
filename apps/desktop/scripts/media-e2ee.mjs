@@ -4,6 +4,7 @@
 // their own ports, data in a temp dir. Never touches :4000/:7880, the default/bob profiles or apps/desktop/out.
 //
 //   node apps/desktop/scripts/media-e2ee.mjs [--no-build] [--phase=bugs,join,cpu,loss,codec,nokey] [--reps=6] [--joins=20] [--tag=after]
+//   node apps/desktop/scripts/media-e2ee.mjs --phase=percall   (per-call E2EE flag: pass/fail, not in the default run)
 //   (also: node apps/desktop/scripts/media-lab.mjs --e2ee …)
 //
 // The SFU runs ICE-lite behind scripts/netem/udp-impair.mjs (as media-net.mjs), so the loss phase can impair media;
@@ -11,7 +12,7 @@
 // swaps any getDisplayMedia for Chromium's own synthetic screen (QA report 2026-11-01), so real windows (ffplay test
 // patterns) are captured. Results: docs/benchmarks/e2ee-media.json (numbers quoted in docs/benchmarks/e2ee-media.md).
 import { spawn, spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { networkInterfaces, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -551,6 +552,104 @@ async function phaseLoss(sig, acc) {
 }
 
 /** Codec by room decode capability under E2EE (no backup codec): a viewer without HEVC decode joins mid-share, then leaves. */
+/** Verified email (the outbox link): invites need it. */
+async function verifyEmail(user) {
+  const box = join(WORK, 'outbox')
+  for (let i = 0; i < 60; i++) {
+    for (const f of existsSync(box) ? readdirSync(box).filter((x) => x.includes('verify_email')) : []) {
+      const eml = readFileSync(join(box, f), 'utf8')
+      const token = eml.includes(`${user.username}@`) && /[?&]token=([A-Za-z0-9_-]+)/.exec(eml)?.[1]
+      if (token && (await rest(null, 'POST', '/auth/verify-email', { token }).then(() => true, () => false))) return
+    }
+    await sleep(250)
+  }
+  throw new Error(`no verification mail for ${user.username}`)
+}
+
+/**
+ * Per-call E2EE flag (server 133002d, client fix): a space voice channel follows Space.e2ee (off: plain media, no MLS
+ * join), toggling it live makes both ends rejoin (share and mute kept), and a DM call is E2EE. Pass/fail, no numbers.
+ */
+async function phasePerCall(sig, acc) {
+  const { a: ua, b: ub } = acc.users
+  for (const u of [ua, ub]) await verifyEmail(u)
+  const space = await rest(ua.token, 'POST', '/spaces', { name: 'Per-call lab' })
+  const voice = space.channels.find((c) => c.type === 'voice') ?? (await rest(ua.token, 'POST', `/spaces/${space.id}/channels`, { type: 'voice', name: 'Voz' }))
+  const inv = await rest(ua.token, 'POST', `/spaces/${space.id}/invites`, { maxAgeSeconds: 0, maxUses: 0 })
+  await rest(ub.token, 'POST', `/invites/${inv.code}`)
+  const a = await launch('pc-a') // shares a real window, no mic
+  const b = await launch('pc-b', { wav: sig.tone })
+  const fails = []
+  const expect = (name, ok, detail) => (log(ok ? 'ok  ' : 'FAIL', name, JSON.stringify(detail)), ok || fails.push(name))
+  const view = async (i) => {
+    const s = await S(i)
+    const mls = await ev(i, async () => (await window.alga.e2ee.status()).call)
+    return { conn: s.connection.state, e2ee: s.e2ee.state, members: s.e2ee.members.length, peers: Object.keys(s.participants).length, sharing: s.screen.active, muted: s.self.muted, mls: mls?.state ?? null }
+  }
+  const until = async (pred, ms = 25_000) => {
+    const t0 = Date.now()
+    let v
+    while (Date.now() - t0 < ms) {
+      v = await Promise.all([view(a), view(b)])
+      if (v.every((x, i) => pred(x, i))) return { ok: true, ms: Date.now() - t0, a: v[0], b: v[1] }
+      await sleep(200)
+    }
+    return { ok: false, ms, a: v[0], b: v[1] }
+  }
+  // a hears b's tone and b gets a picture of a's share (decrypted, under E2EE).
+  const flows = async () => {
+    const heard = await ev(a, ([id]) => window.__mediaLab.firstAudio(id, -40, 10_000), [b.id]).catch(() => null)
+    await ev(b, (id) => window.__mediaLab.media.watch(id, 'auto'), a.id)
+    const f = await firstFrame(b, a.id, 15_000)
+    return { heard: heard !== null, frameMs: f.ms }
+  }
+  try {
+    await signIn(a, ua)
+    await signIn(b, ub)
+    await ev(b, () => (window.__mediaLab.media.setProcessing('off'), window.__mediaLab.media.setInputMode('ptt'), window.__mediaLab.media.pttDown()))
+    await joinCall(b, voice.id)
+    await joinCall(a, voice.id, { publishMic: false })
+    await ev(a, () => window.__mediaLab.media.setMuted(true))
+    let r = await until((v) => v.conn === 'connected' && v.peers === 1)
+    expect('space voice, Space.e2ee off: connected, plain, no MLS call', r.ok && r.a.e2ee === 'off' && r.b.e2ee === 'off' && r.a.mls === null && r.b.mls === null, r)
+    const attr = await ev(b, (id) => window.__mediaLab.media.debug.room?.remoteParticipants.get(id)?.attributes['alga.decode'] ?? null, a.id)
+    expect('alga.decode attribute in the token', typeof attr === 'string' && attr.includes('h264'), { attr })
+    await patternWindow(960, 540)
+    await share(a, { quality: '720p30' })
+    let m = await flows()
+    expect('plain media flows', m.heard && m.frameMs !== null, m)
+
+    await rest(ua.token, 'PATCH', `/spaces/${space.id}`, { e2ee: true })
+    // i 0 = a, the sharer: its share is captured again right after the rejoin
+    r = await until((v, i) => v.conn === 'connected' && v.e2ee === 'active' && v.members === 2 && v.peers === 1 && (i === 1 || v.sharing))
+    expect('Space.e2ee on: both rejoined with E2EE active', r.ok, r)
+    expect('share and mute kept across the switch', r.a.sharing && r.a.muted, r.a)
+    m = await flows()
+    expect('encrypted media flows', m.heard && m.frameMs !== null, m)
+
+    await rest(ua.token, 'PATCH', `/spaces/${space.id}`, { e2ee: false })
+    r = await until((v, i) => v.conn === 'connected' && v.e2ee === 'off' && v.mls === null && v.peers === 1 && (i === 1 || v.sharing))
+    expect('Space.e2ee off again: both back to plain, share kept', r.ok, r)
+    m = await flows()
+    expect('plain media flows again', m.heard && m.frameMs !== null, m)
+
+    await ev(a, () => window.__mediaLab.media.stopScreenShare())
+    await leave(a)
+    await leave(b)
+    await joinCall(b, acc.channelId)
+    await joinCall(a, acc.channelId, { publishMic: false })
+    r = await until((v) => v.conn === 'connected' && v.e2ee === 'active' && v.members === 2)
+    expect('DM call: E2EE active', r.ok, r)
+    const heard = await ev(a, ([id]) => window.__mediaLab.firstAudio(id, -40, 10_000), [b.id]).catch(() => null)
+    expect('DM: encrypted audio flows', heard !== null, { heard })
+  } finally {
+    stopPattern()
+    await close(a)
+    await close(b)
+  }
+  if (fails.length) throw new Error(`percall: ${fails.length} check(s) failed: ${fails.join('; ')}`)
+}
+
 async function phaseCodec(sig, acc) {
   const out = (results.codec = { when: new Date().toISOString(), runs: [] })
   const a = await launch('a')
@@ -649,9 +748,10 @@ export async function main() {
     await startStack()
     results.env = { when: new Date().toISOString(), machine: 'i5-13600KF + RTX 3070, Windows 11 Pro 10.0.26300', sfu: `LiveKit 1.13.11 :${LK_PORT}, ICE-lite UDP mux ${SFU_IP}:${UDP_PORT} atrás do proxy ${PROXY_IP}`, api: `${API} (PGlite em ${WORK})` }
     if (phases.includes('bugs')) await phaseBugs(sig)
-    const e2eePhases = ['join', 'cpu', 'loss', 'codec', 'nokey'].filter((p) => phases.includes(p))
+    const e2eePhases = ['join', 'cpu', 'loss', 'codec', 'nokey', 'percall'].filter((p) => phases.includes(p))
     if (e2eePhases.length) {
       const acc = await accounts()
+      if (phases.includes('percall')) await phasePerCall(sig, acc)
       if (phases.includes('join')) await phaseJoin(sig, acc)
       if (phases.includes('codec')) await phaseCodec(sig, acc)
       if (phases.includes('nokey')) await phaseNoKey(sig, acc)

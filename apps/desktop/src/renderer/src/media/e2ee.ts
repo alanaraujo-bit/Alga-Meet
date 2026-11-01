@@ -28,6 +28,16 @@ export class AlgaKeyProvider extends BaseKeyProvider {
 }
 
 /**
+ * How this call's media goes. The server decides per call (VoiceJoinResponse.e2ee: DMs always, space voice channels per
+ * Space.e2ee); a server without the flag (older) = whenever this client can. `unsupported`: the call is E2EE and this
+ * client can't do it, so the join fails closed (never plain media instead).
+ */
+export function callMode(server: boolean | undefined, capable: boolean): 'e2ee' | 'plain' | 'unsupported' {
+  if (!(server ?? capable)) return 'plain'
+  return capable ? 'e2ee' : 'unsupported'
+}
+
+/**
  * Who we cannot vouch for (0004 §3.8): an MLS leaf with no SFU participant (a ghost the DS added), an SFU participant
  * with no leaf (someone who got a LiveKit token but no keys), a user on two leaves, or someone publishing unencrypted.
  * Our own leaf is skipped; another leaf with our userId is not.
