@@ -26,6 +26,9 @@ export async function openDatabase(config: Config): Promise<Database> {
     const pool = new pg.Pool({ connectionString: config.databaseUrl, max: 10 })
     const db = drizzle({ client: pool, schema })
     try {
+      // A non-UTF8 database (initdb's default on Windows is WIN1252) rejects emoji and most non-Latin text at INSERT.
+      const { rows } = await pool.query<{ enc: string }>("select current_setting('server_encoding') as enc")
+      if (rows[0]?.enc !== 'UTF8') throw new Error(`database encoding must be UTF8, got ${rows[0]?.enc}`)
       await migrate(db, { migrationsFolder })
     } catch (err) {
       await pool.end()

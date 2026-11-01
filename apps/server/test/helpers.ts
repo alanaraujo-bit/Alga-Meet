@@ -3,6 +3,8 @@ import type { AddressInfo } from 'node:net'
 import type { AuthResponse, Dispatch, DispatchOf, DispatchType, ServerFrame } from '@alga/shared'
 import type { FastifyInstance } from 'fastify'
 import { AccessToken } from 'livekit-server-sdk'
+import pg from 'pg'
+import { inject } from 'vitest'
 import WebSocket from 'ws'
 import { buildApp } from '../src/app.js'
 import { loadConfig, type Config } from '../src/config.js'
@@ -14,11 +16,34 @@ export interface TestServer {
   close(): Promise<void>
 }
 
+let dbCounter = 0
+/** `npm run test:pg`: a fresh database on the shared real PostgreSQL cluster (test/pg-setup.ts); otherwise none (PGlite). */
+export async function freshDatabaseUrl(): Promise<string | undefined> {
+  const admin = inject('pgAdminUrl')
+  if (!admin) return undefined
+  const name = `alga_${process.pid}_${++dbCounter}_${Math.random().toString(36).slice(2, 8)}`
+  const client = new pg.Client({ connectionString: admin })
+  await client.connect()
+  try {
+    await client.query(`create database "${name}"`)
+  } finally {
+    await client.end()
+  }
+  const url = new URL(admin)
+  url.pathname = `/${name}`
+  return url.toString()
+}
+
+/** True when the suite runs against real PostgreSQL. */
+export const onRealPostgres = () => Boolean(inject('pgAdminUrl'))
+
 export async function startServer(env: Record<string, string> = {}): Promise<TestServer> {
+  const databaseUrl = await freshDatabaseUrl()
   const config = loadConfig({
     NODE_ENV: 'test',
     LOG_LEVEL: 'silent',
     PGLITE_DIR: 'memory://',
+    ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
     // Nothing listens here: SFU calls (kick/delete room) fail fast and are logged, as in production with LiveKit down.
     LIVEKIT_URL: 'http://127.0.0.1:9',
     ...env,
