@@ -202,8 +202,12 @@ Falha fechada:
     cliente não muda); `VoiceJoinResponse.streamPresets` traz o mesmo. O motor de mídia deve limitar a camada topo
     a um preset (`STREAM_PRESETS`: lado curto ≤ `height`, fps ≤ `fps`, bitrate ≤ `maxBitrateKbps`) e reagir a
     `ENTITLEMENTS_UPDATE`. No `track_published` de `SCREEN_SHARE` o servidor compara o lado curto e o bitrate das
-    camadas (com 10% de folga) com o maior preset do plano e **muta a faixa no SFU** se passar. O teto de anexo por
-    plano vale no upload (413).
+    camadas (com 10% de folga) com o maior preset do plano e **muta a faixa no SFU** se passar. **Mudança de plano
+    durante a transmissão** (subida ou descida): o atributo muda na hora (`updateParticipant`, na sala em que o usuário
+    está; quem entra com um token anterior à mudança é corrigido no `participant_joined`); `PLAN_RECHECK_MS` (10 s)
+    depois, cada tela não mutada do usuário passa pela mesma conferência do `track_published` contra o plano atual
+    (lido do banco: subir de novo dentro dos 10 s cancela) e é mutada se passar. Na subida não há o que mutar. O teto
+    de anexo por plano vale no upload (413).
   - **Sandbox** (padrão em dev/test): o checkout aponta para `GET /billing/sandbox/checkout/:ref?sig=` (link HMAC;
     `&outcome=decline` recusa), que faz o papel da página do provedor; webhooks assinados com
     `x-alga-sandbox-signature: t=<unix>,v1=<HMAC-SHA256(segredo, "t.corpo")>` (±5 min; segredo aleatório por processo,
@@ -297,7 +301,7 @@ Falha fechada:
   aleatório e `user_hash` com sal aleatório trocado todo dia e nunca gravado; expurgo aos 30 dias; vira histogramas
   `alga_call_*`.
 
-## Testes (`test/`, 167 casos)
+## Testes (`test/`, 168 casos)
 
 `npm test` roda em PGlite; `npm run test:pg` roda os mesmos casos num PostgreSQL 18 real (`test/pg-setup.ts`: um
 cluster UTF8 descartável por execução, um banco por `startServer`). Os dois passam.
@@ -323,7 +327,9 @@ verificado, produto vendável, nada concedido, 409), página sandbox assinada, a
 vencida, corpo adulterado, provedor não configurado), idempotência, eventos fora de ordem, valor abaixo do preço,
 cancelamento no fim do período → expiração pelo job (com `ENTITLEMENTS_UPDATE`/`ME_UPDATE`), carência, recompute
 (reembolso, cosmético próprio × coleção do plano), teto de anexo por plano, atributo de presets no token e mute de
-tela acima do plano, sandbox recusado em produção, e o adaptador Mercado Pago contra uma API simulada (`x-signature`,
+tela acima do plano, mudança de plano com a tela no ar (`RoomServiceClient` simulado: atributo na hora, mute só
+depois da carência e só do que passa do plano novo, subida sem mute, token antigo corrigido na entrada), sandbox
+recusado em produção, e o adaptador Mercado Pago contra uma API simulada (`x-signature`,
 re-busca, `past_due`, cancelamento, compra avulsa). `spaces.test.ts` inclui listar/revogar convites (authz) e `INVITE_CREATE`/`INVITE_DELETE` (audiência: gestores + criador,
 saída do criador). `billing.test.ts` também cobre retomar (idempotente, carência volta, 404 depois do fim), cosméticos
 (só itens com direito, espaço errado/desconhecido, `USER_UPDATE` e perfis com `cosmetics`, desequipar; itens do plano
@@ -364,6 +370,27 @@ na sala com `livekit-client` e publica o microfone; o dono chama `PATCH /spaces/
 `[CAMERA, SCREEN_SHARE, SCREEN_SHARE_AUDIO]`, o SFU despublica o microfone e a nova tentativa do cliente falha com
 `insufficient permissions`; com `serverMute:false` o cliente volta a publicar.
 
+## Smoke com LiveKit real (plano durante a transmissão)
+
+2026-11-01, LiveKit 1.13.11 próprio (:7990, webhooks para uma API própria em :4390, PGlite em memória, sandbox com
+segredo conhecido; nada no stack de dev). Três usuários entram pela API (`POST /voice/join`); cada um é uma página
+headless do Chromium com `livekit-client` 2.23 publicando um canvas a 60 fps com `source: ScreenShare` e simulcast
+(o SFU só vê a origem e as camadas declaradas, então não precisa de `getDisplayMedia`). Leitura por
+`RoomServiceClient.getParticipant` a cada 500 ms:
+
+| Quem | Tela | Mudança | Atributo no cliente / no SFU | Resultado |
+|---|---|---|---|---|
+| hi | 1080p60, 8 Mbps (só Plus); re-cap no lugar ao ver o atributo, como o desktop (102 ms) | Plus → Grátis (revoked) | 35 ms / ≤ 110 ms | **mutada em 10,1 s**; o SFU continuou com `1920x1080@8000k` |
+| ok | 720p60, 3 Mbps (cabe no Grátis) | Plus → Grátis | 66 ms / ≤ 110 ms | não mutada |
+| fr | 720p30, 2 Mbps | Grátis → Plus | 35 ms / ≤ 110 ms | não mutada |
+
+**O SFU não vê o re-cap no lugar.** Para um cliente normal o LiveKit guarda as camadas do `AddTrackRequest`: o
+`TrackInfo` só é atualizado pela mídia no modo de sinalização one-shot (`UpdateTrackInfoByVideoSizeChange:
+UseOneShotSignallingMode`, `pkg/rtc/participant.go` 1.13.11), e o `livekit-client` 2.23 nunca manda
+`UpdateLocalVideoTrack`/`UpdateVideoLayers` (que de todo jeito não levam fps nem bitrate). `docs/benchmarks/media-plan.json`
+mostra o mesmo no sentido oposto (subida 720p60 → 1080p60 no lugar, o SFU segue com `1280x720@3000k`). Consequência
+na lacuna abaixo.
+
 ## Lacunas conhecidas
 
 - **Imagens fora dos tipos inline** (HEIC, TIFF, BMP, RAW…) vão como download, sem re-encode: o EXIF delas chega a
@@ -394,8 +421,12 @@ na sala com `livekit-client` e publica o microfone; o dono chama `PATCH /spaces/
   webhook reativa a assinatura antiga). Sem reembolso self-service (CDC art. 49): hoje é estorno manual no painel →
   webhook revoga. Sem Pix na assinatura (só cartão recorrente). USD não é cobrado (MP é só BRL).
 - O mute de tela acima do plano usa as dimensões/bitrates que o SDK do cliente declara ao publicar: um cliente
-  modificado pode declarar menos (medição real exigiria estatísticas do SFU). Mudança de plano no meio de uma
-  transmissão só vale na próxima publicação (o atributo LiveKit é atualizado na hora).
+  modificado pode declarar menos (medição real exigiria estatísticas do SFU). **Descida com a tela no ar:** como o
+  SFU guarda as camadas da publicação (smoke acima), uma tela publicada acima do plano novo é mutada 10 s depois
+  **mesmo que o cliente tenha feito o re-cap no lugar** (o desktop faz, em ~100 ms, e avisa "a transmissão continua").
+  Para não mutar quem cumpre, o desktop precisa republicar a tela (publicação nova → conferida no `track_published`)
+  ao descer de plano, dentro dos 10 s. Sem essa mudança, a alternativa é a re-checagem só registrar (o log
+  `screen share above the plan`) em vez de mutar.
 - Dois checkouts de plano pagos ao mesmo tempo não são bloqueados: o recompute usa o melhor e o outro precisa de
   estorno manual. Pagamento duplo de um pedido é logado como erro (estorno manual).
 - Downloads de anexo passam pela API: o anexo de 100 MiB do Plus custa egress do Railway (ver lacuna acima).

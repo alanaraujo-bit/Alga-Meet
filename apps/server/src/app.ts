@@ -105,6 +105,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     await ctx.trust.stop()
     await files.stop()
     await billing.stop()
+    voice.stop()
     await database.close()
   })
 

@@ -39,6 +39,8 @@ const VOICE_TYPES = ['voice', 'dm', 'group_dm']
 const WEBHOOK_DEDUPE_MS = 10 * 60_000
 /** How long a moderator move lets the user into the target channel even when it is full. */
 const MOVE_TICKET_MS = 60_000
+/** After a plan change, time a compliant client gets to re-cap a live screen share before the server re-checks it (the desktop takes ~100 ms). */
+export const PLAN_RECHECK_MS = 10_000
 
 /**
  * LiveKit grants: SPEAK → microphone + camera, STREAM → screen + its audio; server mute drops the microphone,
@@ -64,6 +66,10 @@ export class Voice {
   private readonly seenEvents = new Map<string, number>()
   /** userId → channel a moderator moved them to (bypasses userLimit until `until`). */
   private readonly moves = new Map<string, { channelId: string; until: number }>()
+  /** userId → pending post-plan-change screen share re-check (one per user: a newer change restarts it). */
+  private readonly rechecks = new Map<string, NodeJS.Timeout>()
+  /** Grace before that re-check; tests shorten it. */
+  planRecheckMs = PLAN_RECHECK_MS
 
   constructor(
     private readonly config: Config,
@@ -124,7 +130,7 @@ export class Voice {
     const identity = ev.participant?.identity ?? ''
     switch (ev.event) {
       case 'participant_joined':
-        await this.participantJoined(channelId, identity, joinedAtOf(ev.participant), true)
+        await this.participantJoined(channelId, identity, joinedAtOf(ev.participant), true, ev.participant?.attributes?.[STREAM_PRESETS_ATTRIBUTE])
         break
       case 'participant_left':
       case 'participant_connection_aborted':
@@ -141,7 +147,8 @@ export class Voice {
     }
   }
 
-  async participantJoined(channelId: string, userId: string, joinedAt: string, ring: boolean): Promise<void> {
+  /** `presetsAttr`: the presets attribute LiveKit reports for the participant (from their token). */
+  async participantJoined(channelId: string, userId: string, joinedAt: string, ring: boolean, presetsAttr?: string): Promise<void> {
     if (!UUID_RE.test(userId)) return
     const found = await loadChannel(this.db, channelId)
     if (!found || !VOICE_TYPES.includes(found.row.type)) {
@@ -201,6 +208,11 @@ export class Voice {
     }
     // A token minted before the mute/deafen still carries the old grants.
     if (mod.serverMute || mod.serverDeaf) await this.enforce(state, permissions)
+    // Same for a plan change between /voice/join and this join: it found no VoiceState to update.
+    if (presetsAttr !== undefined) {
+      const presets = PLANS[await this.planOf(userId)].streamPresets
+      if (presets.join(',') !== presetsAttr) await this.setStreamPresets(userId, presets)
+    }
   }
 
   async participantLeft(channelId: string, userId: string): Promise<void> {
@@ -300,7 +312,7 @@ export class Voice {
         const channelId = channelIdOfRoom(r.name)
         if (!channelId) continue
         for (const p of await this.rooms.listParticipants(r.name)) {
-          await this.participantJoined(channelId, p.identity, joinedAtOf(p), false)
+          await this.participantJoined(channelId, p.identity, joinedAtOf(p), false, p.attributes[STREAM_PRESETS_ATTRIBUTE])
           n++
         }
       }
@@ -343,12 +355,46 @@ export class Voice {
     }
   }
 
-  /** Plan changed: refresh the presets attribute of a user in voice (the client also gets ENTITLEMENTS_UPDATE). */
+  /**
+   * Plan changed: refresh the presets attribute of a user in voice at once (the client also gets ENTITLEMENTS_UPDATE),
+   * then re-check their live screen shares after `planRecheckMs`. An upgrade has nothing above it, so that is a no-op.
+   */
   async setStreamPresets(userId: string, presets: StreamPreset[]): Promise<void> {
     const s = this.states.get(userId)
     if (!s) return
+    clearTimeout(this.rechecks.get(userId))
+    this.rechecks.set(userId, setTimeout(() => {
+      this.rechecks.delete(userId)
+      void this.recheckScreenShares(userId)
+    }, this.planRecheckMs).unref())
     await this.rooms.updateParticipant(roomName(s.channelId), userId, { attributes: { [STREAM_PRESETS_ATTRIBUTE]: presets.join(',') } })
       .catch((err: unknown) => this.log.warn({ err: (err as Error).message, userId }, 'voice: could not update stream presets on LiveKit'))
+  }
+
+  /** Drops pending plan re-checks (shutdown). */
+  stop(): void {
+    for (const t of this.rechecks.values()) clearTimeout(t)
+    this.rechecks.clear()
+  }
+
+  /**
+   * After the grace of a plan change: each unmuted screen share of the user is checked like at publish time. LiveKit
+   * reports the layers declared at publish; an in-place re-cap (same publication) does not change them (README).
+   */
+  private async recheckScreenShares(userId: string): Promise<void> {
+    const s = this.states.get(userId)
+    if (!s) return
+    try {
+      const p = await this.rooms.getParticipant(roomName(s.channelId), userId)
+      for (const t of p.tracks) if (!t.muted) await this.checkScreenShare(s.channelId, userId, t)
+    } catch (err) {
+      this.log.warn({ err: (err as Error).message, channelId: s.channelId, userId }, 'voice: could not re-check screen shares after a plan change')
+    }
+  }
+
+  private async planOf(userId: string): Promise<PlanId> {
+    const [u] = await this.db.select({ plan: users.plan }).from(users).where(eq(users.id, userId))
+    return (u?.plan ?? 'free') as PlanId
   }
 
   /**
@@ -358,8 +404,8 @@ export class Voice {
    */
   private async checkScreenShare(channelId: string, userId: string, track: TrackInfo | undefined): Promise<void> {
     if (track?.source !== TrackSource.SCREEN_SHARE || !UUID_RE.test(userId)) return
-    const [u] = await this.db.select({ plan: users.plan }).from(users).where(eq(users.id, userId))
-    const presets = PLANS[(u?.plan ?? 'free') as PlanId].streamPresets.map((p) => STREAM_PRESETS[p])
+    const plan = await this.planOf(userId)
+    const presets = PLANS[plan].streamPresets.map((p) => STREAM_PRESETS[p])
     const maxSide = Math.max(...presets.map((p) => p.height))
     const maxBps = Math.max(...presets.map((p) => p.maxBitrateKbps)) * 1000 * 1.1 // 10% encoder slack
     const layers = [...track.layers, ...track.codecs.flatMap((c) => c.layers)]
@@ -367,7 +413,7 @@ export class Voice {
     const side = Math.max(...dims.map((l) => Math.min(l.width, l.height)))
     const bps = Math.max(0, ...layers.map((l) => l.bitrate))
     if (side <= maxSide && bps <= maxBps) return
-    this.log.warn({ channelId, userId, side, bps, plan: u?.plan }, 'voice: screen share above the plan, muting it')
+    this.log.warn({ channelId, userId, side, bps, plan }, 'voice: screen share above the plan, muting it')
     await this.rooms.mutePublishedTrack(roomName(channelId), userId, track.sid, true)
       .catch((err: unknown) => this.log.warn({ err: (err as Error).message, userId }, 'voice: could not mute screen share'))
   }

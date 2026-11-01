@@ -5,7 +5,7 @@ import {
 } from '@alga/shared'
 import { count, eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
-import { TokenVerifier, type RoomServiceClient } from 'livekit-server-sdk'
+import { TokenVerifier, TrackSource, type RoomServiceClient } from 'livekit-server-sdk'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { GRACE_MS } from '../src/billing/billing.js'
 import { productById } from '../src/billing/catalog.js'
@@ -13,6 +13,7 @@ import { MercadoPagoProvider, mapPaymentStatus, mapPreapprovalStatus, parseRefer
 import { SANDBOX_SIGNATURE_HEADER, SandboxProvider, WebhookRejected, sandboxSignature } from '../src/billing/provider.js'
 import { loadConfig } from '../src/config.js'
 import { billingEvents, subscriptions } from '../src/db/schema.js'
+import { PLAN_RECHECK_MS } from '../src/voice.js'
 import { api, befriend, connect, postWebhook, register, startServer, type TestServer } from './helpers.js'
 
 let s: TestServer
@@ -380,6 +381,63 @@ describe('enforcement', () => {
     await published(plus.user.id, { sid: 'TR_e', source: 'SCREEN_SHARE', width: 3840, height: 2160, layers: [layer(3840, 2160, 15_000_000)] })
     expect(mute.mock.calls.map((c) => c[2])).toEqual(['TR_a', 'TR_c'])
     expect(mute.mock.calls[0]![1]).toBe(free.user.id)
+  })
+
+  it('plan change mid-share: presets attribute at once (stale join tokens too); after the grace, shares above the new plan are muted', async () => {
+    const voice = s.app.ctx.voice
+    voice.planRecheckMs = 30
+    const rooms = (voice as unknown as { rooms: RoomServiceClient }).rooms
+    const update = vi.spyOn(rooms, 'updateParticipant').mockResolvedValue({} as never)
+    const mute = vi.spyOn(rooms, 'mutePublishedTrack').mockResolvedValue({} as never)
+    const layer = (width: number, height: number, bitrate: number) => ({ quality: 2, width, height, bitrate })
+    const screen = (sid: string, l: ReturnType<typeof layer>, muted = false) => ({ sid, source: TrackSource.SCREEN_SHARE, muted, width: l.width, height: l.height, layers: [layer(320, 180, 100_000), l], codecs: [] })
+    // As LiveKit reports them: layers declared at publish (1080p60 at 8 Mbps is Plus-only; 720p60 fits Free).
+    const tracks = [
+      screen('TR_hi', layer(1920, 1080, 8_000_000)),
+      screen('TR_ok', layer(1280, 720, 3_000_000)),
+      screen('TR_off', layer(3840, 2160, 15_000_000), true),
+      { sid: 'TR_cam', source: TrackSource.CAMERA, muted: false, width: 3840, height: 2160, layers: [layer(3840, 2160, 15_000_000)], codecs: [] },
+    ]
+    const get = vi.spyOn(rooms, 'getParticipant').mockResolvedValue({ tracks } as never)
+    let seq = 0
+    const join = async (u: { token: string; user: { id: string } }, attrs: Record<string, string> = {}) => {
+      const space = (await api<SpaceSnapshot>(s.app, 'POST', '/spaces', { token: u.token, body: { name: 'Ao vivo' } })).body
+      const ch = space.channels.find((c) => c.type === 'voice')!
+      await postWebhook(s.app, s.config, { event: 'participant_joined', id: `PJ_${++seq}`, room: { name: `ch_${ch.id}` }, participant: { identity: u.user.id, attributes: attrs } })
+      expect(voice.stateOf(u.user.id)?.channelId).toBe(ch.id)
+      return `ch_${ch.id}`
+    }
+    const presetsSent = () => update.mock.calls.map((c) => [c[0], c[1], c[2]?.attributes?.[STREAM_PRESETS_ATTRIBUTE]])
+    const FREE = '720p30,720p60,1080p30'
+
+    // Downgrade (refund): the attribute changes in the same request; the re-check mutes only what is still above.
+    const plus = await subscribed()
+    const room = await join(plus)
+    expect(update).not.toHaveBeenCalled() // no attribute in the event: nothing to compare
+    expect(await sandboxHook(s.app, subEvent(plus.reference, 'revoked'))).toBe(200)
+    expect(presetsSent()).toEqual([[room, plus.user.id, FREE]])
+    expect(mute).not.toHaveBeenCalled() // the client gets the grace to re-cap itself
+    await vi.waitFor(() => expect(mute).toHaveBeenCalledTimes(1))
+    expect(mute.mock.calls[0]).toEqual([room, plus.user.id, 'TR_hi', true])
+    expect(get).toHaveBeenCalledWith(room, plus.user.id)
+
+    // Upgrade: attribute at once; the re-check finds nothing above Plus.
+    update.mockClear(); mute.mockClear(); get.mockClear()
+    const free = await register(s.app)
+    const room2 = await join(free, { [STREAM_PRESETS_ATTRIBUTE]: FREE }) // fresh token: matches, no update
+    expect(update).not.toHaveBeenCalled()
+    const co = (await checkout(free.token, 'plus_monthly')).body
+    expect(await sandboxHook(s.app, subEvent(co.reference, 'active', { currentPeriodEnd: new Date(Date.now() + 30 * DAY).toISOString(), amountCents: 1490 }))).toBe(200)
+    expect(presetsSent()).toEqual([[room2, free.user.id, expect.stringContaining('2160p30')]])
+    await vi.waitFor(() => expect(get).toHaveBeenCalled())
+    await new Promise((r) => setTimeout(r, 100))
+    expect(mute).not.toHaveBeenCalled()
+
+    // A token minted before the plan change still says Free: corrected on join (and re-checked).
+    update.mockClear()
+    await join(free, { [STREAM_PRESETS_ATTRIBUTE]: FREE })
+    expect(presetsSent()).toEqual([[expect.stringMatching(/^ch_/), free.user.id, expect.stringContaining('2160p30')]])
+    voice.planRecheckMs = PLAN_RECHECK_MS
   })
 })
 
