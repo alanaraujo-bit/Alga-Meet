@@ -1,0 +1,1875 @@
+{
+  "env": {
+    "when": "2026-11-01T12:30:29.766Z",
+    "machine": "i5-13600KF + RTX 3070, Windows 11 Pro 10.0.26300",
+    "sfu": "LiveKit 1.13.11 :7970, ICE-lite UDP mux 169.254.83.107:7972 atrás do proxy 192.168.1.116",
+    "api": "http://127.0.0.1:4470 (PGlite em C:\\Users\\ALANAR~1\\AppData\\Local\\Temp\\alga-e2ee-lab)"
+  },
+  "bugs-before": {
+    "note": "build HEAD (antes): bug02FirstRun = 12 transmissões, bug02 = mais 4, bug03 = harness com quadro pequeno",
+    "bug02FirstRun": [
+      {
+        "window": "640x360",
+        "i": 0,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 2066.7
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 1,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 2140.4
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 2,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 1926.4
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 3,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 1987.7
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 4,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 1978.1
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 5,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 1981.6
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 0,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 1912.4
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 1,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 2067.4
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 2,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 2050.6
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 3,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 1955.4
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 4,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 1879.5
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 5,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 2079.9
+        }
+      }
+    ],
+    "bug03BigTile": [
+      {
+        "i": 0,
+        "original": "960x540@29",
+        "after60": "960x540@29",
+        "senderLayers": [
+          "960x540@31",
+          "640x360@31",
+          "320x180@15"
+        ]
+      },
+      {
+        "i": 1,
+        "original": "960x540@29",
+        "after60": "960x540@30",
+        "senderLayers": [
+          "960x540@30",
+          "640x360@30",
+          "320x180@15"
+        ]
+      }
+    ],
+    "when": "2026-11-01T11:40:45.054Z",
+    "bug02": [
+      {
+        "window": "640x360",
+        "i": 0,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 1989.3
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 1,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 2116.8
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 0,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 1933.7
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 1,
+        "firstFrameMs": null,
+        "sent": [
+          "video/H265"
+        ],
+        "recv": {
+          "codec": "video/H265",
+          "size": "0x0",
+          "fps": 0,
+          "decoder": "NullVideoDecoder (fallback from: ExternalDecoder (D3D11VideoDecoder))",
+          "kbps": 2072.7
+        }
+      }
+    ],
+    "bug03": [
+      {
+        "i": 0,
+        "auto": "640x360@29",
+        "original": "640x360@29",
+        "adaptiveAfterOriginal": "n/a",
+        "capture30": 30,
+        "after60": "640x360@28",
+        "capture60": 52,
+        "senderLayers": [
+          "640x360@30",
+          "320x180@15",
+          "0x0@0"
+        ],
+        "switchMaxGapMs": 56,
+        "fresh60": "960x540@48",
+        "fresh60Capture": 49,
+        "fresh60Layers": [
+          "960x540@49",
+          "640x360@30",
+          "320x180@15"
+        ]
+      },
+      {
+        "i": 1,
+        "auto": "640x360@29",
+        "original": "640x360@29",
+        "adaptiveAfterOriginal": "n/a",
+        "capture30": 30,
+        "after60": "640x360@30",
+        "capture60": 49,
+        "senderLayers": [
+          "640x360@29",
+          "320x180@15",
+          "0x0@0"
+        ],
+        "switchMaxGapMs": 67,
+        "fresh60": "960x540@48",
+        "fresh60Capture": 50,
+        "fresh60Layers": [
+          "960x540@51",
+          "640x360@30",
+          "320x180@15"
+        ]
+      }
+    ]
+  },
+  "join": {
+    "when": "2026-11-01T11:59:48.915Z",
+    "joins": 20,
+    "mic": "tom 1 kHz contínuo (dispositivo falso), processamento desligado, PTT pressionado (portão aberto)",
+    "runs": [
+      {
+        "e2ee": false,
+        "joinMs": 243,
+        "e2eeMs": null,
+        "firstAudioMs": 341,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 216,
+        "e2eeMs": null,
+        "firstAudioMs": 316,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 205,
+        "e2eeMs": null,
+        "firstAudioMs": 304,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 204,
+        "e2eeMs": null,
+        "firstAudioMs": 315,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 212,
+        "e2eeMs": null,
+        "firstAudioMs": 313,
+        "state": "off"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 203,
+        "e2eeMs": 67,
+        "firstAudioMs": 298,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 210,
+        "e2eeMs": 39,
+        "firstAudioMs": 497,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 205,
+        "e2eeMs": 35,
+        "firstAudioMs": 304,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 205,
+        "e2eeMs": 34,
+        "firstAudioMs": 309,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 207,
+        "e2eeMs": 39,
+        "firstAudioMs": 314,
+        "state": "active"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 204,
+        "e2eeMs": null,
+        "firstAudioMs": 296,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 206,
+        "e2eeMs": null,
+        "firstAudioMs": 308,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 204,
+        "e2eeMs": null,
+        "firstAudioMs": 304,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 205,
+        "e2eeMs": null,
+        "firstAudioMs": 303,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 203,
+        "e2eeMs": null,
+        "firstAudioMs": 313,
+        "state": "off"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 202,
+        "e2eeMs": 39,
+        "firstAudioMs": 307,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 209,
+        "e2eeMs": 42,
+        "firstAudioMs": 313,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 203,
+        "e2eeMs": 37,
+        "firstAudioMs": 302,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 204,
+        "e2eeMs": 40,
+        "firstAudioMs": 303,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 199,
+        "e2eeMs": 40,
+        "firstAudioMs": 290,
+        "state": "active"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 187,
+        "e2eeMs": null,
+        "firstAudioMs": 279,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 206,
+        "e2eeMs": null,
+        "firstAudioMs": 305,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 204,
+        "e2eeMs": null,
+        "firstAudioMs": 306,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 226,
+        "e2eeMs": null,
+        "firstAudioMs": 355,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 219,
+        "e2eeMs": null,
+        "firstAudioMs": 348,
+        "state": "off"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 205,
+        "e2eeMs": 32,
+        "firstAudioMs": 300,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 203,
+        "e2eeMs": 36,
+        "firstAudioMs": 315,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 206,
+        "e2eeMs": 37,
+        "firstAudioMs": 311,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 204,
+        "e2eeMs": 40,
+        "firstAudioMs": 304,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 218,
+        "e2eeMs": 52,
+        "firstAudioMs": 319,
+        "state": "active"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 213,
+        "e2eeMs": null,
+        "firstAudioMs": 314,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 207,
+        "e2eeMs": null,
+        "firstAudioMs": 308,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 210,
+        "e2eeMs": null,
+        "firstAudioMs": 314,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 206,
+        "e2eeMs": null,
+        "firstAudioMs": 309,
+        "state": "off"
+      },
+      {
+        "e2ee": false,
+        "joinMs": 199,
+        "e2eeMs": null,
+        "firstAudioMs": 295,
+        "state": "off"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 204,
+        "e2eeMs": 40,
+        "firstAudioMs": 306,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 207,
+        "e2eeMs": 37,
+        "firstAudioMs": 309,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 210,
+        "e2eeMs": 54,
+        "firstAudioMs": 317,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 195,
+        "e2eeMs": 38,
+        "firstAudioMs": 289,
+        "state": "active"
+      },
+      {
+        "e2ee": true,
+        "joinMs": 204,
+        "e2eeMs": 36,
+        "firstAudioMs": 309,
+        "state": "active"
+      }
+    ],
+    "plain": {
+      "joinMs": {
+        "n": 20,
+        "median": 206,
+        "p95": 243,
+        "min": 187,
+        "max": 243,
+        "mean": 209
+      },
+      "firstAudioMs": {
+        "n": 20,
+        "median": 309,
+        "p95": 355,
+        "min": 279,
+        "max": 355,
+        "mean": 312.3
+      },
+      "noAudio": 0
+    },
+    "e2ee": {
+      "joinMs": {
+        "n": 20,
+        "median": 205,
+        "p95": 218,
+        "min": 195,
+        "max": 218,
+        "mean": 205.2
+      },
+      "firstAudioMs": {
+        "n": 20,
+        "median": 309,
+        "p95": 497,
+        "min": 289,
+        "max": 497,
+        "mean": 315.8
+      },
+      "noAudio": 0
+    }
+  },
+  "bugs-after": {
+    "when": "2026-11-01T11:55:54.364Z",
+    "bug02": [
+      {
+        "window": "640x360",
+        "i": 0,
+        "firstFrameMs": 1226,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x360",
+          "fps": 30,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 1967
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 1,
+        "firstFrameMs": 1173,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x360",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 2136.9
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 2,
+        "firstFrameMs": 1224,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x360",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 2005.7
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 3,
+        "firstFrameMs": 104,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x360",
+          "fps": 19,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 557.6
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 4,
+        "firstFrameMs": 1172,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x360",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 1967.4
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 5,
+        "firstFrameMs": 1222,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x360",
+          "fps": 30,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 1980.5
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 0,
+        "firstFrameMs": 1173,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x392",
+          "fps": 30,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 2007.5
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 1,
+        "firstFrameMs": 1173,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x392",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 2122.8
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 2,
+        "firstFrameMs": 1165,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x392",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 2027.6
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 3,
+        "firstFrameMs": 1221,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x392",
+          "fps": 30,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 1916.1
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 4,
+        "firstFrameMs": 102,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x392",
+          "fps": 25,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 1313.1
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 5,
+        "firstFrameMs": 104,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "160x98",
+          "fps": 15,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 86.6
+        }
+      }
+    ],
+    "bug03": [
+      {
+        "i": 0,
+        "auto": "640x360@29",
+        "original": "960x540@29",
+        "adaptiveAfterOriginal": false,
+        "capture30": 30,
+        "after60": "960x540@46",
+        "capture60": 50,
+        "senderLayers": [
+          "960x540@50",
+          "640x360@29",
+          "320x180@15"
+        ],
+        "sender": {
+          "encodings": [
+            "q:on/15fps/3",
+            "h:on/30fps/1.5",
+            "f:on/60fps/1"
+          ],
+          "limits": [
+            "q:none",
+            "f:none",
+            "h:none"
+          ]
+        },
+        "switchMaxGapMs": 61,
+        "after60At25s": "960x540@50",
+        "senderLayersAt25s": [
+          "960x540@49",
+          "640x360@29",
+          "320x180@16"
+        ],
+        "viewerDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "brokenDecoders": [],
+        "fresh60": "960x540@50",
+        "fresh60Capture": 48,
+        "fresh60Layers": [
+          "960x540@48",
+          "640x360@30",
+          "320x180@15"
+        ]
+      },
+      {
+        "i": 1,
+        "auto": "640x360@29",
+        "original": "960x540@29",
+        "adaptiveAfterOriginal": false,
+        "capture30": 30,
+        "after60": "960x540@47",
+        "capture60": 53,
+        "senderLayers": [
+          "960x540@55",
+          "640x360@29",
+          "320x180@15"
+        ],
+        "sender": {
+          "encodings": [
+            "q:on/15fps/3",
+            "h:on/30fps/1.5",
+            "f:on/60fps/1"
+          ],
+          "limits": [
+            "h:none",
+            "q:none",
+            "f:none"
+          ]
+        },
+        "switchMaxGapMs": 39,
+        "after60At25s": "960x540@50",
+        "senderLayersAt25s": [
+          "960x540@49",
+          "640x360@29",
+          "320x180@15"
+        ],
+        "viewerDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "brokenDecoders": [],
+        "fresh60": "960x540@52",
+        "fresh60Capture": 48,
+        "fresh60Layers": [
+          "960x540@47",
+          "640x360@30",
+          "320x180@15"
+        ]
+      }
+    ],
+    "runtimeFallback": [
+      {
+        "i": 0,
+        "firstFrameMs": 1479,
+        "sentAtStart": [
+          "video/H265"
+        ],
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)"
+        },
+        "brokenDecoders": [
+          "h265"
+        ]
+      },
+      {
+        "i": 1,
+        "firstFrameMs": 1172,
+        "sentAtStart": [
+          "video/H264"
+        ],
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)"
+        },
+        "brokenDecoders": [
+          "h265"
+        ]
+      },
+      {
+        "i": 2,
+        "firstFrameMs": 103,
+        "sentAtStart": [
+          "video/H264"
+        ],
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)"
+        },
+        "brokenDecoders": [
+          "h265"
+        ]
+      }
+    ],
+    "bug02EarlierRun": [
+      {
+        "window": "640x360",
+        "i": 0,
+        "firstFrameMs": 1175,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x360",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 1948.5
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 1,
+        "firstFrameMs": 1172,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x360",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 2076.1
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 2,
+        "firstFrameMs": 1170,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x360",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 2044.3
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 3,
+        "firstFrameMs": 1174,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x360",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 1968.2
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 4,
+        "firstFrameMs": 106,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x360",
+          "fps": 24,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 1166.9
+        }
+      },
+      {
+        "window": "640x360",
+        "i": 5,
+        "firstFrameMs": 1222,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x360",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 2103.3
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 0,
+        "firstFrameMs": 1169,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x392",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 1914.1
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 1,
+        "firstFrameMs": 1174,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x392",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 2049.4
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 2,
+        "firstFrameMs": 1172,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x392",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 2013.6
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 3,
+        "firstFrameMs": 1173,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x392",
+          "fps": 30,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 1940.6
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 4,
+        "firstFrameMs": 1225,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x392",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 2057.2
+        }
+      },
+      {
+        "window": "642x392",
+        "i": 5,
+        "firstFrameMs": 103,
+        "sent": [
+          "video/H264"
+        ],
+        "recv": {
+          "codec": "video/H264",
+          "size": "640x392",
+          "fps": 29,
+          "decoder": "ExternalDecoder (D3D11VideoDecoder)",
+          "kbps": 2000.7
+        }
+      }
+    ],
+    "bug03Intermediate": [
+      {
+        "i": 0,
+        "auto": "640x360@29",
+        "original": "960x540@29",
+        "adaptiveAfterOriginal": false,
+        "capture30": 30,
+        "after60": "960x540@31",
+        "capture60": 47,
+        "senderLayers": [
+          "960x540@30",
+          "640x360@30",
+          "320x180@15"
+        ],
+        "sender": {
+          "encodings": [
+            "q:on/15fps/3",
+            "h:on/30fps/1.5",
+            "f:on/60fps/1"
+          ],
+          "limits": [
+            "q:none",
+            "f:none",
+            "h:none"
+          ]
+        },
+        "switchMaxGapMs": 56,
+        "after60At25s": "960x540@30",
+        "senderLayersAt25s": [
+          "960x540@30",
+          "640x360@30",
+          "320x180@15"
+        ],
+        "viewerDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "brokenDecoders": [],
+        "fresh60": "960x540@47",
+        "fresh60Capture": 53,
+        "fresh60Layers": [
+          "960x540@52",
+          "640x360@31",
+          "320x180@15"
+        ]
+      },
+      {
+        "i": 1,
+        "auto": "640x360@29",
+        "original": "960x540@29",
+        "adaptiveAfterOriginal": false,
+        "capture30": 30,
+        "after60": "960x540@30",
+        "capture60": 49,
+        "senderLayers": [
+          "960x540@30",
+          "640x360@30",
+          "320x180@15"
+        ],
+        "sender": {
+          "encodings": [
+            "q:on/15fps/3",
+            "h:on/30fps/1.5",
+            "f:on/60fps/1"
+          ],
+          "limits": [
+            "f:none",
+            "h:none",
+            "q:none"
+          ]
+        },
+        "switchMaxGapMs": 78,
+        "after60At25s": "960x540@31",
+        "senderLayersAt25s": [
+          "960x540@29",
+          "640x360@29",
+          "320x180@15"
+        ],
+        "viewerDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "brokenDecoders": [],
+        "fresh60": "960x540@52",
+        "fresh60Capture": 51,
+        "fresh60Layers": [
+          "960x540@47",
+          "640x360@31",
+          "320x180@15"
+        ]
+      }
+    ],
+    "note": "bug03Intermediate = build com a correção do Original mas sem republicar ao subir o fps"
+  },
+  "codec": {
+    "when": "2026-11-01T12:04:10.350Z",
+    "runs": [
+      {
+        "i": 0,
+        "before": {
+          "sent": [
+            "video/H265"
+          ],
+          "bFirstFrameMs": 106
+        },
+        "mixed": {
+          "sent": [
+            "video/H264"
+          ],
+          "b": "video/H264",
+          "c": "video/H264",
+          "cFirstFrameAfterJoinMs": 2005
+        },
+        "afterCLeft": {
+          "sent": [
+            "video/H265"
+          ],
+          "b": "video/H265",
+          "bFrames": true
+        },
+        "e2ee": "active"
+      },
+      {
+        "i": 1,
+        "before": {
+          "sent": [
+            "video/H265"
+          ],
+          "bFirstFrameMs": 105
+        },
+        "mixed": {
+          "sent": [
+            "video/H264"
+          ],
+          "b": "video/H264",
+          "c": "video/H264",
+          "cFirstFrameAfterJoinMs": 980
+        },
+        "afterCLeft": {
+          "sent": [
+            "video/H265"
+          ],
+          "b": "video/H265",
+          "bFrames": true
+        },
+        "e2ee": "active"
+      },
+      {
+        "i": 2,
+        "before": {
+          "sent": [
+            "video/H265"
+          ],
+          "b": null,
+          "bFirstFrameMs": 1223
+        },
+        "mixed": {
+          "sent": [
+            "video/H264"
+          ],
+          "b": "video/H264",
+          "c": "video/H264",
+          "cFirstFrameAfterJoinMs": 916
+        },
+        "afterCLeft": {
+          "sent": [
+            "video/H265"
+          ],
+          "b": "video/H265",
+          "bFrames": true
+        },
+        "e2ee": "active"
+      }
+    ],
+    "decodeCaps": {
+      "b": [
+        "vp8",
+        "vp9",
+        "h264",
+        "av1",
+        "h265"
+      ],
+      "c": [
+        "vp8",
+        "vp9",
+        "h264",
+        "av1"
+      ]
+    }
+  },
+  "nokey": {
+    "when": "2026-11-01T12:04:53.826Z",
+    "intruder": {
+      "video": {
+        "bytesReceived": 4375306,
+        "framesReceived": 591,
+        "framesDecoded": 0,
+        "keyFramesDecoded": 0
+      },
+      "audio": {
+        "packetsReceived": 614,
+        "totalAudioEnergy": 0,
+        "totalSamplesDuration": 12.199999999999784
+      },
+      "audioMeanPowerDb": null
+    },
+    "mismatch": {
+      "a": [
+        "intruder"
+      ],
+      "b": [
+        "intruder"
+      ]
+    },
+    "members": 2
+  },
+  "cpu": {
+    "when": "2026-11-01T12:30:30.049Z",
+    "voice": [
+      {
+        "e2ee": false,
+        "round": 0,
+        "sender": 5.3,
+        "receiver": 5.2,
+        "gpuA": 0.7,
+        "gpuB": 0.3,
+        "consoleMessages": 4
+      },
+      {
+        "e2ee": true,
+        "round": 0,
+        "sender": 6.4,
+        "receiver": 7.4,
+        "gpuA": 0.7,
+        "gpuB": 1.2,
+        "consoleMessages": 4
+      },
+      {
+        "e2ee": true,
+        "round": 1,
+        "sender": 6.1,
+        "receiver": 6,
+        "gpuA": 0.7,
+        "gpuB": 0.4,
+        "consoleMessages": 4
+      },
+      {
+        "e2ee": false,
+        "round": 1,
+        "sender": 5.2,
+        "receiver": 5.1,
+        "gpuA": 0.7,
+        "gpuB": 0.6,
+        "consoleMessages": 4
+      },
+      {
+        "e2ee": false,
+        "round": 2,
+        "sender": 5.5,
+        "receiver": 9.2,
+        "gpuA": 0.9,
+        "gpuB": 3.5,
+        "consoleMessages": 4
+      },
+      {
+        "e2ee": true,
+        "round": 2,
+        "sender": 5.4,
+        "receiver": 8.3,
+        "gpuA": 0.9,
+        "gpuB": 3,
+        "consoleMessages": 5
+      },
+      {
+        "e2ee": true,
+        "round": 3,
+        "sender": 5.2,
+        "receiver": 5.8,
+        "gpuA": 0.8,
+        "gpuB": 0.7,
+        "consoleMessages": 4
+      },
+      {
+        "e2ee": false,
+        "round": 3,
+        "sender": 4.7,
+        "receiver": 7.8,
+        "gpuA": 0.8,
+        "gpuB": 3.6,
+        "consoleMessages": 4
+      },
+      {
+        "e2ee": false,
+        "round": 4,
+        "sender": 5.4,
+        "receiver": 9.1,
+        "gpuA": 1,
+        "gpuB": 3.8,
+        "consoleMessages": 4
+      },
+      {
+        "e2ee": true,
+        "round": 4,
+        "sender": 5,
+        "receiver": 7.9,
+        "gpuA": 0.8,
+        "gpuB": 3.1,
+        "consoleMessages": 4
+      },
+      {
+        "e2ee": true,
+        "round": 5,
+        "sender": 4.9,
+        "receiver": 8.4,
+        "gpuA": 0.8,
+        "gpuB": 4,
+        "consoleMessages": 4
+      },
+      {
+        "e2ee": false,
+        "round": 5,
+        "sender": 3.9,
+        "receiver": 6.2,
+        "gpuA": 0.8,
+        "gpuB": 2.9,
+        "consoleMessages": 4
+      }
+    ],
+    "screen": [
+      {
+        "e2ee": false,
+        "round": 0,
+        "sender": 11.3,
+        "viewer": 8.9,
+        "gpuA": 9.8,
+        "gpuB": 8.6,
+        "sent": [
+          "video/H265"
+        ],
+        "top": "1280x720@48",
+        "recv": "video/H265 1280x720@48 2920kbps"
+      },
+      {
+        "e2ee": true,
+        "round": 0,
+        "sender": 13.3,
+        "viewer": 9.9,
+        "gpuA": 9.5,
+        "gpuB": 8.2,
+        "sent": [
+          "video/H265"
+        ],
+        "top": "1280x720@48",
+        "recv": "video/H265 1280x720@52 2911kbps"
+      },
+      {
+        "e2ee": true,
+        "round": 1,
+        "sender": 14.7,
+        "viewer": 11.3,
+        "gpuA": 10.4,
+        "gpuB": 9,
+        "sent": [
+          "video/H265"
+        ],
+        "top": "1280x720@45",
+        "recv": "video/H265 1280x720@45 2797kbps"
+      },
+      {
+        "e2ee": false,
+        "round": 1,
+        "sender": 12.1,
+        "viewer": 9.4,
+        "gpuA": 10.4,
+        "gpuB": 8.9,
+        "sent": [
+          "video/H265"
+        ],
+        "top": "1280x720@47",
+        "recv": "video/H265 1280x720@45 2862kbps"
+      },
+      {
+        "e2ee": false,
+        "round": 2,
+        "sender": 11.5,
+        "viewer": 8.8,
+        "gpuA": 9.9,
+        "gpuB": 8.4,
+        "sent": [
+          "video/H265"
+        ],
+        "top": "1280x720@49",
+        "recv": "video/H265 1280x720@44 2829kbps"
+      },
+      {
+        "e2ee": true,
+        "round": 2,
+        "sender": 12.9,
+        "viewer": 9.6,
+        "gpuA": 9.4,
+        "gpuB": 8,
+        "sent": [
+          "video/H265"
+        ],
+        "top": "1280x720@47",
+        "recv": "video/H265 1280x720@45 2887kbps"
+      },
+      {
+        "e2ee": true,
+        "round": 3,
+        "sender": 16.2,
+        "viewer": 12.7,
+        "gpuA": 11.6,
+        "gpuB": 10.1,
+        "sent": [
+          "video/H265"
+        ],
+        "top": "1280x720@47",
+        "recv": "video/H265 1280x720@48 2901kbps"
+      },
+      {
+        "e2ee": false,
+        "round": 3,
+        "sender": 13.4,
+        "viewer": 11.2,
+        "gpuA": 11.9,
+        "gpuB": 10,
+        "sent": [
+          "video/H265"
+        ],
+        "top": "1280x720@50",
+        "recv": "video/H265 1280x720@50 2818kbps"
+      }
+    ],
+    "voiceSummary": {
+      "plain": {
+        "sender": 5.3,
+        "receiver": 7.8
+      },
+      "e2ee": {
+        "sender": 5.4,
+        "receiver": 7.9
+      }
+    },
+    "screenSummary": {
+      "plain": {
+        "sender": 12.1,
+        "viewer": 9.4
+      },
+      "e2ee": {
+        "sender": 14.7,
+        "viewer": 11.3
+      }
+    },
+    "voiceFirstRun": [
+      {
+        "e2ee": false,
+        "round": 0,
+        "sender": 5.8,
+        "receiver": 5.6,
+        "gpuA": 0.7,
+        "gpuB": 0.3
+      },
+      {
+        "e2ee": true,
+        "round": 0,
+        "sender": 6.7,
+        "receiver": 11.4,
+        "gpuA": 0.7,
+        "gpuB": 5
+      },
+      {
+        "e2ee": true,
+        "round": 1,
+        "sender": 6.6,
+        "receiver": 11.1,
+        "gpuA": 0.7,
+        "gpuB": 4.8
+      },
+      {
+        "e2ee": false,
+        "round": 1,
+        "sender": 5.4,
+        "receiver": 6,
+        "gpuA": 0.7,
+        "gpuB": 1.1
+      },
+      {
+        "e2ee": false,
+        "round": 2,
+        "sender": 6,
+        "receiver": 5.9,
+        "gpuA": 0.7,
+        "gpuB": 0.3
+      },
+      {
+        "e2ee": true,
+        "round": 2,
+        "sender": 6.2,
+        "receiver": 6.2,
+        "gpuA": 0.7,
+        "gpuB": 0.3
+      },
+      {
+        "e2ee": true,
+        "round": 3,
+        "sender": 6.6,
+        "receiver": 7.2,
+        "gpuA": 0.7,
+        "gpuB": 0.5
+      },
+      {
+        "e2ee": false,
+        "round": 3,
+        "sender": 5.5,
+        "receiver": 5.4,
+        "gpuA": 0.7,
+        "gpuB": 0.3
+      }
+    ],
+    "note": "voice: 2 rodadas (voiceFirstRun 4 + voice 6); janelas com o processo de GPU de B > 1,2 % (o renderer de B compondo outra coisa, nos dois modos) ficam fora do delta do receptor"
+  },
+  "loss": {
+    "when": "2026-11-01T12:19:50.676Z",
+    "signal": "TTS pt-BR em loop (como media-network.md §1), modo Padrão, VAD automático",
+    "seconds": 25,
+    "runs": [
+      {
+        "e2ee": false,
+        "red": true,
+        "rep": 0,
+        "lossPct": 0,
+        "codec": "audio/opus",
+        "rtpLossPct": 0,
+        "concealedPct": 2.2,
+        "eventsPerMin": 26.4,
+        "sendKbps": 67.1
+      },
+      {
+        "e2ee": false,
+        "red": true,
+        "rep": 0,
+        "lossPct": 5,
+        "codec": "audio/opus",
+        "rtpLossPct": 5.2,
+        "concealedPct": 0.5,
+        "eventsPerMin": 12,
+        "sendKbps": 49.9
+      },
+      {
+        "e2ee": false,
+        "red": true,
+        "rep": 0,
+        "lossPct": 10,
+        "codec": "audio/opus",
+        "rtpLossPct": 10.5,
+        "concealedPct": 1.1,
+        "eventsPerMin": 19.2,
+        "sendKbps": 50.4
+      },
+      {
+        "e2ee": true,
+        "red": true,
+        "rep": 0,
+        "lossPct": 0,
+        "codec": "audio/opus",
+        "rtpLossPct": 0,
+        "concealedPct": 0.9,
+        "eventsPerMin": 9.6,
+        "sendKbps": 57.7
+      },
+      {
+        "e2ee": true,
+        "red": true,
+        "rep": 0,
+        "lossPct": 5,
+        "codec": "audio/opus",
+        "rtpLossPct": 4.1,
+        "concealedPct": 0.9,
+        "eventsPerMin": 16.8,
+        "sendKbps": 54.5
+      },
+      {
+        "e2ee": true,
+        "red": true,
+        "rep": 0,
+        "lossPct": 10,
+        "codec": "audio/opus",
+        "rtpLossPct": 8.1,
+        "concealedPct": 1.2,
+        "eventsPerMin": 16.8,
+        "sendKbps": 54.4
+      },
+      {
+        "e2ee": true,
+        "red": false,
+        "rep": 0,
+        "lossPct": 0,
+        "codec": "audio/opus",
+        "rtpLossPct": 0,
+        "concealedPct": 0.7,
+        "eventsPerMin": 2.4,
+        "sendKbps": 31.4
+      },
+      {
+        "e2ee": true,
+        "red": false,
+        "rep": 0,
+        "lossPct": 5,
+        "codec": "audio/opus",
+        "rtpLossPct": 5.8,
+        "concealedPct": 2.2,
+        "eventsPerMin": 19.2,
+        "sendKbps": 30
+      },
+      {
+        "e2ee": true,
+        "red": false,
+        "rep": 0,
+        "lossPct": 10,
+        "codec": "audio/opus",
+        "rtpLossPct": 10.6,
+        "concealedPct": 1.7,
+        "eventsPerMin": 57.6,
+        "sendKbps": 30.8
+      },
+      {
+        "e2ee": false,
+        "red": true,
+        "rep": 1,
+        "lossPct": 0,
+        "codec": "audio/opus",
+        "rtpLossPct": 0,
+        "concealedPct": 0.7,
+        "eventsPerMin": 14.4,
+        "sendKbps": 50.8
+      },
+      {
+        "e2ee": false,
+        "red": true,
+        "rep": 1,
+        "lossPct": 5,
+        "codec": "audio/opus",
+        "rtpLossPct": 3.2,
+        "concealedPct": 0.9,
+        "eventsPerMin": 12,
+        "sendKbps": 48.6
+      },
+      {
+        "e2ee": false,
+        "red": true,
+        "rep": 1,
+        "lossPct": 10,
+        "codec": "audio/opus",
+        "rtpLossPct": 9.4,
+        "concealedPct": 2,
+        "eventsPerMin": 24,
+        "sendKbps": 50.5
+      },
+      {
+        "e2ee": true,
+        "red": true,
+        "rep": 1,
+        "lossPct": 0,
+        "codec": "audio/opus",
+        "rtpLossPct": 0,
+        "concealedPct": 0.7,
+        "eventsPerMin": 2.4,
+        "sendKbps": 58.2
+      },
+      {
+        "e2ee": true,
+        "red": true,
+        "rep": 1,
+        "lossPct": 5,
+        "codec": "audio/opus",
+        "rtpLossPct": 4.7,
+        "concealedPct": 1.5,
+        "eventsPerMin": 9.6,
+        "sendKbps": 54.8
+      },
+      {
+        "e2ee": true,
+        "red": true,
+        "rep": 1,
+        "lossPct": 10,
+        "codec": "audio/opus",
+        "rtpLossPct": 8.9,
+        "concealedPct": 0.7,
+        "eventsPerMin": 12,
+        "sendKbps": 54.7
+      },
+      {
+        "e2ee": true,
+        "red": false,
+        "rep": 1,
+        "lossPct": 0,
+        "codec": "audio/opus",
+        "rtpLossPct": 0,
+        "concealedPct": 0.7,
+        "eventsPerMin": 2.4,
+        "sendKbps": 31.2
+      },
+      {
+        "e2ee": true,
+        "red": false,
+        "rep": 1,
+        "lossPct": 5,
+        "codec": "audio/opus",
+        "rtpLossPct": 4.2,
+        "concealedPct": 1.9,
+        "eventsPerMin": 19.2,
+        "sendKbps": 29.7
+      },
+      {
+        "e2ee": true,
+        "red": false,
+        "rep": 1,
+        "lossPct": 10,
+        "codec": "audio/opus",
+        "rtpLossPct": 7.7,
+        "concealedPct": 3.4,
+        "eventsPerMin": 33.6,
+        "sendKbps": 29.6
+      }
+    ]
+  }
+}

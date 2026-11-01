@@ -166,6 +166,39 @@ export function pickCodec(hw: Partial<Record<VideoCodecId, boolean>>): VideoCode
   return 'h264'
 }
 
+/**
+ * Smallest side a hardware HEVC decoder takes (NVDEC: 144 px). Below it Chromium's D3D11 decoder fails over to a null
+ * decoder (it has no software HEVC) and the viewer never gets a picture: a 640×360 window's ¼ layer is 160×90 (QA
+ * BUG-02, 6/6). Such a share goes out as H.264.
+ */
+export const HEVC_MIN_SIDE = 144
+const MIME_CODEC: Record<string, VideoCodecId> = { 'video/h264': 'h264', 'video/h265': 'h265', 'video/vp8': 'vp8', 'video/vp9': 'vp9', 'video/av1': 'av1' }
+/** Our codec ids among RTCRtpReceiver.getCapabilities('video') mime types. */
+export const decodable = (mimes: readonly string[]): VideoCodecId[] => [...new Set(mimes.map((m) => MIME_CODEC[m.toLowerCase()]).filter((c) => !!c))]
+
+/**
+ * What a client decodes rides in its mic publication's name: the token has no canUpdateOwnMetadata grant, so a
+ * participant attribute is not ours to set. shortcut: listen-only and server-muted users publish no mic and count as
+ * not advertised; replace with an `alga.decode` attribute the server sets from POST /voice/join.
+ */
+const DECODE_PREFIX = 'alga.decode='
+export const decodeName = (codecs: readonly VideoCodecId[]): string => DECODE_PREFIX + codecs.join(',')
+export function decodeOf(trackName: string | undefined): VideoCodecId[] | null {
+  if (!trackName?.startsWith(DECODE_PREFIX)) return null
+  return decodable(trackName.slice(DECODE_PREFIX.length).split(',').map((c) => `video/${c}`))
+}
+
+/**
+ * Codec of a share: `want` when every layer suits it and every other participant decodes it, else H.264 (every client
+ * decodes it). `viewers`: each one's advertised list; null = not advertised (older client, no mic). Without E2EE the
+ * SFU's H.264 backup covers those; with E2EE livekit-client publishes no backup, so they count as unable.
+ */
+export function roomCodec(want: VideoCodecId, layers: readonly Pick<Layer, 'width' | 'height'>[], viewers: readonly (VideoCodecId[] | null)[], e2ee: boolean, minSide = HEVC_MIN_SIDE): VideoCodecId {
+  if (want === 'h264') return want
+  if (want === 'h265' && layers.some((l) => Math.min(l.width, l.height) < minSide)) return 'h264'
+  return viewers.every((v) => (v ? v.includes(want) : !e2ee)) ? want : 'h264'
+}
+
 export function contentSettings(type: ContentType): { hint: 'motion' | 'detail'; degradation: RTCDegradationPreference } {
   return type === 'motion'
     ? { hint: 'motion', degradation: 'maintain-framerate' }

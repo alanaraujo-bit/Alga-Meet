@@ -19,10 +19,15 @@ import {
   type RemoteTrackPublication,
   type TrackPublishOptions,
 } from 'livekit-client'
+// LiveKit's frame cryptor (AES-GCM per frame): its own chunk, loaded from 'self' (CSP worker-src 'self' blob:).
+import E2eeWorker from 'livekit-client/e2ee-worker?worker'
 import { STREAM_PRESETS_ATTRIBUTE } from '@alga/shared'
+import { onDispatch, useSession } from '@/store/session'
+import type { E2eeEpochInfo, E2eeFrameKey } from '../../../shared/bridge'
+import { AlgaKeyProvider, mismatchOf, settled } from './e2ee'
 import { PttLatch, perceptualLevel, rmsDb } from './vad'
 import { PrefsStore, type InputMode, type ProcessingMode } from './prefs'
-import { aboveContract, availablePresets, clampPreset, contentSettings, gatePresets, isPresetId, pickCodec, recordSustain, simulcastFor, type ContentType, type ScreenPreset, type ScreenPresetId, type VideoCodecId } from './presets'
+import { HEVC_MIN_SIDE, aboveContract, availablePresets, clampPreset, contentSettings, decodable, decodeName, decodeOf, gatePresets, isPresetId, pickCodec, recordSustain, roomCodec, simulcastFor, type ContentType, type ScreenPreset, type ScreenPresetId, type VideoCodecId } from './presets'
 import { VoiceGraph, VoiceProcessor, captureConstraints } from './processing'
 import { playCue, setCueOutput, startRing, stopRing, type Cue, type RingKind } from './sounds'
 import { stallStep, type StallState } from './stall'
@@ -89,6 +94,12 @@ const LEVEL_TICK_MS = 50
 const REPUBLISH_OVERLAP_MS = 3000
 /** Stall guard (viewer side) poll period. */
 const STALL_TICK_MS = 200
+/** Longest wait for the call's MLS epoch (and our cryptor) before a join fails closed. */
+const E2EE_SETUP_MS = 10_000
+/** Room changes (joins, leaves, decode lists) settle this long before a live share's codec is re-decided. */
+const CODEC_SETTLE_MS = 500
+/** A watched stream with bytes arriving and no decoded picture for this many stats ticks (1 s) = decoder failure. */
+const DECODE_FAIL_TICKS = 5
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 const bridge = (): Partial<Window['alga']> | undefined => (typeof window !== 'undefined' ? window.alga : undefined)
@@ -120,7 +131,7 @@ class MediaEngine {
   private audioEls = new Set<HTMLMediaElement>()
   private viewerEls = new Map<string, Set<HTMLVideoElement>>()
   /** `declared`: the preset of the video publication (the SFU keeps its layers; an in-place re-cap changes `preset` only). */
-  private screenPub: { video: LocalTrackPublication; audio: LocalTrackPublication | null; preset: ScreenPreset; declared: ScreenPreset; cpuLimited: boolean[]; sourceId: string | null } | null = null
+  private screenPub: { video: LocalTrackPublication; audio: LocalTrackPublication | null; preset: ScreenPreset; declared: ScreenPreset; cpuLimited: boolean[]; sourceId: string | null; codec: VideoCodecId; want: VideoCodecId } | null = null
   /** Presets this machine sustains (probeEncoder); the conservative software list until the probe answers. */
   private capable: ScreenPreset[] = availablePresets({ hardware: false })
   /** Presets the user's plan allows (join response, token attribute, Me.plan); null = unknown. */
@@ -149,6 +160,28 @@ class MediaEngine {
   stallGuard = true
   /** Mic re-published because the SFU answered it without DTX (ensureDtx); read by the lab. */
   private dtxRepairs = 0
+  /**
+   * E2EE of the current call (decision 0004; README §E2EE). Kept across automatic rejoins of the same channel: the
+   * newest key of each remote sender, ours (`own`, the one we send with; `next` waits for its epoch to go active).
+   */
+  private call: { channelId: string; remote: Map<string, E2eeFrameKey>; own: E2eeFrameKey | null; next: E2eeFrameKey | null; active: boolean } | null = null
+  /** Per Room: LiveKit's key provider and its frame-cryptor worker. */
+  private keys: AlgaKeyProvider | null = null
+  private cryptor: Worker | null = null
+  /** Joins waiting for the epoch: called with null when we may publish, or with the reason it failed. */
+  private e2eeWaiters = new Set<(err: string | null) => void>()
+  private mismatchSince = new Map<string, number>()
+  /** Lab only: join without E2EE even when main runs it (baselines, direct LiveKit tokens). */
+  labNoE2ee = false
+  /** Lab only: HEVC layer floor (0 lets a too-small HEVC share out, to exercise the viewer-side fallback). */
+  hevcMinSide = HEVC_MIN_SIDE
+  /** Codecs this client failed to decode in this session: no longer advertised, so senders switch away from them. */
+  private brokenDecoders = new Set<VideoCodecId>()
+  /** Per watched stream: consecutive stats ticks with bytes arriving and no picture. */
+  private undecoded = new Map<string, number>()
+  /** Hardware encoder per codec (probeEncoder). */
+  private hw: Partial<Record<VideoCodecId, boolean>> = {}
+  private codecTimer: ReturnType<typeof setTimeout> | null = null
 
   /** Wire OS/bridge integrations once (idempotent). Called lazily by every public entry point. */
   private start(): void {
@@ -174,6 +207,18 @@ class MediaEngine {
     void this.refreshDevices(false)
     this.syncPlan()
     void this.probeEncoder()
+    // E2EE relay (main has the MLS state; the gateway is the renderer's): every E2EE_* dispatch in, every e2ee_* frame out.
+    const e2ee = b?.e2ee
+    if (e2ee) {
+      onDispatch((d) => {
+        if (d.t.startsWith('E2EE_')) e2ee.handleDispatch(d.t, d.d)
+        // A new gateway session: re-announce our epoch so the DS resends what we missed (0004 §3.6).
+        else if (d.t === 'READY' && this.call && !this.userLeft) void e2ee.joinCall(this.call.channelId).catch(() => undefined)
+      })
+      e2ee.onGatewaySend((frame) => void useSession.getState().send(frame))
+      e2ee.onFrameKey((k) => void this.onFrameKey(k))
+      e2ee.onEpoch((e) => void this.onEpoch(e))
+    }
   }
 
   // ───────────────────────────── voice ─────────────────────────────
@@ -201,19 +246,32 @@ class MediaEngine {
     const t0 = performance.now()
     this.setConn('connecting', null, { channelId: params.channelId ?? null, joinMs: null })
     const kbps = params.bitrateKbps ?? DEFAULT_KBPS
-    const room = new Room({
-      adaptiveStream: ADAPTIVE,
-      dynacast: true,
-      // Remote audio through WebAudio: enables >100% per-user gain and AudioContext.setSinkId.
-      webAudioMix: true,
-      audioOutput: { deviceId: this.activeOutput ?? 'default' },
-      publishDefaults: { dtx: true, red: params.red !== false, forceStereo: false, audioPreset: { maxBitrate: kbps * 1000 }, stopMicTrackOnMute: false },
-      disconnectOnPageLeave: true,
-      reconnectPolicy: new DefaultReconnectPolicy(RECONNECT_DELAYS_MS),
-    })
+    let e2ee: { joined: Promise<void> } | null
+    let room: Room
+    try {
+      // In parallel with the LiveKit connection: the MLS join (0004 §3.4). null = this call is not E2EE.
+      e2ee = await this.e2eeStart(params.channelId)
+      room = new Room({
+        adaptiveStream: ADAPTIVE,
+        dynacast: true,
+        // Remote audio through WebAudio: enables >100% per-user gain and AudioContext.setSinkId.
+        webAudioMix: true,
+        audioOutput: { deviceId: this.activeOutput ?? 'default' },
+        publishDefaults: { dtx: true, red: params.red !== false, forceStereo: false, audioPreset: { maxBitrate: kbps * 1000 }, stopMicTrackOnMute: false },
+        disconnectOnPageLeave: true,
+        reconnectPolicy: new DefaultReconnectPolicy(RECONNECT_DELAYS_MS),
+        ...(e2ee && { e2ee: { keyProvider: this.keys!, worker: this.cryptor! } }),
+      })
+    } catch (e) {
+      // E2EE expected but unusable here (no channel, unsupported browser): nothing was connected or published.
+      await this.failClosed(`Criptografia de ponta a ponta indisponível: ${errText(e)}.`)
+      throw e
+    }
     this.room = room
     this.wire(room)
     try {
+      // Before connecting: every track this Room ever publishes is encrypted (AddTrackRequest says GCM).
+      if (e2ee) await room.setE2EEEnabled(true)
       // Video is subscribed on demand (watch()); voice is subscribed explicitly in addRemote().
       await room.connect(params.url, params.token, { autoSubscribe: false })
     } catch (e) {
@@ -221,7 +279,9 @@ class MediaEngine {
         this.room = null
         room.removeAllListeners()
         // An automatic rejoin attempt failing is not the end: scheduleRejoin() follows unless the backoff ran out.
-        this.setConn('disconnected', `Não foi possível conectar ao servidor de voz: ${errText(e)}`, { willRetry: this.rejoinAttempt > 0 && REJOIN_BACKOFF_MS[this.rejoinAttempt] !== undefined })
+        const willRetry = this.rejoinAttempt > 0 && REJOIN_BACKOFF_MS[this.rejoinAttempt] !== undefined
+        if (!willRetry) this.endE2ee()
+        this.setConn('disconnected', `Não foi possível conectar ao servidor de voz: ${errText(e)}`, { willRetry })
       }
       throw e
     }
@@ -230,6 +290,18 @@ class MediaEngine {
     patch('self', { identity: room.localParticipant.identity })
     this.planFromRoom(room)
     for (const rp of room.remoteParticipants.values()) this.addRemote(rp)
+    if (e2ee) {
+      // Fail closed: nothing is published before the epoch is active and our cryptor confirmed encryption.
+      try {
+        await e2ee.joined
+        await this.untilActive(room)
+      } catch (e) {
+        if (this.room !== room) return
+        await this.failClosed(errText(e))
+        throw e
+      }
+      if (this.room !== room) return
+    }
     await this.syncMic(room)
     if (this.room !== room) return
     this.rejoinAttempt = 0
@@ -244,6 +316,8 @@ class MediaEngine {
     this.userLeft = true
     this.clearRejoin()
     const room = this.room
+    this.endE2ee()
+    patch('e2ee', initialState().e2ee)
     if (!room) {
       if (!silent) this.channelName = null
       this.setConn('idle', null, { channelName: this.channelName })
@@ -313,7 +387,7 @@ class MediaEngine {
       await this.applyRnnoise(p.processing)
       const s = useMedia.getState().self
       if (s.muted || s.deafened) await track.mute()
-      await room.localParticipant.publishTrack(track, { source: Track.Source.Microphone, dtx: true, red: this.last?.red !== false, forceStereo: false, audioPreset: { maxBitrate: kbps * 1000 } })
+      await room.localParticipant.publishTrack(track, { source: Track.Source.Microphone, name: decodeName(this.decodeCaps()), dtx: true, red: this.last?.red !== false, forceStereo: false, audioPreset: { maxBitrate: kbps * 1000 } })
       patch('self', { micAvailable: true })
       patch('devices', { inputId: this.activeInput })
       void this.refreshDevices(false)
@@ -351,8 +425,10 @@ class MediaEngine {
       .on(RoomEvent.ParticipantConnected, (rp) => {
         this.addRemote(rp)
         this.cue('join')
+        this.syncCodecSoon()
       })
       .on(RoomEvent.ParticipantDisconnected, (rp) => {
+        this.syncCodecSoon()
         this.viewerEls.delete(rp.identity)
         this.dropMeter(rp.identity)
         useMedia.setState((s) => {
@@ -385,6 +461,7 @@ class MediaEngine {
       .on(RoomEvent.TrackUnpublished, (pub, rp) => {
         // Another one left = a republish (plan downgrade): whoever watched follows the new one.
         if (pub.source === Track.Source.ScreenShare && !screenOf(rp)) this.unwatch(rp.identity)
+        if (pub.source === Track.Source.Microphone) this.syncCodecSoon()
       })
       .on(RoomEvent.SignalReconnecting, () => this.onReconnecting())
       .on(RoomEvent.Reconnecting, () => this.onReconnecting())
@@ -415,6 +492,7 @@ class MediaEngine {
     this.cue('disconnect')
     this.syncTray()
     if (this.userLeft || (reason !== undefined && TERMINAL.has(reason)) || !this.last) {
+      this.endE2ee()
       this.setConn('disconnected', text)
       return
     }
@@ -425,6 +503,7 @@ class MediaEngine {
     this.clearRejoin()
     const delay = REJOIN_BACKOFF_MS[this.rejoinAttempt]
     if (delay === undefined) {
+      this.endE2ee()
       this.setConn('disconnected', 'Sem conexão com o servidor de voz. Entre no canal de novo quando a rede voltar.')
       return
     }
@@ -518,6 +597,125 @@ class MediaEngine {
     patch('connection', { state, reason, willRetry, ...extra })
   }
 
+  // ───────────────────────────── E2EE (decision 0004) ─────────────────────────────
+
+  /**
+   * E2EE is expected unless main says it is off (build without ALGA_E2EE, signed out) or the lab asked for a baseline;
+   * an unknown status counts as expected. null = not E2EE. Otherwise: a fresh key provider + cryptor for the new Room
+   * (the newest keys replayed after an automatic rejoin), the MLS join sent, and its promise (rejects = fail closed).
+   */
+  private async e2eeStart(channelId: string | undefined): Promise<{ joined: Promise<void> } | null> {
+    const api = bridge()?.e2ee
+    if (this.labNoE2ee || !api || (await api.status().catch(() => null))?.state === 'off') {
+      this.endE2ee()
+      patch('e2ee', initialState().e2ee)
+      return null
+    }
+    if (!channelId) throw new Error('canal desconhecido')
+    if (this.call?.channelId !== channelId) {
+      this.endE2ee()
+      this.call = { channelId, remote: new Map(), own: null, next: null, active: false }
+    }
+    const call = this.call!
+    this.cryptor?.terminate()
+    this.cryptor = new E2eeWorker()
+    this.keys = new AlgaKeyProvider()
+    // Ours last: setting it also selects the slot we encrypt with.
+    for (const k of [...call.remote.values(), ...(call.own ? [call.own] : [])]) await this.keys.setKey(k.userId, k.keyIndex, k.key)
+    patch('e2ee', { state: call.active ? 'active' : 'establishing' })
+    const joined = api.joinCall(channelId)
+    joined.catch(() => undefined) // awaited after room.connect; not an unhandled rejection meanwhile
+    return { joined }
+  }
+
+  /** Resolves once the epoch is active and LiveKit confirmed our own cryptor is on; rejects with the failure reason. */
+  private untilActive(room: Room, ms = E2EE_SETUP_MS): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const check = (err: string | null = null) => {
+        if (err !== null) done(err)
+        else if (this.call?.active && room.isE2EEEnabled) done(null)
+      }
+      const onEncryption = () => check()
+      const t = setTimeout(() => done('A criptografia de ponta a ponta não ficou pronta a tempo.'), ms)
+      const done = (err: string | null) => {
+        clearTimeout(t)
+        this.e2eeWaiters.delete(check)
+        room.off(RoomEvent.ParticipantEncryptionStatusChanged, onEncryption)
+        if (err === null) resolve()
+        else reject(new Error(err))
+      }
+      this.e2eeWaiters.add(check)
+      room.on(RoomEvent.ParticipantEncryptionStatusChanged, onEncryption)
+      check()
+    })
+  }
+
+  private async onFrameKey(k: E2eeFrameKey): Promise<void> {
+    const c = this.call
+    if (!c || k.channelId !== c.channelId) return
+    // Ours is applied when its epoch goes active (everyone can decrypt it by then): that is the switch to send with it.
+    if (k.self) return void (c.next = k)
+    c.remote.set(k.userId, k)
+    await this.keys?.setKey(k.userId, k.keyIndex, k.key)
+  }
+
+  private async onEpoch(e: E2eeEpochInfo): Promise<void> {
+    const c = this.call
+    if (!c || e.channelId !== c.channelId) return
+    if (e.state !== 'active') {
+      const reason = e.state === 'removed' ? 'Você foi removido da chamada criptografada.' : `A criptografia de ponta a ponta falhou (${e.reason ?? 'erro'}).`
+      c.active = false
+      // A join in progress fails with it (connect() closes); a live call is closed here.
+      if (this.e2eeWaiters.size) for (const w of [...this.e2eeWaiters]) w(reason)
+      else await this.failClosed(reason, e.state !== 'removed')
+      return
+    }
+    const own = c.next?.epoch === e.epoch ? c.next : null
+    if (own && own !== c.own) {
+      c.own = own
+      await this.keys?.setKey(own.userId, own.keyIndex, own.key)
+    }
+    if (this.call !== c) return
+    c.active = true
+    patch('e2ee', { state: 'active', epoch: e.epoch, members: e.members })
+    for (const w of [...this.e2eeWaiters]) w(null)
+  }
+
+  /** Leave the call's MLS group and drop its keys and cryptor (leave, terminal disconnect, another channel). */
+  private endE2ee(): void {
+    const c = this.call
+    this.call = null
+    if (c) void bridge()?.e2ee?.leaveCall(c.channelId).catch(() => undefined)
+    for (const w of [...this.e2eeWaiters]) w('A chamada foi encerrada.')
+    this.cryptor?.terminate()
+    this.cryptor = null
+    this.keys = null
+    this.mismatchSince.clear()
+  }
+
+  /** E2EE expected and not there: leave, no automatic rejoin, say why. Media is never sent unencrypted instead. */
+  private async failClosed(reason: string, failure = true): Promise<void> {
+    this.userLeft = true
+    this.clearRejoin()
+    const room = this.room
+    this.room = null
+    this.endE2ee()
+    // State first (a join started meanwhile writes after this), then the slow part.
+    patch('e2ee', { ...initialState().e2ee, state: 'failed' })
+    this.setConn('disconnected', failure ? `${reason} A chamada foi encerrada para não seguir sem criptografia.` : reason)
+    if (!room) return
+    room.removeAllListeners()
+    await this.teardown()
+    await room.disconnect(true).catch(() => undefined)
+    this.cue('disconnect')
+    this.syncTray()
+  }
+
+  /** Some track of this participant is unencrypted: LiveKit would pass its frames through as is, so none is played. */
+  private plaintext(rp: RemoteParticipant): boolean {
+    return !!this.call && [...rp.trackPublications.values()].some((p) => !p.isEncrypted)
+  }
+
   // ───────────────────────────── participants ─────────────────────────────
 
   private addRemote(rp: RemoteParticipant): void {
@@ -526,8 +724,14 @@ class MediaEngine {
   }
 
   private onRemotePublished(pub: RemoteTrackPublication, rp: RemoteParticipant): void {
-    if (pub.source === Track.Source.Microphone) pub.setSubscribed(true)
-    else if (pub.source === Track.Source.ScreenShare) {
+    if (this.plaintext(rp)) {
+      for (const p of rp.trackPublications.values()) if (p.isSubscribed) p.setSubscribed(false)
+      return
+    }
+    if (pub.source === Track.Source.Microphone) {
+      pub.setSubscribed(true)
+      this.syncCodecSoon() // its name carries what this participant decodes
+    } else if (pub.source === Track.Source.ScreenShare) {
       if (!useMedia.getState().participants[rp.identity]?.streaming) this.cue('streamStart') // not on a republish
       if (useMedia.getState().viewers[rp.identity]?.subscribed) this.watch(rp.identity, useMedia.getState().viewers[rp.identity]!.quality)
     }
@@ -870,16 +1074,21 @@ class MediaEngine {
     const track = stream.getVideoTracks()[0]
     const set = track?.getSettings()
     const real = track && set?.width && set.height ? await frameSize(track) : null
+    if (real) frameSizes.set(track!, real)
     if (!real || (real.width >= set!.width! && real.height >= set!.height!)) return stream
     stream.getTracks().forEach((t) => t.stop())
     // Multiple of 8: the /4 and /2 simulcast layers (presets.simulcastFor) stay even, as the HW encoder needs.
-    return open(real.width & ~1, real.height & ~1)
+    const again = await open(real.width & ~1, real.height & ~1)
+    const t2 = again.getVideoTracks()[0]
+    if (t2) frameSizes.set(t2, { width: real.width & ~1, height: real.height & ~1 })
+    return again
   }
 
   async startScreenShare(opts: ScreenShareOptions = {}): Promise<void> {
     this.start()
     const room = this.room
     if (!room) throw new Error('Entre em um canal de voz antes de transmitir.')
+    if (this.call && !this.call.active) throw new Error('A criptografia da chamada ainda não está pronta.')
     if (this.screenPub) await this.stopScreenShare(true)
     const p = this.prefs.get()
     const contentType = opts.contentType ?? p.contentType
@@ -898,8 +1107,17 @@ class MediaEngine {
       throw e
     }
     try {
-      const pub = await this.publishScreen(room, stream, preset, contentType, codec)
-      this.screenPub = { ...pub, preset, declared: preset, cpuLimited: [], sourceId: opts.sourceId ?? null }
+      // What the room can take (decode lists, E2EE has no backup codec) and what the layers allow (HEVC_MIN_SIDE).
+      const live = this.shareCodec(codec, preset, stream.getVideoTracks()[0]!)
+      const top = this.presetFor(live, preset)
+      if (top !== preset) {
+        const v = stream.getVideoTracks()[0]!
+        await v.applyConstraints({ width: { max: top.width }, height: { max: top.height }, frameRate: { ideal: top.fps, max: top.fps } }).catch(() => undefined)
+        frameSizes.set(v, fit(sizeOf(v), top))
+      }
+      const pub = await this.publishScreen(room, stream, top, contentType, live)
+      this.screenPub = { ...pub, preset: top, declared: top, cpuLimited: [], sourceId: opts.sourceId ?? null, codec: live, want: codec }
+      if (top !== preset) patch('screen', { preset: top.id })
       for (const el of this.ownEls) pub.video.track?.attach(el)
       patch('screen', { active: true, sourceId: opts.sourceId ?? null })
       this.cue('streamStart')
@@ -923,7 +1141,7 @@ class MediaEngine {
     const { hint, degradation } = contentSettings(contentType)
     video.contentHint = hint
     video.addEventListener('ended', () => void this.stopScreenShare())
-    const size = video.getSettings()
+    const size = sizeOf(video)
     const svc = codec === 'vp9' || codec === 'av1'
     return room.localParticipant.publishTrack(video, {
       source: Track.Source.ScreenShare,
@@ -968,7 +1186,8 @@ class MediaEngine {
     this.screenPub = null
     for (const el of this.ownEls) cur.video.track?.detach(el)
     await this.dropScreenTracks(this.room, [cur.video, cur.audio])
-    if (cur.cpuLimited.length >= 10) {
+    // The sustain record is per preset for the machine's codec: a share the room moved to another codec says nothing about it.
+    if (cur.cpuLimited.length >= 10 && cur.codec === useMedia.getState().screen.codec) {
       this.prefs.set({ encoderSustain: recordSustain(this.prefs.get().encoderSustain, cur.preset.id, cur.cpuLimited) })
       void this.probeEncoder()
     }
@@ -1007,6 +1226,7 @@ class MediaEngine {
         hw[c] = false
       }
     }
+    this.hw = hw
     const chosen = this.prefs.get().codec
     const codec = chosen ?? pickCodec(hw)
     const hardware = hw[codec] ?? false
@@ -1068,11 +1288,15 @@ class MediaEngine {
    * at publish; what goes on the wire follows the new caps right away.
    */
   private recap(preset: ScreenPreset): Promise<void> {
+    // The hardware encoder keeps the frame rate it was started with: 30 → 60 fps in place stayed at 30 fps with
+    // maxFramerate 60, 47 fps captured and no limitation (NVENC HEVC, QA BUG-03). More fps needs a fresh encoder,
+    // so that one is a republish (viewers follow it, ~0.2–0.5 s of rebuffer).
+    if (this.screenPub && preset.fps > this.screenPub.preset.fps) return this.republish(preset)
     const run = async () => {
       const cur = this.screenPub
       if (!cur || !this.room || cur.preset.id === preset.id) return
       const vtrack = cur.video.track as LocalVideoTrack
-      const codec = useMedia.getState().screen.codec
+      const codec = cur.codec
       let video = vtrack.mediaStreamTrack
       if (cur.sourceId) {
         // Chromium shares one capture device per source: a second capture of it only gets frames up to the size/fps
@@ -1084,9 +1308,13 @@ class MediaEngine {
         if (this.screenPub !== cur) return stream.getTracks().forEach((t) => t.stop())
         const old = video
         video = stream.getVideoTracks()[0]!
+        // No frame within capture()'s probe (a second capture of a live source can be slow): same source, so the live
+        // one's size, fitted to the preset. getSettings() would give the capture buffer and a ladder for the wrong size
+        // (measured: 240×135 layers of a 960×540 window, below what an HEVC decoder takes).
+        if (!frameSizes.has(video)) frameSizes.set(video, fit(sizeOf(old), preset))
         video.contentHint = old.contentHint
         video.addEventListener('ended', () => void this.stopScreenShare())
-        const size = video.getSettings()
+        const size = sizeOf(video)
         // replaceTrack recomputes encodings from publishOptions when the size changes: hand it the new ladder first.
         vtrack.publishOptions = { ...vtrack.publishOptions, ...layerOptions(preset, size.width, size.height, codec) }
         await vtrack.replaceTrack(video, true)
@@ -1095,12 +1323,13 @@ class MediaEngine {
         // An injected stream (lab patterns): only the frame rate can follow, the encoder caps below do the rest.
         await video.applyConstraints({ frameRate: { ideal: preset.fps, max: preset.fps } }).catch(() => undefined)
       }
-      const size = video.getSettings()
+      const size = sizeOf(video)
       vtrack.publishOptions = { ...vtrack.publishOptions, ...layerOptions(preset, size.width, size.height, codec) }
       await applyEncodings(vtrack, preset, size.width ?? preset.width, size.height ?? preset.height)
       cur.preset = preset
       cur.cpuLimited = []
       patch('screen', { preset: preset.id })
+      this.syncCodecSoon() // the new ladder may not suit the codec (HEVC_MIN_SIDE)
     }
     return this.queueRecap(run)
   }
@@ -1111,15 +1340,22 @@ class MediaEngine {
    * of it, no picker; system audio stays published as is), then drop the old video publication. Viewers follow the
    * new one (onRemotePublished / onSubscribed) without going back to "Assistir".
    */
-  private republish(preset: ScreenPreset): Promise<void> {
+  private republish(preset: ScreenPreset, codec = this.screenPub?.codec): Promise<void> {
     const run = async () => {
       const cur = this.screenPub
       const room = this.room
       if (!cur || !room) return
       const old = cur.video
       const s = useMedia.getState().screen
+      const live = codec ?? cur.codec
       let video: MediaStreamTrack
-      if (cur.sourceId) video = (await this.capture(cur.sourceId, false, preset)).getVideoTracks()[0]!
+      if (cur.sourceId) {
+        // Same as recap(): the live capture of this source caps a new one at its own size/fps; raise it first.
+        if (preset.height > cur.preset.height || preset.fps > cur.preset.fps) {
+          await old.track?.mediaStreamTrack.applyConstraints({ width: { max: preset.width }, height: { max: preset.height }, frameRate: { ideal: preset.fps, max: preset.fps } }).catch(() => undefined)
+        }
+        video = (await this.capture(cur.sourceId, false, preset)).getVideoTracks()[0]!
+      }
       else {
         // Injected stream or no picker bridge: a clone of the live capture (same source, nothing to pick).
         video = old.track!.mediaStreamTrack.clone()
@@ -1128,7 +1364,7 @@ class MediaEngine {
       if (this.screenPub !== cur || this.room !== room) return video.stop()
       let vpub: LocalTrackPublication
       try {
-        vpub = await this.publishScreenVideo(room, video, preset, s.contentType, s.codec)
+        vpub = await this.publishScreenVideo(room, video, preset, s.contentType, live)
       } catch (e) {
         video.stop()
         throw e
@@ -1136,7 +1372,7 @@ class MediaEngine {
       // Stopped or left meanwhile: the new publication goes too.
       if (this.screenPub !== cur || this.room !== room) return this.dropScreenTracks(room, [vpub])
       for (const el of this.ownEls) old.track?.detach(el), vpub.track?.attach(el)
-      Object.assign(cur, { video: vpub, preset, declared: preset, cpuLimited: [] })
+      Object.assign(cur, { video: vpub, preset, declared: preset, cpuLimited: [], codec: live })
       patch('screen', { preset: preset.id })
       // The SFU announces the new track only once its media flows: dropped earlier, viewers saw the share end
       // (measured). Wait for the first viewer to move over, or REPUBLISH_OVERLAP_MS when nobody watches.
@@ -1153,6 +1389,62 @@ class MediaEngine {
       await this.dropScreenTracks(room, [old])
     }
     return this.queueRecap(run)
+  }
+
+  /** Codecs this client decodes (RTCRtpReceiver capabilities, minus what failed at runtime): what senders read. */
+  private decodeCaps(): VideoCodecId[] {
+    const mimes = typeof RTCRtpReceiver === 'undefined' ? [] : (RTCRtpReceiver.getCapabilities('video')?.codecs.map((c) => c.mimeType) ?? [])
+    return decodable(mimes).filter((c) => !this.brokenDecoders.has(c))
+  }
+
+  /** The codec a share at `preset` goes out in: `want`, unless a layer or someone in the call can't take it (roomCodec). */
+  private shareCodec(want: VideoCodecId, preset: ScreenPreset, video: MediaStreamTrack): VideoCodecId {
+    const { width = preset.width, height = preset.height } = sizeOf(video)
+    const members = this.call ? new Set(useMedia.getState().e2ee.members.map((m) => m.userId)) : null
+    // Under E2EE only MLS members count: someone without keys can't watch anyway (and must not force a codec).
+    const viewers = [...(this.room?.remoteParticipants.values() ?? [])].filter((rp) => !members || members.has(rp.identity))
+    const caps = viewers.map((rp) => decodeOf(rp.getTrackPublication(Track.Source.Microphone)?.trackName))
+    return roomCodec(want, [...simulcastFor(preset, width, height), { width, height }], caps, !!this.call, this.hevcMinSide)
+  }
+
+  /** A codec the room forced on us that has no hardware encoder here: the software ceiling (0001 §6), not `preset`. */
+  private presetFor(codec: VideoCodecId, preset: ScreenPreset): ScreenPreset {
+    if (codec === useMedia.getState().screen.codec || this.hw[codec]) return preset
+    const soft = gatePresets(availablePresets({ hardware: false }, this.prefs.get().encoderSustain), this.plan).offered
+    return clampPreset(preset.id, soft, useMedia.getState().screen.contentType)
+  }
+
+  /** Someone joined, left or re-advertised: a live share whose codec no longer fits the call is republished in it. */
+  private syncCodecSoon(): void {
+    if (!this.screenPub) return
+    if (this.codecTimer) clearTimeout(this.codecTimer)
+    this.codecTimer = setTimeout(() => {
+      this.codecTimer = null
+      const cur = this.screenPub
+      const video = cur?.video.track?.mediaStreamTrack
+      if (!cur || !video || !this.room) return
+      const s = useMedia.getState().screen
+      // The wish (pref within plan × machine), not the live preset: a share capped for software H.264 goes back up.
+      const base = clampPreset(this.prefs.get().screenPreset, s.offered, s.contentType)
+      const codec = this.shareCodec(cur.want, base, video)
+      const preset = this.presetFor(codec, base)
+      if (codec !== cur.codec || (codec !== cur.want && preset.id !== cur.preset.id)) void this.republish(preset, codec)
+    }, CODEC_SETTLE_MS)
+  }
+
+  /** Viewer side: a stream we can't decode (HEVC fell back to a null decoder) → stop advertising that codec. */
+  private decodeFailed(codec: VideoCodecId): void {
+    if (codec === 'h264' || this.brokenDecoders.has(codec)) return
+    this.brokenDecoders.add(codec)
+    const room = this.room
+    // The mic's name carries the list: publish it again (a short gap in our voice) so senders republish in H.264.
+    // shortcut: listen-only (no mic) can't re-advertise; goes away with a server-set decode attribute.
+    if (!room || !this.mic) return
+    this.micOp = this.micOp.then(async () => {
+      if (this.room !== room || !this.mic) return
+      await this.dropMic(room)
+      if (this.room === room && this.micAllowed(room)) await this.publishMic(room, this.last?.bitrateKbps ?? DEFAULT_KBPS)
+    })
   }
 
   private queueRecap(run: () => Promise<void>): Promise<void> {
@@ -1177,12 +1469,21 @@ class MediaEngine {
     const rp = room?.remoteParticipants.get(identity)
     const vpub = screenOf(rp)
     useMedia.setState((s) => ({ viewers: { ...s.viewers, [identity]: { identity, quality, subscribed: true, volume: this.prefs.streamVolumeOf(identity), stats: null } } }))
-    if (!room || !vpub) return
+    if (!room || !vpub || this.plaintext(rp!)) return
     // adaptiveStream is fixed per track at subscription time; "source" subscribes this one track without it.
     if (quality === 'source') room.options.adaptiveStream = false
     this.stalls.delete(identity)
     vpub.setSubscribed(true)
-    if (quality === 'source') vpub.setVideoQuality(VideoQuality.HIGH)
+    if (quality === 'source') {
+      // livekit-client 2.23 keeps the element size an earlier adaptive subscription of this publication reported and
+      // keeps sending it (videoDimensionsAdaptiveStream is never cleared): "Original" got the layer of a small tile
+      // (QA BUG-03, measured: 640×360 of a 960×540 share, the top layer paused).
+      // shortcut: private field of RemoteTrackPublication; drop once the SDK clears it in setTrack (report upstream).
+      const p = vpub as unknown as { videoDimensionsAdaptiveStream?: unknown; emitTrackUpdate?: () => void }
+      p.videoDimensionsAdaptiveStream = undefined
+      vpub.setVideoQuality(VideoQuality.HIGH)
+      p.emitTrackUpdate?.()
+    }
     rp?.getTrackPublication(Track.Source.ScreenShareAudio)?.setSubscribed(true)
     this.applyVolume(identity)
   }
@@ -1206,12 +1507,11 @@ class MediaEngine {
     if (!v || v.quality === quality) return
     const pub = screenOf(this.room?.remoteParticipants.get(identity))
     if (pub?.isSubscribed && this.room) {
-      const room = this.room
-      await new Promise<void>((resolve) => {
-        const t = setTimeout(resolve, 1500)
-        room.once(RoomEvent.TrackUnsubscribed, () => (clearTimeout(t), resolve()))
-        pub.setSubscribed(false)
-      })
+      // adaptiveStream is fixed when LiveKit creates the track: re-subscribe only once the old one is really gone.
+      // Waiting for any TrackUnsubscribed (or 1.5 s) could re-subscribe first, keep the old element-sized track, and
+      // "Original" stayed on the middle layer (QA BUG-03, a busy machine).
+      pub.setSubscribed(false)
+      for (const t0 = performance.now(); pub.track && performance.now() - t0 < 5000; ) await new Promise((r) => setTimeout(r, 50))
     }
     this.watch(identity, quality)
   }
@@ -1262,6 +1562,7 @@ class MediaEngine {
     if (this.stallTimer) clearInterval(this.stallTimer)
     this.uiTimer = this.statsTimer = this.levelTimer = this.stallTimer = null
     this.stalls.clear()
+    this.undecoded.clear()
   }
 
   /**
@@ -1357,6 +1658,12 @@ class MediaEngine {
     useMedia.setState({ participants })
     const quality = room.localParticipant.connectionQuality as Quality
     if (useMedia.getState().self.quality !== quality) patch('self', { quality })
+    if (this.call?.active) {
+      const e = useMedia.getState().e2ee
+      const plain = [...room.remoteParticipants.values()].filter((rp) => this.plaintext(rp)).map((rp) => rp.identity)
+      const mismatch = settled(this.mismatchSince, mismatchOf(e.members, room.remoteParticipants.keys(), plain), performance.now())
+      if (String(mismatch) !== String(e.mismatch)) patch('e2ee', { mismatch })
+    }
   }
 
   private delta(key: string): StatsDelta {
@@ -1383,7 +1690,13 @@ class MediaEngine {
     const viewers = { ...useMedia.getState().viewers }
     for (const id of Object.keys(viewers)) {
       const t = screenOf(room.remoteParticipants.get(id))?.track
-      viewers[id] = { ...viewers[id]!, stats: t ? videoIn(this.delta(`v:${id}`).next(await t.getRTCStatsReport())) : null }
+      const v = t ? videoIn(this.delta(`v:${id}`).next(await t.getRTCStatsReport())) : null
+      viewers[id] = { ...viewers[id]!, stats: v }
+      // Runtime decoder failure (QA BUG-02): Chromium's null decoder, or bytes for 5 s and never a picture.
+      const n = v && v.width === 0 && v.bitrateKbps > 100 ? (this.undecoded.get(id) ?? 0) + 1 : 0
+      this.undecoded.set(id, n)
+      const codec = v?.codec ? decodable([v.codec])[0] : undefined
+      if (codec && (v!.decoderImplementation?.includes('NullVideoDecoder') || n >= DECODE_FAIL_TICKS)) this.decodeFailed(codec)
     }
     if (this.room !== room) return
     useMedia.setState((s) => {
@@ -1424,7 +1737,7 @@ class MediaEngine {
 
   /** Dev/benchmark access (MediaLab only). Not part of the UI contract. */
   get debug() {
-    return { room: this.room, graph: this.graph, mic: this.mic, screen: this.screenPub, prefs: this.prefs, dtxRepairs: this.dtxRepairs }
+    return { room: this.room, graph: this.graph, mic: this.mic, screen: this.screenPub, prefs: this.prefs, dtxRepairs: this.dtxRepairs, decodeCaps: this.decodeCaps(), brokenDecoders: [...this.brokenDecoders] }
   }
 }
 
@@ -1513,6 +1826,17 @@ async function opusFmtp(track: LocalAudioTrack, ms = 3000): Promise<string | nul
     await new Promise((r) => setTimeout(r, 100))
   }
   return null
+}
+
+/** Real frame size of capture tracks (capture()); getSettings() can report the capture buffer instead. */
+const frameSizes = new WeakMap<MediaStreamTrack, { width: number; height: number }>()
+const sizeOf = (t: MediaStreamTrack): { width?: number; height?: number } => frameSizes.get(t) ?? t.getSettings()
+/** `s` scaled down (never up) to fit `p`, even sides. */
+function fit(s: { width?: number; height?: number }, p: Pick<ScreenPreset, 'width' | 'height'>): { width: number; height: number } {
+  const w = s.width ?? p.width
+  const h = s.height ?? p.height
+  const k = Math.min(1, p.width / w, p.height / h)
+  return { width: Math.round(w * k) & ~1, height: Math.round(h * k) & ~1 }
 }
 
 /** Size of the first real frame (getSettings() can report the capture buffer instead). null = unknown. */

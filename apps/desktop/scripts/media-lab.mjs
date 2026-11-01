@@ -918,6 +918,11 @@ async function phaseUnmute(sig) {
 // Importable: scripts/media-net.mjs (and ad-hoc probes) reuse launch/token/metrics without running the phases.
 export { ROOM, LK_PORT, secret, arg, startWindowPattern, stopWindowPattern, children, close, ev, gotoLab, join_, killTree, launch, leave, liveKitOverride, log, makeSignals, memSample, metrics, median, q, r1, results, sampler, save, sleep, startLiveKit, state, stopLiveKit, summary, token, cleanup, LK_URL, MEM_FLAGS, desktop, repo, work }
 const isMain = process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url
+// --e2ee: the E2EE lab (own API as Delivery Service + own LiveKit, signed-in instances): scripts/media-e2ee.mjs.
+if (isMain && argv.includes('--e2ee')) {
+  const r = spawnSync(process.execPath, [join(here, 'media-e2ee.mjs'), ...argv.filter((a) => a !== '--e2ee')], { stdio: 'inherit' })
+  process.exit(r.status ?? 1)
+}
 if (isMain) try {
   mkdirSync(work, { recursive: true })
   if (!argv.includes('--no-build')) {

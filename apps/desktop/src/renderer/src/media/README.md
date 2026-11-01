@@ -40,7 +40,7 @@ Integrações automáticas (feature-detect, degradam se o bridge não existir): 
 |---|---|
 | `getScreenSources()` | Lista telas/janelas (`window.alga.screen.getSources`). `[]` se o bridge não existir. |
 | `startScreenShare({ sourceId, audio?, quality?, contentType?, codec? })` | `sourceId` vem do picker; `audio:true` captura o áudio do sistema (loopback **sem o próprio Alga Meet**: `restrictOwnAudio`, ver decisão 0002 — quem assiste não ouve a call de volta) como `screen_share_audio`. `quality`: `720p30`, `720p60`, `1080p30`, `1080p60`, `1440p60`, `2160p30` (os ids de `STREAM_PRESETS`). **Nunca publica acima de `screen.offered`**: um pedido fora dele vira o melhor oferecido abaixo (movimento mantém o fps: 1080p60 → 720p60; detalhe mantém a resolução: → 1080p30), e o pedido fica guardado para voltar quando o plano permitir. `contentType`: `motion` (jogos/vídeo: prioriza fps) ou `detail` (texto/código: prioriza nitidez). |
-| `setScreenQuality(q)` | Troca a qualidade **ao vivo** (mesma publicação; quem assiste não sai) ou a da próxima transmissão. Mesma regra de limite do `startScreenShare`. |
+| `setScreenQuality(q)` | Troca a qualidade **ao vivo** (mesma publicação; quem assiste não sai) ou a da próxima transmissão. **Subir o fps** republica (o encoder por hardware fica na taxa com que começou; quem assiste segue sozinho, rebuffer curto). Mesma regra de limite do `startScreenShare`. |
 | `setPlanPresets(list \| null)` | Presets que o plano permite (`Me.plan.streamPresets`). O motor também lê `VoiceJoinResponse.streamPresets` e o atributo `alga.stream_presets` do token, que o servidor reescreve quando o plano muda no meio da chamada; `voice.ts` chama isto no `ENTITLEMENTS_UPDATE` e no `ME_UPDATE`. Com transmissão ativa: acima do novo plano, a transmissão é **rebaixada no lugar** (sem parar) e um aviso diz isso uma vez; se o que ela **declarou** ao publicar passa do plano novo (o servidor confere isso 10 s depois e mutaria), ela é **republicada** em < 1 s, mesma fonte, sem seletor, áudio intacto, e quem assiste segue sozinho (150–512 ms de interrupção). Num upgrade, o limite sai e ela volta ao que você tinha pedido (no lugar). |
 | `switchScreenSource(sourceId)` | Troca a fonte sem derrubar a transmissão (quem assiste continua inscrito). |
 | `stopScreenShare()` | Para na hora. Também para sozinho se a captura terminar (janela fechada). |
@@ -61,6 +61,29 @@ Integrações automáticas (feature-detect, degradam se o bridge não existir): 
 - `viewers[userId]`: `quality`, `volume`, `stats` (fps, resolução, kbps, decoder, HW?, congelamentos, quadros perdidos, jitter buffer).
 - `devices`, `notice` (`{id, text}` — mostre como toast quando `id` mudar), `micTest`.
 
+## E2EE (criptografia de ponta a ponta)
+
+Decisão e modelo de ameaças: `docs/decisions/0004-e2ee.md`; números: `docs/benchmarks/e2ee-media.md`. O MLS roda no main (`window.alga.e2ee`); o motor faz o resto sozinho. A UI **não chama nada**: só lê `useMedia((s) => s.e2ee)`.
+
+- `e2ee.state`:
+  - `off` — a chamada **não** é de ponta a ponta (build sem `ALGA_E2EE`, ou o main diz `off`). Mostre "sem criptografia de ponta a ponta", sem ambiguidade.
+  - `establishing` — entrando no grupo MLS da chamada (dura ~35–60 ms, em paralelo com o LiveKit). Nada é publicado ainda.
+  - `active` — tudo que sai e tudo que toca está cifrado com as chaves da chamada. Mostre o cadeado.
+  - `failed` — não deu para cifrar (DS recusou, sem resposta em 10 s, removido do grupo, falha no meio da chamada). **A chamada foi encerrada** (`connection.state = 'disconnected'`, `willRetry: false`, motivo em `connection.reason`): o motor nunca cai para mídia sem criptografia.
+- `e2ee.epoch` — época MLS em uso (muda a cada entrada/saída). `e2ee.members` — o grupo MLS (`userId`, `deviceId`, `self`): quem tem as chaves. É essa a lista para "nesta chamada criptografada", nunca uma lista do servidor.
+- `e2ee.mismatch: string[]` — identidades que não dá para garantir, depois de 2 s: participante do SFU sem folha MLS (alguém com token do LiveKit e sem chaves), folha MLS sem participante (membro fantasma que o servidor pôs), duas folhas para o mesmo usuário, ou alguém publicando sem criptografia (o motor não toca nada dele). Não vazio = faixa vermelha "Há alguém na chamada que não conseguimos verificar" (0004 §3.8). Se o `userId` está em `members`, é fantasma; se não, é alguém sem chaves.
+- **Códigos de verificação:** `window.alga.e2ee.verificationCode(channelId)` (30 dígitos, igual para todos na chamada; muda a cada época) e `verificationCode(channelId, userId)` (45 dígitos, por par). `window.alga.e2ee.status().persistent === false` = identidade só desta execução (os códigos mudam ao reiniciar).
+- **Regras do motor:** só publica depois de `active` e de o LiveKit confirmar o cifrador local; a nossa chave nova só entra quando o DS diz que todos têm a época (`onEpoch`); recebe com até 16 épocas por remetente; reconexão do LiveKit e reentrada automática mantêm o grupo (as chaves mais novas são reaplicadas); depois de cada `READY` do gateway, reanuncia a época. Faixas sem criptografia de um participante numa chamada E2EE não são assinadas (o LiveKit as tocaria como estão).
+- **RED da voz continua ligado com E2EE** (o SDK desligava; o build reescreve uma expressão do `livekit-client`, ver `electron.vite.config.ts`). **Sem codec reserva com E2EE** (o SDK não publica): o codec da tela é escolhido pela sala, abaixo.
+
+## Codec da tela pela sala
+
+- Cada cliente anuncia o que decodifica (`RTCRtpReceiver.getCapabilities('video')`) **no nome da publicação do microfone** (`alga.decode=h265,h264,…`): o token não deixa o cliente mudar atributos. Quem não publica microfone (só ouvindo, server mute) conta como "não anunciou".
+- Quem transmite usa o codec escolhido só se **todos** os outros (com E2EE: todos os membros MLS) o decodificam; senão H.264. Sem E2EE, quem não anunciou é coberto pelo H.264 reserva do SFU; com E2EE conta como "não decodifica". Entrou ou saiu alguém, ou alguém mudou o anúncio: a transmissão é republicada no codec certo em ~0,5 s (quem assiste segue sozinho). Forçado para H.264 sem encoder por hardware: teto do software (1080p30).
+- **HEVC nunca sai com uma camada abaixo de 144 px** (o decodificador por hardware não aceita; o Chromium não tem HEVC por software): uma janela pequena (≈640×360) vai em H.264 (QA BUG-02).
+- **Falha em tempo de execução:** quem assiste e vê o decodificador desistir (`NullVideoDecoder`, ou bytes chegando sem imagem por 5 s) para de anunciar aquele codec (republica o microfone, um corte curto na própria voz) e quem transmite muda para H.264.
+- `screen.codec` continua sendo a escolha (ou o automático); o codec que de fato sai está em `screen.stats`.
+
 ## Garantias
 
 - Microfone nunca fica aberto depois de uma queda: em qualquer desconexão não pedida a captura é parada antes de tentar reentrar.
@@ -77,4 +100,4 @@ Integrações automáticas (feature-detect, degradam se o bridge não existir): 
 
 ## Laboratório
 
-`index.html?url=ws://localhost:7880&token=…#media-lab` (só em build não empacotado) abre o `MediaLab`. `node apps/desktop/scripts/media-lab.mjs` sobe o LiveKit local, abre duas instâncias e mede tudo.
+`index.html?url=ws://localhost:7880&token=…#media-lab` (só em build não empacotado) abre o `MediaLab`. `node apps/desktop/scripts/media-lab.mjs` sobe o LiveKit local, abre duas instâncias e mede tudo. `node apps/desktop/scripts/media-lab.mjs --e2ee` (= `media-e2ee.mjs`) sobe API própria (o DS) + LiveKit próprio, entra com contas de verdade e mede E2EE, codec pela sala e as regressões de tela (QA BUG-02/03, com captura real de janela). Campos só do lab no motor: `labNoE2ee`, `hevcMinSide`, `stallGuard`.

@@ -1,5 +1,6 @@
 // Observable media state for the UI (zustand). Only the engine writes to it.
 import { create } from 'zustand'
+import type { E2eeMember } from '../../../shared/bridge'
 import { DEFAULT_PREFS, type InputMode, type ProcessingMode } from './prefs'
 import type { ContentType, ScreenPreset, ScreenPresetId, VideoCodecId } from './presets'
 import type { AudioInStats, AudioOutStats, VideoInStats, VideoOutStats } from './stats'
@@ -109,6 +110,24 @@ export interface MediaState {
   }
   viewers: Record<string, ViewerView>
   micTest: { active: boolean; loopback: boolean }
+  /** End-to-end encryption of the call (media/README.md §E2EE, decision 0004). */
+  e2ee: {
+    /**
+     * off: not end-to-end encrypted (E2EE disabled in this build, or not signed in). establishing: joining the call's
+     * MLS group; nothing is published yet. active: everything we send and play is encrypted with the call's keys.
+     * failed: E2EE could not be set up or was lost; the call was left (connection.reason says why), never downgraded.
+     */
+    state: 'off' | 'establishing' | 'active' | 'failed'
+    /** MLS epoch we send with (changes on every join/leave); null when not active. */
+    epoch: number | null
+    /** The MLS group (who holds the keys), self included. Compare with `participants`, never a server list. */
+    members: E2eeMember[]
+    /**
+     * Identities we cannot vouch for, after 2 s: in the SFU room without an MLS leaf, an MLS leaf not in the room
+     * (ghost), two leaves for one user, or publishing unencrypted (never played). Non-empty = show the warning.
+     */
+    mismatch: string[]
+  }
 }
 
 export const initialState = (): MediaState => ({
@@ -154,6 +173,7 @@ export const initialState = (): MediaState => ({
   },
   viewers: {},
   micTest: { active: false, loopback: false },
+  e2ee: { state: 'off', epoch: null, members: [], mismatch: [] },
 })
 
 export const useMedia = create<MediaState>(() => initialState())

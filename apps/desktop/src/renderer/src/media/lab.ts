@@ -1,6 +1,95 @@
 // Measurement helpers for MediaLab / scripts/media-lab.mjs (dev only; not part of the UI contract).
 import { Track } from 'livekit-client'
+import { setApiToken } from '@/lib/api'
+import { voiceJoin } from '@/store/actions'
+import { useSession } from '@/store/session'
 import { media } from './engine'
+import { useMedia } from './store'
+
+// ── E2EE lab (scripts/media-e2ee.mjs): a signed-in instance joining like the app does ──
+
+/** Session token in (main starts its E2EE device on it), gateway up, READY received, E2EE device ready. */
+export async function signIn(token: string): Promise<void> {
+  await window.alga.auth.setToken(token)
+  setApiToken(token)
+  await useSession.getState().boot()
+  const t0 = performance.now()
+  while (!useSession.getState().hydrated || (await window.alga.e2ee.status()).state !== 'ready') {
+    if (performance.now() - t0 > 20_000) throw new Error(`not ready: gateway ${useSession.getState().gateway}, e2ee ${(await window.alga.e2ee.status()).state}`)
+    await new Promise((r) => setTimeout(r, 50))
+  }
+}
+
+/** POST /voice/join + media.join (features/voice does the same). `e2ee: false` = baseline with E2EE off. */
+export async function joinChannel(channelId: string, o: { e2ee?: boolean; publishMic?: boolean; red?: boolean } = {}) {
+  media.labNoE2ee = o.e2ee === false
+  const t0 = performance.now()
+  let e2eeMs: number | null = null
+  const off = useMedia.subscribe((s) => {
+    if (e2eeMs === null && s.e2ee.state === 'active') e2eeMs = Math.round(performance.now() - t0)
+  })
+  try {
+    const res = await voiceJoin(channelId)
+    await media.join({ ...res, channelId, publishMic: o.publishMic, red: o.red, refresh: () => voiceJoin(channelId) })
+  } finally {
+    off()
+  }
+  return { joinMs: useMedia.getState().connection.joinMs, e2eeMs }
+}
+
+/** epochNow() of the first received audio of `identity` above `thresholdDb` (waits for the track), null on timeout. */
+export async function firstAudio(identity: string, thresholdDb: number, timeoutMs: number): Promise<number | null> {
+  const t0 = performance.now()
+  let track: MediaStreamTrack | undefined
+  while (!(track = remoteMic(identity))) {
+    if (performance.now() - t0 > timeoutMs) return null
+    await new Promise((r) => setTimeout(r, 2))
+  }
+  const ctx = new AudioContext({ sinkId: { type: 'none' } } as AudioContextOptions)
+  const an = ctx.createAnalyser()
+  an.fftSize = 256
+  ctx.createMediaStreamSource(new MediaStream([track])).connect(an)
+  const buf = new Float32Array(an.fftSize)
+  try {
+    while (performance.now() - t0 < timeoutMs) {
+      an.getFloatTimeDomainData(buf)
+      let peak = 0
+      for (const v of buf) peak = Math.max(peak, Math.abs(v))
+      if (20 * Math.log10(peak || 1e-9) > thresholdDb) return epochNow()
+      await new Promise((r) => setTimeout(r, 2))
+    }
+    return null
+  } finally {
+    void ctx.close()
+  }
+}
+
+/** Frames per second the live screen capture delivers (before the encoder), over `ms`. */
+export async function captureFps(ms = 2000): Promise<number | null> {
+  const t = media.debug.screen?.video.track?.mediaStreamTrack
+  const P = (window as unknown as { MediaStreamTrackProcessor?: new (o: { track: MediaStreamTrack }) => { readable: ReadableStream<{ close(): void }> } }).MediaStreamTrackProcessor
+  if (!t || !P) return null
+  const clone = t.clone()
+  const rd = new P({ track: clone }).readable.getReader()
+  let n = 0
+  const t0 = performance.now()
+  try {
+    while (performance.now() - t0 < ms) {
+      const r = await Promise.race([rd.read(), new Promise<null>((res) => setTimeout(() => res(null), 500))])
+      if (r?.value) (r.value.close(), n++)
+    }
+  } finally {
+    void rd.cancel().catch(() => undefined)
+    clone.stop()
+  }
+  return Math.round((n * 1000) / (performance.now() - t0))
+}
+
+/** Is `identity`'s screen track subscribed with adaptive stream (resolution follows the element)? */
+export const screenAdaptive = (identity: string): boolean | null => {
+  const pub = [...(media.debug.room?.remoteParticipants.get(identity)?.trackPublications.values() ?? [])].filter((p) => p.source === Track.Source.ScreenShare).pop()
+  return pub?.track ? (pub.track as unknown as { isAdaptiveStream: boolean }).isAdaptiveStream : null
+}
 
 /** Wall-clock ms with sub-ms resolution, comparable across processes on the same machine. */
 export const epochNow = (): number => performance.timeOrigin + performance.now()

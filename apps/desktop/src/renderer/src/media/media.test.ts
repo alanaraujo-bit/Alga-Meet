@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_HANGOVER_MS, PttLatch, VadGate, perceptualLevel, rmsDb } from './vad'
 import { STREAM_PRESETS } from '@alga/shared'
-import { SCREEN_PRESETS, aboveContract, availablePresets, clampPreset, contentSettings, defaultPreset, gatePresets, getPreset, pickCodec, recordSustain, simulcastFor } from './presets'
+import { SCREEN_PRESETS, aboveContract, availablePresets, clampPreset, contentSettings, decodable, decodeName, decodeOf, defaultPreset, gatePresets, getPreset, pickCodec, recordSustain, roomCodec, simulcastFor } from './presets'
+import { mismatchOf, settled } from './e2ee'
 import { PrefsStore } from './prefs'
 import { stallStep, type StallState } from './stall'
 
@@ -222,5 +223,49 @@ describe('stall guard', () => {
     const [down1, up1, down2, up2] = asks.map((a) => a[0])
     expect(up1! - down1!).toBeGreaterThanOrEqual(8000)
     expect(up2! - down2!).toBeGreaterThanOrEqual(16000)
+  })
+})
+
+describe('codec by room decode capability (0004 §4.4, QA BUG-02)', () => {
+  const big = [{ width: 320, height: 180 }, { width: 640, height: 360 }, { width: 1280, height: 720 }]
+  it('advertises through the mic name and reads it back', () => {
+    const caps = decodable(['video/VP8', 'video/H264', 'video/H265', 'video/rtx', 'video/H264'])
+    expect(caps).toEqual(['vp8', 'h264', 'h265'])
+    expect(decodeOf(decodeName(caps))).toEqual(caps)
+    expect(decodeOf('')).toBeNull()
+    expect(decodeOf('microphone')).toBeNull()
+  })
+  it('HEVC only when every layer is at least 144 px and everyone decodes it', () => {
+    expect(roomCodec('h265', big, [['h264', 'h265']], true)).toBe('h265')
+    expect(roomCodec('h265', big, [['h264', 'h265'], ['h264']], true)).toBe('h264')
+    // 640×360 window: its ¼ layer is 160×90, below what NVDEC takes
+    expect(roomCodec('h265', simulcastFor(getPreset('720p30'), 640, 360), [['h265', 'h264']], false)).toBe('h264')
+    expect(roomCodec('h265', simulcastFor(getPreset('720p30'), 640, 360), [['h265', 'h264']], false, 0)).toBe('h265')
+  })
+  it('a silent participant: the backup codec covers it without E2EE, nothing does with it', () => {
+    expect(roomCodec('h265', big, [null], false)).toBe('h265')
+    expect(roomCodec('h265', big, [null], true)).toBe('h264')
+    expect(roomCodec('vp9', big, [['vp9', 'h264'], null], true)).toBe('h264')
+    expect(roomCodec('h264', big, [[]], true)).toBe('h264')
+  })
+})
+
+describe('MLS × SFU members (0004 §3.8)', () => {
+  const m = (userId: string, self = false) => ({ userId, deviceId: `d-${userId}`, self })
+  it('flags ghosts, keyless participants, double leaves and plaintext; never ourselves', () => {
+    expect(mismatchOf([m('me', true), m('b')], ['b'])).toEqual([])
+    expect(mismatchOf([m('me', true), m('b'), m('ghost')], ['b'])).toEqual(['ghost'])
+    expect(mismatchOf([m('me', true), m('b')], ['b', 'intruder'])).toEqual(['intruder'])
+    expect(mismatchOf([m('me', true), m('b'), m('b')], ['b'])).toEqual(['b'])
+    expect(mismatchOf([m('me', true), m('me')], [])).toEqual(['me'])
+    expect(mismatchOf([m('me', true), m('b')], ['b'], ['b'])).toEqual(['b'])
+  })
+  it('reports a mismatch only once it lasted the grace period', () => {
+    const since = new Map<string, number>()
+    expect(settled(since, ['x'], 0)).toEqual([])
+    expect(settled(since, ['x'], 1999)).toEqual([])
+    expect(settled(since, ['x'], 2000)).toEqual(['x'])
+    expect(settled(since, [], 2100)).toEqual([])
+    expect(settled(since, ['x'], 2200)).toEqual([])
   })
 })
