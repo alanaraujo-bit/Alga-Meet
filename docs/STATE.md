@@ -3,7 +3,7 @@
 > Fonte de verdade. Só entra como "Validado" o que tem evidência (teste, medição, screenshot). Atualizado: 2026-11-01.
 
 ## Staging (Railway, criado 2026-11-01 com aprovação do dono)
-API pública `https://api-staging-b3ea.up.railway.app` + Postgres + bucket — ver `docs/infra/staging.md`. Funciona: contas, social, espaços, mensagens, gateway. **Não funciona ainda: voz/tela (sem SFU com UDP), e-mail real, pagamentos.**
+API pública `https://api-staging-b3ea.up.railway.app` + Postgres + bucket — ver `docs/infra/staging.md`. Funciona: contas, social, espaços, convites, mensagens, gateway (e-mail auto-verificado só em staging). Instalador apontando para staging: `apps/desktop/release/AlgaMeet-Setup-0.1.0-staging.exe` (não assinado). **Não funciona ainda: voz/tela (sem SFU com UDP), e-mail real, pagamentos.**
 
 ## Versão executável
 - Dev: `npm install && npm run dev` (ver `README.md`). Multiusuário local: `npm run dev -- --profiles=bob` — abre duas janelas; crie uma conta em cada, adicione como amigo, crie um espaço, convide, entre no canal de voz e transmita a tela.

@@ -19,7 +19,7 @@
 |---|---|---|
 | Voz e transmissão | Não há SFU com UDP (`LIVEKIT_URL` aponta para `sfu.pending.invalid`; `/ready` mostra `livekit: fail`) | VM em São Paulo ou LiveKit Cloud (ver `deploy.md`) — **decisão/custo do dono** |
 | E-mail real | `EMAIL_DRIVER=console` + `ALGA_ALLOW_CONSOLE_EMAIL=1` (e-mails ficam em arquivo no container) | Conta Resend + domínio verificado |
-| Contas novas não verificam e-mail → não criam convites | Consequência do item acima | Flag de staging `ALGA_AUTO_VERIFY_EMAIL=1` (fail-closed, só com e-mail console) — em implementação |
+| Verificação de e-mail real | Sem provedor; **`ALGA_AUTO_VERIFY_EMAIL=1` ligado** (d036bcb): contas novas nascem verificadas — verificado de fora: convite 201. Manter cadastro restrito a convidados enquanto estiver ligado | Conta Resend → desligar a flag |
 | Pagamentos | `BILLING_PROVIDER=none` | Credenciais de teste do Mercado Pago |
 | Domínio próprio | usando `*.up.railway.app` | Comprar domínio e apontar DNS |
 
@@ -28,6 +28,9 @@
 railway up --service api --environment staging --detach
 ```
 (da raiz do repo; `.railwayignore` evita subir docs, app desktop e screenshots). Migrações rodam no boot.
+
+## Instalador de staging
+`apps/desktop/release/AlgaMeet-Setup-0.1.0-staging.exe` (110 MB, SHA-256 `39f81da0…b28c`), build de `031bbf6` numa worktree limpa com a URL de staging embutida. Verificado: instalação silenciosa, app empacotado abre a tela de login apontando para `api-staging-b3ea.up.railway.app` (`scripts/check-installed.mjs`), desinstalação limpa (pasta e protocolo `algameet://` removidos). **Sem assinatura de código** → SmartScreen avisa "editor desconhecido".
 
 ## App desktop apontando para staging
 Build com `MAIN_VITE_API_URL=https://api-staging-b3ea.up.railway.app npm run dist -w apps/desktop`, ou em dev: `ALGA_API_URL=https://api-staging-b3ea.up.railway.app`.
