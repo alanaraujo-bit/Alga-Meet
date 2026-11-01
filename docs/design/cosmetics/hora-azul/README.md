@@ -56,7 +56,7 @@ Decorações aparecem em 32, 40, 56, 80 e 96 px; temas e efeitos no cartão de p
 | HA-22 Sopro | Ar filtrado subindo 250 ms e um sino suave em Lá5, 600 ms. | Idem. |
 | HA-23 Reações Hora Azul | 8 reações em SVG de 64 px (coração de vidro, 3 bolhas, palmas com 2 faíscas, "Boa!" em Inter Display 590, olhos, fogo frio índigo, estrela de vidro, chorei de rir), sobem 40 px do tile com escala 0,9 → 1 em 1,2 s; 1 a cada 1,5 s por pessoa, 6 na tela; reduzido = selo parado 1,5 s. | As palmas são abstratas (duas pílulas e duas faíscas); as outras sete leem de primeira em 40 px. |
 | HA-25 Moldura de vidro | Chanfro de 3 px fora do conteúdo (prata 4 → 10 %, borda porcelana 18 %) e o topo aceso a 25 %. | Um acabamento, não um enfeite; fica perto de um bisel de monitor, o que combina com quem transmite todo dia. |
-| HA-26 Noite, HA-27 Porcelana, HA-28 Crepúsculo | A geometria da marca (`build/brand/mark.svg`) nas cores da coleção; Crepúsculo em degradê brasa → índigo claro. | Nítidos em 16 px (barras em pixel inteiro). |
+| HA-26 Noite, HA-27 Porcelana, HA-28 Crepúsculo | A Marca v2 "Encosto" (`build/brand/mark.svg`, `mark-mono.svg`: uma alga, duas lâminas) no ladrilho do ícone do app, nas cores da coleção: Noite e Porcelana usam a marca de uma cor (o vão entre as lâminas carrega a ideia); Crepúsculo corre um degradê só, brasa no alto → índigo claro, pelas duas lâminas. | Redesenhados quando a marca mudou de três barras para o Encosto. Em 16 px o vetor fica macio: o ícone aplicado à janela e à bandeja deve usar os masters ajustados à mão (`mark-16…32.svg`), trabalho do processo principal. |
 
 ## Regras verificadas em teste (`render/render.test.ts`)
 
