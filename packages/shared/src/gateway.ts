@@ -3,6 +3,7 @@ import type {
   Role, Space, SpaceSnapshot, StatusPreference, VoiceDisconnectReason, VoiceState,
 } from './models.js'
 import type { Entitlements } from './billing.js'
+import type { E2eeClientFrame, E2eeCommit, E2eeEpoch, E2eeProposals, E2eeResyncRequired, E2eeWelcome } from './e2ee.js'
 
 /**
  * Realtime gateway: WebSocket at /gateway, JSON frames.
@@ -14,6 +15,11 @@ import type { Entitlements } from './billing.js'
  * Limits: identify within 10 s; at most 120 frames per 60 s and 10 identified sockets per user (else 4008, back off
  * before reconnecting). `presence` / `voice_state` fan out at most once per second per user: frames sent faster
  * collapse into the latest value, so always send the full current state. A client that stops reading is dropped.
+ * E2EE (e2ee.ts, docs/decisions/0004-e2ee.md): `e2ee_*` ops and `E2EE_*` dispatches carry the MLS handshake of a call
+ * (base64 MLSMessage bytes; the server is the Delivery Service and never sees a group secret). They are bound to the
+ * device named in `e2ee_join` (registered with POST /e2ee/devices by this session) and go only to that device's
+ * sockets. Own quota: E2EE_FRAME_LIMIT frames per 60 s per socket, apart from the 120 above; up to E2EE_MAX_FRAME_BYTES
+ * per frame (other ops: 16 KiB). Invalid e2ee frames close with 4003 like any other.
  */
 
 export const GatewayClose = {
@@ -34,6 +40,11 @@ export type ClientFrame =
   | { op: 'presence'; status: StatusPreference }
   /** Self voice flags while connected to a voice channel. Ignored if not in voice. */
   | { op: 'voice_state'; selfMute: boolean; selfDeaf: boolean; streaming: boolean; video: boolean }
+  /**
+   * MLS of a call (e2ee.ts): `e2ee_join` (join intent / re-announce with the local epoch), `e2ee_group_info` (creator,
+   * epoch 0), `e2ee_commit`, `e2ee_welcome_ack`, `e2ee_resync`. The server answers with E2EE_* dispatches only.
+   */
+  | E2eeClientFrame
 
 export interface ReadyPayload {
   user: Me
@@ -106,6 +117,14 @@ export type Dispatch =
    * INVITE_CREATE. Invites that expire or run out of uses are not announced: drop them by expiresAt/maxUses.
    */
   | { t: 'INVITE_DELETE'; d: { code: string; spaceId: string } }
+  /** E2EE (e2ee.ts): only to member devices of the call's MLS group at `epoch` (the bound sockets of those devices). */
+  | { t: 'E2EE_PROPOSALS'; d: E2eeProposals }
+  | { t: 'E2EE_COMMIT'; d: E2eeCommit }
+  /** Only to the added device. */
+  | { t: 'E2EE_WELCOME'; d: E2eeWelcome }
+  | { t: 'E2EE_EPOCH'; d: E2eeEpoch }
+  /** Only to the device whose frame could not be applied (see E2EE_RESYNC_REASONS for what to do). */
+  | { t: 'E2EE_RESYNC_REQUIRED'; d: E2eeResyncRequired }
 
 export type DispatchType = Dispatch['t']
 export type DispatchOf<T extends DispatchType> = Extract<Dispatch, { t: T }>['d']

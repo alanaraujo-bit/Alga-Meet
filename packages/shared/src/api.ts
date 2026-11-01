@@ -116,7 +116,24 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  * POST   /voice/join               VoiceJoinBody         -> VoiceJoinResponse
  *   The token carries the participant attribute STREAM_PRESETS_ATTRIBUTE (the user's plan presets); the server also
  *   checks every screen-share publication against them (see VoiceJoinResponse.streamPresets).
- * GET    /billing/catalog                                -> BillingCatalog (public, no auth)
+ * E2EE devices and key packages (bodies, models and the call flow in e2ee.ts; 10/min per route; 503 when the server
+ * has no MLS module):
+ * POST   /e2ee/devices             RegisterDeviceBody    -> E2eeDevice (201 new, 200 again: binds the device to this
+ *                                                          user + session (deleted with the session), empties its key
+ *                                                          package pool; a new signatureKey replaces the old one; a
+ *                                                          session holds one device (another deviceId replaces it);
+ *                                                          409 above E2EE_MAX_DEVICES_PER_USER)
+ * POST   /e2ee/devices/:id/key-packages UploadKeyPackagesBody -> KeyPackagesUploaded (this session's device only;
+ *                                                          each must be valid, ciphersuite 1, identity
+ *                                                          `userId:deviceId` and signed by the device's key, else 400
+ *                                                          `fields.keyPackages.<i>`; 409 above
+ *                                                          E2EE_MAX_KEY_PACKAGES_PER_DEVICE; duplicates are ignored)
+ * GET    /e2ee/users/:userId/key-packages                -> ClaimedKeyPackages (claims one per device, single use;
+ *                                                          yourself, a friend, someone in a shared space or private
+ *                                                          channel, never across a block, else 404)
+ * DELETE /e2ee/devices/:id                               -> 204 (your device: its key packages go too and it leaves
+ *                                                          any call group at once)
+ * GET    /billing/catalog                               -> BillingCatalog (public, no auth)
  * GET    /billing/me                                     -> BillingMe (plan, subscriptions, entitlements, orders)
  * POST   /billing/checkout         CheckoutBody          -> CheckoutResponse (201; verified e-mail required; 10/h)
  *   Creates a pending subscription (plan products) or order (cosmetics) and returns the provider's page. Nothing is
