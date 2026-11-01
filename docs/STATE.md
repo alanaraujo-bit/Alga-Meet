@@ -172,6 +172,8 @@ Percursos só por teclado 3/10 → **10/10**; achados da auditoria 31 → 1; reg
 ## Direção de design (2026-11-01)
 O dono rejeitou o teal ("artificial, robotizado, nada parecido com o Linear") e escolheu **B · Índigo suave** (D10b). Redesenho aplicado em todo o renderer, com comparação lado a lado contra o Linear (`docs/design/compare/`). Critério permanente: *"algo gostoso, sexy, que as pessoas tenham prazer de ver e de utilizar"*.
 
+**Crítica r3 (e786d05):** 7/10 vs Linear, **5/10 em desejo/prazer** ("Discord escuro bem-feito"). Áreas mais fracas: palco de chamada (5; caixas 16:9 vazias), loja/cosméticos (4; sendo refeitos no pacote B), marca (4,5; parece equalizador genérico e se repete ~5× por tela), login (5,5). Movimentos "sexy" propostos: cor vinda das pessoas (tom de cada um no banner e no palco), coreografia + 3 sons suaves ao entrar numa sala, Ctrl+K nascendo da busca da barra de título. Fila: conceitos de marca para o dono escolher (em andamento) → onda de design 9 depois do pacote B (palco só de voz, contenção do índigo, login, menos esqueleto Discord, conteúdo de demonstração digno).
+
 ## Próximos passos (fila do Maestro, em ordem)
 0. **Pequenos pendentes:** `setZoomFactor` no bridge (zoom da UI), bandeja "respirando" durante voz, avisos de mídia com `kind` (hoje a UI reconhece pelo texto), sessões com dispositivo/Windows no servidor, grades 5/7 recapturadas com 5–7 instâncias.
 1. **Aguardando agentes:** mídia onda 3, desempenho da UI e Trust & Safety/LGPD no servidor.
