@@ -1,0 +1,30 @@
+[package]
+name = "alga-mls"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Alga Meet E2EE: thin OpenMLS wrapper compiled to WASM (docs/decisions/0004-e2ee.md)"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+openmls = "=0.9.2"
+openmls_rust_crypto = "=0.6.0"
+openmls_basic_credential = "=0.6.0"
+openmls_traits = "=0.6.0"
+wasm-bindgen = "=0.2.130"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+openmls = { version = "=0.9.2", features = ["js"] }
+# ed25519-dalek/p256 still pull getrandom 0.2 (rand_core 0.6): its wasm backend is behind "js".
+getrandom_02 = { package = "getrandom", version = "=0.2.17", features = ["js"] }
+
+# RustCrypto unoptimized is ~50x slower: keeps `cargo test` (groups up to 99) fast.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = true
+codegen-units = 1

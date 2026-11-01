@@ -25,6 +25,10 @@ extraResources:
   # Tray/notification images as real files (resources/assets), see src/main/assets.ts.
   - from: build/runtime
     to: assets
+  # E2EE: MLS WASM + its wasm-bindgen glue (native/mls/build.sh), loaded from resources/mls by src/main/mls/host.ts.
+  - from: ../../native/mls/pkg
+    to: mls
+    filter: [alga_mls.js, alga_mls_bg.wasm]
 # Chromium UI strings for pt-BR plus the en-US fallback; the other ~50 locales are dead weight.
 electronLanguages: [pt-BR, en-US]
 # uiohook-napi is N-API with prebuilt binaries: nothing to rebuild against Electron's ABI.

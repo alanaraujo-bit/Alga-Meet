@@ -7,6 +7,9 @@ release/
 .env.*
 !.env.example
 infra/livekit/bin/
+# Rust build output and the generated WASM + glue (native/mls/build.sh).
+native/mls/target/
+native/mls/pkg/
 apps/server/data/
 .vite/
 coverage/
