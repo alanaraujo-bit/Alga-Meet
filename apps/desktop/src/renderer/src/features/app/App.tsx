@@ -6,6 +6,7 @@ import { useSession } from '@/store/session'
 import { useUi } from '@/store/ui'
 import { MenuHost, ToastHost, toast } from '@/ui'
 import { AuthScreen } from '../auth/AuthScreen'
+import { applySavedHotkeys } from '../settings/hotkeys'
 import { Shell } from '../shell/Shell'
 import { BootSplash } from './BootSplash'
 import { TitleBar } from './TitleBar'
@@ -18,6 +19,7 @@ export function App() {
 
   useEffect(() => {
     void useSession.getState().boot()
+    applySavedHotkeys()
   }, [])
 
   // Media engine notices (device unplugged, fallback to standard noise suppression…) surface as toasts.

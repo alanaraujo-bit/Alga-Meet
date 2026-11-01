@@ -21,9 +21,73 @@
   display: flex;
   align-items: center;
   gap: var(--s-2);
+  min-width: 0;
+  margin-left: calc(var(--s-4) * -1);
   color: var(--text-tertiary);
   font: var(--type-meta);
   font-weight: var(--w-medium);
+  white-space: nowrap;
+}
+/* The mark sits on the rail's axis (64px rail → 32px center). */
+.brandMark {
+  display: grid;
+  place-items: center;
+  width: var(--rail-w);
+  margin-right: calc(var(--s-2) * -1);
+}
+.liveChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1_5);
+  height: 24px;
+  margin-left: var(--s-2);
+  padding: 0 2px 0 var(--s-2);
+  border-radius: var(--r-full);
+  background: var(--accent-tint);
+  color: var(--accent);
+  -webkit-app-region: no-drag;
+}
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: currentColor;
+  animation: breathe 1.6s var(--ease-in-out-cubic) infinite;
+}
+.liveStop {
+  height: 20px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-full);
+  color: var(--text-secondary);
+}
+.liveStop:hover {
+  background: var(--state-selected);
+  color: var(--text-primary);
+}
+/* Connection chip: replaces the search while the realtime link is down (no layout shift below). */
+.chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  width: 100%;
+  height: 28px;
+  padding: 0 var(--s-1) 0 var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--warning-tint);
+  color: var(--warning);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+  -webkit-app-region: no-drag;
+}
+.chipOffline {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+.chipText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .profile {
   padding: 1px 6px;
@@ -75,6 +139,12 @@
   min-height: 20px;
   color: var(--text-tertiary);
   font: var(--type-ui);
+}
+.splashCause {
+  min-height: 16px;
+  margin-top: calc(var(--s-3) * -1);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
 }
 .splashActions {
   display: flex;

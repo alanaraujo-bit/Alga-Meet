@@ -1,5 +1,5 @@
+/* --speak is inherited when not set here, so a call tile and its avatar share one envelope. */
 .avatar {
-  --speak: 0;
   --dot: 10px;
   position: relative;
   display: inline-grid;
@@ -39,10 +39,10 @@
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  opacity: min(1, calc(var(--speak) * 2.5));
+  opacity: min(1, calc(var(--speak, 0) * 2.5));
   box-shadow:
     0 0 0 2px var(--accent),
-    0 0 calc(4px + 14px * var(--speak)) var(--accent-glow);
+    0 0 calc(4px + 14px * var(--speak, 0)) var(--accent-glow);
 }
 
 .presence {

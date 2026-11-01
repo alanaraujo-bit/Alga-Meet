@@ -57,11 +57,11 @@ export function Onboarding() {
         animate={{ opacity: 1, y: 0, transition: { duration: 0.3, ease: EASE_OUT_QUART } }}
       >
         <p className={s.step}>Passo 1 de 2</p>
-        <h1 className={s.title}>{t.title(me?.displayName ?? '')}</h1>
+        <h1 className={s.title}>{t.title(me?.displayName.split(' ')[0] ?? '')}</h1>
         <p className={s.subtitle}>{t.subtitle}</p>
         <div className={s.choices}>
           {choices.map((c) => (
-            <button key={c.key} type="button" className={`${s.choice} ${c.primary ? s.primary : ''}`} onClick={c.run}>
+            <button key={c.key} type="button" className={s.choice} onClick={c.run}>
               <span className={s.choiceIcon}>
                 <Icon icon={c.icon} size={20} />
               </span>

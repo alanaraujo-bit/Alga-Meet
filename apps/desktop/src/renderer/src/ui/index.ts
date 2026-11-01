@@ -1,4 +1,5 @@
-export { Avatar, PresenceGlyph, PRESENCE_LABEL, useSpeakingGlow, type AvatarUser } from './Avatar'
+export { Avatar, PresenceGlyph, PRESENCE_LABEL, tintFor, useEnvelope, useSpeakingGlow, type AvatarUser } from './Avatar'
+export { Fronds } from './Fronds'
 export { Button, IconButton } from './Button'
 export { Icon } from './Icon'
 export { Kbd } from './Kbd'

@@ -1,4 +1,4 @@
-import type { Channel, CreateChannelBody, Invite, Me, Message, Relationship, SpaceSnapshot, StatusPreference, VoiceJoinResponse } from '@alga/shared'
+import type { ChangePasswordBody, Channel, CreateChannelBody, Invite, Me, Message, PatchMeBody, Relationship, Session, SpaceSnapshot, StatusPreference, VoiceJoinResponse, VoiceModerationBody } from '@alga/shared'
 import { uuidv7 } from '@alga/shared'
 import { api } from '@/lib/api'
 import { useData } from './data'
@@ -151,6 +151,23 @@ export async function openDm(recipientIds: string[]): Promise<Channel> {
 }
 
 export const voiceJoin = (channelId: string) => api<VoiceJoinResponse>('POST', '/voice/join', { channelId })
+
+/** Moderation: serverMute/serverDeaf (SFU-enforced), move (channelId) or disconnect (channelId: null). */
+export const moderateVoice = (spaceId: string, userId: string, body: VoiceModerationBody) =>
+  api<void>('PATCH', `/spaces/${spaceId}/members/${userId}/voice`, body)
+
+export const leaveGroupDm = (channelId: string) => api<void>('DELETE', `/channels/${channelId}/recipients/@me`)
+
+// ── Account ─────────────────────────────────────────────
+export async function patchMe(body: PatchMeBody): Promise<Me> {
+  const me = await api<Me>('PATCH', '/users/@me', body)
+  useData.getState().apply({ t: 'ME_UPDATE', d: me })
+  return me
+}
+export const listSessions = () => api<Session[]>('GET', '/auth/sessions')
+export const revokeSession = (id: string) => api<void>('DELETE', `/auth/sessions/${id}`)
+export const revokeOtherSessions = () => api<void>('DELETE', '/auth/sessions')
+export const changePassword = (body: ChangePasswordBody) => api<void>('POST', '/auth/password', body)
 
 /** "Marcar como lido" for a whole space: acks each unread text channel at its last message. */
 export function markSpaceRead(spaceId: string): void {

@@ -1,0 +1,526 @@
+/* ── Call stage ─────────────────────────────────────────────
+ * The product's core screen. Tiles sit on the content surface with no borders; the only line
+ * that ever appears is the speaking outline, and it follows the voice envelope (--speak).
+ */
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--bg-content);
+}
+/* DM call: the stage takes the top of the conversation, the chat stays below. */
+.dm {
+  flex: 0 0 auto;
+  height: clamp(240px, 42vh, 460px);
+  background: var(--bg-sidebar);
+}
+
+.area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* bottom padding keeps tiles clear of the floating controls dock */
+  padding: var(--s-4) var(--s-4) calc(var(--h-call) + 12px + var(--s-4) * 2);
+  overflow: hidden;
+}
+.idle .area {
+  padding-bottom: var(--s-4);
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: var(--s-2);
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Tile ─────────────────────────────────── */
+.tile {
+  --speak: 0;
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-lg);
+  background: var(--bg-raised);
+  overflow: hidden;
+  isolation: isolate;
+}
+.dm .tile {
+  background: var(--bg-content);
+}
+/* Speaking: continuous 2px accent outline whose opacity is the envelope (not an on/off ring). */
+.tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--accent);
+  opacity: min(1, calc(var(--speak) * 2.5));
+  pointer-events: none;
+  z-index: 3;
+}
+.tileBody {
+  display: grid;
+  place-items: center;
+  gap: var(--s-2);
+}
+.label {
+  position: absolute;
+  left: var(--s-2);
+  bottom: var(--s-2);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  max-width: calc(100% - var(--s-4));
+  height: 24px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-full);
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--text-primary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+  white-space: nowrap;
+}
+.label > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.flagDanger {
+  display: grid;
+  color: var(--danger);
+}
+.corner {
+  position: absolute;
+  top: var(--s-2);
+  right: var(--s-2);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.qualityPoor {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--warning);
+}
+.qualityLost {
+  composes: qualityPoor;
+  color: var(--danger);
+}
+.tileMenu {
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.5) !important;
+}
+.tile:hover .tileMenu,
+.tileMenu:focus-visible,
+.tileMenu[aria-expanded='true'] {
+  opacity: 1;
+}
+.waiting {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+
+/* Stale: the media link is down. People are not shown as fine: dimmed, no glow, no levels. */
+.stale .tile {
+  --speak: 0 !important;
+}
+.stale .tile .tileBody,
+.stale .stream video {
+  filter: grayscale(1);
+  opacity: 0.4;
+}
+
+/* ── Stream tile ──────────────────────────── */
+.stream {
+  composes: tile;
+  background: radial-gradient(240px 160px at 50% 40%, rgba(33, 201, 202, 0.06), transparent 70%), #0b0e0f;
+}
+.stream video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+.streamCard {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-2);
+  padding: var(--s-4);
+  text-align: center;
+}
+.streamTitle {
+  color: var(--text-primary);
+  font: var(--type-ui-lg);
+  font-weight: var(--w-semibold);
+}
+.streamBody {
+  max-width: 320px;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-wrap: balance;
+}
+.liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--r-xs);
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font: var(--type-badge);
+  letter-spacing: 0.02em;
+}
+.liveBadge::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: var(--r-full);
+  background: currentColor;
+  animation: breathe 1.6s var(--ease-in-out-cubic) infinite;
+}
+.loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 1;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.loading > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+/* Toolbar over a watched stream: shows on hover/focus, never covers the label. */
+.streamBar {
+  position: absolute;
+  top: var(--s-2);
+  right: var(--s-2);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-md);
+  background: rgba(16, 19, 20, 0.86);
+  box-shadow: var(--elev-overlay);
+  opacity: 0;
+  transition: opacity var(--dur-hover-out) var(--ease-out-quad);
+}
+.stream:hover .streamBar,
+.streamBar:focus-within {
+  opacity: 1;
+  transition-duration: 0ms;
+}
+.volume {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: 0 var(--s-1) 0 var(--s-1);
+  color: var(--text-tertiary);
+}
+.volume input {
+  width: 84px;
+  accent-color: var(--accent-fill);
+}
+.barSep {
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--border-default);
+}
+
+/* Discreet stats overlay (Ctrl Shift E): numbers people use to report problems. */
+.stats {
+  position: absolute;
+  left: var(--s-2);
+  top: var(--s-2);
+  z-index: 4;
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: var(--s-3);
+  row-gap: 1px;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: rgba(0, 0, 0, 0.62);
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.stats dt {
+  color: var(--text-tertiary);
+}
+.stats dd {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+/* ── Focus mode ───────────────────────────── */
+.focus {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.focusMain {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+.focusMain .stream {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: var(--r-lg);
+}
+.strip {
+  display: flex;
+  justify-content: center;
+  gap: var(--s-2);
+  flex-shrink: 0;
+  height: 90px;
+  overflow-x: auto;
+}
+.strip .tile,
+.strip .stream {
+  height: 90px;
+  width: 160px;
+}
+
+/* Fullscreen: the element itself goes fullscreen; keep the video black-framed. */
+.stream:fullscreen {
+  border-radius: 0;
+  background: #000;
+}
+
+/* ── Header status chip ───────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1_5);
+  height: 24px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-full);
+  background: var(--accent-tint);
+  color: var(--accent);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+  white-space: nowrap;
+}
+.chipWarn {
+  background: var(--warning-tint);
+  color: var(--warning);
+}
+.count {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Overlays on the stage ────────────────── */
+.notice {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: var(--s-6);
+  pointer-events: none;
+}
+.noticeCard {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-2);
+  max-width: 360px;
+  padding: var(--s-5) var(--s-6);
+  border-radius: var(--r-lg);
+  background: var(--bg-overlay);
+  box-shadow: var(--elev-overlay);
+  text-align: center;
+  pointer-events: auto;
+}
+.noticeTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--warning);
+  font: var(--type-ui-lg);
+  font-weight: var(--w-semibold);
+}
+.noticeBody {
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+  text-wrap: balance;
+}
+
+/* ── Pre-join / empty ─────────────────────── */
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-2);
+  max-width: 380px;
+  padding: var(--s-8) var(--s-6);
+  text-align: center;
+  background: radial-gradient(240px 160px at 50% 32%, rgba(33, 201, 202, 0.06), transparent 70%);
+}
+.emptyGlyph {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--s-2);
+  color: var(--accent);
+  filter: drop-shadow(0 0 14px rgba(33, 201, 202, 0.35));
+}
+.emptyTitle {
+  color: var(--text-primary);
+  font: var(--type-title-sm);
+  letter-spacing: var(--track-title);
+}
+.emptyBody {
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+  text-wrap: balance;
+}
+.emptyActions {
+  margin-top: var(--s-3);
+}
+.preview {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-4);
+}
+.previewPeople {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s-4);
+  max-width: 560px;
+}
+.previewPerson {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-1_5);
+  width: 72px;
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.previewPerson > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Controls dock (floating, centered, 16px off the bottom) ── */
+.dock {
+  position: absolute;
+  left: 50%;
+  bottom: var(--s-4);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 6px;
+  border-radius: var(--r-full);
+  background: var(--bg-overlay);
+  box-shadow: var(--elev-overlay);
+  transform: translateX(-50%);
+}
+.dockSep {
+  width: 1px;
+  height: 24px;
+  margin: 0 2px;
+  background: var(--border-default);
+}
+.ctl {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--h-call);
+  height: var(--h-call);
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  transition: background-color var(--dur-hover-out) var(--ease-out-quad);
+}
+.ctl:hover {
+  transition-duration: 0ms;
+  background: rgba(255, 255, 255, 0.11);
+}
+.ctl:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+/* Off states read as "off" by icon + color + tint, never color alone. */
+.ctlOff {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+.ctlOff:hover {
+  background: rgba(247, 93, 89, 0.2);
+}
+.ctlOn {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+.ctlOn:hover {
+  background: var(--accent-fill-hover);
+}
+.ctlLeave {
+  width: 56px;
+  background: var(--danger);
+  color: var(--on-danger);
+}
+.ctlLeave:hover {
+  background: var(--danger-hover);
+}
+.ctl[aria-disabled='true'] {
+  opacity: 0.45;
+}
+/* Mic button carries a tiny live meter: you can see yourself being heard. */
+.ctlMeter {
+  position: absolute;
+  inset: 3px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 2px var(--accent);
+  opacity: min(1, calc(var(--speak, 0) * 2.5));
+  pointer-events: none;
+}
+.dockJoin {
+  composes: dock;
+  padding: 6px 6px 6px var(--s-4);
+  gap: var(--s-3);
+  color: var(--text-secondary);
+  font: var(--type-ui);
+}
+.accentIcon {
+  color: var(--accent);
+}

@@ -7,8 +7,6 @@ export interface TabItem<T extends string> {
   value: T
   label: ReactNode
   badge?: number
-  /** Accent-colored call to action tab (e.g. "Adicionar amigo"). */
-  accent?: boolean
 }
 
 /** Arrow-key roving focus shared by Tabs and SegmentedControl. */
@@ -42,7 +40,7 @@ export function Tabs<T extends string>({ items, value, onChange, label }: { item
           data-roving
           aria-selected={it.value === value}
           tabIndex={it.value === value ? 0 : -1}
-          className={`${s.tab} ${it.accent ? s.tabAccent : ''}`}
+          className={s.tab}
           onClick={() => onChange(it.value)}
         >
           {it.label}

@@ -1,13 +1,18 @@
 import { Permission, type Channel } from '@alga/shared'
-import { ChevronDown, Hash, HeadphoneOff, MicOff, Plus, Search, Users, Volume2 } from 'lucide-react'
-import { useMemo } from 'react'
+import { ChevronDown, Hash, HeadphoneOff, LogOut, MicOff, Plus, Search, ShieldOff, Users, Volume2 } from 'lucide-react'
+import { useMemo, useRef } from 'react'
+import { useMedia } from '@/media'
 import { useShallow } from 'zustand/react/shallow'
 import { isUnread, useData } from '@/store/data'
 import { can, channelTitle, dmChannels, dmPeers, mentionCount, presenceOf, spaceChannels, spacePermissions, voiceMembers } from '@/store/selectors'
 import { useUi } from '@/store/ui'
-import { Avatar, Badge, contextMenuHandler, Icon, IconButton, MenuButton, PRESENCE_LABEL, ScrollArea, Tooltip } from '@/ui'
-import { markSpaceRead } from '@/store/actions'
+import { Avatar, Badge, contextMenuHandler, Fronds, Icon, IconButton, MenuButton, ScrollArea, toast, Tooltip, useSpeakingGlow } from '@/ui'
+import { leaveGroupDm, markSpaceRead } from '@/store/actions'
+import { errorText } from '@/lib/errors'
 import { spaceMenu } from '../spaces/spaceMenu'
+import { LiveNow } from '../voice/LiveNow'
+import { roomLevelNow, useLevelGetter } from '../voice/levels'
+import { joinVoice, openCall } from '../voice/voice'
 import { UserPanel } from './UserPanel'
 import { t } from './strings'
 import s from './shell.module.css'
@@ -39,6 +44,7 @@ function HomeSidebar() {
         </button>
       </div>
       <ScrollArea className={s.list}>
+        <LiveNow />
         <button
           type="button"
           className={s.row}
@@ -68,7 +74,7 @@ function HomeSidebar() {
 }
 
 function DmRow({ channel, active }: { channel: Channel; active: boolean }) {
-  const { title, peer, unread, mentions, presence } = useData(
+  const { title, peer, unread, mentions, presence, inCall } = useData(
     useShallow((st) => {
       const peers = dmPeers(st, channel)
       const peer = channel.type === 'dm' ? (peers[0] ?? null) : null
@@ -78,6 +84,7 @@ function DmRow({ channel, active }: { channel: Channel; active: boolean }) {
         unread: isUnread(st, channel.id),
         mentions: mentionCount(st, channel.id),
         presence: peer ? presenceOf(st, peer.id) : null,
+        inCall: Object.values(st.voiceStates).some((v) => v.channelId === channel.id),
       }
     }),
   )
@@ -87,21 +94,34 @@ function DmRow({ channel, active }: { channel: Channel; active: boolean }) {
       className={`${s.row} ${s.rowTall} ${unread && !active ? s.rowUnread : ''}`}
       aria-current={active ? 'page' : undefined}
       onClick={() => useUi.getState().go({ kind: 'dm', channelId: channel.id })}
+      onContextMenu={
+        channel.type === 'group_dm'
+          ? contextMenuHandler(() => [
+              {
+                label: t.space.leaveGroup,
+                icon: LogOut,
+                danger: true,
+                onSelect: () =>
+                  void leaveGroupDm(channel.id)
+                    .then(() => toast.success(t.space.leftGroup(title)))
+                    .catch((e: unknown) => toast.error(errorText(e))),
+              },
+            ], title)
+          : undefined
+      }
     >
       {peer ? (
         <Avatar user={peer} size={32} presence={presence ?? undefined} decorative />
       ) : (
         <Avatar user={{ id: channel.id, displayName: title, avatarUrl: null }} size={32} decorative />
       )}
+      {/* One line: the presence dot already says "online"; a subtitle only when it adds something. */}
       <span className={s.rowName}>
         {title}
-        {channel.type === 'group_dm' ? (
-          <span className={s.rowSub}>{(channel.recipientIds?.length ?? 0)} membros</span>
-        ) : presence && presence !== 'offline' ? (
-          <span className={s.rowSub}>{PRESENCE_LABEL[presence]}</span>
-        ) : null}
+        {inCall ? <span className={`${s.rowSub} ${s.rowSubLive}`}>{t.space.inVoice}</span> : channel.type === 'group_dm' ? <span className={s.rowSub}>{channel.recipientIds?.length ?? 0} membros</span> : null}
       </span>
-      <Badge count={mentions} />
+      {inCall && <Fronds size={14} breathing className={s.accent} />}
+      <Badge count={mentions} mention />
     </button>
   )
 }
@@ -163,7 +183,7 @@ function TextChannelRow({ channel, active }: { channel: Channel; active: boolean
         <Icon icon={Hash} size={16} />
       </span>
       <span className={s.rowName}>{channel.name}</span>
-      <Badge count={mentions} />
+      <Badge count={mentions} mention />
     </button>
   )
 }
@@ -171,24 +191,31 @@ function TextChannelRow({ channel, active }: { channel: Channel; active: boolean
 function VoiceChannelRow({ channel, active }: { channel: Channel; active: boolean }) {
   const voiceStates = useData((st) => st.voiceStates)
   const people = useMemo(() => voiceMembers({ voiceStates }, channel.id), [voiceStates, channel.id])
+  const here = useMedia((st) => st.connection.channelId === channel.id && st.connection.state !== 'idle')
+  // Discord habit kept on purpose: one click on a voice channel puts you in it.
+  const open = () => {
+    openCall(channel.id)
+    if (!here) void joinVoice(channel.id)
+  }
   return (
     <>
       <button
         type="button"
         className={`${s.row} ${people.length ? s.voiceActive : ''}`}
         aria-current={active ? 'page' : undefined}
-        onClick={() => useUi.getState().go({ kind: 'space', spaceId: channel.spaceId!, channelId: channel.id })}
+        onClick={open}
+        aria-label={here ? channel.name : `${t.space.joinVoice(channel.name)}${people.length ? `, ${people.length}` : ''}`}
       >
         <span className={s.rowIcon}>
-          <Icon icon={Volume2} size={16} />
+          {people.length ? <Fronds size={16} breathing={!here} getLevel={here ? roomLevelNow : undefined} /> : <Icon icon={Volume2} size={16} />}
         </span>
         <span className={s.rowName}>{channel.name}</span>
-        {(people.length > 0 || !!channel.userLimit) && <span className={s.rowMeta}>{t.space.users(people.length, channel.userLimit || undefined)}</span>}
+        {!!channel.userLimit && <span className={s.rowMeta}>{t.space.users(people.length, channel.userLimit)}</span>}
       </button>
       {people.length > 0 && (
         <ul className={s.voiceUsers} aria-label={`Pessoas em ${channel.name}`}>
           {people.map((v) => (
-            <VoiceUser key={v.userId} userId={v.userId} spaceId={channel.spaceId} muted={v.selfMute || v.serverMute} deaf={v.selfDeaf || v.serverDeaf} live={v.streaming} />
+            <VoiceUser key={v.userId} userId={v.userId} channelId={channel.id} spaceId={channel.spaceId} muted={v.selfMute} deaf={v.selfDeaf} server={v.serverMute || v.serverDeaf} live={v.streaming} />
           ))}
         </ul>
       )}
@@ -196,17 +223,25 @@ function VoiceChannelRow({ channel, active }: { channel: Channel; active: boolea
   )
 }
 
-function VoiceUser({ userId, spaceId, muted, deaf, live }: { userId: string; spaceId: string | null; muted: boolean; deaf: boolean; live: boolean }) {
+function VoiceUser({ userId, channelId, spaceId, muted, deaf, server, live }: { userId: string; channelId: string; spaceId: string | null; muted: boolean; deaf: boolean; server: boolean; live: boolean }) {
   const user = useData((st) => st.users[userId])
   const name = useData((st) => (spaceId && st.members[spaceId]?.[userId]?.nickname) || st.users[userId]?.displayName || '…')
+  const glow = useRef<HTMLSpanElement>(null)
+  useSpeakingGlow(glow, useLevelGetter(userId, channelId))
   if (!user) return null
   return (
     <li className={s.voiceUser}>
-      <Avatar user={user} size={20} decorative />
+      <Avatar user={user} size={20} glowRef={glow} decorative />
       <span className={s.rowName}>{name}</span>
       {live && <span className={s.live}>{t.space.live}</span>}
       <span className={s.voiceFlags}>
-        {deaf ? (
+        {server ? (
+          <Tooltip content={t.space.serverMuted}>
+            <span className={s.voiceFlagDanger} role="img" aria-label={t.space.serverMuted}>
+              <Icon icon={ShieldOff} size={14} />
+            </span>
+          </Tooltip>
+        ) : deaf ? (
           <Tooltip content={t.space.deafened}>
             <span className={s.voiceFlagDanger} role="img" aria-label={t.space.deafened}>
               <Icon icon={HeadphoneOff} size={14} />

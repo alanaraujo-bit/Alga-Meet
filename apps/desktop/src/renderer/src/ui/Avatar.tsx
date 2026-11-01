@@ -2,9 +2,9 @@ import type { PresenceStatus } from '@alga/shared'
 import { useEffect, useId, useState, type RefObject } from 'react'
 import s from './Avatar.module.css'
 
-export type AvatarSize = 16 | 20 | 24 | 32 | 36 | 40 | 56 | 80
+export type AvatarSize = 16 | 20 | 24 | 32 | 36 | 40 | 48 | 56 | 64 | 80 | 96
 
-const DOT: Record<AvatarSize, number> = { 16: 0, 20: 8, 24: 8, 32: 10, 36: 11, 40: 12, 56: 14, 80: 18 }
+const DOT: Record<AvatarSize, number> = { 16: 0, 20: 8, 24: 8, 32: 10, 36: 11, 40: 12, 48: 13, 56: 14, 64: 16, 80: 18, 96: 20 }
 
 export const PRESENCE_LABEL: Record<PresenceStatus, string> = {
   online: 'Online',
@@ -13,12 +13,18 @@ export const PRESENCE_LABEL: Record<PresenceStatus, string> = {
   offline: 'Offline',
 }
 
-/** Stable hue per user id so initials avatars are recognizable without being loud. */
+/** 8 clean hues (OKLCH H 150–340): skips the 40–110 band that turns muddy brown on the deep-water neutrals. */
+const HUES = [150, 175, 200, 228, 255, 282, 310, 338] as const
+
+/** Stable hue per id so initials avatars are recognizable without being loud. */
 export function hueFor(id: string): number {
   let h = 0
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
-  return h % 360
+  return HUES[h % HUES.length]!
 }
+
+/** Same hash as a 12% tint over the raised surface (space tiles without an icon). */
+export const tintFor = (id: string): string => `color-mix(in srgb, oklch(0.5 0.07 ${hueFor(id)}) 12%, var(--bg-raised))`
 
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -58,6 +64,7 @@ export function Avatar({
   presence,
   speaking,
   glowRef,
+  glow,
   decorative,
 }: {
   user: AvatarUser
@@ -66,6 +73,8 @@ export function Avatar({
   /** Static speaking state; for live levels pass glowRef to useSpeakingGlow instead. */
   speaking?: boolean
   glowRef?: RefObject<HTMLSpanElement | null>
+  /** Render the glow layer driven by an inherited --speak (an ancestor runs useEnvelope). */
+  glow?: boolean
   /** Name is already visible next to it. */
   decorative?: boolean
 }) {
@@ -76,7 +85,7 @@ export function Avatar({
   return (
     <span
       className={`${s.avatar} ${showDot ? s.withPresence : ''}`}
-      style={{ width: size, height: size, ['--dot' as string]: `${DOT[size]}px`, ['--speak' as string]: speaking ? 1 : 0 }}
+      style={{ width: size, height: size, ['--dot' as string]: `${DOT[size]}px`, ...(speaking !== undefined && { ['--speak' as string]: speaking ? 1 : 0 }) }}
       role={label ? 'img' : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
@@ -84,14 +93,15 @@ export function Avatar({
       <span
         className={s.face}
         style={{
-          background: user.accentColor ?? `oklch(0.4 0.055 ${hue})`,
-          color: user.accentColor ? '#fff' : `oklch(0.93 0.035 ${hue})`,
+          background: user.accentColor ?? `oklch(0.5 0.07 ${hue})`,
+          color: user.accentColor ? '#fff' : `oklch(0.96 0.02 ${hue})`,
           fontSize: Math.max(8, Math.round(size * 0.38)),
         }}
       >
-        {user.avatarUrl && !broken ? <img src={user.avatarUrl} alt="" draggable={false} onError={() => setBroken(true)} /> : initials(user.displayName)}
+        {/* At 20px and below initials are noise: the color disc alone identifies. */}
+        {user.avatarUrl && !broken ? <img src={user.avatarUrl} alt="" draggable={false} onError={() => setBroken(true)} /> : size > 20 ? initials(user.displayName) : null}
       </span>
-      {(speaking || glowRef) && <span ref={glowRef} className={s.glow} />}
+      {(speaking || glowRef || glow) && <span ref={glowRef} className={s.glow} />}
       {showDot && (
         <span className={s.presence}>
           <PresenceGlyph status={presence} />
@@ -101,25 +111,31 @@ export function Avatar({
   )
 }
 
+const reducedMotion = () =>
+  document.documentElement.classList.contains('reduce-motion') || matchMedia('(prefers-reduced-motion: reduce)').matches
+
 /**
- * Drives the speaking glow from a live audio level without re-rendering React:
- * a compressor-like envelope (attack ~60ms, release ~240ms) written to --speak each frame.
- * `getLevel` returns the current RMS level 0..1 (from the media engine).
+ * Writes a live audio level to `--speak` on an element without re-rendering React:
+ * a compressor-like envelope (attack ~60ms, release ~240ms) applied every frame.
+ * Reduced motion: no continuous movement, the value steps between 0 and 1 (state stays visible).
+ * `getLevel` returns the current level 0..1 (from the media engine).
  */
-export function useSpeakingGlow(ref: RefObject<HTMLElement | null>, getLevel: (() => number) | null) {
+export function useEnvelope(ref: RefObject<HTMLElement | null>, getLevel: (() => number) | null, target: 'self' | 'parent' = 'self') {
   useEffect(() => {
-    const el = ref.current?.parentElement
+    const el = target === 'parent' ? ref.current?.parentElement : ref.current
     if (!el || !getLevel) return
     let env = 0
     let last = performance.now()
     let raf = 0
+    let written = ''
     const tick = (now: number) => {
       const dt = now - last
       last = now
-      const target = Math.max(0, Math.min(1, getLevel()))
-      const tau = target > env ? 60 : 240
-      env += (target - env) * (1 - Math.exp(-dt / tau))
-      el.style.setProperty('--speak', env < 0.01 ? '0' : env.toFixed(3))
+      const level = Math.max(0, Math.min(1, getLevel()))
+      if (reducedMotion()) env = level > 0.06 ? 1 : 0
+      else env += (level - env) * (1 - Math.exp(-dt / (level > env ? 60 : 240)))
+      const v = env < 0.01 ? '0' : env.toFixed(3)
+      if (v !== written) el.style.setProperty('--speak', (written = v))
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
@@ -127,5 +143,8 @@ export function useSpeakingGlow(ref: RefObject<HTMLElement | null>, getLevel: ((
       cancelAnimationFrame(raf)
       el.style.setProperty('--speak', '0')
     }
-  }, [ref, getLevel])
+  }, [ref, getLevel, target])
 }
+
+/** Speaking glow on an Avatar: pass the Avatar's `glowRef`; the envelope lands on the avatar itself. */
+export const useSpeakingGlow = (ref: RefObject<HTMLElement | null>, getLevel: (() => number) | null) => useEnvelope(ref, getLevel, 'parent')

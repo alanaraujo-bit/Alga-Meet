@@ -1,18 +1,24 @@
+/** One sentence for "the server is unreachable", everywhere (banner, splash). */
+const offlineText = (s: number | null) => (s === null || s <= 0 ? 'Sem conexão. Tentando de novo…' : `Sem conexão. Tentando de novo em ${s} s…`)
+
 export const t = {
+  live: 'Você está transmitindo',
+  stopLive: 'Parar',
   appName: 'Alga Meet',
   search: 'Buscar ou ir para…',
   searchShortcut: 'Ctrl K',
   splash: {
     connecting: 'Conectando…',
     loading: 'Carregando suas conversas…',
-    retrying: (s: number) => `Sem conexão com o servidor. Nova tentativa em ${s}s.`,
+    retrying: (s: number) => offlineText(s),
+    cause: 'Verifique sua internet. Se ela estiver ok, o problema é do nosso lado.',
     retryNow: 'Tentar agora',
     signOut: 'Sair da conta',
   },
   banner: {
     connecting: 'Conectando ao servidor…',
-    reconnecting: (s: number | null) => (s === null || s <= 0 ? 'Reconectando…' : `Conexão perdida. Reconectando em ${s}s…`),
-    offline: 'Você está sem internet. Reconectamos assim que a conexão voltar.',
+    reconnecting: (s: number | null) => offlineText(s),
+    offline: 'Sem internet. Reconectamos quando ela voltar.',
     retryNow: 'Tentar agora',
   },
   rail: {
@@ -21,6 +27,7 @@ export const t = {
     createSpace: 'Criar espaço',
     joinSpace: 'Entrar com convite',
     mentions: (n: number) => `${n} menç${n === 1 ? 'ão' : 'ões'}`,
+    inVoice: 'pessoas em voz agora',
   },
   userPanel: {
     mute: 'Desativar microfone',
@@ -30,10 +37,12 @@ export const t = {
     settings: 'Configurações',
     settingsSoon: 'Configurações completas chegam na próxima versão',
     reduceMotion: 'Reduzir animações',
-    signOut: 'Sair',
+    signOut: 'Sair da conta',
     setStatus: 'Definir status',
     status: { online: 'Online', idle: 'Ausente', dnd: 'Não perturbe', invisible: 'Invisível' },
-    statusHint: { online: '', idle: '', dnd: 'Você não receberá notificações', invisible: 'Você aparece offline, mas tem acesso a tudo' },
+    statusHint: { online: '', idle: '', dnd: 'Notificações pausadas', invisible: 'Os outros te veem offline. Você continua vendo tudo.' },
+    reconnecting: 'Reconectando…',
+    serverMuted: 'A moderação silenciou você neste canal',
     copyUsername: 'Copiar nome de usuário',
     copied: 'Copiado',
     statusError: 'Não foi possível alterar o status.',

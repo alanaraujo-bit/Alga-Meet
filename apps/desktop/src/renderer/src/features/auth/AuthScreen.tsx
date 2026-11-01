@@ -28,7 +28,7 @@ export function AuthScreen() {
           exit={{ opacity: 0, transition: { duration: 0.1 } }}
         >
           <div className={s.mark}>
-            <LogoMark size={24} />
+            <LogoMark size={28} />
           </div>
           {mode === 'login' ? <LoginForm onSwitch={() => setMode('register')} /> : <RegisterForm onSwitch={() => setMode('login')} />}
         </motion.div>

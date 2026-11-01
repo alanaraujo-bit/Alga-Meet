@@ -2,7 +2,8 @@ import { Crown } from 'lucide-react'
 import { useMemo } from 'react'
 import { useData } from '@/store/data'
 import { presenceOf, roleColor } from '@/store/selectors'
-import { Avatar, Icon, ScrollArea, Tooltip } from '@/ui'
+import { useSession } from '@/store/session'
+import { Avatar, Fronds, Icon, ScrollArea, Tooltip } from '@/ui'
 import { t } from './strings'
 import s from './shell.module.css'
 
@@ -12,6 +13,9 @@ export function MemberList({ spaceId }: { spaceId: string }) {
   const me = useData((st) => st.me)
   const roles = useData((st) => st.roles)
   const ownerId = useData((st) => st.spaces[spaceId]?.ownerId)
+  const voice = useData((st) => st.voiceStates)
+  // Presence is stale while the realtime link is down: show it as uncertain, not as fact.
+  const stale = useSession((st) => st.gateway !== 'ready')
 
   const groups = useMemo(() => {
     const all = Object.values(members ?? {}).map((m) => ({
@@ -25,7 +29,7 @@ export function MemberList({ spaceId }: { spaceId: string }) {
   }, [members, presences, me, roles, spaceId])
 
   return (
-    <ScrollArea className={s.members} aria-label="Membros">
+    <ScrollArea className={`${s.members} ${stale ? s.membersStale : ''}`} aria-label="Membros">
       {(['online', 'offline'] as const).map((k) =>
         groups[k].length === 0 ? null : (
           <section key={k} aria-label={k === 'online' ? 'Online' : 'Offline'}>
@@ -38,6 +42,13 @@ export function MemberList({ spaceId }: { spaceId: string }) {
                 <span className={s.memberName} style={color ? { color } : undefined}>
                   {name}
                 </span>
+                {voice[m.user.id]?.spaceId === spaceId && (
+                  <Tooltip content={t.members.inVoice}>
+                    <span className={s.accent} role="img" aria-label={t.members.inVoice}>
+                      <Fronds size={14} breathing />
+                    </span>
+                  </Tooltip>
+                )}
                 {m.user.id === ownerId && (
                   <Tooltip content={t.members.owner}>
                     <span className={s.crown} role="img" aria-label={t.members.owner}>

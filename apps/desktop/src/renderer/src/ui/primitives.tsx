@@ -42,11 +42,11 @@ export function EmptyState({
   )
 }
 
-/** Count badge. Red = needs you (mentions, requests); neutral = informational. */
-export function Badge({ count, neutral, label }: { count: number; neutral?: boolean; label?: string }) {
+/** Count badge. Neutral by default; red only for direct @mentions (red is reserved for mentions and errors). */
+export function Badge({ count, mention, label }: { count: number; mention?: boolean; label?: string }) {
   if (count <= 0) return null
   return (
-    <span className={`${s.badge} ${neutral ? s.badgeNeutral : ''}`} aria-label={label}>
+    <span className={`${s.badge} ${mention ? s.badgeMention : ''}`} aria-label={label}>
       {count > 99 ? '99+' : count}
     </span>
   )

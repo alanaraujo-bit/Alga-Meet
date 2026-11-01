@@ -1,6 +1,9 @@
 export const t = {
   placeholder: (target: string) => `Mensagem para ${target}`,
   noPermission: 'Você não tem permissão para enviar mensagens neste canal.',
+  offline: 'Sem conexão. Sua mensagem sai quando voltar.',
+  emoji: { title: 'Emojis', open: 'Emoji', search: 'Buscar emoji', none: 'Nenhum emoji com esse nome.', react: 'Adicionar reação' },
+  mentions: { title: 'Mencionar' },
   send: 'Enviar',
   sendHint: 'Enter',
   tooLong: (n: number) => `Mensagem ${n} caracteres acima do limite`,
@@ -26,7 +29,9 @@ export const t = {
     edit: 'Editar',
     delete: 'Excluir',
     copy: 'Copiar texto',
-    more: 'Mais',
+    copyGroup: 'Copiar',
+    yours: 'Sua mensagem',
+    more: 'Mais ações',
   },
   reactionLabel: (emoji: string, n: number, me: boolean) => `${emoji}: ${n} ${n === 1 ? 'reação' : 'reações'}${me ? ', incluindo a sua' : ''}`,
   deleteTitle: 'Excluir mensagem?',
@@ -41,9 +46,10 @@ export const t = {
     : names.length === 3 ? `${names[0]}, ${names[1]} e ${names[2]} estão digitando`
     : 'Várias pessoas estão digitando',
   intro: {
-    channelTitle: (n: string) => `Boas-vindas a #${n}`,
-    channelBody: (n: string) => `Este é o começo do canal #${n}.`,
-    dmBody: (n: string) => `Este é o começo da sua conversa com ${n}.`,
+    channelTitle: (n: string) => `#${n}`,
+    channelBody: (n: string) => `Tudo o que for dito em #${n} começa aqui.`,
+    dmBody: (n: string) => `Aqui começa sua conversa com ${n}. Que tal uma chamada?`,
+    call: 'Ligar',
   },
   header: {
     members: 'Lista de membros',
@@ -51,4 +57,4 @@ export const t = {
 } as const
 
 /** Quick reactions in the hover toolbar. */
-export const QUICK_EMOJI = ['👍', '❤️', '😂', '🎉', '😮'] as const
+export const QUICK_EMOJI = ['👍', '❤️', '😂'] as const

@@ -87,13 +87,28 @@ textarea,
   outline-offset: 2px;
 }
 
-/* Scrollbars: thin, recede until hovered. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+/*
+ * Scrollbars: thin thumb, no track, no arrow buttons. Only ::-webkit-scrollbar here: in Chromium >= 121 the
+ * standard scrollbar-width/scrollbar-color win over it and the Windows "thin" variant draws arrow buttons.
+ */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
 }
-*:hover {
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.12) padding-box;
+}
+:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 .tnum {

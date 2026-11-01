@@ -1,10 +1,12 @@
 import { MessageCircle, Plus } from 'lucide-react'
 import { useMemo } from 'react'
+import { useMedia } from '@/media'
 import { useData } from '@/store/data'
 import { homeBadge, spaceUnread } from '@/store/selectors'
 import { useUi } from '@/store/ui'
-import { Badge, contextMenuHandler, Icon, MenuButton, Tooltip } from '@/ui'
+import { Badge, contextMenuHandler, Fronds, Icon, MenuButton, Tooltip, tintFor } from '@/ui'
 import { initials } from '@/ui/Avatar'
+import { roomLevelNow } from '../voice/levels'
 import { spaceMenu } from '../spaces/spaceMenu'
 import { t } from '../app/strings'
 import s from './shell.module.css'
@@ -16,6 +18,7 @@ export function SpaceRail() {
   const channels = useData((st) => st.channels)
   const readStates = useData((st) => st.readStates)
   const home = useMemo(() => homeBadge({ channels, readStates, relationships }), [channels, readStates, relationships])
+  const dmCall = useData((st) => Object.values(st.voiceStates).some((v) => v.spaceId === null))
 
   return (
     <nav className={s.rail} aria-label="Espaços">
@@ -31,11 +34,15 @@ export function SpaceRail() {
               onClick={() => useUi.getState().go({ kind: 'home' })}
             >
               <Icon icon={MessageCircle} size={20} />
-              {home > 0 && (
+              {home > 0 ? (
                 <span className={s.railBadge}>
                   <Badge count={home} />
                 </span>
-              )}
+              ) : dmCall ? (
+                <span className={s.railVoice}>
+                  <Fronds size={12} breathing />
+                </span>
+              ) : null}
             </button>
           </Tooltip>
         </div>
@@ -68,6 +75,9 @@ function SpaceIcon({ spaceId, active }: { spaceId: string; active: boolean }) {
   const channels = useData((st) => st.channels)
   const readStates = useData((st) => st.readStates)
   const { unread, mentions } = useMemo(() => spaceUnread({ channels, readStates }, spaceId), [channels, readStates, spaceId])
+  const voice = useData((st) => Object.values(st.voiceStates).some((v) => v.spaceId === spaceId))
+  // When I'm in this space's voice, the fronds ride the room's real envelope; elsewhere they just breathe.
+  const mine = useMedia((st) => st.connection.state === 'connected' && !!st.connection.channelId && useData.getState().channels[st.connection.channelId]?.spaceId === spaceId)
   if (!space) return null
   const open = () => {
     const ui = useUi.getState()
@@ -81,17 +91,22 @@ function SpaceIcon({ spaceId, active }: { spaceId: string; active: boolean }) {
         <button
           type="button"
           className={s.spaceBtn}
+          style={space.iconUrl ? undefined : { ['--tile' as string]: tintFor(spaceId) }}
           aria-current={active ? 'page' : undefined}
-          aria-label={label}
+          aria-label={voice ? `${label}, ${t.rail.inVoice}` : label}
           onClick={open}
           onContextMenu={contextMenuHandler(() => spaceMenu(spaceId), space.name)}
         >
           {space.iconUrl ? <img src={space.iconUrl} alt="" draggable={false} /> : initials(space.name)}
-          {mentions > 0 && (
+          {mentions > 0 ? (
             <span className={s.railBadge}>
-              <Badge count={mentions} />
+              <Badge count={mentions} mention />
             </span>
-          )}
+          ) : voice ? (
+            <span className={s.railVoice}>
+              <Fronds size={12} breathing={!mine} getLevel={mine ? roomLevelNow : undefined} />
+            </span>
+          ) : null}
         </button>
       </Tooltip>
     </div>

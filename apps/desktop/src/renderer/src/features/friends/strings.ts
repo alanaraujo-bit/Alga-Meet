@@ -45,8 +45,10 @@ export const t = {
     notFound: 'Não encontramos ninguém com esse nome de usuário. Confira a grafia.',
     self: 'Esse é você. Tente o nome de usuário de outra pessoa.',
     already: 'Vocês já são amigos ou já existe um pedido entre vocês.',
-    invalid: 'Nomes de usuário têm de 2 a 32 caracteres: letras minúsculas, números, "_" e ".".',
-    tip: 'Dica: seu nome de usuário fica no painel do canto inferior esquerdo. Clique nele para copiar.',
+    invalid: 'Use de 2 a 32 caracteres: letras minúsculas, números, ponto ou _.',
+    yours: 'Seu nome de usuário:',
+    copy: 'Copiar',
+    copied: 'Copiado',
   },
   error: 'Não foi possível concluir. Tente de novo.',
 } as const

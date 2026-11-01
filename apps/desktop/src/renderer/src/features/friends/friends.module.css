@@ -2,11 +2,36 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  width: 100%;
+  max-width: 840px;
   min-height: 0;
   padding: var(--s-4) var(--s-6) 0;
 }
-.searchRow {
-  max-width: 360px;
+.filter {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1_5);
+  width: 200px;
+  height: 28px;
+  margin-right: var(--s-2);
+  padding: 0 var(--s-2);
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-tertiary);
+}
+.filter:focus-within {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.filter input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  font: var(--type-ui);
+}
+.filter input:focus-visible {
+  outline: none;
 }
 .countLabel {
   margin: var(--s-4) 0 var(--s-1);
@@ -29,29 +54,13 @@
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  height: 56px;
+  height: 48px;
   padding: 0 var(--s-2);
   border-radius: var(--r-md);
-}
-/* Hairline between rows that disappears around the hovered one. */
-.row + .row::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: var(--s-2);
-  right: var(--s-2);
-  height: 1px;
-  background: var(--border-subtle);
 }
 .row:hover,
 .row:focus-within {
   background: var(--state-hover);
-}
-.row:hover::before,
-.row:hover + .row::before,
-.row:focus-within::before,
-.row:focus-within + .row::before {
-  opacity: 0;
 }
 .who {
   display: flex;
@@ -86,19 +95,18 @@
   font: var(--type-meta);
 }
 .subAccent {
-  color: var(--accent);
+  color: var(--text-secondary);
 }
 .actions {
   display: flex;
-  gap: var(--s-1_5);
+  align-items: center;
+  gap: var(--s-1);
+  opacity: 0;
 }
-.action {
-  border-radius: var(--r-full);
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
-}
-.actionDanger:hover {
-  color: var(--danger) !important;
+.row:hover .actions,
+.row:focus-within .actions,
+.actionsPinned {
+  opacity: 1;
 }
 
 .add {
@@ -125,11 +133,14 @@
   color: var(--success);
 }
 .tip {
-  margin-top: var(--s-6);
-  padding: var(--s-3);
-  border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.025);
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-5);
   color: var(--text-tertiary);
   font: var(--type-ui);
+}
+.tip strong {
+  color: var(--text-secondary);
+  font-weight: var(--w-medium);
 }

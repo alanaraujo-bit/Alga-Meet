@@ -20,6 +20,7 @@ export function BootSplash() {
       <p className={`${s.splashText} tnum`} role="status" aria-live="polite">
         {failing ? t.splash.retrying(secs ?? 0) : phase === 'booting' ? t.splash.connecting : t.splash.loading}
       </p>
+      <p className={s.splashCause}>{failing ? t.splash.cause : ''}</p>
       <div className={s.splashActions}>
         {failing && (
           <>

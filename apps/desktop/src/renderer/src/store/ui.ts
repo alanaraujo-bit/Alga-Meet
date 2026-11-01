@@ -16,8 +16,18 @@ export type ModalState =
   | { kind: 'leaveSpace'; spaceId: string }
   | null
 
+export type Density = 'comfortable' | 'compact'
+
 interface Prefs {
   reducedMotion: boolean
+  /** Compact = the "classic" dense layout migrants ask for (smaller rows, no message gaps). */
+  density: Density
+  /** Desktop notifications for DMs and @mentions while the window is not focused. */
+  notifyMessages: boolean
+  /** Native notification for an incoming call while the window is not focused. */
+  notifyCalls: boolean
+  /** Taskbar badge with the mention count. */
+  taskbarBadge: boolean
   memberList: boolean
   lastChannelBySpace: Record<string, string>
   /** Users who skipped/finished onboarding on this device. */
@@ -44,7 +54,7 @@ interface UiState extends Prefs {
 
 const KEY = `alga.ui.v1`
 function loadPrefs(): Prefs {
-  const d: Prefs = { reducedMotion: false, memberList: true, lastChannelBySpace: {}, onboarded: {} }
+  const d: Prefs = { reducedMotion: false, density: 'comfortable', notifyMessages: true, notifyCalls: true, taskbarBadge: true, memberList: true, lastChannelBySpace: {}, onboarded: {} }
   try {
     return { ...d, ...(JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Prefs>) }
   } catch {
@@ -55,7 +65,16 @@ const savePrefs = (s: Prefs) => {
   try {
     localStorage.setItem(
       KEY,
-      JSON.stringify({ reducedMotion: s.reducedMotion, memberList: s.memberList, lastChannelBySpace: s.lastChannelBySpace, onboarded: s.onboarded }),
+      JSON.stringify({
+        reducedMotion: s.reducedMotion,
+        density: s.density,
+        notifyMessages: s.notifyMessages,
+        notifyCalls: s.notifyCalls,
+        taskbarBadge: s.taskbarBadge,
+        memberList: s.memberList,
+        lastChannelBySpace: s.lastChannelBySpace,
+        onboarded: s.onboarded,
+      }),
     )
   } catch {
     /* storage full or unavailable: prefs are a convenience */
@@ -89,6 +108,10 @@ export const useUi = create<UiState>()((set, get) => ({
   },
 }))
 
-// Manual reduced-motion toggle: one class on <html>, read by CSS tokens and by MotionConfig.
-useUi.subscribe((s) => document.documentElement.classList.toggle('reduce-motion', s.reducedMotion))
-document.documentElement.classList.toggle('reduce-motion', useUi.getState().reducedMotion)
+// Manual reduced-motion and density: one class each on <html>, read by CSS tokens (and MotionConfig).
+const applyHtml = (s: Prefs) => {
+  document.documentElement.classList.toggle('reduce-motion', s.reducedMotion)
+  document.documentElement.classList.toggle('density-compact', s.density === 'compact')
+}
+useUi.subscribe(applyHtml)
+applyHtml(useUi.getState())

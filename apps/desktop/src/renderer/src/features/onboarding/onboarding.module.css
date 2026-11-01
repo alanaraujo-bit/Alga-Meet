@@ -16,9 +16,9 @@
   text-align: center;
 }
 .step {
-  color: var(--accent);
+  color: var(--text-tertiary);
   font: var(--type-meta);
-  font-weight: var(--w-semibold);
+  font-weight: var(--w-medium);
 }
 .title {
   margin-top: var(--s-2);
@@ -53,7 +53,6 @@
   padding: var(--s-5);
   border-radius: var(--r-lg);
   background: var(--bg-raised);
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
   text-align: left;
   transition:
     background-color var(--dur-hover-out) var(--ease-out-quad),
@@ -61,16 +60,9 @@
 }
 .choice:hover {
   transition-duration: 0ms;
-  background: color-mix(in srgb, var(--bg-raised), white 4%);
-  box-shadow: inset 0 0 0 1px var(--border-strong);
+  background: color-mix(in srgb, var(--bg-raised), white 5%);
 }
-.primary {
-  box-shadow: inset 0 0 0 1px rgba(77, 220, 220, 0.22);
-  background: linear-gradient(180deg, rgba(77, 220, 220, 0.07), transparent 70%), var(--bg-raised);
-}
-.primary:hover {
-  box-shadow: inset 0 0 0 1px rgba(77, 220, 220, 0.4);
-}
+
 .choiceIcon {
   display: grid;
   place-items: center;
@@ -81,10 +73,7 @@
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-secondary);
 }
-.primary .choiceIcon {
-  background: var(--accent-tint);
-  color: var(--accent);
-}
+
 .choiceTitle {
   display: flex;
   align-items: center;

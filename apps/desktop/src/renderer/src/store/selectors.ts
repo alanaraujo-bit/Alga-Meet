@@ -104,3 +104,47 @@ export function roleColor(s: Pick<S, 'members' | 'roles'>, spaceId: string, user
   }
   return best?.color ?? null
 }
+
+export interface LiveRoom {
+  channel: Channel
+  /** Space name, or null for a DM call. */
+  spaceName: string | null
+  people: VoiceState[]
+  streaming: boolean
+  /** How many of the people are my friends (rooms with my people come first). */
+  friends: number
+  mine: boolean
+}
+
+/**
+ * "Agora": every voice room with someone in it right now (space channels and DM calls), mine first,
+ * then rooms with more of my friends, then bigger rooms.
+ */
+export function liveRooms(s: Pick<S, 'voiceStates' | 'channels' | 'spaces' | 'relationships' | 'me'>): LiveRoom[] {
+  const by = new Map<string, VoiceState[]>()
+  for (const v of Object.values(s.voiceStates)) {
+    const list = by.get(v.channelId)
+    if (list) list.push(v)
+    else by.set(v.channelId, [v])
+  }
+  const rooms: LiveRoom[] = []
+  for (const [channelId, people] of by) {
+    const channel = s.channels[channelId]
+    if (!channel) continue
+    people.sort((a, b) => a.joinedAt.localeCompare(b.joinedAt))
+    rooms.push({
+      channel,
+      spaceName: channel.spaceId ? (s.spaces[channel.spaceId]?.name ?? null) : null,
+      people,
+      streaming: people.some((p) => p.streaming),
+      friends: people.filter((p) => s.relationships[p.userId]?.type === 'friend').length,
+      mine: people.some((p) => p.userId === s.me?.id),
+    })
+  }
+  return rooms.sort((a, b) => Number(b.mine) - Number(a.mine) || b.friends - a.friends || b.people.length - a.people.length || a.channel.name.localeCompare(b.channel.name, 'pt-BR'))
+}
+
+/** Space ids with at least one person in voice (rail affordance). */
+export function spacesInVoice(s: Pick<S, 'voiceStates'>): Set<string> {
+  return new Set(Object.values(s.voiceStates).flatMap((v) => (v.spaceId ? [v.spaceId] : [])))
+}

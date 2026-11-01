@@ -19,6 +19,7 @@ export function FriendsView() {
   const tab = useUi((st) => st.friendsTab)
   const relationships = useData((st) => st.relationships)
   const pending = useMemo(() => Object.values(relationships).filter((r) => r.type === 'incoming').length, [relationships])
+  const [q, setQ] = useState('')
   return (
     <div className={sh.mainCol}>
       <header className={sh.header}>
@@ -27,29 +28,39 @@ export function FriendsView() {
           {t.title}
         </h1>
         <span className={sh.headerSep} />
-        <Tabs<FriendsTab>
+        {/* Tabs filter the list; "Adicionar amigo" is an action, so it is a button, outside the tab group. */}
+        <Tabs<Exclude<FriendsTab, 'add'>>
           label={t.title}
-          value={tab}
+          value={tab === 'add' ? ('' as never) : tab}
           onChange={(v) => useUi.getState().setFriendsTab(v)}
           items={[
             { value: 'online', label: t.tabs.online },
             { value: 'all', label: t.tabs.all },
             { value: 'pending', label: t.tabs.pending, badge: pending },
             { value: 'blocked', label: t.tabs.blocked },
-            { value: 'add', label: t.tabs.add, accent: true },
           ]}
         />
+        <div className={sh.headerActions}>
+          {tab !== 'add' && (
+            <label className={s.filter}>
+              <Icon icon={Search} size={14} />
+              <input value={q} placeholder={t.search} aria-label={t.search} onChange={(e) => setQ(e.target.value)} />
+            </label>
+          )}
+          <Button size="sm" variant={tab === 'add' ? 'primary' : 'secondary'} icon={UserPlus} aria-pressed={tab === 'add'} onClick={() => useUi.getState().setFriendsTab('add')}>
+            {t.tabs.add}
+          </Button>
+        </div>
       </header>
-      {tab === 'add' ? <AddFriend /> : <FriendList key={tab} tab={tab} />}
+      {tab === 'add' ? <AddFriend /> : <FriendList key={tab} tab={tab} q={q} />}
     </div>
   )
 }
 
-function FriendList({ tab }: { tab: Exclude<FriendsTab, 'add'> }) {
+function FriendList({ tab, q }: { tab: Exclude<FriendsTab, 'add'>; q: string }) {
   const relationships = useData((st) => st.relationships)
   const presences = useData((st) => st.presences)
   const me = useData((st) => st.me)
-  const [q, setQ] = useState('')
   const all = useMemo(() => {
     const list = Object.values(relationships).filter((r) =>
       tab === 'online' ? r.type === 'friend' && presenceOf({ presences, me }, r.user.id) !== 'offline'
@@ -82,9 +93,6 @@ function FriendList({ tab }: { tab: Exclude<FriendsTab, 'add'> }) {
   }
   return (
     <div className={s.body}>
-      <div className={s.searchRow}>
-        <TextField size="sm" ariaLabel={t.search} placeholder={t.search} leadingIcon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
-      </div>
       <div className={s.countLabel}>{t.count[tab](shown.length)}</div>
       <ScrollArea className={s.list} role="list">
         {shown.length === 0 ? <p className={s.noMatch}>{t.empty.search}</p> : shown.map((r) => <FriendRow key={r.user.id} rel={r} />)}
@@ -146,14 +154,10 @@ function FriendRow({ rel }: { rel: Relationship }) {
     : rel.type === 'outgoing' ? t.outgoing
     : rel.type === 'blocked' ? t.blockedLabel
     : PRESENCE_LABEL[presence]
-  const quick: Array<{ icon: LucideIcon; label: string; run: () => void; danger?: boolean }> =
+  const quick: Array<{ icon: LucideIcon; label: string; run: () => void }> =
     rel.type === 'friend' ? [{ icon: MessageCircle, label: t.actions.message, run: () => void message(u.id) }]
-    : rel.type === 'incoming'
-      ? [
-          { icon: Check, label: t.actions.accept, run: () => void run(setRelationship(u.id, 'friend'), t.done.accepted(u.displayName)) },
-          { icon: X, label: t.actions.decline, run: () => void run(removeRelationship(u.id)), danger: true },
-        ]
-    : rel.type === 'outgoing' ? [{ icon: X, label: t.actions.cancel, run: () => void run(removeRelationship(u.id)), danger: true }]
+    : rel.type === 'incoming' ? [{ icon: X, label: t.actions.decline, run: () => void run(removeRelationship(u.id)) }]
+    : rel.type === 'outgoing' ? [{ icon: X, label: t.actions.cancel, run: () => void run(removeRelationship(u.id)) }]
     : [{ icon: Ban, label: t.actions.unblock, run: () => void run(removeRelationship(u.id), t.done.unblocked(u.displayName)) }]
 
   return (
@@ -175,12 +179,18 @@ function FriendRow({ rel }: { rel: Relationship }) {
         </span>
         <span className={`${s.sub} ${rel.type === 'incoming' ? s.subAccent : ''}`}>{sub}</span>
       </div>
-      <div className={s.actions}>
+      {/* Actions show on hover/focus; a request waiting on you keeps them visible. Accept ≠ decline in weight. */}
+      <div className={`${s.actions} ${rel.type === 'incoming' ? s.actionsPinned : ''}`}>
+        {rel.type === 'incoming' && (
+          <Button size="sm" variant="primary" icon={Check} onClick={() => void run(setRelationship(u.id, 'friend'), t.done.accepted(u.displayName))}>
+            {t.actions.accept}
+          </Button>
+        )}
         {quick.map((a) => (
-          <IconButton key={a.label} icon={a.icon} label={a.label} size="lg" className={`${s.action} ${a.danger ? s.actionDanger : ''}`} onClick={a.run} />
+          <IconButton key={a.label} icon={a.icon} label={a.label} onClick={a.run} />
         ))}
         <MenuButton items={() => friendMenu(rel)} align="end" label={u.displayName}>
-          <IconButton icon={MoreHorizontal} label={t.actions.more} size="lg" className={s.action} />
+          <IconButton icon={MoreHorizontal} label={t.actions.more} />
         </MenuButton>
       </div>
     </div>
@@ -193,6 +203,7 @@ function AddFriend() {
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
   const input = useRef<HTMLInputElement>(null)
   const me = useData((st) => st.me)
+  const [copied, setCopied] = useState(false)
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -249,7 +260,23 @@ function AddFriend() {
             }
           />
         </form>
-        <p className={s.tip}>{t.add.tip}</p>
+        {me && (
+          <p className={s.tip}>
+            {t.add.yours} <strong data-selectable>@{me.username}</strong>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={copied ? Check : Copy}
+              onClick={() => {
+                void copyText(me.username)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 1500)
+              }}
+            >
+              {copied ? t.add.copied : t.add.copy}
+            </Button>
+          </p>
+        )}
       </section>
     </div>
   )

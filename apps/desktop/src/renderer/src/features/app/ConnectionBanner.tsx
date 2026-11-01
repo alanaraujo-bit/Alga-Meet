@@ -32,24 +32,20 @@ export function useOnline(): boolean {
   return online
 }
 
-/** Shown above the main area while the realtime connection is not ready (data stays usable). */
-export function ConnectionBanner() {
+/**
+ * Realtime link status as a chip in the title bar (where the search sits), so nothing below moves when the
+ * connection wobbles. Returns null while ready.
+ */
+export function ConnectionChip() {
   const status = useSession((st) => st.gateway)
   const secs = useRetryCountdown()
   const online = useOnline()
   if (status === 'ready' || status === 'idle' || status === 'closed') return null
-  if (!online)
-    return (
-      <div className={`${s.banner} ${s.bannerOffline}`} role="status">
-        <span className={s.bannerDot} />
-        {t.banner.offline}
-      </div>
-    )
   return (
-    <div className={s.banner} role="status" aria-live="polite">
+    <div className={`${s.chip} ${!online ? s.chipOffline : ''}`} role="status" aria-live="polite">
       <span className={s.bannerDot} />
-      <span className="tnum">{status === 'connecting' ? t.banner.connecting : t.banner.reconnecting(secs)}</span>
-      {status === 'reconnecting' && (
+      <span className={`${s.chipText} tnum`}>{!online ? t.banner.offline : status === 'connecting' ? t.banner.connecting : t.banner.reconnecting(secs)}</span>
+      {online && status === 'reconnecting' && (
         <button type="button" className={s.bannerAction} onClick={() => useSession.getState().reconnect()}>
           {t.banner.retryNow}
         </button>

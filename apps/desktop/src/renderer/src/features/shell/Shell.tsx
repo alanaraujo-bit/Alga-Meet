@@ -6,22 +6,28 @@ import { useUi } from '@/store/ui'
 import { EmptyState, Button } from '@/ui'
 import { Hash } from 'lucide-react'
 import { EASE_OUT_QUART } from '@/ui/motion'
-import { ConnectionBanner } from '../app/ConnectionBanner'
+import { startNotifications } from '../app/notifications'
 import { ChatView } from '../chat/ChatView'
 import { FriendsView } from '../friends/FriendsView'
 import { Onboarding, useNeedsOnboarding } from '../onboarding/Onboarding'
+import { SettingsOverlay } from '../settings/SettingsOverlay'
 import { SpaceModals } from '../spaces/SpaceModals'
 import { QuickSwitcher } from '../switcher/QuickSwitcher'
+import { CallStage } from '../voice/CallStage'
+import { IncomingCall } from '../voice/IncomingCall'
+import { ScreenPicker } from '../voice/ScreenPicker'
+import { startVoiceSync } from '../voice/voice'
 import { MemberList } from './MemberList'
 import { Sidebar } from './Sidebar'
 import { SpaceRail } from './SpaceRail'
-import { VoiceStage } from './VoiceStage'
 import { t } from './strings'
 import s from './shell.module.css'
 
 export function Shell() {
   useGlobalShortcuts()
   useViewGuard()
+  useEffect(() => startVoiceSync(), [])
+  useEffect(() => startNotifications(), [])
   const view = useUi((st) => st.view)
   const order = useData((st) => st.spaceOrder)
 
@@ -45,12 +51,14 @@ export function Shell() {
       >
         <Sidebar />
         <main className={s.main}>
-          <ConnectionBanner />
           <MainArea />
         </main>
       </motion.div>
       <SpaceModals />
       <QuickSwitcher />
+      <ScreenPicker />
+      <IncomingCall />
+      <SettingsOverlay />
     </motion.div>
   )
 }
@@ -83,7 +91,7 @@ function SpaceMain({ spaceId, channelId }: { spaceId: string; channelId: string 
       </EmptyState>
     )
   }
-  if (ch.type === 'voice') return <VoiceStage key={ch.id} channel={ch} />
+  if (ch.type === 'voice') return <CallStage key={ch.id} channel={ch} />
   return <ChatView key={ch.id} channelId={ch.id} aside={memberList ? <MemberList spaceId={spaceId} /> : null} />
 }
 

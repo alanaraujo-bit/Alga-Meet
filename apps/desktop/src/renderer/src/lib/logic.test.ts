@@ -1,7 +1,10 @@
 import type { Channel, Message, ReadState, Relationship } from '@alga/shared'
 import { describe, expect, it } from 'vitest'
 import { patchReaction } from '../store/data'
-import { homeBadge, spaceUnread } from '../store/selectors'
+import { homeBadge, liveRooms, spaceUnread } from '../store/selectors'
+import { fitTiles, loudness } from '../features/voice/layout'
+import { encodeMentions } from '../features/chat/mentions'
+import { searchEmoji } from '../features/chat/emoji'
 import { place } from '../ui/floating'
 import { fuzzyScore } from './fuzzy'
 import { parseInviteCode } from './invite'
@@ -187,5 +190,63 @@ describe('parseInviteCode', () => {
     expect(parseInviteCode('alga.meet/i/k3yZ9q/')).toBe('k3yZ9q')
     expect(parseInviteCode('não é convite!')).toBeNull()
     expect(parseInviteCode('')).toBeNull()
+  })
+})
+
+describe('call stage geometry', () => {
+  it('fills the box with 16:9 tiles and picks the best column count', () => {
+    // 1 tile in a wide box: limited by height (500 * 16/9 = 888) then capped at 880.
+    expect(fitTiles(1, 1600, 500)).toBe(880)
+    // 2 tiles side by side beat stacking in a 1000x400 box.
+    expect(fitTiles(2, 1000, 400)).toBe(496)
+    // ...and in a 1000x650 one too (stacked would be 571 wide, but landscape rows read better).
+    expect(fitTiles(2, 1000, 650)).toBe(496)
+    // never below the readable minimum, even when crowded.
+    expect(fitTiles(30, 400, 300)).toBe(200)
+    expect(fitTiles(0, 100, 100)).toBe(200)
+  })
+  it('maps SFU amplitude to a perceptual 0..1 for the glow', () => {
+    expect(loudness(0)).toBe(0)
+    expect(loudness(0.1)).toBeCloseTo(1, 5) // -20 dB: clearly speaking
+    expect(loudness(0.01)).toBeCloseTo(1 / 3, 5) // -40 dB: quiet
+    expect(loudness(0.001)).toBe(0) // -60 dB: noise floor
+  })
+})
+
+describe('liveRooms (Agora)', () => {
+  const vs = (userId: string, channelId: string, extra: Partial<{ streaming: boolean; spaceId: string | null }> = {}) => ({
+    userId, channelId, spaceId: extra.spaceId === undefined ? 's1' : extra.spaceId, selfMute: false, selfDeaf: false, serverMute: false, serverDeaf: false, streaming: extra.streaming ?? false, video: false, joinedAt: `2026-11-01T00:00:0${userId.length}Z`,
+  })
+  const ch = (id: string, name: string, spaceId: string | null = 's1'): Channel => ({ id, type: spaceId ? 'voice' : 'dm', spaceId, name, topic: '', position: 0, lastMessageId: null })
+  it('groups by room, puts mine first, then rooms with more friends, and flags streams', () => {
+    const rooms = liveRooms({
+      me: { ...A, email: '', statusPreference: 'online', createdAt: '' },
+      voiceStates: { x: vs('x', 'v1'), y: vs('y', 'v2', { streaming: true }), z: vs('z', 'v2'), a: vs('a', 'v3') },
+      channels: { v1: ch('v1', 'Foco'), v2: ch('v2', 'Jogo'), v3: ch('v3', 'Minha') },
+      spaces: { s1: { id: 's1', name: 'Estúdio', iconUrl: null, ownerId: 'a', createdAt: '' } },
+      relationships: { x: { user: { ...B, id: 'x' }, type: 'friend', since: '' } },
+    })
+    expect(rooms.map((r) => r.channel.id)).toEqual(['v3', 'v1', 'v2'])
+    expect(rooms[0]!.mine).toBe(true)
+    expect(rooms[2]!.streaming).toBe(true)
+    expect(rooms[1]!.spaceName).toBe('Estúdio')
+  })
+  it('skips rooms whose channel is unknown (e.g. a space we just left)', () => {
+    expect(liveRooms({ me: null, voiceStates: { x: vs('x', 'gone') }, channels: {}, spaces: {}, relationships: {} })).toEqual([])
+  })
+})
+
+describe('composer helpers', () => {
+  it('turns picked @names into wire mentions, longest name first', () => {
+    const picked = new Map([['Ana', 'id-ana'], ['Ana Ribeiro', 'id-ar']])
+    expect(encodeMentions('oi @Ana Ribeiro e @Ana!', picked)).toBe('oi <@id-ar> e <@id-ana>!')
+    expect(encodeMentions('sem menção', picked)).toBe('sem menção')
+  })
+  it('finds emoji by accent-insensitive pt-BR keywords', () => {
+    expect(searchEmoji('coracao')).toContain('❤️')
+    expect(searchEmoji('coração')).toContain('❤️')
+    expect(searchEmoji('festa')[0]).toBe('🥳')
+    expect(searchEmoji('xyzxyz')).toEqual([])
+    expect(searchEmoji('').length).toBeGreaterThan(100)
   })
 })

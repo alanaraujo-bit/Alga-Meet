@@ -1,4 +1,4 @@
-import { ArrowDown, Hash } from 'lucide-react'
+import { ArrowDown, Hash, Phone } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { buildRows } from '@/lib/grouping'
 import { mentionedIds } from '@/lib/markdown'
@@ -7,6 +7,7 @@ import { useData } from '@/store/data'
 import { useUi } from '@/store/ui'
 import { Avatar, Button, Divider, Icon, Skeleton } from '@/ui'
 import { errorText } from '@/lib/errors'
+import { joinVoice } from '../voice/voice'
 import { MessageItem } from './MessageItem'
 import { t } from './strings'
 import s from './chat.module.css'
@@ -174,7 +175,14 @@ function Intro({ title, isDm, channelId }: { title: string; isDm: boolean; chann
     <div className={s.intro}>
       <div className={s.introIcon}>{isDm && peer ? <Avatar user={peer} size={56} decorative /> : <Icon icon={Hash} size={24} />}</div>
       <h2 className={s.introTitle}>{isDm ? title : t.intro.channelTitle(title)}</h2>
-      <p className={s.introBody}>{isDm ? t.intro.dmBody(title) : t.intro.channelBody(title)}</p>
+      <p className={s.introBody}>{isDm ? t.intro.dmBody(peer?.displayName.split(' ')[0] ?? title) : t.intro.channelBody(title)}</p>
+      {isDm && (
+        <div className={s.introActions}>
+          <Button icon={Phone} onClick={() => void joinVoice(channelId)}>
+            {t.intro.call}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

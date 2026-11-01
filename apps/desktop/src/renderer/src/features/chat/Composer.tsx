@@ -1,19 +1,42 @@
-import { SendHorizontal, X } from 'lucide-react'
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type Ref } from 'react'
+import type { PublicUser } from '@alga/shared'
+import { SendHorizontal, Smile, X } from 'lucide-react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type Ref } from 'react'
+import { fold } from '@/lib/fuzzy'
 import { toPlainText } from '@/lib/markdown'
 import { sendMessage, typing } from '@/store/actions'
 import { useData } from '@/store/data'
 import { displayName } from '@/store/selectors'
+import { useSession } from '@/store/session'
 import { useUi } from '@/store/ui'
-import { IconButton } from '@/ui'
+import { Avatar, IconButton } from '@/ui'
+import { EmojiPicker } from './EmojiPicker'
+import { encodeMentions } from './mentions'
 import { t } from './strings'
 import s from './chat.module.css'
+
+interface Candidate {
+  user: PublicUser
+  name: string
+}
+const MENTION_RE = /(?:^|\s)@([\p{L}\p{N}_.]{0,32})$/u
+const MAX_SUGGESTIONS = 8
+
+/** Who you can @mention here: the space's members, or the DM's other recipients. */
+function useCandidates(channelId: string, spaceId: string | null): Candidate[] {
+  const members = useData((st) => (spaceId ? st.members[spaceId] : undefined))
+  const channel = useData((st) => st.channels[channelId])
+  const users = useData((st) => st.users)
+  const meId = useData((st) => st.me?.id)
+  return useMemo(() => {
+    if (spaceId) return Object.values(members ?? {}).filter((m) => m.user.id !== meId).map((m) => ({ user: m.user, name: m.nickname || m.user.displayName }))
+    return (channel?.recipientIds ?? []).filter((id) => id !== meId && users[id]).map((id) => ({ user: users[id]!, name: users[id]!.displayName }))
+  }, [spaceId, members, channel, users, meId])
+}
 
 export const MAX_LEN = 4000
 const TYPING_EVERY_MS = 8000
 /** Drafts survive channel switches (in-memory for the session). */
 const drafts = new Map<string, string>()
-
 export function Composer({
   channelId,
   spaceId,
@@ -35,6 +58,19 @@ export function Composer({
   const reply = useData((st) => (replyToId ? st.messages[channelId]?.byId[replyToId] : undefined))
   const replyName = useData((st) => (reply ? displayName(st, reply.author.id, spaceId) : ''))
   const users = useData((st) => st.users)
+  const offline = useSession((st) => st.gateway === 'reconnecting')
+  const candidates = useCandidates(channelId, spaceId)
+  const picked = useRef(new Map<string, string>())
+  const [mention, setMention] = useState<{ start: number; query: string; index: number } | null>(null)
+  const [emojiAt, setEmojiAt] = useState<HTMLElement | null>(null)
+  const suggestions = useMemo(() => {
+    if (!mention) return []
+    const q = fold(mention.query)
+    return candidates
+      .filter((c) => !q || fold(c.name).split(/\s+/).some((w) => w.startsWith(q)) || fold(c.user.username).startsWith(q))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+      .slice(0, MAX_SUGGESTIONS)
+  }, [mention, candidates])
 
   const setRefs = (el: HTMLTextAreaElement | null) => {
     ref.current = el
@@ -63,17 +99,73 @@ export function Composer({
   const remaining = MAX_LEN - value.length
 
   const submit = () => {
-    const content = value.trim()
+    const content = encodeMentions(value.trim(), picked.current)
     if (!content || over > 0 || !canSend) return
     setValue('')
+    setMention(null)
+    picked.current.clear()
     lastTyping.current = 0
     useUi.getState().setReplyTo(channelId, undefined)
     // Failure keeps the message in the list with retry/discard; nothing else to do here.
     sendMessage(channelId, content, replyToId).catch((e: unknown) => console.warn('[send] failed', e))
   }
 
+  const pick = (c: Candidate) => {
+    const el = ref.current
+    if (!el || !mention) return
+    const caret = el.selectionStart
+    const insert = `@${c.name} `
+    const next = value.slice(0, mention.start) + insert + value.slice(caret)
+    picked.current.set(c.name, c.user.id)
+    setValue(next)
+    setMention(null)
+    requestAnimationFrame(() => {
+      el.focus()
+      el.setSelectionRange(mention.start + insert.length, mention.start + insert.length)
+    })
+  }
+
+  const insertEmoji = (emoji: string) => {
+    const el = ref.current
+    const at = el?.selectionStart ?? value.length
+    const end = el?.selectionEnd ?? value.length
+    setValue(value.slice(0, at) + emoji + value.slice(end))
+    setEmojiAt(null)
+    requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(at + emoji.length, at + emoji.length)
+    })
+  }
+
+  /** Re-read the "@query" right before the caret (typing, clicking). */
+  const trackMention = (el: HTMLTextAreaElement) => {
+    const m = MENTION_RE.exec(el.value.slice(0, el.selectionStart))
+    if (!m || candidates.length === 0) return setMention(null)
+    const start = el.selectionStart - m[1]!.length - 1
+    setMention((cur) => ({ start, query: m[1]!, index: cur && cur.start === start ? cur.index : 0 }))
+  }
+
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return
+    if (mention && suggestions.length > 0) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        const d = e.key === 'ArrowDown' ? 1 : -1
+        setMention({ ...mention, index: (mention.index + d + suggestions.length) % suggestions.length })
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        pick(suggestions[Math.min(mention.index, suggestions.length - 1)]!)
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        setMention(null)
+        return
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       submit()
@@ -93,8 +185,9 @@ export function Composer({
     }
   }
 
-  const onChange = (v: string) => {
+  const onChange = (v: string, el: HTMLTextAreaElement) => {
     setValue(v)
+    trackMention(el)
     const now = Date.now()
     if (v.trim() && now - lastTyping.current > TYPING_EVERY_MS) {
       lastTyping.current = now
@@ -102,8 +195,33 @@ export function Composer({
     }
   }
 
+  const listId = `${channelId}-mentions`
+  const active = mention && suggestions.length ? suggestions[Math.min(mention.index, suggestions.length - 1)] : undefined
   return (
     <div className={s.composerWrap}>
+      {mention && suggestions.length > 0 && (
+        <div className={s.mentions} role="listbox" id={listId} aria-label={t.mentions.title}>
+          <div className={s.mentionsHead}>{t.mentions.title}</div>
+          {suggestions.map((c, i) => (
+            <button
+              key={c.user.id}
+              id={`${listId}-${c.user.id}`}
+              type="button"
+              role="option"
+              aria-selected={i === mention.index}
+              tabIndex={-1}
+              className={s.mentionRow}
+              onPointerDown={(e) => e.preventDefault()}
+              onPointerEnter={() => setMention({ ...mention, index: i })}
+              onClick={() => pick(c)}
+            >
+              <Avatar user={c.user} size={20} decorative />
+              <span className={s.mentionName}>{c.name}</span>
+              <span className={s.mentionHandle}>@{c.user.username}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className={`${s.composer} ${over > 0 ? s.composerOver : ''} ${!canSend ? s.composerDisabled : ''}`}>
         {reply && (
           <div className={s.replyBar}>
@@ -121,17 +239,23 @@ export function Composer({
             rows={1}
             value={value}
             disabled={!canSend}
-            placeholder={canSend ? t.placeholder(target) : t.noPermission}
+            placeholder={!canSend ? t.noPermission : offline ? t.offline : t.placeholder(target)}
             aria-label={t.placeholder(target)}
             aria-describedby={remaining <= 400 ? `${channelId}-count` : undefined}
-            onChange={(e) => onChange(e.target.value)}
+            aria-autocomplete="list"
+            aria-controls={mention && suggestions.length ? listId : undefined}
+            aria-activedescendant={active ? `${listId}-${active.user.id}` : undefined}
+            onChange={(e) => onChange(e.target.value, e.target)}
             onKeyDown={onKeyDown}
+            onClick={(e) => trackMention(e.currentTarget)}
+            onBlur={() => setMention(null)}
           />
           {remaining <= 400 && (
             <span id={`${channelId}-count`} className={`${s.counter} tnum ${over > 0 ? s.counterOver : ''}`} aria-live="polite">
               {over > 0 ? `-${over}` : remaining}
             </span>
           )}
+          <IconButton icon={Smile} label={t.emoji.open} aria-expanded={!!emojiAt} className={s.emojiBtn} onClick={(e) => setEmojiAt(emojiAt ? null : e.currentTarget)} />
           <IconButton
             icon={SendHorizontal}
             label={t.send}
@@ -142,6 +266,7 @@ export function Composer({
           />
         </div>
       </div>
+      <EmojiPicker anchor={emojiAt} onClose={() => setEmojiAt(null)} onPick={insertEmoji} />
     </div>
   )
 }

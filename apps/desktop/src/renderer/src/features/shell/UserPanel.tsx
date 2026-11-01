@@ -1,13 +1,14 @@
 import type { StatusPreference } from '@alga/shared'
-import { Copy, Headphones, HeadphoneOff, LogOut, Mic, MicOff, PhoneOff, Settings, Signal, Sparkles } from 'lucide-react'
+import { Check, Copy, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Settings } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { media, useMedia } from '@/media'
 import { setStatus } from '@/store/actions'
 import { useData } from '@/store/data'
-import { channelTitle, presenceOf } from '@/store/selectors'
+import { presenceOf } from '@/store/selectors'
 import { useSession } from '@/store/session'
-import { useUi } from '@/store/ui'
-import { Avatar, Divider, Icon, IconButton, MenuButton, Popover, PresenceGlyph, toast } from '@/ui'
+import { Avatar, Divider, Icon, IconButton, Popover, PresenceGlyph, toast } from '@/ui'
+import { openSettings } from '../settings/store'
+import { VoicePanel } from '../voice/VoicePanel'
 import { errorText } from '@/lib/errors'
 import { copyText } from '@/lib/clipboard'
 import { t } from '../app/strings'
@@ -22,33 +23,6 @@ export function UserPanel() {
   )
 }
 
-/** Slot for the active voice connection (full call controls arrive with the call UI wave). */
-function VoicePanel() {
-  const conn = useMedia((st) => st.connection)
-  const channel = useData((st) => (conn.channelId ? st.channels[conn.channelId] : undefined))
-  const spaceName = useData((st) => (channel?.spaceId ? st.spaces[channel.spaceId]?.name : undefined))
-  const title = useData((st) => (channel ? channelTitle(st, channel) : ''))
-  if (conn.state === 'idle' || (conn.state === 'disconnected' && !conn.reason)) return null
-  const warn = conn.state !== 'connected'
-  const label =
-    conn.state === 'connecting' ? t.voice.connecting
-    : conn.state === 'reconnecting' ? t.voice.reconnecting
-    : conn.state === 'disconnected' ? t.voice.disconnected
-    : t.voice.connected
-  return (
-    <div className={s.voicePanel} role="status" aria-live="polite">
-      <div className={s.voiceState}>
-        <div className={`${s.voiceStateTitle} ${warn ? s.voiceStateWarn : ''}`}>
-          <Icon icon={Signal} size={14} />
-          {label}
-        </div>
-        <div className={s.voiceStateSub}>{conn.state === 'disconnected' ? conn.reason : [title, spaceName].filter(Boolean).join(' / ')}</div>
-      </div>
-      {conn.state !== 'disconnected' && <IconButton icon={PhoneOff} label={t.voice.leave} danger onClick={() => void media.leave()} />}
-    </div>
-  )
-}
-
 const STATUSES: StatusPreference[] = ['online', 'idle', 'dnd', 'invisible']
 
 function UserRow() {
@@ -57,7 +31,9 @@ function UserRow() {
   const muted = useMedia((st) => st.self.muted)
   const deafened = useMedia((st) => st.self.deafened)
   const micAvailable = useMedia((st) => st.self.micAvailable)
-  const reduced = useUi((st) => st.reducedMotion)
+  const serverMute = useData((st) => !!(st.me && st.voiceStates[st.me.id]?.serverMute))
+  // While the realtime link is down, your own status would be a lie: say what is actually happening.
+  const offline = useSession((st) => st.gateway === 'reconnecting' || st.gateway === 'connecting')
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const btn = useRef<HTMLButtonElement>(null)
   if (!me) return null
@@ -81,7 +57,11 @@ function UserRow() {
         <Avatar user={me} size={32} presence={presence} decorative />
         <span className={s.meText}>
           <span className={s.meName}>{me.displayName}</span>
-          <span className={s.meStatus}>{t.userPanel.status[me.statusPreference]}</span>
+          {offline ? (
+            <span className={`${s.meStatus} ${s.meStatusWarn}`}>{t.userPanel.reconnecting}</span>
+          ) : (
+            <span className={s.meStatus}>{t.userPanel.status[me.statusPreference]}</span>
+          )}
         </span>
       </button>
       <IconButton
@@ -89,7 +69,7 @@ function UserRow() {
         label={muted ? t.userPanel.unmute : t.userPanel.mute}
         aria-pressed={muted}
         danger
-        disabledReason={micAvailable ? undefined : 'Nenhum microfone encontrado'}
+        disabledReason={serverMute ? t.userPanel.serverMuted : micAvailable ? undefined : 'Nenhum microfone encontrado'}
         onClick={() => void media.toggleMute()}
       />
       <IconButton
@@ -99,21 +79,9 @@ function UserRow() {
         danger
         onClick={() => void media.toggleDeafen()}
       />
-      <MenuButton
-        side="top"
-        align="end"
-        label={t.userPanel.settings}
-        items={() => [
-          { label: t.userPanel.settings, icon: Settings, disabled: true, hint: 'Em breve', onSelect: () => undefined },
-          { label: t.userPanel.reduceMotion, icon: Sparkles, checked: reduced, onSelect: () => useUi.getState().setPref('reducedMotion', !reduced) },
-          { kind: 'separator' },
-          { label: t.userPanel.signOut, icon: LogOut, danger: true, onSelect: () => void useSession.getState().logout() },
-        ]}
-      >
-        <IconButton icon={Settings} label={t.userPanel.settings} />
-      </MenuButton>
+      <IconButton icon={Settings} label={t.userPanel.settings} shortcut="Ctrl ," onClick={() => openSettings()} />
 
-      <Popover anchor={anchor} onClose={() => setAnchor(null)} side="top" align="start" label={t.userPanel.setStatus} width={260}>
+      <Popover anchor={anchor} onClose={() => setAnchor(null)} side="top" align="start" gap={12} label={t.userPanel.setStatus} width={232}>
         <div className={s.profileCard}>
           <Avatar user={me} size={40} presence={presence} decorative />
           <div style={{ minWidth: 0 }}>
@@ -127,10 +95,15 @@ function UserRow() {
               <span className={s.statusDot}>
                 <PresenceGlyph status={p === 'invisible' ? 'offline' : p} />
               </span>
-              <span>
+              <span className={s.statusLabel}>
                 {t.userPanel.status[p]}
                 {t.userPanel.statusHint[p] && <span className={s.statusHint}>{t.userPanel.statusHint[p]}</span>}
               </span>
+              {me.statusPreference === p && (
+                <span className={s.statusCheck}>
+                  <Icon icon={Check} size={14} />
+                </span>
+              )}
             </button>
           ))}
           <Divider style={{ margin: '6px 0' }} />
@@ -147,6 +120,19 @@ function UserRow() {
               <Icon icon={Copy} size={14} />
             </span>
             {t.userPanel.copyUsername}
+          </button>
+          <button
+            type="button"
+            className={`${s.statusItem} ${s.statusDanger}`}
+            onClick={() => {
+              setAnchor(null)
+              void useSession.getState().logout()
+            }}
+          >
+            <span className={s.statusDot} style={{ marginTop: 2 }}>
+              <Icon icon={LogOut} size={14} />
+            </span>
+            {t.userPanel.signOut}
           </button>
         </div>
       </Popover>

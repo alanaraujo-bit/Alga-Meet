@@ -74,8 +74,7 @@
   width: 40px;
   height: 40px;
   border-radius: var(--r-lg);
-  background: var(--bg-raised);
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  background: var(--tile, var(--bg-raised));
   color: var(--text-secondary);
   font: var(--type-ui-lg);
   font-weight: var(--w-semibold);
@@ -87,13 +86,13 @@
 }
 .spaceBtn:hover {
   transition-duration: 0ms, 0ms, var(--dur-morph);
-  background: color-mix(in srgb, var(--bg-raised), white 6%);
+  background: color-mix(in srgb, var(--tile, var(--bg-raised)), white 6%);
   color: var(--text-primary);
 }
+/* Selection is neutral and borderless: the tile just steps up in luminance. */
 .spaceBtn[aria-current='page'] {
-  background: color-mix(in srgb, var(--bg-raised), white 9%);
+  background: color-mix(in srgb, var(--tile, var(--bg-raised)), white 9%);
   color: var(--text-primary);
-  box-shadow: inset 0 0 0 1px var(--border-strong);
 }
 .spaceBtn img {
   width: 100%;
@@ -101,18 +100,25 @@
   border-radius: inherit;
   object-fit: cover;
 }
-.homeBtn[aria-current='page'] {
-  color: var(--accent);
-  background: var(--accent-tint);
-  box-shadow: inset 0 0 0 1px rgba(77, 220, 220, 0.18);
-}
 .addBtn {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--border-default);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--text-tertiary);
 }
 .addBtn:hover {
-  background: var(--accent-tint);
+  background: var(--state-selected);
+  color: var(--text-primary);
+}
+/* Voice in the chrome: live fronds on a space where people are talking right now. */
+.railVoice {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-full);
+  background: var(--bg-app);
   color: var(--accent);
 }
 .railBadge {
@@ -240,9 +246,26 @@
 .rowTall {
   height: 40px;
 }
+:global(.density-compact) .rowTall {
+  height: 32px;
+}
+:global(.density-compact) .member {
+  height: 32px;
+}
 .rowUnread {
   color: var(--text-primary);
   font-weight: var(--w-semibold);
+}
+/* Unread is weight + a dot, so it never reads like "selected" (which is weight + fill). */
+.rowUnread::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: calc(50% - 3px);
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--text-primary);
 }
 .rowName {
   flex: 1;
@@ -273,7 +296,8 @@
   font: var(--type-meta);
   font-weight: var(--w-regular);
 }
-.voiceActive .rowIcon {
+.voiceActive .rowIcon,
+.row[aria-current='page'].voiceActive .rowIcon {
   color: var(--accent);
 }
 
@@ -306,13 +330,20 @@
 .voiceFlagDanger {
   color: var(--danger);
 }
+/* Live = voice-adjacent signal: accent, never the red reserved for mentions and errors. */
 .live {
   padding: 0 5px;
   border-radius: var(--r-xs);
-  background: var(--danger);
-  color: var(--on-danger);
+  background: var(--accent-fill);
+  color: var(--on-accent);
   font: var(--type-badge);
   letter-spacing: 0.02em;
+}
+.accent {
+  color: var(--accent);
+}
+.rowSubLive {
+  color: var(--accent);
 }
 
 /* ── User panel card ──────────────────────── */
@@ -321,7 +352,6 @@
   margin: 0 var(--s-2) var(--s-2);
   border-radius: var(--r-lg);
   background: rgba(255, 255, 255, 0.025);
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
   overflow: hidden;
 }
 .userRow {
@@ -367,36 +397,6 @@
   font: var(--type-meta);
 }
 
-.voicePanel {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
-  box-shadow: inset 0 -1px 0 var(--border-subtle);
-}
-.voiceState {
-  flex: 1;
-  min-width: 0;
-}
-.voiceStateTitle {
-  display: flex;
-  align-items: center;
-  gap: var(--s-1_5);
-  color: var(--accent);
-  font: var(--type-ui);
-  font-weight: var(--w-semibold);
-}
-.voiceStateWarn {
-  color: var(--warning);
-}
-.voiceStateSub {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-tertiary);
-  font: var(--type-meta);
-}
-
 .statusMenu {
   display: flex;
   flex-direction: column;
@@ -427,6 +427,25 @@
   height: 10px;
   margin-top: 5px;
   flex-shrink: 0;
+}
+.statusLabel {
+  flex: 1;
+}
+.statusCheck {
+  display: grid;
+  margin-top: 3px;
+  color: var(--text-primary);
+}
+.statusDanger,
+.statusDanger:hover,
+.statusDanger:focus-visible {
+  color: var(--danger);
+}
+.meStatusWarn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  color: var(--warning);
 }
 .statusHint {
   display: block;
@@ -553,6 +572,9 @@
   opacity: 0.45;
 }
 .crown {
-  color: var(--warning);
+  color: var(--text-tertiary);
   display: grid;
+}
+.membersStale :global([class*='_presence_']) {
+  opacity: 0.4;
 }

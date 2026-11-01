@@ -1,16 +1,17 @@
 import type { Message } from '@alga/shared'
-import { Copy, CornerUpLeft, Pencil, SmilePlus, Trash2, AlertCircle } from 'lucide-react'
+import { Copy, CornerUpLeft, MoreHorizontal, Pencil, SmilePlus, Trash2, AlertCircle } from 'lucide-react'
 import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { create } from 'zustand'
 import { copyText } from '@/lib/clipboard'
 import { errorText } from '@/lib/errors'
-import { clock, fullDate, messageTime } from '@/lib/format'
+import { clock, fullDate } from '@/lib/format'
 import { toPlainText } from '@/lib/markdown'
 import { deleteMessage, discardSend, editMessage, react, retrySend } from '@/store/actions'
 import { useData } from '@/store/data'
 import { displayName, roleColor } from '@/store/selectors'
 import { useUi } from '@/store/ui'
-import { Avatar, Button, contextMenuHandler, Icon, IconButton, Modal, Tooltip, toast, type MenuEntry } from '@/ui'
+import { Avatar, Button, contextMenuHandler, Icon, IconButton, Kbd, MenuButton, Modal, Tooltip, toast, type MenuEntry } from '@/ui'
+import { EmojiPicker } from './EmojiPicker'
 import { Markdown } from './Markdown'
 import { QUICK_EMOJI, t } from './strings'
 import s from './chat.module.css'
@@ -55,16 +56,22 @@ export const MessageItem = memo(function MessageItem({
   const name = useData((st) => displayName(st, m.author.id, spaceId))
   const color = useData((st) => (spaceId ? roleColor(st, spaceId, m.author.id) : null))
   const at = new Date(m.createdAt)
+  const row = useRef<HTMLDivElement>(null)
+  const [pickerAt, setPickerAt] = useState<HTMLElement | null>(null)
+  const users = useData((st) => st.users)
 
+  // Grouped by label, not by lines; only actions that really exist (no fake "Fixar"/"Denunciar" without a backend).
   const menu = (): MenuEntry[] => {
     if (pending) return []
     const items: MenuEntry[] = [
+      { label: t.emoji.react, icon: SmilePlus, onSelect: () => setPickerAt(row.current?.querySelector<HTMLElement>('[data-react-anchor]') ?? row.current) },
       { label: t.actions.reply, icon: CornerUpLeft, onSelect: () => useUi.getState().setReplyTo(m.channelId, m.id) },
-      { label: t.actions.copy, icon: Copy, onSelect: () => void copyText(m.content) },
+      { kind: 'group', label: t.actions.copyGroup },
+      { label: t.actions.copy, icon: Copy, onSelect: () => void copyText(toPlainText(m.content, (id) => users[id]?.displayName ?? t.unknownUser)) },
     ]
     if (mine) {
       items.push(
-        { kind: 'separator' },
+        { kind: 'group', label: t.actions.yours },
         { label: t.actions.edit, icon: Pencil, onSelect: () => useUi.getState().setEditing(m.channelId, m.id) },
         { label: t.actions.delete, icon: Trash2, danger: true, onSelect: () => requestDelete(m) },
       )
@@ -74,6 +81,7 @@ export const MessageItem = memo(function MessageItem({
 
   return (
     <div
+      ref={row}
       className={`${s.msg} ${head ? s.head : ''} ${mentioned ? s.mentioned : ''} ${editing ? s.editingRow : ''}`}
       data-message-id={m.id}
       onContextMenu={contextMenuHandler(menu)}
@@ -98,7 +106,7 @@ export const MessageItem = memo(function MessageItem({
             </span>
             <Tooltip content={fullDate(at)}>
               <time className={`${s.time} tnum`} dateTime={m.createdAt}>
-                {messageTime(at)}
+                {clock(at)}
               </time>
             </Tooltip>
           </div>
@@ -122,7 +130,7 @@ export const MessageItem = memo(function MessageItem({
             <button type="button" className={s.failedAction} onClick={() => retrySend(m.channelId, m.id).catch(() => undefined)}>
               {t.retry}
             </button>
-            ·
+            <span className={s.failedSep}>·</span>
             <button type="button" className={s.failedAction} onClick={() => discardSend(m.channelId, m.id)}>
               {t.discard}
             </button>
@@ -143,6 +151,11 @@ export const MessageItem = memo(function MessageItem({
                 <span className="tnum">{r.count}</span>
               </button>
             ))}
+            <Tooltip content={t.emoji.react}>
+              <button type="button" className={`${s.reaction} ${s.reactionAdd}`} aria-label={t.emoji.react} onClick={(e) => setPickerAt(e.currentTarget)}>
+                <Icon icon={SmilePlus} size={14} />
+              </button>
+            </Tooltip>
           </div>
         )}
       </div>
@@ -155,12 +168,25 @@ export const MessageItem = memo(function MessageItem({
               </button>
             </Tooltip>
           ))}
+          <IconButton icon={SmilePlus} label={t.emoji.react} data-react-anchor onClick={(e) => setPickerAt(e.currentTarget)} />
           <span className={s.toolSep} />
           <IconButton icon={CornerUpLeft} label={t.actions.reply} onClick={() => useUi.getState().setReplyTo(m.channelId, m.id)} />
           {mine && <IconButton icon={Pencil} label={t.actions.edit} onClick={() => useUi.getState().setEditing(m.channelId, m.id)} />}
           {mine && <IconButton icon={Trash2} label={t.actions.delete} className={s.toolDanger} onClick={(e) => requestDelete(m, e.shiftKey)} />}
+          <MenuButton items={menu} align="end" label={t.actions.more}>
+            <IconButton icon={MoreHorizontal} label={t.actions.more} />
+          </MenuButton>
         </div>
       )}
+      <EmojiPicker
+        anchor={pickerAt}
+        side="bottom"
+        onClose={() => setPickerAt(null)}
+        onPick={(e) => {
+          setPickerAt(null)
+          toggleReaction(m, e)
+        }}
+      />
     </div>
   )
 })
@@ -242,7 +268,7 @@ function InlineEditor({ message: m }: { message: Message }) {
     <div className={s.editor}>
       <textarea ref={ref} className={s.editInput} value={value} rows={1} disabled={busy} onChange={(e) => setValue(e.target.value)} onKeyDown={onKeyDown} aria-label={t.actions.edit} />
       <p className={s.editHint}>
-        <kbd>{t.editHint.esc}</kbd> {t.editHint.cancel} · <kbd>{t.editHint.enter}</kbd> {t.editHint.save}
+        <Kbd>{t.editHint.esc}</Kbd> {t.editHint.cancel} · <Kbd>{t.editHint.enter}</Kbd> {t.editHint.save}
       </p>
     </div>
   )

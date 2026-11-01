@@ -217,11 +217,7 @@ function Panel() {
                 <span className={s.itemIcon}>{i.icon}</span>
                 <span className={`${s.itemLabel} ${i.unread ? s.unread : ''}`}>{i.label}</span>
                 {i.sub && <span className={s.itemSub}>{i.sub}</span>}
-                <Badge count={i.mentions} />
-                <span className={s.itemKind}>
-                  {i.kind === 'space' ? <Icon icon={LayoutGrid} size={12} /> : null}
-                  {t.kinds[i.kind]}
-                </span>
+                <Badge count={i.mentions} mention />
                 {idx === active && <Icon icon={CornerDownLeft} size={14} className={s.enter} />}
               </div>
             ))

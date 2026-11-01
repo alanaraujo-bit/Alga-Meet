@@ -25,7 +25,7 @@ export const t = {
   errors: {
     required: 'Preencha este campo.',
     email: 'Digite um e-mail válido.',
-    username: 'De 2 a 32 caracteres: a–z, 0–9, "_" ou ".".',
+    username: 'Use de 2 a 32 caracteres: letras minúsculas, números, ponto ou _.',
     passwordShort: 'A senha precisa ter pelo menos 8 caracteres.',
     invalidCredentials: 'E-mail, usuário ou senha incorretos.',
     rateLimited: 'Muitas tentativas. Aguarde um pouco e tente de novo.',

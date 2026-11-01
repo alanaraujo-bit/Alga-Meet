@@ -37,6 +37,7 @@
   gap: var(--s-1);
   padding: var(--s-8) var(--s-4) var(--s-4) var(--s-4);
 }
+/* The splash's atmosphere at the start of every conversation: a soft light, no box. */
 .introIcon {
   display: grid;
   place-items: center;
@@ -44,9 +45,14 @@
   height: 56px;
   margin-bottom: var(--s-3);
   border-radius: var(--r-full);
-  background: var(--bg-raised);
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
-  color: var(--text-secondary);
+  background: radial-gradient(closest-side, rgba(33, 201, 202, 0.16), rgba(33, 201, 202, 0.04) 70%, transparent);
+  color: var(--accent);
+}
+.intro {
+  background: radial-gradient(240px 160px at 44px 40%, rgba(33, 201, 202, 0.06), transparent 70%);
+}
+.introActions {
+  margin-top: var(--s-3);
 }
 .introTitle {
   font: var(--type-title-lg);
@@ -68,15 +74,17 @@
   justify-content: flex-end;
   height: 0;
   margin: var(--s-3) var(--s-4) var(--s-1);
-  border-top: 1px solid var(--danger);
+  border-top: 1px solid rgba(77, 220, 220, 0.45);
 }
+/* The label "punches through" the line instead of sitting on a filled pill. */
 .unreadLine span {
+  position: relative;
+  top: -1px;
   padding: 0 6px;
-  border-radius: var(--r-xs);
-  background: var(--danger);
-  color: var(--on-danger);
+  background: var(--bg-content);
+  color: var(--accent);
   font: var(--type-badge);
-  line-height: 16px;
+  line-height: 14px;
 }
 
 .loadError {
@@ -115,7 +123,7 @@
   padding: 1px var(--s-12) 1px var(--s-4);
 }
 .head {
-  margin-top: var(--s-4);
+  margin-top: var(--density-head, var(--s-4));
   padding-top: 2px;
 }
 .msg:hover,
@@ -130,7 +138,7 @@
   background: color-mix(in srgb, var(--accent), transparent 91%);
 }
 .editingRow {
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--state-hover);
 }
 .flash {
   animation: flash 1.2s var(--ease-out-quad);
@@ -180,6 +188,7 @@
   font: var(--type-meta);
 }
 .content {
+  max-width: 92ch;
   color: var(--text-secondary);
   font: var(--type-message);
   letter-spacing: var(--track-message);
@@ -212,19 +221,22 @@
   padding: 1px 5px;
   border-radius: var(--r-xs);
   background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 0 0 1px var(--border-default);
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 0.85em;
+  font-size: 0.86em;
+  font-weight: 400;
 }
+/* Sized to its content (no 1000px slab for two lines), a step up from the page, not a hole in it. */
 .codeBlock {
+  width: fit-content;
+  min-width: 320px;
   margin: var(--s-1) 0;
   padding: var(--s-3);
   max-width: 100%;
   overflow-x: auto;
   border-radius: var(--r-md);
-  background: var(--bg-app);
-  box-shadow: inset 0 0 0 1px var(--border-default);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 13px;
@@ -256,10 +268,16 @@
   font: var(--type-meta);
 }
 .failedAction {
-  color: var(--danger);
-  font-weight: var(--w-semibold);
-  text-decoration: underline;
+  color: var(--text-secondary);
+  font-weight: var(--w-medium);
   text-underline-offset: 2px;
+}
+.failedAction:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+.failedSep {
+  color: var(--text-tertiary);
 }
 
 .reactions {
@@ -275,22 +293,31 @@
   height: 24px;
   padding: 0 var(--s-2) 0 6px;
   border-radius: var(--r-full);
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-secondary);
   font: var(--type-meta);
   font-weight: var(--w-semibold);
 }
 .reaction:hover {
-  box-shadow: inset 0 0 0 1px var(--border-strong);
+  background: rgba(255, 255, 255, 0.09);
 }
 .reactionMe {
   background: var(--accent-tint);
-  box-shadow: inset 0 0 0 1px rgba(77, 220, 220, 0.35);
   color: var(--accent);
 }
 .reactionMe:hover {
-  box-shadow: inset 0 0 0 1px rgba(77, 220, 220, 0.55);
+  background: var(--accent-tint-strong);
+}
+.reactionAdd {
+  width: 28px;
+  justify-content: center;
+  padding: 0;
+  color: var(--text-tertiary);
+  opacity: 0;
+}
+.msg:hover .reactionAdd,
+.reactionAdd:focus-visible {
+  opacity: 1;
 }
 .reactionEmoji {
   font-size: 14px;
@@ -314,6 +341,14 @@
 .msg:hover .toolbar,
 .msg:focus-within .toolbar {
   display: flex;
+}
+/* A context menu is its own layer: the hover toolbar steps aside (unless the menu came from it). */
+:global(body:has([role='menu'])) .toolbar:not(:has([aria-expanded='true'])) {
+  display: none;
+}
+/* Never cover the "Novas" line right above the first unread message. */
+.unreadLine + .msg .toolbar {
+  top: 6px;
 }
 .toolEmoji {
   display: grid;
@@ -409,15 +444,11 @@ button.replyBody:hover {
   color: var(--text-tertiary);
   font: var(--type-meta);
 }
-.editHint kbd {
-  color: var(--accent);
-  font: inherit;
-  font-weight: var(--w-semibold);
-}
+
 
 .jump {
   position: absolute;
-  bottom: var(--s-3);
+  bottom: var(--s-5);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -454,7 +485,6 @@ button.replyBody:hover {
 .composer {
   border-radius: var(--r-lg);
   background: var(--bg-raised);
-  box-shadow: inset 0 0 0 1px var(--border-default);
   transition: box-shadow var(--dur-hover-out) var(--ease-out-quad);
 }
 .composer:focus-within {
@@ -474,7 +504,6 @@ button.replyBody:hover {
   gap: var(--s-2);
   height: 32px;
   padding: 0 var(--s-1) 0 var(--s-3);
-  box-shadow: inset 0 -1px 0 var(--border-subtle);
   color: var(--text-tertiary);
   font: var(--type-meta);
 }
@@ -515,8 +544,11 @@ button.replyBody:hover {
 .input::placeholder {
   color: var(--text-tertiary);
 }
-.inputRow > :last-child {
+.inputRow > button {
   margin-bottom: 8px;
+}
+.emojiBtn {
+  color: var(--text-tertiary);
 }
 .counter {
   margin-bottom: 14px;
@@ -584,6 +616,124 @@ button.replyBody:hover {
   overflow: hidden;
 }
 .deleteTip {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+
+/* DM header: call state */
+.callChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1_5);
+  height: 24px;
+  margin-right: var(--s-1);
+  padding: 0 var(--s-2);
+  border-radius: var(--r-full);
+  background: var(--accent-tint);
+  color: var(--accent);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.callLive {
+  color: var(--accent) !important;
+}
+
+/* ── @mention autocomplete ────────────────── */
+.mentions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + var(--s-2));
+  z-index: var(--z-popover);
+  max-width: 420px;
+  padding: var(--s-1_5);
+  border-radius: var(--r-lg);
+  background: var(--bg-overlay);
+  box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-default);
+  animation: jumpIn var(--dur-pop) var(--ease-out-quart);
+}
+.mentionsHead {
+  padding: var(--s-1) var(--s-2);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.mentionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  height: var(--h-row);
+  padding: 0 var(--s-2);
+  border-radius: var(--r-sm);
+  text-align: left;
+}
+.mentionRow[aria-selected='true'] {
+  background: var(--state-selected);
+}
+.mentionName {
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+  white-space: nowrap;
+}
+.mentionHandle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+
+/* ── Emoji picker ─────────────────────────── */
+.emoji {
+  display: grid;
+  gap: var(--s-1_5);
+  padding: var(--s-2);
+}
+.emojiSearch {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 28px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-tertiary);
+}
+.emojiSearch input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  font: var(--type-ui);
+}
+.emojiSearch input:focus-visible {
+  outline: none;
+}
+.emojiGrid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  height: 232px;
+  overflow-y: auto;
+  align-content: start;
+}
+.emojiCell {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  border-radius: var(--r-sm);
+  font-size: 20px;
+  line-height: 1;
+}
+.emojiCell[aria-selected='true'] {
+  background: var(--state-selected);
+}
+.emojiNone {
+  grid-column: 1 / -1;
+  padding: var(--s-4) var(--s-2);
   color: var(--text-tertiary);
   font: var(--type-meta);
 }

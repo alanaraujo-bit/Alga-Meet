@@ -155,6 +155,13 @@
   --z-context-menu: 1200;
 }
 
+/* Compact density (Aparência): the dense "classic" layout. Rows and message rhythm tighten, type stays. */
+:root.density-compact {
+  --h-row: 24px;
+  --density-gap: 0;
+  --density-head: 8px;
+}
+
 /* Reduced motion: OS setting or the in-app toggle (html.reduce-motion). */
 @media (prefers-reduced-motion: reduce) {
   :root {
