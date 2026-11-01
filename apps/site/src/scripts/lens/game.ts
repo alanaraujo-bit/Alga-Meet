@@ -189,7 +189,7 @@ function hudCanvas(): HTMLCanvasElement {
   g.fillStyle = '#a9acff'; g.font = F(600, 18); g.fillText('CHECKPOINT', 72, 84);
   g.fillStyle = '#f7f8f8'; g.font = F(650, 40); g.fillText('3 / 12', 72, 128);
   for (let i = 0; i < 12; i++) { g.fillStyle = i < 3 ? '#8b8ef7' : 'rgba(255,255,255,0.18)'; g.fillRect(232 + i * 18, 106, 12, 4); }
-  g.fillStyle = 'rgba(208,214,224,0.75)'; g.font = F(500, 15); g.fillText('Melhor volta 1:42.318 · Carlinha', 232, 140);
+  g.fillStyle = 'rgba(208,214,224,0.75)'; g.font = F(500, 15); g.fillText('Melhor volta 1:42.318 · Ronaldo', 232, 140);
   // minimapa
   const mx = 1730, my = 172, mr = 118;
   g.fillStyle = 'rgba(8,9,20,0.55)'; g.beginPath(); g.arc(mx, my, mr, 0, 7); g.fill();
@@ -198,7 +198,7 @@ function hudCanvas(): HTMLCanvasElement {
   g.strokeStyle = 'rgba(169,172,255,0.9)'; g.lineWidth = 3; g.beginPath();
   for (let i = 0; i <= 40; i++) { const t = i / 40; const x = mx + Math.sin(t * 9) * 26, y = my + mr - t * mr * 2; i ? g.lineTo(x, y) : g.moveTo(x, y); }
   g.stroke();
-  const dots: [string, string, number, number][] = [['Carlinha', '#f7c46c', -12, -60], ['Bruno', '#7cc0f5', 20, -18], ['Diego', '#c9a99a', -20, 40], ['Você', '#f7f8f8', 0, 72]];
+  const dots: [string, string, number, number][] = [['Ronaldo', '#f7c46c', -12, -60], ['Gabriel', '#7cc0f5', 20, -18], ['Jovaci', '#c9a99a', -20, 40], ['Você', '#f7f8f8', 0, 72]];
   for (const [n, col, dx, dy] of dots) {
     g.fillStyle = col; g.beginPath(); g.arc(mx + dx, my + dy, 5, 0, 7); g.fill();
     g.fillStyle = 'rgba(247,248,248,0.9)'; g.font = F(560, 13); g.fillText(n, mx + dx + 9, my + dy + 4);
@@ -208,7 +208,7 @@ function hudCanvas(): HTMLCanvasElement {
   g.strokeStyle = 'rgba(247,248,248,0.8)'; g.lineWidth = 1.5;
   for (const [a, b, cc, dd] of [[960, 520, 960, 530], [960, 550, 960, 560], [930, 540, 940, 540], [980, 540, 990, 540]]) { g.beginPath(); g.moveTo(a, b); g.lineTo(cc, dd); g.stroke(); }
   // chat do grupo
-  const chat: [string, string, string][] = [['Bruno', '#7cc0f5', 'essa curva é sua, vai'], ['Carlinha', '#f7c46c', 'AAAAA quase'], ['Diego', '#c9a99a', 'gg, próxima eu ganho'], ['Ana', '#a9acff', 'transmitindo em 1080p pra vocês']];
+  const chat: [string, string, string][] = [['Gabriel', '#7cc0f5', 'essa curva é sua, vai'], ['Ronaldo', '#f7c46c', 'AAAAA quase'], ['Jovaci', '#c9a99a', 'gg, próxima eu ganho'], ['Alan', '#a9acff', 'transmitindo em 1080p pra vocês']];
   g.fillStyle = 'rgba(8,9,20,0.5)'; round(g, 1420, 830, 452, 200, 14); g.fill();
   chat.forEach(([n, col, t], i) => {
     g.font = F(600, 16); g.fillStyle = col; g.fillText(n, 1444, 872 + i * 42);

@@ -1,11 +1,11 @@
 // A conversa da sala de voz (momento 2). Uma fonte só para as ondas no chão (WebGL), as legendas e o som
 // sintetizado: cada fala vira sílabas com início, duração e intensidade, sorteadas com semente fixa.
 export const people = [
-  { name: 'Carlinha', initials: '', grad: ['#f7c46c', '#e86885'], pitch: 245 },
-  { name: 'Bruno', initials: '', grad: ['#7cc0f5', '#2f5ea8'], pitch: 128 },
-  { name: 'Diego', initials: 'DA', grad: ['#3a2f2c', '#55443f'], pitch: 112 },
-  { name: 'Ana', initials: 'AR', grad: ['#2f2c3f', '#4a4466'], pitch: 210 },
-  { name: 'Elisa', initials: 'EN', grad: ['#8b8ef7', '#4b4fc0'], pitch: 230 },
+  { name: 'Ronaldo Barbosa', initials: '', grad: ['#f7c46c', '#e86885'], pitch: 142 },
+  { name: 'Gabriel Airton', initials: '', grad: ['#7cc0f5', '#2f5ea8'], pitch: 128 },
+  { name: 'Jovaci Neto', initials: 'JN', grad: ['#3a2f2c', '#55443f'], pitch: 112 },
+  { name: 'Alan Araújo', initials: 'AA', grad: ['#2f2c3f', '#4a4466'], pitch: 120 },
+  { name: 'Gleyson Mario', initials: 'GM', grad: ['#8b8ef7', '#4b4fc0'], pitch: 155 },
 ] as const;
 
 // [quem, começa em s, texto]. Risada = várias pessoas ao mesmo tempo (as ondas se cruzam).
@@ -13,7 +13,7 @@ export const lines: { who: number[]; at: number; text: string; laugh?: boolean }
   { who: [0], at: 0.4, text: 'Gente, entrei. Tão me ouvindo?' },
   { who: [1], at: 2.3, text: 'Alto e claro. Parece que você tá aqui do lado.' },
   { who: [2], at: 4.6, text: 'Bora uma ranked antes da janta?' },
-  { who: [3], at: 6.3, text: 'Só se o Diego não for de suporte de novo.' },
+  { who: [3], at: 6.3, text: 'Só se o Jovaci não for de suporte de novo.' },
   { who: [2], at: 8.4, text: 'Ei! Foi UMA vez.' },
   { who: [0, 1, 3, 4], at: 9.5, text: 'kkkkkkkkk', laugh: true },
   { who: [4], at: 11.6, text: 'Tô entrando. Me espera!' },
