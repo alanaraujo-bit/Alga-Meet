@@ -43,6 +43,7 @@ uniform vec4 uPool;
 uniform vec4 uObjA;
 uniform vec4 uObjB;
 uniform vec3 uBed;
+uniform vec3 uDust;
 ${noiseGLSL}
 
 vec3 sky(vec2 uv, vec2 p, float t) {
@@ -142,6 +143,14 @@ void main() {
       col = mix(col, oc, edge * ob.w);
       col += vec3(0.6, 0.62, 1.0) * exp(-max(L - 1.0, 0.0) * 9.0) * 0.12 * ob.w * step(1.0, L);
     }
+  }
+
+  // sedimento levantado quando a esfera pesada bate no fundo
+  if (uDust.z > 0.0) {
+    vec2 dp = q - vec2((uDust.x - 0.5) * uAspect, uDust.y - 0.5);
+    float cloud = noise(dp * 14.0 + vec2(t * 0.3, -t * 0.5)) * 0.6 + noise(dp * 31.0 - t * 0.4) * 0.4;
+    float shape = exp(-length(dp * vec2(0.8 / max(uDust.z, 0.2), 2.6)) * 4.0);
+    col += vec3(0.42, 0.44, 0.62) * cloud * shape * uDust.z * 0.55;
   }
 
   // leito: a luz que mora onde as frondes nascem

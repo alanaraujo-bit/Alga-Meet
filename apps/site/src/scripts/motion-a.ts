@@ -73,6 +73,7 @@ export function initTierA() {
 
   initHero(w, narrow);
   initRoom(w);
+  if (w) { initFloat(w, narrow); initMoods(w); }
   initMagnetic(fine);
   initRest();
 
@@ -157,6 +158,86 @@ function initHero(w: World | null, narrow: boolean) {
       if (at < 8.2) clicked = false;
     },
   });
+}
+
+// Leveza: a esfera densa (808 MB) afunda e levanta sedimento; a bolha de vidro com a alga (230 MB) sobe e balança.
+// Área proporcional à memória: raio ∝ √MB.
+function initFloat(w: World, narrow: boolean) {
+  const ch = $('[data-float-ch]');
+  if (!ch) return;
+  const la = $('[data-obj="a"]')!, lb = $('[data-obj="b"]')!;
+  const rA = narrow ? 0.12 : 0.16;
+  const rB = rA * Math.sqrt(230 / 808);
+  const A = w.state.objA, B = w.state.objB;
+  const xa = narrow ? 0.34 : 0.62, xb = narrow ? 0.72 : 0.82;
+  let active = false, settled = 0;
+  const place = () => {
+    const W = innerWidth, H = innerHeight;
+    la.style.transform = `translate(${A.x * W}px, ${(1 - A.y - A.r) * H - 34}px) translate(-50%, -50%)`;
+    lb.style.transform = `translate(${B.x * W}px, ${(1 - B.y + B.r) * H + 30}px) translate(-50%, -50%)`;
+    la.style.opacity = String(A.i); lb.style.opacity = String(B.i);
+  };
+  const prev = w.onFrame;
+  w.onFrame = (t) => {
+    prev?.(t);
+    if (!active) return;
+    // a bolha balança quando chega lá em cima
+    const bob = Math.sin(t * 1.7) * 0.006 * settled, sway = Math.sin(t * 1.1) * 0.004 * settled;
+    w.bladeAt = B.i > 0.01 ? { x: B.x + sway, y: B.y + bob, h: B.r * 1.25 } : null;
+    w.blade.fade = B.i;
+    place();
+  };
+  const sink = { y: narrow ? 0.5 : 0.62 }, rise = { y: narrow ? 0.36 : 0.46, wob: 0 };
+  const tl = gsap.timeline({ defaults: { ease: 'none' }, onUpdate: () => {
+    A.x = xa; A.r = rA; A.y = sink.y;
+    B.x = xb + Math.sin(rise.wob * 9) * 0.012 * (1 - settled); B.r = rB; B.y = rise.y;
+  } });
+  tl.fromTo([A, B], { i: 0 }, { i: 1, duration: 0.8, ease: 'power2.out' }, 0)
+    .to(sink, { y: rA * 0.86, duration: 3.2, ease: 'power3.in' }, 0.6)
+    .to(rise, { y: narrow ? 0.5 : 1 - rB - 0.15, wob: 1, duration: 3.6, ease: 'power2.out' }, 0.6)
+    .add(() => { w.ripple(xa, 1 - rA * 0.4, 1.6); }, 3.8)
+    .fromTo(w.dust, { a: 0 }, { a: 1, duration: 0.5, ease: 'power2.out', immediateRender: false }, 3.8)
+    .to(w.dust, { a: 0, duration: 2.2, ease: 'power1.in' }, 4.3)
+    .to({}, { duration: 1 }, 5.5)
+    .to([A, B], { i: 0, duration: 0.6 }, 6.0);
+  w.dust.x = xa; w.dust.y = 0.02;
+  ScrollTrigger.create({
+    trigger: ch, start: 'top top', end: 'bottom bottom', scrub: 0.6, animation: tl,
+    onToggle: (s) => { active = s.isActive; if (!active) { w.bladeAt = null; w.blade.fade = 0; A.i = 0; B.i = 0; place(); } },
+    onUpdate: (s) => { settled = gsap.utils.clamp(0, 1, (s.progress - 0.6) * 4); },
+  });
+}
+
+// O "clima" da água por capítulo depois da abertura: profundidade e raios interpolados pela rolagem.
+function initMoods(w: World) {
+  const hero = $('[data-hero]');
+  const keys: [string, number, number][] = [
+    ['[data-hero]', 1, 0.12], ['#voz .grid', 0.95, 0.2], ['#tela', 0.82, 0.3], ['#leve', 0.32, 1.0], ['#grupo', 0.7, 0.45], ['#plus', 0.5, 0.7], ['#faq', 0.75, 0.35],
+  ];
+  let pts: { y: number; d: number; r: number }[] = [];
+  let heroEnd = 0;
+  const measure = () => {
+    heroEnd = hero ? hero.offsetTop + hero.offsetHeight - innerHeight : 0;
+    pts = keys.map(([sel, d, r]) => {
+      const el = $(sel);
+      const y = sel === '[data-hero]' ? heroEnd : el ? el.getBoundingClientRect().top + scrollY - innerHeight * 0.5 : Infinity;
+      return { y, d, r };
+    }).filter((p) => Number.isFinite(p.y)).sort((a, b) => a.y - b.y);
+  };
+  ScrollTrigger.addEventListener('refresh', measure);
+  measure();
+  const prev = w.onFrame;
+  w.onFrame = (t) => {
+    prev?.(t);
+    const y = scrollY;
+    if (y <= heroEnd || !pts.length) return; // a abertura cuida da própria água
+    let d = pts[pts.length - 1].d, r = pts[pts.length - 1].r;
+    for (let i = 0; i < pts.length - 1; i++) {
+      if (y < pts[i + 1].y) { const k = gsap.utils.clamp(0, 1, (y - pts[i].y) / (pts[i + 1].y - pts[i].y)); const e = k * k * (3 - 2 * k); d = pts[i].d + (pts[i + 1].d - pts[i].d) * e; r = pts[i].r + (pts[i + 1].r - pts[i].r) * e; break; }
+    }
+    w.state.depth += (d - w.state.depth) * 0.1;
+    w.state.rays += (r - w.state.rays) * 0.1;
+  };
 }
 
 // Botões magnéticos (só mouse): o botão vem um pouco na direção do cursor.

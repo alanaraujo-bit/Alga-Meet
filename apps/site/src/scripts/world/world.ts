@@ -92,6 +92,10 @@ export class World {
   };
   scroll = 0;
   flow = 0;
+  /** sedimento: x, y (fração da tela, y para cima) e quantidade */
+  dust = { x: 0.5, y: 0.1, a: 0 };
+  /** frondes presas a um ponto da tela (dentro da bolha): x, y (y para cima) e altura em fração da tela */
+  bladeAt: { x: number; y: number; h: number } | null = null;
   onFrame?: (t: number) => void;
 
   constructor() {
@@ -114,7 +118,7 @@ export class World {
       vertex: fullVert, fragment: waterFrag, depthTest: false, depthWrite: false,
       uniforms: {
         uTime: { value: 0 }, uAspect: { value: 1 }, uDepth: { value: 0 }, uRays: { value: 1 }, uIntro: { value: 0 },
-        uSurface: { value: 0 }, uFlow: { value: 0 }, uTint: { value: [0.26, 0.32, 0.86] }, uBed: { value: [0.5, 0, 0] },
+        uSurface: { value: 0 }, uFlow: { value: 0 }, uTint: { value: [0.26, 0.32, 0.86] }, uBed: { value: [0.5, 0, 0] }, uDust: { value: [0.5, 0, 0] },
         uMouse: { value: [0.5, 0.5] }, uMouseOn: { value: 0 }, uRip: { value: rip.flat() },
         uPool: { value: [0.5, -0.15, 1, 0] }, uObjA: { value: [0, 0, 0, 0] }, uObjB: { value: [0, 0, 0, 0] },
       },
@@ -226,7 +230,8 @@ export class World {
     // leito sob as frondes: projeta a base do grupo na tela
     const bx = 0.5 + (this.layout.x + this.blade.x) / ((2 * this.cam.z * Math.tan((35 * Math.PI) / 360)) * (innerWidth / innerHeight));
     const by = 0.5 + (this.layout.y + this.blade.y) / (2 * this.cam.z * Math.tan((35 * Math.PI) / 360));
-    u.uBed.value = [bx, by, this.blade.fade * ease];
+    u.uBed.value = [bx, by, this.bladeAt ? 0 : this.blade.fade * ease];
+    u.uDust.value = [this.dust.x, this.dust.y, this.dust.a];
     u.uMouse.value = [m.x, m.y]; u.uMouseOn.value = m.on; u.uFlow.value = this.flow;
     u.uRip.value = this.water.ripples.flat();
     this.renderer.render({ scene: this.fsScene, target: this.target, clear: false });
@@ -236,8 +241,16 @@ export class World {
     this.composite.program.uniforms.uTime.value = t % 10;
 
     const b = this.blade, L = this.layout;
-    this.bladeGroup.position.set(L.x + b.x, L.y + b.y, 0);
-    this.bladeGroup.scale.set(L.s * b.scale);
+    if (this.bladeAt) {
+      // de fração da tela para o plano z = 0 visto pela câmera atual
+      const H = 2 * this.cam.z * Math.tan((35 * Math.PI) / 360), A = innerWidth / innerHeight;
+      const mh = this.bladeAt.h * H;
+      this.bladeGroup.position.set(this.cam.x * 0.6 + (this.bladeAt.x - 0.5) * H * A, this.cam.y * 0.6 + (this.bladeAt.y - 0.5) * H - mh / 2, 0);
+      this.bladeGroup.scale.set(mh / 3.1);
+    } else {
+      this.bladeGroup.position.set(L.x + b.x, L.y + b.y, 0);
+      this.bladeGroup.scale.set(L.s * b.scale);
+    }
     this.blades.forEach(({ mesh, prog }, i) => {
       const pu = prog.uniforms;
       pu.uTime.value = t; pu.uGrow.value = b.grow[i]; pu.uFade.value = b.fade * ease; pu.uGlow.value = b.glow; pu.uBend.value = b.bend;

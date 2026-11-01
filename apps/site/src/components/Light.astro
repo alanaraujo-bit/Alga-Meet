@@ -3,16 +3,20 @@ import { facts } from '../data/facts';
 const max = facts.discordIdleRamMb;
 ---
 <section class="light" id="leve" aria-labelledby="leve-t">
+  <!-- Nível A: capítulo preso; a esfera densa afunda e a bolha com a alga sobe (shader da água global). -->
+  <div class="float-ch" data-float-ch>
+  <div class="float-stage" data-float-stage>
   <div class="wrap two">
     <div class="copy">
       <p class="eyebrow" data-reveal>Leveza</p>
-      <h2 id="leve-t" data-reveal>Leve enquanto você joga.</h2>
-      <p class="lede" data-reveal>Aberto na bandeja, esperando o pessoal chamar, o Alga Meet usa <strong>menos de um terço</strong> da memória do Discord. O resto fica para o jogo.</p>
+      <h2 id="leve-t" data-reveal>Leve como <em>uma alga.</em></h2>
+      <p class="lede" data-reveal>Parado na bandeja, esperando o pessoal chamar, o Discord ocupa <strong>{facts.discordIdleRamMb} MB</strong> em {facts.discordProcesses} processos. O Alga Meet, <strong>{facts.idleRamMb}</strong>. O resto fica para o jogo.</p>
       <ul class="minis" data-reveal>
         <li><b class="tnum">{facts.voiceCpuPct}%</b><span>de CPU numa chamada de voz</span></li>
         <li><b class="tnum">~{facts.openMs} ms</b><span>do clique ao app aberto</span></li>
         <li><b class="tnum">0</b><span>reinícios automáticos para "liberar memória"</span></li>
       </ul>
+      <p class="area-note">Área de cada esfera proporcional à memória medida.</p>
     </div>
 
     <figure class="card" data-bars data-reveal>
@@ -28,10 +32,29 @@ const max = facts.discordIdleRamMb;
       <figcaption>Memória privada medida em 01/11/2026 no mesmo PC (i5-13600KF, 32 GB, Windows 11). Discord 1.0.9266 na bandeja; Alga Meet ocioso por 10 minutos.</figcaption>
     </figure>
   </div>
+  <p class="obj heavy" data-obj="a" aria-hidden="true"><b class="tnum">{facts.discordIdleRamMb} MB</b>Discord · {facts.discordProcesses} processos</p>
+  <p class="obj light-o" data-obj="b" aria-hidden="true"><b class="tnum">{facts.idleRamMb} MB</b>Alga Meet</p>
+  </div>
+  </div>
 </section>
 
 <style>
   .light { position: relative; padding-block: clamp(80px, 14vh, 160px); }
+  h2 em { font-style: normal; color: #a9acff; }
+  .area-note, .obj { display: none; }
+  /* Nível A: preso, sem cartão de barras (as esferas são o gráfico); o cartão segue para leitores de tela. */
+  :global(html.gl-on) .light { padding: 0; }
+  :global(html.gl-on) .float-ch { height: 340vh; }
+  :global(html.gl-on) .float-stage { position: sticky; top: 0; height: 100vh; height: 100lvh; overflow: hidden; display: flex; align-items: center; }
+  :global(html.gl-on) .two { grid-template-columns: minmax(0, 520px); }
+  :global(html.gl-on) .card { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); padding: 0; margin: 0; }
+  :global(html.gl-on) .area-note { display: block; margin-top: 8px; font-size: 13px; color: var(--text-3); }
+  :global(html.gl-on) .obj {
+    display: grid; position: absolute; left: 0; top: 0; text-align: center; opacity: 0; pointer-events: none;
+    font-size: 13px; font-weight: 520; color: var(--text-3); white-space: nowrap; transform: translate(-50%, -50%);
+  }
+  .obj b { font-size: clamp(20px, 2.2vw, 30px); font-weight: 640; letter-spacing: -0.03em; color: var(--text-1); }
+  .light-o b { color: #c9cbff; }
   .two { display: grid; grid-template-columns: 1fr 1.1fr; gap: clamp(32px, 6vw, 80px); align-items: center; }
   .copy { display: grid; gap: 16px; }
   .minis { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 14px; }
@@ -58,5 +81,9 @@ const max = facts.discordIdleRamMb;
   :global(html.tier-b) .card:global(.in) .fill { transform: none; }
   figcaption { margin-top: 24px; font-size: 13px; line-height: 1.5; color: var(--text-3); }
 
-  @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) {
+    .two { grid-template-columns: 1fr; }
+    :global(html.gl-on) .float-stage { align-items: flex-start; padding-top: 96px; }
+    :global(html.gl-on) .minis { display: none; }
+  }
 </style>
