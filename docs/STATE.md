@@ -26,7 +26,7 @@
 | Nativo onda 2 (deep links, verificações visuais) | `src/main`, `preload` | **feito** — ver Validado |
 | UI onda 3 (anexos, avatares, configurações do espaço, verificação de e-mail/reset) | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Monetização (estratégia + motor de direitos) + listar/revogar convites | `docs/business`, `apps/server` | **feito** — ver Validado |
-| UI onda 4a (planos/checkout, loja de cosméticos, deep links, página de convites) | `apps/desktop/src/renderer` (exceto `media/`, `features/voice`) | em andamento |
+| UI onda 4a (assinatura, loja, deep links, convites) | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Rascunhos legais | `docs/legal` | **feito** (rascunho p/ advogado) |
 | Trust & Safety + LGPD (idade, denúncias, suspensão/apelação, CSAM, exclusão de conta, exportação, logs de acesso, aceite de termos) | `apps/server`, `docs/trust-safety` | em andamento |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
@@ -47,6 +47,7 @@
 - UI onda 3: anexos (botão, arrastar, colar, progresso real, retry, grade 1–10, lightbox, players, refetch de link expirado testado com 403 forçado), avatar/ícone com recorte, configurações do espaço (visão geral, cargos com hierarquia espelhando o servidor, membros, banimentos, convites), apelidos em todo lugar, troca de senha, sair de outras sessões, verificação de e-mail e "Esqueci minha senha". 78 testes no desktop. Capturas `docs/screenshots/2026-11-01-chat-attachments-v3.png`, `space-settings-roles-v4.png`, `settings-account-security-v2.png`…
 - Nativo onda 2: deep links `algameet://auth/verify-email?token=`, `auth/reset-password?token=`, `invite/<code>` (parse estrito, tokens redigidos do log), entregues a frio, por segunda instância e pelo caminho real do Windows (`Start-Process`); protocolo registrado/removido pelo instalador NSIS (testado). safeStorage migrado para API assíncrona sem perder tokens antigos. Verificados com captura: toast nativo (clique foca e dispara evento), badge da barra de tarefas, iniciar com o Windows (`--hidden` vai para a bandeja). 20 testes nativos + verify-native verde. **UI ainda não consome `window.alga.deepLinks`.**
 - Monetização (`docs/business/monetization.md`): proposta **Alga Plus R$ 14,90/mês ou R$ 149/ano** (1080p60/1440p60/4K30, anexos 100 MB, 2 cosméticos inclusos); grátis mantém voz igual para todos, social completo e tela até 1080p30; cosméticos avulsos R$ 5,90–12,90, sem moeda virtual, sem anúncios/quests. Provedor recomendado: **Mercado Pago** (Pix 0,99%). Com banda em pacote o Plus cobre toda a infra a partir de ~2,3% de conversão (1k CCU); a preço de tabela precisa ~5,5%. Motor de direitos no servidor: só webhook verificado muda estado de pagamento; provedor sandbox bloqueado em produção; presets de transmissão do plano vão no token LiveKit e o servidor muta transmissão acima do plano. **138 testes em PGlite e PostgreSQL 18.** Adaptador Mercado Pago testado só contra API simulada.
+- UI onda 4a: compra sandbox ponta a ponta no app real (checkout → sandbox confirma → webhook → `ENTITLEMENTS_UPDATE` → UI), recusa e cancelamento no fim do período; loja de personalização com prévia no próprio perfil e cosméticos desenhados em CSS/SVG; deep links consumidos (verificar e-mail, reset, convite — a frio e por segunda instância); página de convites com revogar. Texto legal aplicado ("fica na sua conta, sem renovação"; reembolso 7 dias antes do clique). 85 testes no desktop. Capturas `docs/screenshots/2026-11-01-billing-*-v5.png`, `shop-*-v5.png`.
 - Backend: 47 testes vitest (PGlite em memória, REST via inject + gateway via WebSocket real) passando, conferido pelo Maestro. Smoke test com LiveKit real: webhooks `room_started/finished` e `participant_joined/left` reais recebidos e assinatura verificada; `VOICE_STATE_UPDATE/REMOVE` entregues no gateway.
 
 ## Pesquisa concluída
@@ -103,7 +104,10 @@ Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não d
 | Cotação escrita Latitude.sh São Paulo (pacote de banda) | O custo recomendado depende dela (US$ 4,9k vs 18,3k/mês a 10k CCU) | Pedir cotação antes da fase 1k CCU | Plano de custo a 1k+ CCU fica incerto |
 | Segunda máquina independente | Validar voz/tela entre dispositivos reais e NATs diferentes | Instalar o build em outro PC e entrar num canal | Só temos medições em localhost |
 
-## Próximos passos
-1. Integrar backend + nativo + mídia; rodar o fluxo ponta a ponta com dois perfis.
-2. Design system e telas (após estudo do Linear), com ciclo de screenshots e crítica.
-3. Primeiro build instalável para o usuário testar.
+## Próximos passos (fila do Maestro, em ordem)
+1. **Aguardando agentes:** mídia onda 2 (vazamento de memória, unmute pós-moderação, rede degradada via proxy UDP) e Trust & Safety/LGPD no servidor.
+2. **Servidor (depois do T&S):** `PUT /users/@me/cosmetics` (equipar), cosméticos em `PublicUser`, eventos de convite no gateway, retomar renovação após cancelar.
+3. **Mídia onda 3:** `ScreenPicker` bloquear presets fora de `VoiceJoinResponse.streamPresets` (dica Alga Plus → `openSettings('plan')`), re-limitar camada publicada quando o plano muda em chamada, preset `720p60` (grátis), apelidos no `CallStage.tsx:167` (`displayName(st, id, spaceId)`), grade de 3 tiles, destaque da transmissão, mini-player ao sair do palco, som de toque. Depois: **E2EE** (paridade com DAVE do Discord) — desenho + protótipo.
+4. **UI onda 5:** telas de T&S/LGPD (data de nascimento no cadastro, denunciar mensagem/usuário/espaço, aviso de suspensão + apelação, excluir conta, exportar dados, aceite de termos), virtualização da lista de mensagens, divisão do bundle, checar 960×600 e 1920×1080@125% das telas novas.
+5. **Observabilidade:** métricas do servidor (Prometheus protegido), telemetria opt-in de qualidade de chamada sem conteúdo.
+6. **Deploy de teste** quando o dono aprovar (Railway + SFU) → teste real entre máquinas e comparação com Discord na mesma rede.
