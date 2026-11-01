@@ -1,16 +1,18 @@
+import { rm } from 'node:fs/promises'
 import {
-  AckBody, EditMessageBody, Permission, SendMessageBody, hasPermission, uuidv7,
+  AckBody, EditMessageBody, MAX_ATTACHMENTS, Permission, SendMessageBody, SendMessageWithAttachmentsBody, hasPermission, uuidv7,
   type Message, type ReadState,
 } from '@alga/shared'
 import { and, asc, countDistinct, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { assertDmNotBlocked, channelAudience, requireChannel, type ChannelAccess } from '../access.js'
 import type { Ctx } from '../app.js'
 import type { Db } from '../db/index.js'
-import { channels, messages, reactions, readStates, type MessageRow } from '../db/schema.js'
-import { badRequest, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
-import { messageFor, messageViews } from '../views.js'
+import { attachments, channels, messages, reactions, readStates, type MessageRow } from '../db/schema.js'
+import { HttpError, badRequest, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
+import { inspect, safeFilename, spool, tooLarge, type Spooled } from '../files.js'
+import { messageFor, messageViews, type FileUrl } from '../views.js'
 
 const HistoryQuery = z.object({
   before: z.uuid().optional(),
@@ -45,7 +47,40 @@ function checkEmoji(emoji: string, strict = true): string {
 }
 
 export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
-  const { db, hub } = ctx
+  const { db, hub, files } = ctx
+  const maxBytes = ctx.config.files.maxAttachmentBytes
+  const fileUrl: FileUrl = (id, uid) => files.url(id, uid)
+  // Every stored file counts, across messages and channels.
+  const uploadLimit = app.createRateLimit({ max: 30, timeWindow: '10 minutes', keyGenerator: (req) => `upload:${req.auth.user.id}` })
+
+  /** Multipart send: `payload_json` + up to MAX_ATTACHMENTS files spooled to temp files (removed by the caller). */
+  async function readUpload(req: FastifyRequest): Promise<{ payload: unknown; spooled: Spooled[] }> {
+    if (Number(req.headers['content-length']) > MAX_ATTACHMENTS * maxBytes + 1024 * 1024) throw tooLarge(maxBytes)
+    const spooled: Spooled[] = []
+    let payload: unknown
+    try {
+      for await (const part of req.parts({ limits: { fileSize: maxBytes, files: MAX_ATTACHMENTS + 1, fields: 4, fieldSize: 64 * 1024 } })) {
+        if (part.type === 'file') {
+          if (spooled.length === MAX_ATTACHMENTS) {
+            throw new HttpError('validation', `No máximo ${MAX_ATTACHMENTS} arquivos por mensagem.`, { files: 'Arquivos demais.' }, 413)
+          }
+          const limit = await uploadLimit(req)
+          if (!limit.isAllowed && limit.isExceeded) throw new HttpError('rate_limited', 'Muitos envios de arquivo. Tente novamente em alguns minutos.')
+          spooled.push(await spool(part.file, part.filename, maxBytes))
+        } else if (part.fieldname === 'payload_json') {
+          try {
+            payload = typeof part.value === 'string' ? JSON.parse(part.value) : part.value
+          } catch {
+            throw invalid({ payload_json: 'JSON inválido.' })
+          }
+        }
+      }
+    } catch (err) {
+      await Promise.all(spooled.map((f) => rm(f.path, { force: true })))
+      throw err
+    }
+    return { payload, spooled }
+  }
 
   // userId:channelId → last TYPING_START. Pruned every minute.
   const typing = new Map<string, number>()
@@ -74,17 +109,44 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
     const rows = await db.select().from(messages).where(where)
       .orderBy(forward ? asc(messages.id) : desc(messages.id)).limit(q.limit)
     if (forward) rows.reverse()
-    return (await messageViews(db, rows)).map((v) => messageFor(v, req.auth.user.id))
+    return (await messageViews(db, rows)).map((v) => messageFor(v, req.auth.user.id, fileUrl))
   })
 
   app.post<P>('/channels/:id/messages', {
     config: { rateLimit: { max: 10, timeWindow: '10 seconds' } },
   }, async (req): Promise<Message> => {
     const me = req.auth.user.id
-    const access = await requireChannel(db, idParam(req.params.id), me, Permission.SEND_MESSAGES)
+    const multipart = req.isMultipart()
+    // Checked before reading any upload byte.
+    const access = await requireChannel(db, idParam(req.params.id), me, Permission.SEND_MESSAGES | (multipart ? Permission.ATTACH_FILES : 0))
     textOnly(access)
     await assertDmNotBlocked(db, access, me)
-    const body = parse(SendMessageBody, req.body)
+    if (!multipart) return send(me, access, parse(SendMessageBody, req.body), [])
+    const { payload, spooled } = await readUpload(req)
+    let stored: string[] = []
+    try {
+      const body = parse(SendMessageWithAttachmentsBody, payload)
+      if (!body.content && !spooled.length) throw invalid({ content: 'Envie um texto ou ao menos um arquivo.' })
+      const now = Date.now()
+      const prepared = await Promise.all(spooled.map(async (f, i) => {
+        const info = await inspect(f.path)
+        const id = uuidv7(now + i) // + i ms: ids sort in upload order
+        return { ...f, ...info, id, key: `attachments/${access.channel.id}/${id}`, filename: safeFilename(f.name, info) }
+      }))
+      await files.store(prepared)
+      stored = prepared.map((f) => f.key)
+      return await send(me, access, body, prepared)
+    } catch (err) {
+      if (stored.length) await files.abandon(stored)
+      throw err
+    } finally {
+      await Promise.all(spooled.map((f) => rm(f.path, { force: true })))
+    }
+  })
+
+  interface Prepared { id: string; key: string; filename: string; contentType: string; size: number; width?: number; height?: number }
+
+  async function send(me: string, access: ChannelAccess, body: SendMessageBody, prepared: Prepared[]): Promise<Message> {
     const channelId = access.channel.id
     if (body.replyToId) {
       const [parent] = await db.select({ id: messages.id }).from(messages)
@@ -98,6 +160,13 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
       const inserted = await tx.insert(messages).values({
         id, channelId, authorId: me, content: body.content, replyToId: body.replyToId ?? null,
       }).returning()
+      if (prepared.length) {
+        await tx.insert(attachments).values(prepared.map((f) => ({
+          id: f.id, messageId: id, storageKey: f.key, filename: f.filename, contentType: f.contentType, size: f.size,
+          width: f.width ?? null, height: f.height ?? null,
+        })))
+        await files.keep(tx, prepared.map((f) => f.key))
+      }
       await tx.update(channels).set({ lastMessageId: id }).where(eq(channels.id, channelId))
       // The author has obviously read their own message.
       await tx.insert(readStates).values({ userId: me, channelId, lastReadMessageId: id, mentionCount: 0 })
@@ -113,14 +182,14 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
     })
     const [view] = await messageViews(db, [row!])
     const withNonce = { ...view!, ...(body.nonce !== undefined ? { nonce: body.nonce } : {}) }
-    hub.dispatch(audience, 'MESSAGE_CREATE', (uid) => messageFor(withNonce, uid))
+    hub.dispatch(audience, 'MESSAGE_CREATE', (uid) => messageFor(withNonce, uid, fileUrl))
     if (mentioned.length) {
       const states = await db.select().from(readStates)
         .where(and(eq(readStates.channelId, channelId), inArray(readStates.userId, mentioned)))
       for (const s of states) hub.dispatch([s.userId], 'READ_STATE_UPDATE', readStateView(s))
     }
-    return messageFor(withNonce, me)
-  })
+    return messageFor(withNonce, me, fileUrl)
+  }
 
   app.patch<PM>('/channels/:id/messages/:mid', async (req): Promise<Message> => {
     const me = req.auth.user.id
@@ -132,8 +201,8 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { content } = parse(EditMessageBody, req.body)
     const [row] = await db.update(messages).set({ content, editedAt: new Date() }).where(eq(messages.id, msg.id)).returning()
     const [view] = await messageViews(db, [row!])
-    hub.dispatch(await channelAudience(db, access.channel, access.recipientIds), 'MESSAGE_UPDATE', (uid) => messageFor(view!, uid))
-    return messageFor(view!, me)
+    hub.dispatch(await channelAudience(db, access.channel, access.recipientIds), 'MESSAGE_UPDATE', (uid) => messageFor(view!, uid, fileUrl))
+    return messageFor(view!, me, fileUrl)
   })
 
   app.delete<PM>('/channels/:id/messages/:mid', async (req, reply) => {
@@ -144,6 +213,7 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
       throw forbidden('Você não pode apagar esta mensagem.')
     }
     await db.delete(messages).where(eq(messages.id, msg.id))
+    files.kick() // the delete trigger queued its attachments
     hub.dispatch(await channelAudience(db, access.channel, access.recipientIds), 'MESSAGE_DELETE', { id: msg.id, channelId: msg.channelId })
     return reply.code(204).send()
   })

@@ -45,7 +45,10 @@ function spyRooms() {
   }
 }
 
-const PROD = { NODE_ENV: 'production', DATABASE_URL: 'postgres://u:p@db:5432/alga', CORS_ORIGINS: 'null,file://' }
+const PROD = {
+  NODE_ENV: 'production', DATABASE_URL: 'postgres://u:p@db:5432/alga', CORS_ORIGINS: 'null,file://',
+  PUBLIC_URL: 'https://api.example.com', FILES_SECRET: 'f'.repeat(32), STORAGE_DRIVER: 'local',
+}
 const REAL_SECRET = 'a-real-production-secret-0123456789abcdef'
 
 describe('A1 trusted proxy + login limits', () => {
@@ -400,14 +403,22 @@ describe('M7 reactions are real emoji, at most 20 distinct per message', () => {
 })
 
 describe('M9/B4 input bounds', () => {
-  it('avatarUrl / iconUrl must be https', async () => {
+  it('avatarUrl / iconUrl only accept null or our own uploads (no third-party tracking pixels)', async () => {
     const a = await register(s.app)
     const { space } = await spaceWith(a.token)
-    for (const u of ['javascript:alert(1)', 'file:///C:/Windows/win.ini', 'http://attacker.example/p.gif', 'data:image/png;base64,AA']) {
+    const pub = s.config.publicUrl
+    for (const u of [
+      'javascript:alert(1)', 'file:///C:/Windows/win.ini', 'http://attacker.example/p.gif', 'data:image/png;base64,AA',
+      'https://cdn.example/a.png', 'https://attacker.example/pixel?u=1',
+      // ours, but someone else's avatar / another space's icon / not an image name
+      `${pub}/api/v1/avatars/${space.id}/${'a'.repeat(32)}.png`, `${pub}/api/v1/icons/${a.user.id}/${'a'.repeat(32)}.png`,
+      `${pub}/api/v1/avatars/${a.user.id}/../x.png`,
+    ]) {
       expect((await api(s.app, 'PATCH', '/users/@me', { token: a.token, body: { avatarUrl: u } })).status).toBe(400)
       expect((await api(s.app, 'PATCH', `/spaces/${space.id}`, { token: a.token, body: { iconUrl: u } })).status).toBe(400)
     }
-    expect((await api(s.app, 'PATCH', '/users/@me', { token: a.token, body: { avatarUrl: 'https://cdn.example/a.png' } })).status).toBe(200)
+    expect((await api(s.app, 'PATCH', '/users/@me', { token: a.token, body: { avatarUrl: null } })).status).toBe(200)
+    expect((await api(s.app, 'PATCH', `/spaces/${space.id}`, { token: a.token, body: { iconUrl: null } })).status).toBe(200)
   })
 
   it('channel position is bounded (no 500 on integer overflow)', async () => {

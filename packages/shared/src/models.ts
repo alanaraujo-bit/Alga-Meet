@@ -101,10 +101,14 @@ export interface Reaction {
 
 export interface Attachment {
   id: string
+  /** Sanitized by the server. */
   filename: string
+  /** How the file is served: image/*, video/* or audio/* = render inline; application/octet-stream = download only. */
   contentType: string
   size: number
+  /** Signed for the current viewer and short-lived (GET /files/:id, see api.ts): refetch messages for fresh ones. */
   url: string
+  /** Images only (as displayed, EXIF rotation applied). */
   width?: number
   height?: number
 }

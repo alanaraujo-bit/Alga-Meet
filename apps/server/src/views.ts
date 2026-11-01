@@ -1,11 +1,11 @@
 /** Row → wire-model mapping and batched loaders for composite models. */
 import type {
-  Channel, Me, Member, Message, PublicUser, Relationship, Role, Space, SpaceSnapshot,
+  Attachment, Channel, Me, Member, Message, PublicUser, Relationship, Role, Space, SpaceSnapshot,
 } from '@alga/shared'
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import type { Db } from './db/index.js'
 import {
-  channelRecipients, channels, memberRoles, reactions, relationships, roles, spaceMembers, spaces, users,
+  attachments, channelRecipients, channels, memberRoles, reactions, relationships, roles, spaceMembers, spaces, users,
   type ChannelRow, type MessageRow, type RoleRow, type SpaceRow, type UserRow,
 } from './db/schema.js'
 
@@ -148,18 +148,27 @@ export async function relationshipsOf(db: Db, userId: string, targetId?: string)
   return rows.map(({ r, u }) => ({ user: publicUser(u), type: r.type, since: r.since.toISOString() }))
 }
 
-/** Message without per-viewer data: reactions keep the full user list so `me` can be computed per recipient. */
-export interface MessageView extends Omit<Message, 'reactions'> {
+/**
+ * Message without per-viewer data: reactions keep the full user list so `me` can be computed per recipient, and
+ * attachments have no URL yet (it is signed per viewer).
+ */
+export interface MessageView extends Omit<Message, 'reactions' | 'attachments'> {
   reactionUsers: { emoji: string; userIds: string[] }[]
+  files: Omit<Attachment, 'url'>[]
 }
+
+/** Signs Attachment.url for one viewer (Files.url). */
+export type FileUrl = (attachmentId: string, viewerId: string) => string
 
 export async function messageViews(db: Db, rows: MessageRow[]): Promise<MessageView[]> {
   if (!rows.length) return []
   const authorIds = [...new Set(rows.map((m) => m.authorId))]
-  const [authors, reactionRows] = await Promise.all([
+  const ids = rows.map((m) => m.id)
+  const [authors, reactionRows, fileRows] = await Promise.all([
     db.select().from(users).where(inArray(users.id, authorIds)),
-    db.select().from(reactions).where(inArray(reactions.messageId, rows.map((m) => m.id)))
+    db.select().from(reactions).where(inArray(reactions.messageId, ids))
       .orderBy(asc(reactions.createdAt)),
+    db.select().from(attachments).where(inArray(attachments.messageId, ids)).orderBy(asc(attachments.id)),
   ])
   const authorById = new Map(authors.map((u) => [u.id, publicUser(u)]))
   return rows.map((m) => {
@@ -176,16 +185,23 @@ export async function messageViews(db: Db, rows: MessageRow[]): Promise<MessageV
       createdAt: m.createdAt.toISOString(),
       editedAt: m.editedAt?.toISOString() ?? null,
       replyToId: m.replyToId,
-      attachments: [], // uploads are out of scope for now
       reactionUsers: [...byEmoji].map(([emoji, userIds]) => ({ emoji, userIds })),
+      files: fileRows.filter((f) => f.messageId === m.id).map((f) => ({
+        id: f.id,
+        filename: f.filename,
+        contentType: f.contentType,
+        size: f.size,
+        ...(f.width !== null && f.height !== null ? { width: f.width, height: f.height } : {}),
+      })),
     }
   })
 }
 
-export function messageFor(view: MessageView, viewerId: string): Message {
-  const { reactionUsers, ...rest } = view
+export function messageFor(view: MessageView, viewerId: string, fileUrl: FileUrl): Message {
+  const { reactionUsers, files, ...rest } = view
   return {
     ...rest,
     reactions: reactionUsers.map((r) => ({ emoji: r.emoji, count: r.userIds.length, me: r.userIds.includes(viewerId) })),
+    attachments: files.map((f) => ({ ...f, url: fileUrl(f.id, viewerId) })),
   }
 }

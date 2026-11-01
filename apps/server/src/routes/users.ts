@@ -30,6 +30,20 @@ export async function afterMeUpdate(ctx: Ctx, before: UserRow, after: UserRow): 
   }
 }
 
+/**
+ * After PATCHing avatarUrl/iconUrl away from one of our objects: queue it for deletion, and un-queue the new one.
+ * shortcut: `previous` comes from before the UPDATE, so a racing upload can leave one object unqueued (a storage leak,
+ * never a broken image); lock the row like PUT /users/@me/avatar does if that ever matters.
+ */
+export async function swapImageKeys(ctx: Ctx, kind: 'avatars' | 'icons', ownerId: string, previous: string | null, next: string | null): Promise<void> {
+  const [old, kept] = [ctx.files.imageKey(kind, ownerId, previous), ctx.files.imageKey(kind, ownerId, next)]
+  if (kept) await ctx.files.keep(ctx.db, [kept])
+  if (old && old !== kept) {
+    await ctx.files.queueDelete(ctx.db, [old])
+    ctx.files.kick()
+  }
+}
+
 async function relOf(db: Db | Tx, userId: string, targetId: string): Promise<RelType | undefined> {
   const [r] = await db.select({ type: relationships.type }).from(relationships)
     .where(and(eq(relationships.userId, userId), eq(relationships.targetId, targetId)))
@@ -83,6 +97,10 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
     const body = parse(PatchMeBody, req.body)
     const before = req.auth.user
     if (!Object.keys(body).length) return meView(before)
+    // M9: only our own uploads (no third-party URL that would log every viewer's IP), or null.
+    if (body.avatarUrl && !ctx.files.imageKey('avatars', before.id, body.avatarUrl)) {
+      throw invalid({ avatarUrl: 'Envie a imagem pelo upload de avatar.' })
+    }
     if (body.username && body.username !== before.username) {
       const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.username, body.username))
       if (taken) throw conflict('Nome de usuário já em uso.', { username: 'Nome de usuário já em uso.' })
@@ -94,6 +112,7 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
       if (isUniqueViolation(err)) throw conflict('Nome de usuário já em uso.', { username: 'Nome de usuário já em uso.' })
       throw err
     }
+    if (after!.avatarUrl !== before.avatarUrl) await swapImageKeys(ctx, 'avatars', before.id, before.avatarUrl, after!.avatarUrl)
     await afterMeUpdate(ctx, before, after!)
     return meView(after!)
   })

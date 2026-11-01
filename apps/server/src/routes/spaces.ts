@@ -12,7 +12,7 @@ import { isUniqueViolation, type Db } from '../db/index.js'
 import { channels, invites, roles, spaceBans, spaceMembers, spaces, type InviteRow, type SpaceRow } from '../db/schema.js'
 import { badRequest, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
 import { exchangePresence } from '../gateway/hub.js'
-import { perMinute } from './users.js'
+import { perMinute, swapImageKeys } from './users.js'
 import { channelView, memberView, spaceSnapshots, spaceView } from '../views.js'
 
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
@@ -101,7 +101,12 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { space } = await requireSpace(db, idParam(req.params.id), req.auth.user.id, Permission.MANAGE_SPACE)
     const body = parse(PatchSpaceBody, req.body)
     if (!Object.keys(body).length) return spaceView(space)
+    // M9: only our own uploads (PUT /spaces/:id/icon), or null.
+    if (body.iconUrl && !ctx.files.imageKey('icons', space.id, body.iconUrl)) {
+      throw invalid({ iconUrl: 'Envie a imagem pelo upload de ícone.' })
+    }
     const [row] = await db.update(spaces).set(body).where(eq(spaces.id, space.id)).returning()
+    if (row!.iconUrl !== space.iconUrl) await swapImageKeys(ctx, 'icons', space.id, space.iconUrl, row!.iconUrl)
     const view = spaceView(row!)
     hub.dispatch(await spaceMemberIds(db, space.id), 'SPACE_UPDATE', view)
     return view
@@ -114,6 +119,9 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
     const voiceChannels = await db.select({ id: channels.id }).from(channels)
       .where(and(eq(channels.spaceId, space.id), eq(channels.type, 'voice')))
     await db.delete(spaces).where(eq(spaces.id, space.id))
+    // Attachments were queued by the cascade's delete trigger; the icon is not a row.
+    await swapImageKeys(ctx, 'icons', space.id, space.iconUrl, null)
+    ctx.files.kick()
     hub.dispatch(members, 'SPACE_DELETE', { id: space.id })
     await voice.dropChannels(voiceChannels.map((c) => c.id), members)
     return reply.code(204).send()
@@ -181,6 +189,7 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { channel } = await requireChannel(db, idParam(req.params.id), req.auth.user.id, Permission.MANAGE_CHANNELS)
     const audience = await channelAudience(db, channel)
     await db.delete(channels).where(eq(channels.id, channel.id))
+    ctx.files.kick() // attachments queued by the cascade
     hub.dispatch(audience, 'CHANNEL_DELETE', { id: channel.id, spaceId: channel.spaceId })
     if (channel.type === 'voice') await voice.dropChannels([channel.id], audience)
     return reply.code(204).send()

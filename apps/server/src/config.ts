@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -47,6 +48,21 @@ const EnvSchema = z
     ALGA_ALLOW_DEV_SECRETS: bool,
     CORS_ORIGINS: z.string().optional(),
     HEARTBEAT_INTERVAL_MS: z.coerce.number().int().min(1000).default(30_000),
+    /** Origin clients use to reach this API (file and avatar URLs are absolute). https in production. */
+    PUBLIC_URL: z.url().optional(),
+    /** HMAC key for signed file URLs. Production: required; dev/test: random per process. */
+    FILES_SECRET: z.string().min(32).optional(),
+    STORAGE_DRIVER: z.enum(['local', 's3']).optional(),
+    UPLOADS_DIR: z.string().min(1).default(join(serverRoot, 'data', 'uploads')),
+    S3_ENDPOINT: z.url().optional(),
+    S3_BUCKET: z.string().min(1).optional(),
+    S3_REGION: z.string().min(1).default('auto'),
+    S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+    S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    /** Railway Buckets, R2 and AWS take virtual-hosted URLs; MinIO and older Railway buckets need path-style. */
+    S3_URL_STYLE: z.enum(['virtual', 'path']).default('virtual'),
+    MAX_ATTACHMENT_BYTES: z.coerce.number().int().min(1024).max(500 * 1024 * 1024).default(25 * 1024 * 1024),
+    FILE_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(7 * 24 * 3600).default(3600),
   })
   .superRefine((env, ctx) => {
     const devMode = env.ALGA_ALLOW_DEV_SECRETS || (env.NODE_ENV !== 'production' && LOOPBACK.has(env.HOST))
@@ -58,6 +74,15 @@ const EnvSchema = z
     if (env.NODE_ENV === 'production') {
       if (!env.DATABASE_URL) ctx.addIssue({ code: 'custom', path: ['DATABASE_URL'], message: 'required in production' })
       if (!env.CORS_ORIGINS?.trim()) ctx.addIssue({ code: 'custom', path: ['CORS_ORIGINS'], message: 'required in production (no permissive default)' })
+      if (!env.PUBLIC_URL?.startsWith('https://')) ctx.addIssue({ code: 'custom', path: ['PUBLIC_URL'], message: 'required in production, https://' })
+      if (!env.FILES_SECRET) ctx.addIssue({ code: 'custom', path: ['FILES_SECRET'], message: 'required in production (≥ 32 random characters)' })
+      // Container disks are ephemeral: picking local storage must be a deliberate choice (with a volume).
+      if (!env.STORAGE_DRIVER) ctx.addIssue({ code: 'custom', path: ['STORAGE_DRIVER'], message: 'required in production: s3, or local with a persistent UPLOADS_DIR' })
+    }
+    if (env.STORAGE_DRIVER === 's3') {
+      for (const k of ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const) {
+        if (!env[k]) ctx.addIssue({ code: 'custom', path: [k], message: 'required with STORAGE_DRIVER=s3' })
+      }
     }
   })
 
@@ -74,7 +99,17 @@ export interface Config {
   corsOrigins: string[]
   heartbeatIntervalMs: number
   version: string
+  /** No trailing slash. */
+  publicUrl: string
+  files: { secret: string; urlTtlSeconds: number; maxAttachmentBytes: number }
+  storage: StorageConfig
 }
+
+export type StorageConfig =
+  | { driver: 'local'; dir: string }
+  | { driver: 's3'; endpoint: string; bucket: string; region: string; accessKeyId: string; secretAccessKey: string; pathStyle: boolean }
+
+const urlHost = (host: string) => (host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host.includes(':') ? `[${host}]` : host)
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   const parsed = EnvSchema.safeParse(env)
@@ -100,5 +135,17 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     corsOrigins: (e.CORS_ORIGINS ?? DEV_CORS_ORIGINS).split(',').map((o) => o.trim()).filter(Boolean),
     heartbeatIntervalMs: e.HEARTBEAT_INTERVAL_MS,
     version: (JSON.parse(readFileSync(join(serverRoot, 'package.json'), 'utf8')) as { version: string }).version,
+    publicUrl: (e.PUBLIC_URL ?? `http://${urlHost(e.HOST)}:${e.PORT}`).replace(/\/+$/, ''),
+    files: {
+      secret: e.FILES_SECRET ?? randomBytes(32).toString('hex'),
+      urlTtlSeconds: e.FILE_URL_TTL_SECONDS,
+      maxAttachmentBytes: e.MAX_ATTACHMENT_BYTES,
+    },
+    storage: e.STORAGE_DRIVER === 's3'
+      ? {
+          driver: 's3', endpoint: e.S3_ENDPOINT!, bucket: e.S3_BUCKET!, region: e.S3_REGION,
+          accessKeyId: e.S3_ACCESS_KEY_ID!, secretAccessKey: e.S3_SECRET_ACCESS_KEY!, pathStyle: e.S3_URL_STYLE === 'path',
+        }
+      : { driver: 'local', dir: e.UPLOADS_DIR },
   }
 }

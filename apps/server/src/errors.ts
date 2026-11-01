@@ -15,9 +15,10 @@ const STATUS: Record<ApiErrorCode, number> = {
 
 export class HttpError extends Error {
   readonly statusCode: number
-  constructor(readonly code: ApiErrorCode, message: string, readonly fields?: Record<string, string>) {
+  /** `status` overrides the code's default (e.g. 413 for a `validation` error on an oversized upload). */
+  constructor(readonly code: ApiErrorCode, message: string, readonly fields?: Record<string, string>, status?: number) {
     super(message)
-    this.statusCode = STATUS[code]
+    this.statusCode = status ?? STATUS[code]
   }
 }
 
@@ -65,8 +66,9 @@ export function safeErr(err: unknown): Record<string, unknown> {
   }
 }
 
-/** Invite codes in URLs are bearer secrets for joining; keep them out of request logs. */
-export const safeUrl = (url: string) => url.replace(/(\/invites\/)[^/?#]+/, '$1<redacted>')
+/** Invite codes and file-URL signatures are bearer secrets; keep them out of request logs. */
+export const safeUrl = (url: string) =>
+  url.replace(/(\/invites\/)[^/?#]+/, '$1<redacted>').replace(/([?&]sig=)[^&#]+/, '$1<redacted>')
 
 const body = (code: ApiErrorCode, message: string, fields?: Record<string, string>): ApiError =>
   ({ error: fields ? { code, message, fields } : { code, message } })

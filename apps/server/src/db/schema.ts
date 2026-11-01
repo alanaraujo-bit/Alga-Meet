@@ -170,3 +170,31 @@ export type MessageRow = typeof messages.$inferSelect
 export type SpaceRow = typeof spaces.$inferSelect
 export type RoleRow = typeof roles.$inferSelect
 export type InviteRow = typeof invites.$inferSelect
+
+/** Files of a message, in upload order (UUIDv7 ids). Deleted with the message; a trigger queues the object for removal. */
+export const attachments = pgTable('attachments', {
+  id: uuid('id').primaryKey(),
+  messageId: uuid('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  storageKey: text('storage_key').notNull(),
+  /** Sanitized; display/download name only (the storage key never contains it). */
+  filename: text('filename').notNull(),
+  /** Sniffed from the bytes; the client's Content-Type and extension are ignored. */
+  contentType: text('content_type').notNull(),
+  size: integer('size').notNull(),
+  width: integer('width'),
+  height: integer('height'),
+}, (t) => [index('attachments_message_id_idx').on(t.messageId)])
+
+/**
+ * Outbox of storage objects to remove (deleted attachments via trigger, replaced avatars/icons, failed sends), retried
+ * with backoff by Files.sweep. Uploads are queued an hour ahead before the bytes are stored and dequeued when the row
+ * that references them commits, so a crash in between still cleans up.
+ */
+export const storageDeletions = pgTable('storage_deletions', {
+  key: text('key').primaryKey(),
+  notBefore: ts('not_before').notNull().defaultNow(),
+  attempts: integer('attempts').notNull().default(0),
+  lastError: text('last_error'),
+}, (t) => [index('storage_deletions_not_before_idx').on(t.notBefore)])
+
+export type AttachmentRow = typeof attachments.$inferSelect

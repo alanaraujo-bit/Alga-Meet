@@ -35,6 +35,25 @@ import { ALL_PERMISSIONS } from './permissions.js'
  * DELETE /channels/:id                                   -> 204
  * GET    /channels/:id/messages?before=&after=&limit=    -> Message[] (newest first, limit<=100)
  * POST   /channels/:id/messages    SendMessageBody       -> Message
+ * POST   /channels/:id/messages    multipart/form-data   -> Message (with files; SEND_MESSAGES + ATTACH_FILES)
+ *   Parts: `payload_json` = JSON text of SendMessageWithAttachmentsBody (content may be empty if a file is attached),
+ *   and 1–MAX_ATTACHMENTS file parts (field name `files`). Each file ≤ the server cap (DEFAULT_MAX_ATTACHMENT_BYTES
+ *   unless configured): 413 above it or above MAX_ATTACHMENTS files. The type is sniffed from the bytes (the part's
+ *   Content-Type and the extension are ignored) and the filename is sanitized. Attachment.contentType is what the
+ *   file is served as: an image/*, video/* or audio/* type means "render inline"; anything else (unknown types,
+ *   SVG, HTML, huge images) is application/octet-stream, a download. width/height come with images.
+ *   Uploads are limited to 30 files per 10 minutes per user (429). Deleting the message deletes its files.
+ * GET    /files/:id?uid=&exp=&sig=                        -> file bytes (no auth header: Attachment.url is signed)
+ *   Attachment.url is per viewer and expires (~1 h; every message fetch or event carries fresh ones), so it works
+ *   in <img>/<video> without headers. 403 = expired or tampered, 404 = gone or the viewer lost access to the channel.
+ *   Single `Range` requests are supported (video seeking).
+ * PUT    /users/@me/avatar         multipart `file`      -> Me    (ME_UPDATE + USER_UPDATE)
+ * PUT    /spaces/:id/icon          multipart `file`      -> Space (MANAGE_SPACE; SPACE_UPDATE)
+ *   One image of AVATAR_CONTENT_TYPES (sniffed; SVG refused), ≤ MAX_AVATAR_BYTES and ≤ MAX_AVATAR_SIDE px per side,
+ *   5 per minute. Sets avatarUrl/iconUrl to our own URL, served publicly and immutably at
+ * GET    /avatars/:userId/:file  ·  GET /icons/:spaceId/:file   -> image (public, no auth)
+ *   PATCH /users/@me and PATCH /spaces/:id accept avatarUrl/iconUrl only as null (remove) or a URL these uploads
+ *   returned for that same user/space; any other URL is a 400.
  * PATCH  /channels/:id/messages/:mid EditMessageBody     -> Message
  * DELETE /channels/:id/messages/:mid                     -> 204
  * PUT    /channels/:id/messages/:mid/reactions/:emoji    -> 204
@@ -81,7 +100,10 @@ export interface ApiError {
   error: { code: ApiErrorCode; message: string; fields?: Record<string, string> }
 }
 
-/** Profile/space images: https only (no javascript:/file:/data:/http: — tracking and unsafe schemes). */
+/**
+ * Profile/space images: https only (no javascript:/file:/data:/http: — tracking and unsafe schemes). The server also
+ * requires the URL to be one of its own uploads (PUT /users/@me/avatar, PUT /spaces/:id/icon) or null.
+ */
 const httpsUrl = z.url({ protocol: /^https$/ }).max(2048)
 
 const username = z
@@ -168,6 +190,19 @@ export const SendMessageBody = z.object({
   replyToId: z.string().uuid().optional(),
 })
 export type SendMessageBody = z.infer<typeof SendMessageBody>
+
+/** Most files per message. */
+export const MAX_ATTACHMENTS = 10
+/** Per-file cap unless the server sets MAX_ATTACHMENT_BYTES; larger files get 413. */
+export const DEFAULT_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+/** Avatars and space icons. */
+export const MAX_AVATAR_BYTES = 8 * 1024 * 1024
+export const MAX_AVATAR_SIDE = 4096
+export const AVATAR_CONTENT_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const
+
+/** `payload_json` of a multipart send: as SendMessageBody, but `content` may be empty when files are attached. */
+export const SendMessageWithAttachmentsBody = SendMessageBody.extend({ content: z.string().trim().max(4000).default('') })
+export type SendMessageWithAttachmentsBody = z.infer<typeof SendMessageWithAttachmentsBody>
 
 export const EditMessageBody = z.object({ content: z.string().trim().min(1).max(4000) })
 export type EditMessageBody = z.infer<typeof EditMessageBody>
