@@ -190,3 +190,29 @@
   color: var(--danger);
   font: var(--type-meta);
 }
+/* Sustained by this computer, not in the plan: readable, clearly not pickable, no accent (state, not a sale). */
+.optionLocked {
+  color: var(--text-disabled);
+  cursor: default;
+}
+.optionLocked:hover {
+  background: none;
+}
+.plusTag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.option .plusTag svg {
+  color: currentColor;
+}
+.hintLink {
+  color: var(--accent);
+  font: inherit;
+  font-weight: var(--w-medium);
+}
+.hintLink:hover {
+  text-decoration: underline;
+}

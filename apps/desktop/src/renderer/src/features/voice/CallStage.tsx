@@ -12,25 +12,29 @@ import { can, channelTitle, displayName, spaceChannels, spacePermissions, voiceM
 import { Avatar, Button, contextMenuHandler, Fronds, Icon, IconButton, Popover, SegmentedControl, Spinner, Switch, toast, Tooltip, useEnvelope, type MenuEntry } from '@/ui'
 import { EASE_OUT_QUART } from '@/ui/motion'
 import { ControlsDock } from './ControlsDock'
-import { fitTiles } from './layout'
+import { stageLayout, type StageLayout } from './layout'
 import { useLevelGetter, roomLevelNow } from './levels'
 import { t } from './strings'
 import { joinVoice, leaveVoice, useVoice } from './voice'
 import sh from '../shell/shell.module.css'
 import s from './stage.module.css'
 
-function useFit(ref: RefObject<HTMLElement | null>, n: number): number {
-  const [w, setW] = useState(320)
+function useStageLayout(ref: RefObject<HTMLElement | null>, n: number, featured: boolean, mounted: boolean): StageLayout {
+  const [l, setL] = useState<StageLayout>({ featured: null, width: 320, rows: [n] })
   useLayoutEffect(() => {
     const el = ref.current
-    if (!el) return
-    const measure = () => setW(fitTiles(n, el.clientWidth, el.clientHeight))
+    if (!el || !mounted) return
+    const measure = () =>
+      setL((cur) => {
+        const next = stageLayout(n, el.clientWidth, el.clientHeight, featured)
+        return cur.featured === next.featured && cur.width === next.width && String(cur.rows) === String(next.rows) ? cur : next
+      })
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [ref, n])
-  return w
+  }, [ref, n, featured, mounted])
+  return l
 }
 
 type Conn = { state: string; channelId: string | null; reason: string | null; rtt: number | null }
@@ -49,13 +53,19 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
   const live = here && (conn.state === 'connecting' || conn.state === 'connected' || conn.state === 'reconnecting')
   const joining = useVoice((st) => st.joining === channel.id)
 
-  // Watching is opt-in and costs bandwidth: whatever you watched stops when you leave the stage.
-  useEffect(
-    () => () => {
-      for (const id of Object.keys(useMedia.getState().viewers)) media.unwatch(id)
-    },
-    [],
-  )
+  // Watching is opt-in and costs bandwidth: leaving the call's stage keeps one stream for the mini-player
+  // (the one in focus, else the first) and stops the rest.
+  useEffect(() => {
+    useVoice.setState({ stage: channel.id })
+    return () => {
+      if (useVoice.getState().stage === channel.id) useVoice.setState({ stage: null })
+      if (useMedia.getState().connection.channelId !== channel.id) return
+      const watched = Object.keys(useMedia.getState().viewers)
+      const focus = useVoice.getState().focus
+      const keep = focus && watched.includes(focus) ? focus : watched[0]
+      for (const id of watched) if (id !== keep) media.unwatch(id)
+    }
+  }, [channel.id])
 
   const header =
     variant === 'channel' ? (
@@ -138,7 +148,6 @@ function Notice({ title, children, action, dismiss }: { title: string; children:
 // ── Not in the room ───────────────────────────────────────────
 
 function PreJoin({ channel, people, streaming, joining, variant }: { channel: Channel; people: string[]; streaming: string[]; joining: boolean; variant: 'channel' | 'dm' }) {
-  const users = useData((st) => st.users)
   const join = (
     <Button variant="primary" size="lg" icon={Volume2} loading={joining} onClick={() => void joinVoice(channel.id)}>
       {variant === 'dm' ? t.call.join : t.join(channel.name)}
@@ -158,21 +167,27 @@ function PreJoin({ channel, people, streaming, joining, variant }: { channel: Ch
   return (
     <div className={s.preview}>
       <ul className={s.previewPeople} aria-label={t.stage.preview(people.length)}>
-        {people.map((id) => {
-          const u = users[id]
-          if (!u) return null
-          return (
-            <li key={id} className={s.previewPerson}>
-              <Avatar user={u} size={56} decorative />
-              <span>{u.displayName}</span>
-              {streaming.includes(id) && <span className={s.liveBadge}>{t.stage.live}</span>}
-            </li>
-          )
-        })}
+        {people.map((id) => (
+          <PreviewPerson key={id} userId={id} spaceId={channel.spaceId} live={streaming.includes(id)} />
+        ))}
       </ul>
       <p className={s.count}>{t.stage.preview(people.length)}</p>
       {join}
     </div>
+  )
+}
+
+function PreviewPerson({ userId, spaceId, live }: { userId: string; spaceId: string | null; live: boolean }) {
+  const u = useData((st) => st.users[userId])
+  // The space nickname, as in chat and on the tiles.
+  const name = useData((st) => displayName(st, userId, spaceId))
+  if (!u) return null
+  return (
+    <li className={s.previewPerson}>
+      <Avatar user={u} size={56} decorative />
+      <span>{name}</span>
+      {live && <span className={s.liveBadge}>{t.stage.live}</span>}
+    </li>
   )
 }
 
@@ -193,11 +208,15 @@ function LiveRoom({ channel, people, meId }: { channel: Channel; people: string[
     return list
   }, [people, remote, meId])
   const streams = useMemo(() => [...(selfLive && meId ? [meId] : []), ...streamers.filter((id) => id !== meId)], [selfLive, streamers, meId])
+  // A stream you are watching gets the big tile on top; everyone else stays a normal grid below it.
+  const featured = useMedia((st) => streams.find((id) => id !== meId && !!st.viewers[id]) ?? null)
 
   const box = useRef<HTMLDivElement>(null)
-  const width = useFit(box, ids.length + streams.length)
+  const inFocus = !!focus && watchingFocus && streams.includes(focus)
+  // Re-measured when the grid comes back from focus mode (its box only exists outside it).
+  const layout = useStageLayout(box, ids.length + streams.length, !!featured, !inFocus)
 
-  if (focus && watchingFocus && streams.includes(focus)) {
+  if (inFocus) {
     return (
       <div className={s.focus}>
         <div className={s.focusMain}>
@@ -217,21 +236,36 @@ function LiveRoom({ channel, people, meId }: { channel: Channel; people: string[
     )
   }
 
+  const width = layout.width
   const avatar = width >= 420 ? 96 : width >= 300 ? 80 : 56
+  // One flex container (tiles never remount, layout animations keep working) with a line break after each
+  // balanced row: 7 people read as 3+2+2, never 3+3+1 with a stray tile.
+  const tiles: ReactNode[] = []
+  const rest = [...streams.filter((id) => id !== featured).map((id) => ({ key: 's:' + id, id, stream: true })), ...ids.map((id) => ({ key: id, id, stream: false }))]
+  if (featured && layout.featured) {
+    tiles.push(
+      <Appear key={'s:' + featured} width={layout.featured}>
+        <StreamTile userId={featured} channel={channel} />
+      </Appear>,
+      <span key="br:featured" className={s.rowBreak} aria-hidden />,
+    )
+  }
+  const tile = (it: (typeof rest)[number]) => (
+    <Appear key={it.key} width={width}>
+      {it.stream ? <StreamTile userId={it.id} channel={channel} /> : <PersonTile userId={it.id} channel={channel} size={avatar} />}
+    </Appear>
+  )
+  let next = 0
+  layout.rows.forEach((count, r) => {
+    tiles.push(...rest.slice(next, next + count).map(tile))
+    next += count
+    if (r < layout.rows.length - 1) tiles.push(<span key={'br:' + r} className={s.rowBreak} aria-hidden />)
+  })
+  // Someone who arrived since the last measure (re-measured before paint) is never left out meanwhile.
+  tiles.push(...rest.slice(next).map(tile))
   return (
     <div ref={box} className={s.grid}>
-      <AnimatePresence initial={false}>
-        {streams.map((id) => (
-          <Appear key={`s:${id}`} width={width}>
-            <StreamTile userId={id} channel={channel} />
-          </Appear>
-        ))}
-        {ids.map((id) => (
-          <Appear key={id} width={width}>
-            <PersonTile userId={id} channel={channel} size={avatar} />
-          </Appear>
-        ))}
-      </AnimatePresence>
+      <AnimatePresence initial={false}>{tiles}</AnimatePresence>
     </div>
   )
 }

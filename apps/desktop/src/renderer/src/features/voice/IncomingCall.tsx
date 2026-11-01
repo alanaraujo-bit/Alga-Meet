@@ -4,14 +4,23 @@ import { useData } from '@/store/data'
 import { channelTitle, displayName } from '@/store/selectors'
 import { Avatar, Button } from '@/ui'
 import { EASE_IN, EASE_OUT_QUART } from '@/ui/motion'
+import { MiniPlayer } from './MiniPlayer'
 import { t } from './strings'
 import { acceptRing, declineRing, useVoice } from './voice'
 import s from './chrome.module.css'
 
-/** Incoming DM call: a card at the top of the window, answerable from the keyboard, gone after 30 s. */
+/**
+ * The call layer over the whole shell (mounted once by Shell): the incoming DM call card, answerable from the
+ * keyboard and gone after 30 s, and the mini-player of the stream you watch while away from the call.
+ */
 export function IncomingCall() {
   const ring = useVoice((st) => st.ring)
-  return <AnimatePresence>{ring && <RingCard key={ring.channelId + ring.at} channelId={ring.channelId} fromUserId={ring.fromUserId} />}</AnimatePresence>
+  return (
+    <>
+      <AnimatePresence>{ring && <RingCard key={ring.channelId + ring.at} channelId={ring.channelId} fromUserId={ring.fromUserId} />}</AnimatePresence>
+      <MiniPlayer />
+    </>
+  )
 }
 
 function RingCard({ channelId, fromUserId }: { channelId: string; fromUserId: string }) {

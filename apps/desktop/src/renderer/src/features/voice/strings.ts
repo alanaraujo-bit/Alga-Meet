@@ -140,6 +140,11 @@ export const t = {
     choose: 'Escolha uma tela ou janela',
     quality: 'Qualidade',
     qualityHint: 'Só aparecem as opções que este computador sustenta.',
+    qualityLiveHint: 'Muda na hora, sem interromper quem assiste.',
+    plus: 'Alga Plus',
+    lockedHint: (labels: string[]) => `${new Intl.ListFormat('pt-BR').format(labels)} ${labels.length > 1 ? 'vêm' : 'vem'} com o Alga Plus.`,
+    seePlus: 'Ver o Alga Plus',
+    apply: 'Aplicar',
     content: 'O que você vai mostrar',
     motion: 'Jogo ou vídeo',
     motionHint: 'Movimento suave: prioriza quadros por segundo.',
@@ -152,6 +157,12 @@ export const t = {
     switch: 'Trocar fonte',
     cancel: 'Cancelar',
     failed: 'Não foi possível começar a transmissão.',
+  },
+
+  mini: {
+    label: (name: string) => `Transmissão de ${name} em miniatura`,
+    back: 'Voltar para a chamada',
+    close: 'Parar de assistir',
   },
 
   stats: {

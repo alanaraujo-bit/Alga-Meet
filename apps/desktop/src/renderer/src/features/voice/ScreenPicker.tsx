@@ -1,9 +1,10 @@
-import { Check, Monitor, AppWindow } from 'lucide-react'
+import { Check, Lock, Monitor, AppWindow } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type { CaptureSource } from '../../../../shared/bridge'
 import { media, useMedia, SCREEN_PRESETS, type ContentType, type ScreenPresetId } from '@/media'
 import { Button, Icon, Modal, SegmentedControl, Spinner, Switch, Tabs } from '@/ui'
+import { openSettings } from '../settings/store'
 import { t } from './strings'
 import { useVoice } from './voice'
 import s from './picker.module.css'
@@ -23,7 +24,7 @@ export function ScreenPicker() {
 }
 
 function PickerBody({ onDone }: { onDone: () => void }) {
-  const screen = useMedia(useShallow((st) => ({ active: st.screen.active, preset: st.screen.preset, contentType: st.screen.contentType, audio: st.screen.audio, offered: st.screen.offered, sourceId: st.screen.sourceId })))
+  const screen = useMedia(useShallow((st) => ({ active: st.screen.active, preset: st.screen.preset, contentType: st.screen.contentType, audio: st.screen.audio, offered: st.screen.offered, locked: st.screen.locked, sourceId: st.screen.sourceId })))
   const [sources, setSources] = useState<CaptureSource[] | null>(null)
   const [kind, setKind] = useState<Kind>('screen')
   const [picked, setPicked] = useState<string | null>(null)
@@ -63,14 +64,21 @@ function PickerBody({ onDone }: { onDone: () => void }) {
     setPicked(sources.find((x) => x.id === screen.sourceId)?.id ?? sources.find((x) => x.kind === 'screen')?.id ?? sources[0]!.id)
   }, [sources, picked, screen.sourceId])
   const chosen = sources?.find((x) => x.id === picked) ?? null
+  // Live: the same dialog switches the source and/or the quality, both without stopping the stream.
+  const newSource = !!chosen && chosen.id !== screen.sourceId
+  const newQuality = quality !== screen.preset
+  const canApply = !!chosen && (!screen.active || newSource || newQuality)
 
   const start = async () => {
-    if (!chosen) return
+    if (!chosen || !canApply) return
     setBusy(true)
     setError(null)
     try {
-      if (screen.active) await media.switchScreenSource(chosen.id)
-      else await media.startScreenShare({ sourceId: chosen.id, audio, quality, contentType: content })
+      if (!screen.active) await media.startScreenShare({ sourceId: chosen.id, audio, quality, contentType: content })
+      else {
+        if (newSource) await media.switchScreenSource(chosen.id)
+        if (newQuality) await media.setScreenQuality(quality)
+      }
       onDone()
     } catch {
       setError(useMedia.getState().screen.error ?? t.picker.failed)
@@ -138,20 +146,47 @@ function PickerBody({ onDone }: { onDone: () => void }) {
         </div>
         {chosen && <div className={s.previewName}>{chosen.name}</div>}
 
+        <fieldset className={s.field}>
+          <legend className={s.legend}>{t.picker.quality}</legend>
+          <div role="radiogroup" aria-label={t.picker.quality} className={s.options}>
+            {offered.map((p) => (
+              <button key={p.id} type="button" role="radio" aria-checked={p.id === quality} className={s.option} onClick={() => setQuality(p.id)}>
+                <span>{p.label}</span>
+                {p.id === quality && <Icon icon={Check} size={14} />}
+              </button>
+            ))}
+            {/* What this computer could send but the plan doesn't include: visible, not selectable, never a modal. */}
+            {screen.locked.map((p) => (
+              <span key={p.id} role="radio" aria-checked={false} aria-disabled="true" className={`${s.option} ${s.optionLocked}`} aria-label={`${p.label}: ${t.picker.plus}`}>
+                <span>{p.label}</span>
+                <span className={s.plusTag}>
+                  <Icon icon={Lock} size={12} />
+                  {t.picker.plus}
+                </span>
+              </span>
+            ))}
+          </div>
+          {screen.locked.length > 0 ? (
+            <p className={s.hint}>
+              {t.picker.lockedHint(screen.locked.map((p) => p.label))}{' '}
+              <button
+                type="button"
+                className={s.hintLink}
+                onClick={() => {
+                  onDone()
+                  openSettings('plan')
+                }}
+              >
+                {t.picker.seePlus}
+              </button>
+            </p>
+          ) : (
+            <p className={s.hint}>{screen.active ? t.picker.qualityLiveHint : t.picker.qualityHint}</p>
+          )}
+        </fieldset>
+
         {!screen.active && (
           <>
-            <fieldset className={s.field}>
-              <legend className={s.legend}>{t.picker.quality}</legend>
-              <div role="radiogroup" aria-label={t.picker.quality} className={s.options}>
-                {offered.map((p) => (
-                  <button key={p.id} type="button" role="radio" aria-checked={p.id === quality} className={s.option} onClick={() => setQuality(p.id)}>
-                    <span>{p.label}</span>
-                    {p.id === quality && <Icon icon={Check} size={14} />}
-                  </button>
-                ))}
-              </div>
-              <p className={s.hint}>{t.picker.qualityHint}</p>
-            </fieldset>
 
             <fieldset className={s.field}>
               <legend className={s.legend}>{t.picker.content}</legend>
@@ -186,8 +221,8 @@ function PickerBody({ onDone }: { onDone: () => void }) {
           <Button variant="ghost" onClick={onDone}>
             {t.picker.cancel}
           </Button>
-          <Button variant="primary" loading={busy} disabled={!chosen} onClick={() => void start()}>
-            {screen.active ? t.picker.switch : t.picker.start}
+          <Button variant="primary" loading={busy} disabled={!canApply} onClick={() => void start()}>
+            {!screen.active ? t.picker.start : newSource ? t.picker.switch : t.picker.apply}
           </Button>
         </div>
       </aside>

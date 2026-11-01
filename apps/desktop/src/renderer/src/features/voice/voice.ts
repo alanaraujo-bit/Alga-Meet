@@ -1,6 +1,6 @@
 import type { Dispatch } from '@alga/shared'
 import { create } from 'zustand'
-import { media, useMedia } from '@/media'
+import { media, startCallTelemetry, useMedia } from '@/media'
 import { errorText } from '@/lib/errors'
 import { voiceJoin } from '@/store/actions'
 import { useData } from '@/store/data'
@@ -8,6 +8,7 @@ import { displayName } from '@/store/selectors'
 import { onDispatch, useSession } from '@/store/session'
 import { useUi } from '@/store/ui'
 import { toast } from '@/ui'
+import type { Corner } from './layout'
 import { t } from './strings'
 
 export interface Ring {
@@ -24,12 +25,18 @@ interface VoiceUi {
   /** userId of the stream shown big (focus mode). */
   focus: string | null
   stats: boolean
+  /** Channel whose CallStage is on screen (null = none): the mini-player shows only away from the call's stage. */
+  stage: string | null
+  /** Where the mini-player rests. */
+  miniCorner: Corner
 }
 
-export const useVoice = create<VoiceUi>()(() => ({ joining: null, ring: null, picker: false, focus: null, stats: false }))
+export const useVoice = create<VoiceUi>()(() => ({ joining: null, ring: null, picker: false, focus: null, stats: false, stage: null, miniCorner: 'br' }))
 
 const RING_MS = 30_000
 let ringTimer: ReturnType<typeof setTimeout> | null = null
+/** Outgoing DM call nobody answered yet: ringback until someone joins, we leave, or RING_MS. */
+let ringbackTimer: ReturnType<typeof setTimeout> | null = null
 
 export const inVoice = (channelId?: string) => {
   const c = useMedia.getState().connection
@@ -42,10 +49,18 @@ export async function joinVoice(channelId: string): Promise<void> {
   if (inVoice(channelId) || useVoice.getState().joining === channelId) return
   useVoice.setState({ joining: channelId, focus: null })
   if (useVoice.getState().ring?.channelId === channelId) clearRing()
+  stopRingback()
+  const st = useData.getState()
+  // Starting a DM call (nobody there yet): the server rings the others (CALL_RING), we hear the ringback.
+  const calling = !st.channels[channelId]?.spaceId && !Object.values(st.voiceStates).some((v) => v.channelId === channelId && v.userId !== st.me?.id)
   try {
     const res = await voiceJoin(channelId)
     media.setContext({ channelName: useData.getState().channels[channelId]?.name ?? null })
     await media.join({ ...res, channelId, refresh: () => voiceJoin(channelId) })
+    if (calling && inVoice(channelId) && !Object.keys(useMedia.getState().participants).length) {
+      media.ring('outgoing')
+      ringbackTimer = setTimeout(stopRingback, RING_MS)
+    }
   } catch (e) {
     toast.error(errorText(e, useMedia.getState().connection.reason ?? t.joinError))
   } finally {
@@ -55,7 +70,15 @@ export async function joinVoice(channelId: string): Promise<void> {
 
 export function leaveVoice(): void {
   useVoice.setState({ focus: null, picker: false })
+  stopRingback()
   void media.leave()
+}
+
+function stopRingback(): void {
+  if (!ringbackTimer) return
+  clearTimeout(ringbackTimer)
+  ringbackTimer = null
+  media.ring(null)
 }
 
 /** Open the call: voice channels live in their space, DM calls in the DM. */
@@ -68,6 +91,7 @@ export function openCall(channelId: string): void {
 
 function clearRing(): void {
   if (ringTimer) clearTimeout(ringTimer)
+  if (ringTimer) media.ring(null)
   ringTimer = null
   useVoice.setState({ ring: null })
 }
@@ -81,6 +105,8 @@ export async function acceptRing(): Promise<void> {
 }
 
 function onEvent(d: Dispatch): void {
+  // The plan changed (purchase confirmed, renewal ended, refund): the share is re-capped or lifted right away.
+  if (d.t === 'ENTITLEMENTS_UPDATE') return media.setPlanPresets(d.d.plan.streamPresets)
   if (d.t === 'VOICE_DISCONNECT') {
     // Server removed us (full, moderator, access lost): leave for good, say why, never auto-rejoin.
     if (useMedia.getState().connection.channelId === d.d.channelId || useVoice.getState().joining === d.d.channelId) {
@@ -106,6 +132,7 @@ function onEvent(d: Dispatch): void {
     if (ringTimer) clearTimeout(ringTimer)
     useVoice.setState({ ring: { ...d.d, at: Date.now() } })
     ringTimer = setTimeout(clearRing, RING_MS)
+    media.ring('incoming')
     if (!document.hasFocus() && useUi.getState().notifyCalls) {
       const st = useData.getState()
       window.alga?.notify?.({ title: t.ring.notifyTitle, body: t.ring.notifyBody(displayName(st, d.d.fromUserId)), tag: `call:${d.d.channelId}` })
@@ -150,8 +177,18 @@ export function startVoiceSync(): () => void {
       const f = useVoice.getState().focus
       if (f && prev.participants[f]?.streaming && !s.participants[f]?.streaming) useVoice.setState({ focus: null })
       if (s.connection.state === 'idle' && prev.connection.state !== 'idle') useVoice.setState({ focus: null, picker: false })
+      // Ringback ends when someone answers or the call drops.
+      if (ringbackTimer && (Object.keys(s.participants).length > 0 || s.connection.state === 'idle' || s.connection.state === 'disconnected')) stopRingback()
+    }),
+    // One aggregate call-quality report per session, only with the user's consent (Me.telemetryOptIn).
+    startCallTelemetry(() => useData.getState().me?.telemetryOptIn === true),
+    // Me.plan (READY, ME_UPDATE) is the other source of the plan's presets; the engine dedupes.
+    useData.subscribe((s, prev) => {
+      if (s.me?.plan && s.me.plan !== prev.me?.plan) media.setPlanPresets(s.me.plan.streamPresets)
     }),
   ]
+  const plan = useData.getState().me?.plan
+  if (plan) media.setPlanPresets(plan.streamPresets)
   const onKey = (e: KeyboardEvent) => {
     if (e.ctrlKey && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'e' && inVoice()) {
       e.preventDefault()
