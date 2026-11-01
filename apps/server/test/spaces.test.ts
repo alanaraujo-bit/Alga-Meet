@@ -1,4 +1,4 @@
-import { DEFAULT_EVERYONE_PERMISSIONS, type Invite, type SpaceSnapshot } from '@alga/shared'
+import { DEFAULT_EVERYONE_PERMISSIONS, Permission, type Invite, type SpaceSnapshot } from '@alga/shared'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { invites } from '../src/db/schema.js'
@@ -166,5 +166,52 @@ describe('invites', () => {
     expect((await api(s.app, 'PATCH', `/spaces/${space.id}`, { token: u2.token, body: {} })).status).toBe(403)
 
     expect((await api(s.app, 'GET', '/invites/../../x')).status).toBe(404)
+  })
+})
+
+describe('invite management', () => {
+  const list = (token: string, spaceId: string) => api<Invite[]>(s.app, 'GET', `/spaces/${spaceId}/invites`, { token })
+  const create = async (token: string, spaceId: string, body: object = {}) =>
+    (await api<Invite>(s.app, 'POST', `/spaces/${spaceId}/invites`, { token, body })).body
+  const revoke = (token: string, code: string) => api(s.app, 'DELETE', `/invites/${code}`, { token })
+
+  it('lists usable invites: everything with MANAGE_SPACE, only your own otherwise; outsiders are refused', async () => {
+    const { owner, member, space } = await spaceWithMember()
+    const outsider = await register(s.app)
+    const mine = await create(member.token, space.id, { maxUses: 5 })
+    const used = await create(owner.token, space.id, { maxUses: 1 })
+    await s.app.ctx.db.update(invites).set({ uses: 1 }).where(eq(invites.code, used.code))
+    const expired = await create(owner.token, space.id)
+    await s.app.ctx.db.update(invites).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(invites.code, expired.code))
+
+    const all = await list(owner.token, space.id)
+    expect(all.status).toBe(200)
+    const codes = all.body.map((i) => i.code)
+    expect(codes).toContain(mine.code)
+    expect(codes).not.toContain(used.code)
+    expect(codes).not.toContain(expired.code)
+    expect(all.body.find((i) => i.code === mine.code)).toMatchObject({ inviterId: member.user.id, maxUses: 5, memberCount: 2, space: { id: space.id } })
+    expect((await list(member.token, space.id)).body.map((i) => i.code)).toEqual([mine.code])
+    expect((await list(outsider.token, space.id)).status).toBe(403)
+  })
+
+  it('revoke: the creator or MANAGE_SPACE; others get 403, outsiders and unknown codes 404', async () => {
+    const { owner, member, space } = await spaceWithMember()
+    const outsider = await register(s.app)
+    const ownerInvite = await create(owner.token, space.id)
+    const memberInvite = await create(member.token, space.id)
+
+    expect((await revoke(outsider.token, ownerInvite.code)).status).toBe(404)
+    expect((await revoke(member.token, ownerInvite.code)).status).toBe(403)
+    expect((await revoke(member.token, 'NoSuchCode')).status).toBe(404)
+    expect((await revoke(member.token, memberInvite.code)).status).toBe(204)
+    expect((await api(s.app, 'GET', `/invites/${memberInvite.code}`)).status).toBe(404)
+
+    // A member given MANAGE_SPACE can revoke someone else's invite; the code stops working for joins.
+    const role = (await api(s.app, 'POST', `/spaces/${space.id}/roles`, { token: owner.token, body: { name: 'Gestão', permissions: Permission.MANAGE_SPACE } })).body
+    await api(s.app, 'PUT', `/spaces/${space.id}/members/${member.user.id}/roles/${role.id}`, { token: owner.token })
+    expect((await revoke(member.token, ownerInvite.code)).status).toBe(204)
+    expect((await api(s.app, 'POST', `/invites/${ownerInvite.code}`, { token: outsider.token })).status).toBe(404)
+    expect((await revoke(owner.token, ownerInvite.code)).status).toBe(404)
   })
 })

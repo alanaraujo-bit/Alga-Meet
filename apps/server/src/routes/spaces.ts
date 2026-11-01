@@ -1,12 +1,12 @@
 import { randomBytes } from 'node:crypto'
 import {
   CreateChannelBody, CreateInviteBody, CreateSpaceBody, DEFAULT_EVERYONE_PERMISSIONS, PatchChannelBody,
-  PatchSpaceBody, Permission, uuidv7,
+  PatchSpaceBody, Permission, hasPermission, uuidv7,
   type Channel, type Invite, type Space, type SpaceSnapshot, type VoiceDisconnectReason,
 } from '@alga/shared'
-import { and, count, eq, gt, isNull, lt, max, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gt, isNull, lt, max, or, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
-import { assertOutranks, channelAudience, requireActor, requireChannel, requireSpace, spaceMemberIds } from '../access.js'
+import { assertOutranks, channelAudience, memberPermissions, requireActor, requireChannel, requireSpace, spaceMemberIds } from '../access.js'
 import type { Ctx } from '../app.js'
 import { requireVerifiedEmail } from '../auth.js'
 import { isUniqueViolation, type Db } from '../db/index.js'
@@ -36,8 +36,8 @@ function codeParam(code: string): string {
 
 const usable = (i: InviteRow) => (i.maxUses === 0 || i.uses < i.maxUses) && (!i.expiresAt || i.expiresAt > new Date())
 
-async function inviteView(db: Db, i: InviteRow, space: SpaceRow): Promise<Invite> {
-  const [c] = await db.select({ n: count() }).from(spaceMembers).where(eq(spaceMembers.spaceId, space.id))
+async function inviteView(db: Db, i: InviteRow, space: SpaceRow, memberCount?: number): Promise<Invite> {
+  const [c] = memberCount === undefined ? await db.select({ n: count() }).from(spaceMembers).where(eq(spaceMembers.spaceId, space.id)) : [{ n: memberCount }]
   return {
     code: i.code,
     space: spaceView(space),
@@ -218,6 +218,29 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
         if (!isUniqueViolation(err) || attempt >= 3) throw err
       }
     }
+  })
+
+  app.get<{ Params: { id: string } }>('/spaces/:id/invites', async (req): Promise<Invite[]> => {
+    const me = req.auth.user.id
+    const { space, permissions } = await requireSpace(db, idParam(req.params.id), me)
+    const all = hasPermission(permissions, Permission.MANAGE_SPACE)
+    const rows = await db.select().from(invites)
+      .where(and(eq(invites.spaceId, space.id), all ? undefined : eq(invites.inviterId, me))).orderBy(desc(invites.createdAt))
+    const [c] = await db.select({ n: count() }).from(spaceMembers).where(eq(spaceMembers.spaceId, space.id))
+    return Promise.all(rows.filter(usable).map((i) => inviteView(db, i, space, c?.n ?? 0)))
+  })
+
+  app.delete<{ Params: { code: string } }>('/invites/:code', { config: perMinute(30) }, async (req, reply) => {
+    const me = req.auth.user.id
+    const found = await loadInvite(db, codeParam(req.params.code))
+    // Not in the space: the same 404 as an unknown code (codes are bearer secrets; no existence oracle).
+    const perms = found ? (await memberPermissions(db, found.space.id, me)).get(me) : undefined
+    if (!found || perms === undefined) throw notFound('Convite inválido ou expirado.')
+    if (found.invite.inviterId !== me && !hasPermission(perms, Permission.MANAGE_SPACE)) {
+      throw forbidden('Só quem criou o convite ou quem gerencia o espaço pode revogá-lo.')
+    }
+    await db.delete(invites).where(eq(invites.code, found.invite.code))
+    return reply.code(204).send()
   })
 
   app.post<{ Params: { code: string } }>('/invites/:code', { config: perMinute(10) }, async (req): Promise<SpaceSnapshot> => {
