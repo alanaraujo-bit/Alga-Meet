@@ -1008,11 +1008,11 @@ class MediaEngine {
    * token attribute); null = unknown. During a share the live stream is re-capped down, or lifted back, in place.
    */
   setPlanPresets(list: readonly string[] | null): void {
-    this.start()
     const next = list ? list.filter(isPresetId) : null
     if (String(next) === String(this.plan) && (next === null) === (this.plan === null)) return
     this.plan = next
-    this.syncPlan()
+    // Called at boot from the plan: don't start the engine (devices + encoder probe cost ~70 MB idle); start() syncs.
+    if (this.started) this.syncPlan()
   }
 
   private planFromRoom(room: Room): void {
