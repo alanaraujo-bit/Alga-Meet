@@ -3,7 +3,7 @@
 > Fonte de verdade. Só entra como "Validado" o que tem evidência (teste, medição, screenshot). Atualizado: 2026-11-01.
 
 ## Staging (Railway, criado 2026-11-01 com aprovação do dono)
-API pública `https://api-staging-b3ea.up.railway.app` + Postgres + bucket — ver `docs/infra/staging.md`. Funciona: contas, social, espaços, convites, mensagens, gateway (e-mail auto-verificado só em staging). Instalador apontando para staging: `apps/desktop/release/AlgaMeet-Setup-0.1.0-staging.exe` (não assinado). **Não funciona ainda: voz/tela (sem SFU com UDP), e-mail real, pagamentos.**
+API pública `https://api-staging-b3ea.up.railway.app` + Postgres + bucket — ver `docs/infra/staging.md`. Funciona: contas, social, espaços, convites, mensagens, gateway (e-mail auto-verificado só em staging). Instalador apontando para staging: `apps/desktop/release/AlgaMeet-Setup-0.1.0-staging.exe` (não assinado; **build limpo de 085c992 com o visual Índigo**, instalado no PC do dono em 2026-11-01). **Não funciona ainda: voz/tela (sem SFU com UDP), e-mail real, pagamentos.**
 
 ## Servidor de voz em casa (decisão do dono 2026-11-01: custo zero, servidor Ubuntu próprio)
 - **Sem CGNAT (confirmado):** WAN do roteador (Huawei IGD, via UPnP) = `203.0.113.10` = IP público visto de fora. IPv6 público também (provedor local).
@@ -14,6 +14,9 @@ API pública `https://api-staging-b3ea.up.railway.app` + Postgres + bucket — v
 - Feito pelo dono: reserva DHCP do `192.168.1.110`; `root-setup.sh` com sudo (buffers UDP 5 MB, persistidos em `/etc/sysctl.d/90-alga-sfu.conf`; verificado). **O contêiner do LiveKit precisa reiniciar para usar os buffers novos** — adiado até terminar o teste de mídia em andamento.
 - **Teste real de mídia pelo staging + SFU de casa (98203a5, `docs/benchmarks/staging-home-sfu.md`) — LAN com hairpin:** ICE UDP em `203.0.113.10:7882`, RTT 1 ms; voz 10 min: latência A→B 46,7 ms (p95 50,3), 0 perdidos de 20.834 pacotes, 0 % ocultação, 0 reconexões; tela real 1280×720 HEVC por hardware: 29 fps a 4,9 Mbit/s (1080p30) e 49 fps a 2,8 Mbit/s (720p60), 0 congelamentos; fallback TCP 7881 funcionou; webhooks 76/0 erros; contêiner LiveKit 1,2–2,5 % de um núcleo (voz), 6–16 % (tela), 51–77 MiB. LiveKit recriado depois para usar os buffers de 5 MB.
 - Pendentes: **teste de fora da rede** (amigo/4G — único jeito de provar WAN, CGNAT de clientes e TURN); **reimplantar o staging** com o servidor atual (133002d+) depois do pacote A.
+
+## Site (apps/site, Astro 7) — primeira versão (085c992)
+Estudo do heyparker.ai em `docs/research/site-reference-heyparker.md`. Seções: hero com sala de voz viva sobre captura real, voz, transmissão (comparador 720p×1080p), leveza (barras de memória vs Discord), grupo, privacidade (E2EE descrito exatamente como implementado), planos + teaser Hora Azul, FAQ, CTA. Números só de `src/data/facts.ts` com fonte. 3 níveis de desempenho escolhidos antes do primeiro paint (A completo com GSAP/Lenis, B só CSS, C estático). Lighthouse local: mobile 98–99 / LCP 1,9–2,0 s / CLS 0; desktop 100; a11y/SEO 100. Dev ao vivo em `http://localhost:3100`. Pendências: URL pública do instalador, canal de convites, domínio/hospedagem, SVG final da marca, capturas melhores (stream real, palco com 4–5 pessoas), teste em celulares reais e Safari/Firefox.
 
 ## Versão executável
 - Dev: `npm install && npm run dev` (ver `README.md`). Multiusuário local: `npm run dev -- --profiles=bob` — abre duas janelas; crie uma conta em cada, adicione como amigo, crie um espaço, convide, entre no canal de voz e transmita a tela.
