@@ -218,8 +218,10 @@ da loja. A parte desktop (D2) consome o contrato descrito aqui. Data: 2026-11-01
 ## Evidência
 
 - **Testes.** `npm test -w apps/server` (PGlite) e `npm run test:pg -w apps/server` (PostgreSQL 18.6 real, via
-  `embedded-postgres`): 225 de 225 nos dois. Antes eram 203.
-  - Os 22 novos estão em `test/events.test.ts` e `test/retention.test.ts`.
+  `embedded-postgres`): 226 de 226 nos dois. Antes eram 203.
+  - Os 23 novos estão em `test/events.test.ts` e `test/retention.test.ts`, incluindo uma passada do agendador.
+  - `test/uploads.test.ts` ("leaving nothing behind") falhou 1 vez em 3 no PostgreSQL. Ele procura `alga-upload-*` no
+    temp do sistema, que outros processos também usam. É anterior a este pacote.
 - **Lembrete.** Há testes para:
   - uma vez com dois `remind` concorrentes;
   - semanal atravessando meia-noite UTC;

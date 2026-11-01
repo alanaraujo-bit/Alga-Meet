@@ -17,7 +17,7 @@ import { sendActivityEmails } from '../src/activity/email.js'
 import { nextStreak, runWeekly } from '../src/activity/recap.js'
 import { PRODUCTS, isAvailable } from '../src/billing/catalog.js'
 import {
-  activityDays, activityEmails, activitySettings, consentRecords, events, metricCohorts, metricDaily, users,
+  activityDays, activityEmails, activitySettings, consentRecords, events, jobRuns, metricCohorts, metricDaily, users,
   voiceSessions, voiceWeekly, weeklyRecaps,
 } from '../src/db/schema.js'
 import { metrics, registry } from '../src/metrics.js'
@@ -404,5 +404,18 @@ describe('shop funnel metrics', () => {
     const statuses: number[] = []
     for (let i = 0; i < 30; i++) statuses.push((await api(s.app, 'POST', '/shop/opened', { token: u.token })).status)
     expect(statuses.at(-1)).toBe(429)
+  })
+})
+
+describe('scheduler', () => {
+  it('runs every due period once per pass and skips them on the next', async () => {
+    const now = at('2033-01-10T12:00') // a Monday, after 10:00 and inside the e-mail hours
+    await s.app.ctx.activity.tick(now)
+    const runs = await db().select().from(jobRuns)
+    const of = (job: string) => runs.filter((r) => r.job === job && r.finishedAt).map((r) => r.period).sort()
+    expect(of('nightly')).toEqual(['2033-01-03', '2033-01-04', '2033-01-05', '2033-01-06', '2033-01-07', '2033-01-08', '2033-01-09'])
+    expect(of('weekly')).toEqual(['2032-12-13', '2032-12-20', '2032-12-27', '2033-01-03'])
+    expect(of('activity_email')).toEqual(['2033-01-10'])
+    expect(await s.app.ctx.activity.claim('weekly', '2033-01-03', new Date(now.getTime() + 60 * MIN))).toBe(false)
   })
 })
