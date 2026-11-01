@@ -1,0 +1,151 @@
+---
+import { Picture } from 'astro:assets';
+import Download from './Download.astro';
+import chat from '../assets/shots/chat.png';
+
+const people = [
+  { name: 'Carlinha', av: 'av-sun' },
+  { name: 'Bruno', av: 'av-sky' },
+  { name: 'Diego', av: 'av-ink', initials: 'DA' },
+  { name: 'Você', av: 'av-plum', initials: 'AR' },
+];
+---
+<section class="hero" id="topo">
+  <div class="aurora" aria-hidden="true"><div class="glow" data-glow></div></div>
+  <div class="wrap copy">
+    <p class="pill hero-in" style="--d:0ms"><span class="live-dot" aria-hidden="true"></span>Beta fechado · Windows 10 e 11</p>
+    <h1><span class="line hero-in" style="--d:60ms">A voz dos seus amigos,</span> <span class="line hero-in" style="--d:140ms">de perto.</span></h1>
+    <p class="lede hero-in" style="--d:240ms">Canais de voz que soam como se todo mundo estivesse na mesma sala. Tela em 1080p de graça. Leve enquanto você joga. E <strong>nenhum anúncio</strong>, nunca.</p>
+    <div class="ctas hero-in" style="--d:320ms">
+      <Download />
+      <a class="btn btn-ghost btn-lg" href="#voz">Ver por dentro</a>
+    </div>
+  </div>
+
+  <div class="stage wrap">
+    <div class="persp">
+      <div class="window" data-hero-shot>
+        <Picture src={chat} formats={['avif', 'webp']} widths={[640, 960, 1280, 1920]} sizes="(min-width: 1240px) 1160px, calc(100vw - 32px)" alt="O Alga Meet aberto no espaço Estúdio Alga: canais à esquerda, a conversa em #geral no centro e, à direita, quem está em voz agora." loading="eager" fetchpriority="high" />
+      </div>
+    </div>
+
+    <div class="room" data-voice-room data-parallax="14">
+      <p class="sr-only">Exemplo animado de uma sala de voz: quem fala ganha um anel índigo, como no app.</p>
+      <div aria-hidden="true">
+        <div class="room-head">
+          <svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="5" width="2" height="6" rx="1" fill="currentColor"/><rect x="7" y="3" width="2" height="10" rx="1" fill="currentColor"/><rect x="11" y="5" width="2" height="6" rx="1" fill="currentColor"/></svg>
+          <span class="room-name">Sala de jogo</span>
+          <span class="room-count">4 em voz</span>
+        </div>
+        <ul class="room-list">
+          {people.map((p, i) => (
+            <li class:list={['person', i === 0 && 'talking']} data-person={p.name === 'Você' ? 'Você' : p.name}>
+              <span class:list={['av', p.av]}>{p.initials}</span>
+              <span class="who">{p.name}</span>
+              <span class="meter"><i></i><i></i><i></i></span>
+            </li>
+          ))}
+        </ul>
+        <div class="room-foot">
+          <span class="connected"><span class="live-dot"></span>Voz conectada</span>
+          <span class="speaking" data-speaking>Carlinha está falando</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero { position: relative; padding-top: clamp(112px, 16vh, 168px); overflow: clip; isolation: isolate; }
+  .aurora {
+    position: absolute; inset: 0 0 auto; height: 1100px; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(60% 45% at 50% 0%, rgba(110, 114, 232, 0.28), rgba(110, 114, 232, 0) 70%),
+      radial-gradient(40% 30% at 50% 8%, rgba(162, 168, 252, 0.16), rgba(162, 168, 252, 0) 70%);
+  }
+  .glow {
+    position: absolute; left: 50%; top: 340px; width: 640px; height: 640px; margin: -320px 0 0 -320px; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(139, 142, 247, 0.16), rgba(139, 142, 247, 0));
+    will-change: transform;
+  }
+  .copy { display: grid; justify-items: center; text-align: center; gap: 22px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px 0 10px; border-radius: 999px;
+    font-size: 13px; font-weight: 510; color: var(--text-2);
+    background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 0 0 1px var(--line-2), var(--top-light);
+  }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--online); box-shadow: 0 0 0 3px rgba(97, 194, 142, 0.16); }
+  h1 .line { display: block; }
+  .lede { text-align: center; max-width: 34em; text-wrap: balance; }
+  .ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 6px; }
+
+  /* Entrada da abertura (A e B): sobe 18 px e acende. C: nada. */
+  :global(html.tier-a) .hero-in, :global(html.tier-b) .hero-in { animation: hero-in 900ms var(--ease-out) both; animation-delay: var(--d); }
+  @keyframes hero-in { from { opacity: 0; transform: translateY(18px); } }
+
+  .stage { position: relative; margin-top: clamp(48px, 8vh, 88px); padding-bottom: clamp(64px, 12vh, 140px); }
+  .persp { perspective: 1600px; perspective-origin: 50% 0%; }
+  .window {
+    border-radius: 14px; overflow: hidden; background: var(--bg-1);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 120px rgba(97, 99, 208, 0.18);
+    transform-origin: 50% 0%;
+  }
+  .window :global(img) { width: 100%; aspect-ratio: 16 / 9; }
+  :global(html.tier-b) .window { animation: tilt 1400ms var(--ease-sheet) 200ms both; }
+  @keyframes tilt { from { transform: rotateX(18deg) scale(0.94); opacity: 0.4; } }
+  /* Nível A: começa deitada antes do JS chegar; o GSAP assume a partir daí. */
+  :global(html.tier-a) .window { transform: rotateX(24deg) scale(0.9) translateY(4%); }
+
+  /* Sala de voz viva */
+  .room {
+    position: absolute; right: calc(var(--gutter) - 28px); bottom: clamp(24px, 10vh, 96px); width: 288px; z-index: 2;
+    padding: 12px; border-radius: 14px;
+    background: rgba(24, 24, 28, 0.82); -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6);
+    box-shadow: var(--elev), inset 0 0 0 1px var(--line-2), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+  :global(html.tier-b) .room, :global(html.tier-c) .room { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(24, 24, 28); }
+  .room-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px 10px; color: var(--accent); font-size: 13px; }
+  .room-name { color: var(--text-1); font-weight: 590; }
+  .room-count { margin-left: auto; color: var(--text-3); font-size: 12px; }
+  .room-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .person { --speak: 0; display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 6px; border-radius: 8px; }
+  .who { font-size: 14px; font-weight: 510; color: var(--text-2); }
+  .av {
+    position: relative; flex: none; width: 28px; height: 28px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 11px; font-weight: 590; color: var(--text-1);
+  }
+  /* Anel de fala do app: 2 px índigo, opacidade segue a voz; borda macia até 16 %. Só opacity por quadro. */
+  .av::after {
+    content: ''; position: absolute; inset: -3px; border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--accent), 0 0 0 5px rgba(139, 142, 247, 0.16);
+    opacity: min(1, calc(var(--speak) * 2.2));
+  }
+  .meter { margin-left: auto; display: flex; align-items: center; gap: 2px; height: 14px; }
+  .meter i { width: 2px; height: 14px; border-radius: 1px; background: var(--accent); transform-origin: 50% 50%; transform: scaleY(calc(0.2 + var(--speak) * 0.8)); opacity: calc(0.25 + var(--speak)); }
+  .meter i:nth-child(2) { transform: scaleY(calc(0.25 + var(--speak) * 1)); }
+  .person.talking .who { color: var(--text-1); }
+  /* Nível B: quem fala pulsa no CSS. Nível C (e sem JS): anel parado em quem fala. */
+  :global(html.tier-b) .person.talking { animation: talk 900ms ease-in-out infinite alternate; }
+  @keyframes talk { from { --speak: 0.25; } to { --speak: 0.75; } }
+  :global(html.tier-c) .person.talking, :global(html:not(.js)) .person.talking { --speak: 0.6; }
+  .room-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding: 10px 4px 2px; border-top: 1px solid var(--line-1); font-size: 12px; }
+  .connected { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); font-weight: 590; }
+  .speaking { color: var(--text-3); }
+
+  .av-sun { background: linear-gradient(135deg, #f7c46c, #e86885); }
+  .av-sky { background: linear-gradient(135deg, #7cc0f5, #2f5ea8); }
+  .av-ink { background: oklch(0.29 0.02 30); color: oklch(0.86 0.03 30); }
+  .av-plum { background: oklch(0.29 0.02 295); color: oklch(0.86 0.03 295); }
+
+  @media (max-width: 760px) {
+    .room { position: relative; right: auto; bottom: auto; width: min(100%, 340px); margin: -28px auto 0; }
+    .stage { padding-bottom: 72px; }
+    /* No celular o app inteiro fica ilegível: mostramos a conversa maior, com as bordas sumindo. */
+    .persp { margin-inline: calc(var(--gutter) * -1); overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+    .window { width: 190%; margin-left: -45%; border-radius: 0; }
+  }
+</style>
+
+<style is:global>
+  @property --speak { syntax: '<number>'; inherits: true; initial-value: 0; }
+</style>

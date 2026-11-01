@@ -1,0 +1,62 @@
+---
+import { facts } from '../data/facts';
+const max = facts.discordIdleRamMb;
+---
+<section class="light" id="leve" aria-labelledby="leve-t">
+  <div class="wrap two">
+    <div class="copy">
+      <p class="eyebrow" data-reveal>Leveza</p>
+      <h2 id="leve-t" data-reveal>Leve enquanto você joga.</h2>
+      <p class="lede" data-reveal>Aberto na bandeja, esperando o pessoal chamar, o Alga Meet usa <strong>menos de um terço</strong> da memória do Discord. O resto fica para o jogo.</p>
+      <ul class="minis" data-reveal>
+        <li><b class="tnum">{facts.voiceCpuPct}%</b><span>de CPU numa chamada de voz</span></li>
+        <li><b class="tnum">~{facts.openMs} ms</b><span>do clique ao app aberto</span></li>
+        <li><b class="tnum">0</b><span>reinícios automáticos para "liberar memória"</span></li>
+      </ul>
+    </div>
+
+    <figure class="card" data-bars data-reveal>
+      <p class="cap">Memória com o app parado na bandeja</p>
+      <div class="row">
+        <div class="label"><span>Alga Meet</span><b class="tnum">~<span data-count={facts.idleRamMb}>{facts.idleRamMb}</span> MB</b></div>
+        <div class="track"><div class="fill us" style={`--v:${facts.idleRamMb / max}`}></div></div>
+      </div>
+      <div class="row">
+        <div class="label"><span>Discord <small>{facts.discordProcesses} processos</small></span><b class="tnum">~<span data-count={facts.discordIdleRamMb}>{facts.discordIdleRamMb}</span> MB</b></div>
+        <div class="track"><div class="fill them" style="--v:1"></div></div>
+      </div>
+      <figcaption>Memória privada medida em 01/11/2026 no mesmo PC (i5-13600KF, 32 GB, Windows 11). Discord 1.0.9266 na bandeja; Alga Meet ocioso por 10 minutos.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<style>
+  .light { position: relative; padding-block: clamp(80px, 14vh, 160px); }
+  .two { display: grid; grid-template-columns: 1fr 1.1fr; gap: clamp(32px, 6vw, 80px); align-items: center; }
+  .copy { display: grid; gap: 16px; }
+  .minis { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 14px; }
+  .minis li { display: flex; align-items: baseline; gap: 12px; padding-top: 14px; border-top: 1px solid var(--line-1); }
+  .minis b { min-width: 104px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-1); }
+  .minis span { font-size: 15px; color: var(--text-3); }
+
+  .card {
+    margin: 0; padding: clamp(20px, 3vw, 32px); border-radius: 18px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+    box-shadow: inset 0 0 0 1px var(--line-1), var(--top-light), 0 30px 80px rgba(0, 0, 0, 0.35);
+  }
+  .cap { font-size: 13px; font-weight: 510; color: var(--text-3); }
+  .row { margin-top: 24px; }
+  .label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 15px; font-weight: 510; color: var(--text-2); }
+  .label small { margin-left: 6px; font-size: 12px; color: var(--text-3); font-weight: 400; }
+  .label b { font-size: clamp(22px, 2.6vw, 30px); font-weight: 600; letter-spacing: -0.03em; color: var(--text-1); }
+  .track { margin-top: 10px; height: 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 0 0 1px var(--line-1); overflow: hidden; }
+  .fill { height: 100%; width: calc(var(--v) * 100%); border-radius: inherit; transform-origin: 0 50%; }
+  .us { background: linear-gradient(90deg, #6163d0, #a2a8fc); box-shadow: 0 0 24px rgba(139, 142, 247, 0.5); }
+  .them { background: linear-gradient(90deg, #3a3b40, #55575e); }
+  :global(html.tier-a) .fill, :global(html.tier-b) .fill { transform: scaleX(0); }
+  :global(html.tier-b) .fill { transition: transform 1200ms var(--ease-out); }
+  :global(html.tier-b) .card:global(.in) .fill { transform: none; }
+  figcaption { margin-top: 24px; font-size: 13px; line-height: 1.5; color: var(--text-3); }
+
+  @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+</style>

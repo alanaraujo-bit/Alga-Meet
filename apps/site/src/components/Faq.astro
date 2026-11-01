@@ -1,0 +1,51 @@
+---
+import { facts } from '../data/facts';
+const qa = [
+  ['É grátis mesmo?', `É. Voz, chat, espaços e tela em ${facts.freeStream.join(' e ')} não custam nada e não têm prazo. O Alga Plus existe para quem quer transmitir em qualidade mais alta e para quem quer apoiar o projeto.`],
+  ['Funciona no Mac ou no celular?', 'Por enquanto, só no Windows 10 e 11. Começamos pelo PC porque é onde o grupo joga. Outras plataformas vêm depois, sem data prometida.'],
+  ['Por que está em beta fechado?', 'Porque estamos acompanhando cada grupo de perto enquanto o servidor de voz cresce. Se alguém te mandou este site, peça o convite para essa pessoa.'],
+  ['O meu grupo está no Discord. Muda muito?', 'Quase nada no jeito de usar: espaços, canais de texto e de voz, cargos e convites funcionam como vocês já conhecem. Muda o que fica em volta: mais leve, tela melhor de graça, nenhum anúncio.'],
+  ['Pesa no jogo?', `Na bandeja, cerca de ${facts.idleRamMb} MB de memória. Numa chamada de voz, ${facts.voiceCpuPct}% de CPU. Transmitindo 1080p60, ${facts.streamCpuPct}% de CPU, porque quem codifica é a placa de vídeo.`],
+  ['É seguro?', 'Chamadas no privado são cifradas de ponta a ponta. O resto é cifrado no caminho até o servidor. Senhas guardadas com argon2id, nenhuma captura de tela sem você escolher o que mostrar. Detalhes na seção de privacidade.'],
+  ['Como vocês ganham dinheiro?', 'Com o Alga Plus e com itens de personalização comprados uma vez. Sem anúncio, sem venda de dados, sem caixa-surpresa.'],
+  ['Tem idade mínima?', 'Tem: 16 anos. Para quem tem 16 ou 17, a conta já vem com proteções (mensagem direta só entre amigos e compras desligadas).'],
+];
+---
+<section class="faq" id="faq" aria-labelledby="faq-t">
+  <div class="wrap two">
+    <div class="head">
+      <p class="eyebrow" data-reveal>Perguntas</p>
+      <h2 id="faq-t" data-reveal>Antes de chamar o pessoal.</h2>
+    </div>
+    <div class="list" data-reveal>
+      {qa.map(([q, a], i) => (
+        <details name="faq" open={i === 0}>
+          <summary>{q}<span class="pm" aria-hidden="true"></span></summary>
+          <p>{a}</p>
+        </details>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .faq { padding-block: clamp(80px, 14vh, 160px); }
+  .two { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: clamp(32px, 6vw, 80px); align-items: start; }
+  .head { display: grid; gap: 16px; position: sticky; top: 112px; }
+  details { border-bottom: 1px solid var(--line-2); }
+  details:first-child { border-top: 1px solid var(--line-2); }
+  summary {
+    list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    min-height: 64px; padding: 16px 0; font-size: 17px; font-weight: 560; letter-spacing: -0.012em; color: var(--text-1);
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary:hover { color: #fff; }
+  .pm { position: relative; flex: none; width: 14px; height: 14px; }
+  .pm::before, .pm::after { content: ''; position: absolute; left: 0; top: 6px; width: 14px; height: 1.6px; border-radius: 1px; background: var(--text-3); transition: transform 220ms var(--ease-out); }
+  .pm::after { transform: rotate(90deg); }
+  details[open] .pm::after { transform: rotate(0deg); }
+  details p { padding: 0 0 22px; max-width: 40em; font-size: 16px; color: var(--text-3); }
+  details[open] p { animation: open 320ms var(--ease-out); }
+  @keyframes open { from { opacity: 0; transform: translateY(-4px); } }
+  @media (max-width: 860px) { .two { grid-template-columns: 1fr; } .head { position: static; } }
+</style>

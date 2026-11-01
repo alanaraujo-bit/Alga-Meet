@@ -1,0 +1,33 @@
+---
+// Aparece só quando PUBLIC_DOWNLOAD_URL não está definido: beta fechado, sem download falso.
+// PUBLIC_INVITE_URL (opcional): link para pedir convite (formulário, e-mail, WhatsApp).
+const download = import.meta.env.PUBLIC_DOWNLOAD_URL;
+const invite = import.meta.env.PUBLIC_INVITE_URL;
+---
+{!download && (
+  <dialog class="invite" data-invite aria-labelledby="inv-t">
+    <form method="dialog">
+      <p class="eyebrow">Beta fechado</p>
+      <h2 id="inv-t">O Alga Meet ainda é só para convidados.</h2>
+      <p>Estamos abrindo grupo por grupo, para cuidar de perto da voz de cada um. {invite ? 'Peça o seu convite e a gente te avisa quando chegar a sua vez.' : 'Peça o convite para quem te mandou este site.'}</p>
+      <div class="actions">
+        {invite && <a class="btn btn-primary" href={invite} target="_blank" rel="noopener">Pedir convite</a>}
+        <button class:list={['btn', invite ? 'btn-ghost' : 'btn-primary']} value="close" autofocus>Entendi</button>
+      </div>
+    </form>
+  </dialog>
+)}
+
+<style>
+  .invite {
+    width: min(440px, calc(100vw - 32px)); padding: 0; border: 0; border-radius: 16px; color: var(--text-2);
+    background: #171719; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), inset 0 0 0 1px var(--line-2), inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 32px 80px rgba(0, 0, 0, 0.5);
+  }
+  .invite::backdrop { background: rgba(0, 0, 0, 0.56); }
+  .invite[open] { animation: pop 300ms var(--ease-sheet); }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
+  form { padding: 28px; display: grid; gap: 12px; }
+  h2 { font-size: 24px; line-height: 1.25; letter-spacing: -0.02em; }
+  form > p:not(.eyebrow) { font-size: 15px; color: var(--text-3); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+</style>

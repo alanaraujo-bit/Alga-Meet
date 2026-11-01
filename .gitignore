@@ -27,3 +27,6 @@ docs/references/**/*.webm
 docs/references/**/*.mp4
 docs/references/**/*.json
 docs/references/**/_*.mjs
+
+# Vídeos de rolagem do site (apps/site/scripts/shoot.mjs) ficam só locais: pesados para o git.
+docs/site/videos/

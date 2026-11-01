@@ -1,0 +1,33 @@
+---
+import Base from '../layouts/Base.astro';
+import Nav from '../components/Nav.astro';
+import Hero from '../components/Hero.astro';
+import Voice from '../components/Voice.astro';
+import Stream from '../components/Stream.astro';
+import Light from '../components/Light.astro';
+import Group from '../components/Group.astro';
+import Trust from '../components/Trust.astro';
+import Plus from '../components/Plus.astro';
+import Faq from '../components/Faq.astro';
+import Final from '../components/Final.astro';
+import InviteDialog from '../components/InviteDialog.astro';
+---
+<Base title="Alga Meet · A voz dos seus amigos, de perto" description="Canais de voz que soam de perto, tela em 1080p de graça e chat para o seu grupo. Leve enquanto você joga e sem anúncio nenhum. Para Windows.">
+  <Nav />
+  <main id="conteudo">
+    <Hero />
+    <Voice />
+    <Stream />
+    <Light />
+    <Group />
+    <Trust />
+    <Plus />
+    <Faq />
+  </main>
+  <Final />
+  <InviteDialog />
+</Base>
+
+<script>
+  import '../scripts/main';
+</script>

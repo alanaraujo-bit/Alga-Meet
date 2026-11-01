@@ -1,0 +1,49 @@
+---
+// Promessas só do que existe hoje (ver docs/decisions/0004-e2ee.md e docs/STATE.md).
+const items = [
+  { t: 'Zero anúncio.', p: 'Nem banner, nem missão patrocinada, nem moeda para assistir propaganda. A conta fecha com o Alga Plus e itens de personalização.', i: 'M4 12h16M12 4v16', x: true },
+  { t: 'Seus dados não estão à venda.', p: 'Nem para anunciante, nem para ninguém. O que o app guarda serve para ele funcionar, e você baixa uma cópia quando quiser.', i: 'M5 11h14v9H5zM8 11V8a4 4 0 0 1 8 0v3' },
+  { t: 'Chamadas no privado: ponta a ponta.', p: 'Voz e tela nas conversas privadas são cifradas com MLS (RFC 9420). A chave fica nos aparelhos de quem está na chamada.', i: 'M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z' },
+  { t: 'Nos espaços, vira opção.', p: 'A ponta a ponta nas salas de voz já funciona por espaço. O interruptor nas configurações chega numa próxima versão do beta.', i:'M4 7h10M4 17h6M18 7h2M14 17h6M14 5v4M10 15v4' },
+  { t: 'Idade sem selfie.', p: 'Pedimos só a data de nascimento. Nada de foto do rosto nem de documento.', i: 'M4 6h16v13H4zM4 10h16M9 3v4M15 3v4' },
+  { t: 'Relatório de qualidade vem desligado.', p: 'Se quiser ajudar a melhorar as chamadas, você liga. Até lá, nada é enviado.', i: 'M3 12h4l3-7 4 14 3-7h4' },
+];
+---
+<section class="trust" id="privacidade" aria-labelledby="priv-t">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow" data-reveal>Privacidade</p>
+      <h2 id="priv-t" data-reveal>Sem anúncio. Sem vender você.</h2>
+      <p class="lede" data-reveal>O seu grupo não é produto. Está tudo escrito aqui, inclusive o que ainda não fazemos.</p>
+    </div>
+    <ul class="list">
+      {items.map((it, n) => (
+        <li data-reveal style={`--d:${(n % 3) * 70}ms`}>
+          <svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d={it.i} fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" transform={it.x ? 'rotate(45 12 12)' : undefined} /></svg>
+          <h3>{it.t}</h3>
+          <p>{it.p}</p>
+        </li>
+      ))}
+    </ul>
+    <aside class="honest" data-reveal>
+      <h3>O que ainda não é ponta a ponta</h3>
+      <p>Mensagens de texto e chamadas em espaços com a opção desligada são cifradas no caminho até o servidor (TLS e DTLS-SRTP), não de ponta a ponta. A gente prefere que você saiba por aqui.</p>
+    </aside>
+  </div>
+</section>
+
+<style>
+  .trust { position: relative; padding-block: clamp(80px, 14vh, 160px); }
+  .trust::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(45% 35% at 50% 0%, rgba(97, 99, 208, 0.1), transparent 70%); }
+  .head { display: grid; gap: 16px; max-width: 760px; }
+  .list { list-style: none; margin: clamp(40px, 7vh, 72px) 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; border-radius: 18px; overflow: hidden; background: var(--line-1); box-shadow: inset 0 0 0 1px var(--line-1); }
+  .list li { padding: 28px 24px; background: var(--bg-1); display: grid; align-content: start; gap: 10px; }
+  .ic { color: var(--accent); margin-bottom: 6px; }
+  .list h3 { font-size: 17px; }
+  .list p { font-size: 15px; line-height: 1.55; color: var(--text-3); }
+  .honest { margin-top: 12px; padding: 22px 24px; border-radius: 16px; background: rgba(230, 180, 99, 0.05); box-shadow: inset 0 0 0 1px rgba(230, 180, 99, 0.2); }
+  .honest h3 { font-size: 15px; color: #e6b463; }
+  .honest p { margin-top: 6px; font-size: 15px; color: var(--text-2); }
+  @media (max-width: 900px) { .list { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .list { grid-template-columns: 1fr; } .list li { padding: 22px 20px; } }
+</style>

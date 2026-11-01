@@ -1,0 +1,144 @@
+---
+import { facts } from '../data/facts';
+const sentence = 'Quando a Carlinha ri, você ouve a risada dela. Não um eco, não um robô, não meio segundo depois.';
+const words = sentence.split(' ');
+const lost = facts.packetsSent.toLocaleString('pt-BR');
+
+// Onda desenhada no build: fala em rajadas (sílabas) e, na versão com ruído, chiado por baixo de tudo.
+let seed = 7;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const env = (x: number) => {
+  const bursts = [[60, 150], [175, 260], [300, 330], [360, 470], [500, 545]];
+  let a = 0;
+  for (const [s, e] of bursts) if (x > s && x < e) a = Math.max(a, Math.sin(((x - s) / (e - s)) * Math.PI));
+  return a;
+};
+const noise = Array.from({ length: 301 }, () => rnd() * 2 - 1);
+const line = (withNoise: boolean) => {
+  let d = '';
+  for (let i = 0; i <= 300; i++) {
+    const x = i * 2;
+    const y = 80 - env(x) * 58 * Math.sin(x * 0.42) * (0.7 + 0.3 * Math.sin(x * 0.07)) - (withNoise ? noise[i] * 14 : 0);
+    d += (i ? 'L' : 'M') + x + ' ' + y.toFixed(1);
+  }
+  return d;
+};
+const hiss = () => line(true);
+const speech = () => line(false);
+---
+<section class="voice" id="voz" aria-labelledby="voz-t">
+  <div class="wrap">
+    <p class="eyebrow" data-reveal>Voz</p>
+    <h2 id="voz-t" data-reveal>A voz parece de perto.</h2>
+    <p class="lit" data-lit>{words.map((w, i) => <span class="w" style={`--i:${i}`}>{w} </span>)}</p>
+
+    <div class="grid">
+      <article class="stat big" data-reveal>
+        <p class="num tnum"><span data-count={facts.voiceLatencyMs}>{facts.voiceLatencyMs}</span><small> ms</small></p>
+        <h3>da boca de um ao ouvido do outro</h3>
+        <p class="note">Passando pelo servidor de voz. Mediana em 10 minutos de chamada na rede local.</p>
+      </article>
+      <article class="stat" data-reveal style="--d:80ms">
+        <p class="num tnum"><span data-count={facts.packetsLost}>{facts.packetsLost}</span><small> de {lost}</small></p>
+        <h3>pacotes de voz perdidos</h3>
+        <p class="note">No mesmo teste. Em rede ruim, a correção de perda (RED + FEC) segura a fala.</p>
+      </article>
+      <article class="stat" data-reveal style="--d:160ms">
+        <p class="num tnum"><span data-count={facts.joinMs}>{facts.joinMs}</span><small> ms</small></p>
+        <h3>do clique até estar na sala</h3>
+        <p class="note">Entrar num canal de voz é instantâneo de verdade.</p>
+      </article>
+
+      <article class="noise" data-noise data-reveal style="--d:80ms">
+        <div class="noise-copy">
+          <h3>O teclado fica do seu lado da tela.</h3>
+          <p>Supressão de ruído no próprio PC tira ventilador, teclado e o cachorro do vizinho antes de a sua voz sair. Custa {facts.noiseSuppressionCostMs} ms.</p>
+          <button type="button" class="toggle" aria-pressed="false" data-noise-toggle>
+            <span class="knob" aria-hidden="true"></span>
+            <span class="t-off">Supressão de ruído desligada</span><span class="t-on">Supressão de ruído ligada</span>
+          </button>
+        </div>
+        <svg class="wave" viewBox="0 0 600 160" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="wg" x1="0" x2="1"><stop offset="0" stop-color="#8b8ef7" stop-opacity="0"/><stop offset=".15" stop-color="#8b8ef7"/><stop offset=".85" stop-color="#8b8ef7"/><stop offset="1" stop-color="#8b8ef7" stop-opacity="0"/></linearGradient>
+          </defs>
+          <path class="hiss" d={hiss()} />
+          <path class="speech" d={speech()} />
+        </svg>
+      </article>
+
+      <article class="stat equal" data-reveal style="--d:160ms">
+        <p class="num"><small>Voz</small> igual</p>
+        <h3>para todo mundo</h3>
+        <p class="note">{facts.voiceKbps} kbps em Opus com correção de perda, no grátis e no pago. Ninguém paga para ser ouvido melhor.</p>
+      </article>
+    </div>
+
+    <p class="source" data-reveal>Medido em 01/11/2026 em rede local, com duas instâncias do app e o nosso servidor de voz. Pela internet, some o caminho até o servidor (em São Paulo, no lançamento).</p>
+  </div>
+</section>
+
+<style>
+  .voice { position: relative; padding-block: clamp(96px, 16vh, 180px) clamp(64px, 10vh, 120px); }
+  .voice::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: radial-gradient(50% 40% at 15% 30%, rgba(97, 99, 208, 0.12), transparent 70%);
+  }
+  h2 { margin-top: 14px; }
+  .lit {
+    margin-top: clamp(28px, 5vh, 48px); max-width: 22em;
+    font-size: clamp(26px, 3.6vw, 46px); line-height: 1.18; letter-spacing: -0.025em; font-weight: 560;
+    font-variation-settings: 'opsz' 32; color: var(--text-1);
+  }
+  :global(html.tier-a) .lit .w { opacity: 0.18; }
+  :global(html.tier-b) .lit .w { opacity: 0.18; transition: opacity 500ms var(--ease-out); transition-delay: calc(var(--i) * 45ms); }
+  :global(html.tier-b) .lit:global(.in) .w { opacity: 1; }
+
+  .grid { margin-top: clamp(48px, 8vh, 88px); display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .stat, .noise {
+    position: relative; padding: 24px; border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015));
+    box-shadow: inset 0 0 0 1px var(--line-1), var(--top-light);
+  }
+  .num { font-size: clamp(44px, 5.4vw, 68px); line-height: 1; letter-spacing: -0.04em; font-weight: 600; color: var(--text-1); font-variation-settings: 'opsz' 32; }
+  .num small { font-size: 0.4em; letter-spacing: -0.01em; color: var(--text-3); font-weight: 510; }
+  .big .num { color: var(--accent); }
+  .stat h3 { margin-top: 14px; font-size: 16px; }
+  .note { margin-top: 8px; font-size: 14px; line-height: 1.5; color: var(--text-3); }
+
+  .noise { grid-column: span 2; display: grid; grid-template-columns: 1fr 1.2fr; gap: 24px; align-items: center; overflow: hidden; }
+  .noise h3 { font-size: clamp(20px, 2vw, 24px); }
+  .noise p { margin-top: 10px; font-size: 15px; color: var(--text-3); }
+  .toggle {
+    margin-top: 20px; display: inline-flex; align-items: center; gap: 12px; height: 40px; padding: 0 14px 0 6px; border: 0; border-radius: 999px; cursor: pointer;
+    background: rgba(255, 255, 255, 0.05); box-shadow: inset 0 0 0 1px var(--line-2); font-size: 14px; font-weight: 510; color: var(--text-2);
+  }
+  .knob { position: relative; width: 44px; height: 26px; border-radius: 999px; background: rgba(255, 255, 255, 0.12); transition: background-color 160ms var(--ease-out); }
+  .knob::after { content: ''; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 220ms var(--ease-out); }
+  .toggle[aria-pressed='true'] .knob { background: var(--sheen), var(--accent-fill); }
+  .toggle[aria-pressed='true'] .knob::after { transform: translateX(18px); }
+  .t-on, .toggle[aria-pressed='true'] .t-off { display: none; }
+  .toggle[aria-pressed='true'] .t-on { display: inline; }
+  .wave { width: 100%; height: 160px; }
+  .wave path { fill: none; stroke: url(#wg); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+  .hiss { opacity: 0.55; transition: opacity 400ms var(--ease-out); }
+  .speech { opacity: 0.35; transition: opacity 400ms var(--ease-out); }
+  .noise:global(.clean) .hiss { opacity: 0; }
+  .noise:global(.clean) .speech { opacity: 1; }
+  :global(html.tier-a) .hiss { animation: jitter 180ms steps(3) infinite; }
+  @keyframes jitter { 50% { transform: translateY(1.5px); } }
+
+  .equal .num { font-size: clamp(40px, 4.6vw, 56px); }
+  .source { margin-top: 20px; font-size: 13px; color: var(--text-3); max-width: 60em; }
+
+  @media (max-width: 960px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+    .big { grid-column: span 2; }
+    .noise { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: 1fr; }
+    .big, .noise { grid-column: auto; }
+    .stat, .noise { padding: 20px; }
+  }
+</style>

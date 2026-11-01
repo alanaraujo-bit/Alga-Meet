@@ -1,0 +1,47 @@
+---
+import '../styles/global.css';
+import interUrl from '@fontsource-variable/inter/files/inter-latin-opsz-normal.woff2?url';
+
+interface Props { title: string; description: string }
+const { title, description } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta name="theme-color" content="#0b0b0c" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href={interUrl} as="font" type="font/woff2" crossorigin />
+    <!-- Fallback com as métricas da Inter (valores do next/font): a troca de fonte não mexe no layout. -->
+    <style set:html={`@font-face{font-family:'Inter Fallback';src:local('Arial');ascent-override:90.44%;descent-override:22.52%;line-gap-override:0%;size-adjust:107.12%}@font-face{font-family:'Inter Variable';font-style:normal;font-display:swap;font-weight:100 900;src:url(${interUrl}) format('woff2-variations');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}`} />
+    <!-- Nível de desempenho antes da primeira pintura: A (completo), B (só CSS), C (estático). ?tier=a|b|c força. -->
+    <script is:inline>
+      (() => {
+        const d = document.documentElement, n = navigator, c = n.connection || {};
+        const q = new URLSearchParams(location.search).get('tier');
+        const et = c.effectiveType || '', mem = n.deviceMemory, cpu = n.hardwareConcurrency || 8;
+        let t = 'a';
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches || c.saveData || /2g/.test(et)) t = 'c';
+        else if ((mem && mem <= 2) || (mem && mem <= 4 && cpu <= 4) || et === '3g') t = 'b';
+        if (/^[abc]$/.test(q || '')) t = q;
+        d.classList.add('js', 'tier-' + t);
+        d.dataset.tier = t;
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#conteudo">Pular para o conteúdo</a>
+    <slot />
+  </body>
+</html>

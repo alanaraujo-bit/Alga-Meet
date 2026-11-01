@@ -1,0 +1,95 @@
+---
+import { facts } from '../data/facts';
+const free = [
+  'Voz igual para todos, sem limite de tempo',
+  `Tela em ${facts.freeStream.join(' e ')}`,
+  'Espaços, canais, cargos e convites',
+  `Anexos de até ${facts.attachFreeMb} MB`,
+  'Sem anúncio, sem prazo, sem cartão',
+];
+const plus = [
+  `Tela em ${facts.plusStream.join(', ').replace(/, ([^,]*)$/, ' e $1')}`,
+  `Anexos de até ${facts.attachPlusMb} MB`,
+  'Guarda-roupa que ganha um item novo por mês',
+  'Aura de voz, ícones do app e banner animado',
+  'Dois passes de 7 dias por mês para dar a amigos',
+];
+---
+<section class="plus" id="plus" aria-labelledby="plus-t">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow" data-reveal>Planos</p>
+      <h2 id="plus-t" data-reveal>O grátis é bom de verdade.</h2>
+      <p class="lede" data-reveal>Tudo que o grupo precisa para conversar, de graça. O Alga Plus é para quem transmite muito e para quem quer apoiar.</p>
+    </div>
+
+    <div class="plans">
+      <article class="plan" data-reveal>
+        <h3>Grátis</h3>
+        <p class="price"><b>R$ 0</b></p>
+        <ul>{free.map((f) => <li>{f}</li>)}</ul>
+      </article>
+      <article class="plan pro" data-reveal style="--d:80ms">
+        <h3>Alga Plus</h3>
+        <p class="price"><b class="tnum">{facts.plusMonthly}</b><span>/mês</span><small>ou {facts.plusYearly} por ano</small></p>
+        <ul>{plus.map((f) => <li>{f}</li>)}</ul>
+        <p class="fine">Cancele quando quiser. Reembolso em até 7 dias. Preço e benefícios em validação durante o beta.</p>
+      </article>
+    </div>
+
+    <article class="hora" data-reveal aria-labelledby="hora-t">
+      <div class="sky" aria-hidden="true">
+        <div class="sun"></div>
+        <div class="city">{Array.from({ length: 22 }, (_, i) => <i style={`--h:${28 + ((i * 37) % 54)}%;--w:${3 + ((i * 7) % 3)}%;--l:${(i * 41) % 100}%;--i:${i}`}></i>)}</div>
+      </div>
+      <div class="hora-copy">
+        <p class="eyebrow">Coleção 01 · em breve</p>
+        <h3 id="hora-t">Hora Azul</h3>
+        <p>O quarto de hora depois do pôr do sol, quando o céu fica índigo e as janelas acendem. É a hora em que o grupo entra na call.</p>
+        <p class="rules">Nada aleatório. Nada de contagem regressiva. O que você vê é o que você leva.</p>
+      </div>
+    </article>
+  </div>
+</section>
+
+<style>
+  .plus { position: relative; padding-block: clamp(80px, 14vh, 160px); }
+  .head { display: grid; gap: 16px; max-width: 760px; }
+  .plans { margin-top: clamp(40px, 7vh, 72px); display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .plan { padding: clamp(24px, 3vw, 36px); border-radius: 18px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)); box-shadow: inset 0 0 0 1px var(--line-1), var(--top-light); }
+  .pro {
+    background: radial-gradient(90% 70% at 50% 0%, rgba(97, 99, 208, 0.26), transparent 70%), linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+    box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 30px 80px rgba(36, 38, 110, 0.25);
+  }
+  .plan h3 { font-size: 16px; color: var(--text-2); }
+  .pro h3 { color: var(--accent); }
+  .price { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; }
+  .price b { font-size: clamp(36px, 4vw, 48px); font-weight: 600; letter-spacing: -0.035em; color: var(--text-1); font-variation-settings: 'opsz' 32; }
+  .price span { color: var(--text-3); font-size: 16px; }
+  .price small { flex-basis: 100%; font-size: 14px; color: var(--text-3); }
+  .plan ul { list-style: none; margin: 24px 0 0; padding: 0; display: grid; gap: 12px; }
+  .plan li { position: relative; padding-left: 26px; font-size: 15px; color: var(--text-2); }
+  .plan li::before { content: ''; position: absolute; left: 2px; top: 6px; width: 12px; height: 7px; border-left: 1.6px solid var(--accent); border-bottom: 1.6px solid var(--accent); transform: rotate(-45deg); }
+  .fine { margin-top: 24px; font-size: 13px; color: var(--text-3); }
+
+  .hora { position: relative; margin-top: 12px; min-height: 460px; border-radius: 20px; overflow: hidden; display: grid; align-items: start; box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.2); isolation: isolate; }
+  .sky { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, #0e0f26 0%, #1c1e5a 40%, #3d41a3 66%, #8d84d2 84%, #e7b9b4 100%); }
+  .sun { position: absolute; left: 62%; bottom: -60px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 214, 196, 0.55), rgba(255, 214, 196, 0)); }
+  .city { position: absolute; left: 0; right: 0; bottom: 0; height: 34%; }
+  .city i { position: absolute; bottom: 0; left: var(--l); width: var(--w); height: var(--h); background: #0d0e22; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02); }
+  .city i::after { content: ''; position: absolute; inset: 14% 22%; background-image: radial-gradient(circle, rgba(255, 210, 150, 0.85) 0 1px, transparent 1.6px); background-size: 7px 9px; opacity: 0.55; }
+  .hora::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(8, 8, 20, 0.55) 0%, rgba(8, 8, 20, 0) 55%); }
+  .hora-copy { padding: clamp(24px, 4vw, 44px); max-width: 520px; display: grid; gap: 10px; }
+  .hora-copy .eyebrow { color: #c6c8ff; }
+  .hora-copy h3 { font-size: clamp(32px, 4vw, 48px); letter-spacing: -0.03em; }
+  .hora-copy p { color: rgba(240, 240, 255, 0.82); font-size: 16px; }
+  .hora-copy .rules { font-size: 14px; color: rgba(230, 230, 255, 0.7); }
+  :global(html.tier-a) .city i::after, :global(html.tier-b) .city i::after { animation: windows 6s ease-in-out infinite alternate; animation-delay: calc(var(--i) * -0.7s); }
+  @keyframes windows { from { opacity: 0.3; } to { opacity: 0.75; } }
+
+  @media (max-width: 760px) {
+    .plans { grid-template-columns: 1fr; }
+    .hora { min-height: 520px; }
+    .city { height: 26%; }
+  }
+</style>

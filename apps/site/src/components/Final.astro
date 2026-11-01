@@ -1,0 +1,43 @@
+---
+import Download from './Download.astro';
+import Logo from './Logo.astro';
+import mark from '../assets/brand/mark.svg?url';
+import { facts } from '../data/facts';
+const year = new Date().getFullYear();
+---
+<section class="final" aria-labelledby="final-t">
+  <div class="horizon" data-horizon aria-hidden="true"></div>
+  <div class="wrap inner">
+    <img class="mark" src={mark} width="72" height="72" alt="" data-reveal />
+    <h2 id="final-t" data-reveal>Chama o pessoal.</h2>
+    <p class="lede" data-reveal>Baixe, crie um espaço e mande o convite. Em dois minutos vocês estão conversando.</p>
+    <div data-reveal><Download /></div>
+    <p class="specs" data-reveal>Windows 10 e 11 · 64 bits · instalador de {facts.installerMb} MB</p>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap row">
+    <Logo height={22} />
+    <p>Feito no Brasil, para conversar de perto. © {year} Alga Meet.</p>
+  </div>
+</footer>
+
+<style>
+  .final { position: relative; overflow: clip; padding-block: clamp(120px, 20vh, 220px) clamp(120px, 18vh, 200px); text-align: center; isolation: isolate; }
+  /* Horizonte da hora azul: a borda de um planeta escuro com a luz índigo nascendo atrás. */
+  .horizon {
+    position: absolute; left: 50%; top: 74%; width: max(1400px, 170vw); aspect-ratio: 1; margin-left: calc(max(1400px, 170vw) / -2); z-index: -1; border-radius: 50%;
+    background: radial-gradient(closest-side, #09090b 98.6%, rgba(9, 9, 11, 0) 100%);
+    box-shadow: 0 -1px 0 rgba(214, 218, 255, 0.55), 0 -24px 80px rgba(139, 142, 247, 0.38), 0 -80px 220px rgba(97, 99, 208, 0.42);
+  }
+  .final::before { content: ''; position: absolute; inset: 0; z-index: -2; background: radial-gradient(60% 50% at 50% 92%, rgba(97, 99, 208, 0.28), transparent 70%); }
+  .inner { display: grid; justify-items: center; gap: 22px; }
+  .mark { width: 72px; height: 72px; filter: drop-shadow(0 8px 30px rgba(139, 142, 247, 0.45)); }
+  h2 { font-size: clamp(44px, 8vw, 104px); letter-spacing: -0.04em; }
+  .lede { text-align: center; }
+  .specs { font-size: 13px; color: var(--text-3); }
+  .foot { border-top: 1px solid var(--line-1); padding-block: 28px calc(28px + env(safe-area-inset-bottom)); }
+  .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; }
+  .row p { font-size: 13px; color: var(--text-3); }
+</style>

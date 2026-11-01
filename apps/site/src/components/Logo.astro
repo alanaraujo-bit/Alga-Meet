@@ -1,0 +1,14 @@
+---
+// A marca do site mora só aqui. Hoje: conceito A · Encosto (escolha do dono, 2026-11-01), copiado de
+// docs/design/brand/concepts/concept-a-lockup.svg com as cores do sistema (fronde alta #f7f8f8, a que se
+// encosta em #8b8ef7). Quando os SVGs finais saírem em apps/desktop/build/brand/web/, troque o arquivo abaixo.
+import lockup from '../assets/brand/lockup.svg?url';
+interface Props { height?: number; class?: string }
+const { height = 26, class: cls } = Astro.props;
+const width = Math.round(height * (782.4 / 214));
+---
+<img class:list={['logo', cls]} src={lockup} width={width} height={height} style={`width:${width}px;height:${height}px`} alt="Alga Meet" decoding="async" />
+
+<style>
+  .logo { display: block; flex: none; max-width: none; }
+</style>
