@@ -1,12 +1,15 @@
 import { Check, Lock, Monitor, AppWindow } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { motion } from 'motion/react'
+import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type { CaptureSource } from '../../../../shared/bridge'
 import { media, useMedia, SCREEN_PRESETS, type ContentType, type ScreenPresetId } from '@/media'
 import { Button, Icon, Modal, SegmentedControl, Spinner, Switch, Tabs } from '@/ui'
 import { openSettings } from '../settings/store'
 import { t } from './strings'
+import { qualityAxes, type QualityChoice } from './picker'
 import { useVoice } from './voice'
+import ui from '@/ui/misc.module.css'
 import s from './picker.module.css'
 
 type Kind = 'screen' | 'window'
@@ -16,8 +19,9 @@ const REFRESH_MS = 1500
 export function ScreenPicker() {
   const open = useVoice((st) => st.picker)
   const close = () => useVoice.setState({ picker: false })
+  // 836 = 464 px preview + 24 gap + 300 px options + the modal's 2 × 24 padding.
   return (
-    <Modal open={open} onClose={close} title={t.picker.title} description={t.picker.description} width={800}>
+    <Modal open={open} onClose={close} title={t.picker.title} description={t.picker.description} width={836}>
       {open && <PickerBody onDone={close} />}
     </Modal>
   )
@@ -27,7 +31,7 @@ function PickerBody({ onDone }: { onDone: () => void }) {
   const screen = useMedia(useShallow((st) => ({ active: st.screen.active, preset: st.screen.preset, contentType: st.screen.contentType, audio: st.screen.audio, offered: st.screen.offered, locked: st.screen.locked, sourceId: st.screen.sourceId })))
   const [sources, setSources] = useState<CaptureSource[] | null>(null)
   const [kind, setKind] = useState<Kind>('screen')
-  const [picked, setPicked] = useState<string | null>(null)
+  const [picked, setPicked] = useState<string | null>(screen.sourceId)
   const offered = screen.offered.length ? screen.offered : [SCREEN_PRESETS[0]!]
   const [quality, setQuality] = useState<ScreenPresetId>(() => (offered.some((p) => p.id === screen.preset) ? screen.preset : (offered.find((p) => p.id === '1080p60') ?? offered[offered.length - 1]!).id))
   const [content, setContent] = useState<ContentType>(screen.contentType)
@@ -58,12 +62,13 @@ function PickerBody({ onDone }: { onDone: () => void }) {
   }, [bridgeOk])
 
   const list = useMemo(() => (sources ?? []).filter((x) => x.kind === kind), [sources, kind])
-  // First open: the primary screen is preselected (the common case is one click away from "Transmitir").
+  // Live from a window: open on Janelas, with that window chosen.
+  const liveKind = sources?.find((x) => x.id === screen.sourceId)?.kind
   useEffect(() => {
-    if (picked || !sources?.length) return
-    setPicked(sources.find((x) => x.id === screen.sourceId)?.id ?? sources.find((x) => x.kind === 'screen')?.id ?? sources[0]!.id)
-  }, [sources, picked, screen.sourceId])
-  const chosen = sources?.find((x) => x.id === picked) ?? null
+    if (liveKind) setKind(liveKind)
+  }, [liveKind])
+  // Always one of this tab's sources: the pick, else the first (the primary screen, one click from "Transmitir").
+  const chosen = list.find((x) => x.id === picked) ?? list[0] ?? null
   // Live: the same dialog switches the source and/or the quality, both without stopping the stream.
   const newSource = !!chosen && chosen.id !== screen.sourceId
   const newQuality = quality !== screen.preset
@@ -87,6 +92,8 @@ function PickerBody({ onDone }: { onDone: () => void }) {
     }
   }
 
+  const axes = qualityAxes(offered, screen.locked, quality)
+
   return (
     <div className={s.body}>
       <div className={s.left}>
@@ -99,22 +106,15 @@ function PickerBody({ onDone }: { onDone: () => void }) {
             { value: 'window', label: t.picker.windows },
           ]}
         />
-        <div className={s.grid} role="radiogroup" aria-label={kind === 'screen' ? t.picker.screens : t.picker.windows}>
-          {!bridgeOk ? (
-            <p className={s.note}>{t.picker.unavailable}</p>
-          ) : sources === null ? (
-            <p className={s.note}>
-              <Spinner size={16} /> {t.picker.loading}
-            </p>
-          ) : list.length === 0 ? (
-            <p className={s.note}>{kind === 'screen' ? t.picker.none.screens : t.picker.none.windows}</p>
-          ) : (
-            list.map((src) => (
+        {/* One source: no grid, the preview is the choice. */}
+        {list.length > 1 && (
+          <div className={s.grid} role="radiogroup" aria-label={kind === 'screen' ? t.picker.screens : t.picker.windows}>
+            {list.map((src) => (
               <button
                 key={src.id}
                 type="button"
                 role="radio"
-                aria-checked={src.id === picked}
+                aria-checked={src.id === chosen?.id}
                 className={s.source}
                 onClick={() => setPicked(src.id)}
                 onDoubleClick={() => {
@@ -124,7 +124,7 @@ function PickerBody({ onDone }: { onDone: () => void }) {
               >
                 <span className={s.thumb}>
                   <img src={src.thumbnail} alt="" draggable={false} />
-                  {src.id === picked && (
+                  {src.id === chosen?.id && (
                     <span className={s.check}>
                       <Icon icon={Check} size={14} />
                     </span>
@@ -135,36 +135,31 @@ function PickerBody({ onDone }: { onDone: () => void }) {
                   <span>{src.name}</span>
                 </span>
               </button>
-            ))
+            ))}
+          </div>
+        )}
+        <div className={s.preview}>
+          {!bridgeOk ? (
+            <p className={s.note}>{t.picker.unavailable}</p>
+          ) : sources === null ? (
+            <p className={s.note}>
+              <Spinner size={16} /> {t.picker.loading}
+            </p>
+          ) : !chosen ? (
+            <p className={s.note}>{kind === 'screen' ? t.picker.none.screens : t.picker.none.windows}</p>
+          ) : (
+            <img src={chosen.thumbnail} alt={`${t.picker.preview}: ${chosen.name}`} draggable={false} />
           )}
         </div>
+        {chosen && <div className={s.previewName}>{chosen.name}</div>}
       </div>
 
-      <aside className={s.right} aria-label={t.picker.preview}>
-        <div className={s.preview}>
-          {chosen ? <img src={chosen.thumbnail} alt={`${t.picker.preview}: ${chosen.name}`} /> : <span className={s.note}>{t.picker.choose}</span>}
-        </div>
-        {chosen && <div className={s.previewName}>{chosen.name}</div>}
-
+      <div className={s.right}>
         <fieldset className={s.field}>
           <legend className={s.legend}>{t.picker.quality}</legend>
-          <div role="radiogroup" aria-label={t.picker.quality} className={s.options}>
-            {offered.map((p) => (
-              <button key={p.id} type="button" role="radio" aria-checked={p.id === quality} className={s.option} onClick={() => setQuality(p.id)}>
-                <span>{p.label}</span>
-                {p.id === quality && <Icon icon={Check} size={14} />}
-              </button>
-            ))}
-            {/* What this computer could send but the plan doesn't include: visible, not selectable, never a modal. */}
-            {screen.locked.map((p) => (
-              <span key={p.id} role="radio" aria-checked={false} aria-disabled="true" className={`${s.option} ${s.optionLocked}`} aria-label={`${p.label}: ${t.picker.plus}`}>
-                <span>{p.label}</span>
-                <span className={s.plusTag}>
-                  <Icon icon={Lock} size={12} />
-                  {t.picker.plus}
-                </span>
-              </span>
-            ))}
+          <div className={s.stack}>
+            <QualitySegments label={t.picker.resolution} items={axes.resolutions} value={quality} onChange={setQuality} />
+            <QualitySegments label={t.picker.fps} items={axes.rates} value={quality} onChange={setQuality} />
           </div>
           {screen.locked.length > 0 ? (
             <p className={s.hint}>
@@ -187,7 +182,6 @@ function PickerBody({ onDone }: { onDone: () => void }) {
 
         {!screen.active && (
           <>
-
             <fieldset className={s.field}>
               <legend className={s.legend}>{t.picker.content}</legend>
               <SegmentedControl<ContentType>
@@ -225,7 +219,50 @@ function PickerBody({ onDone }: { onDone: () => void }) {
             {!screen.active ? t.picker.start : newSource ? t.picker.switch : t.picker.apply}
           </Button>
         </div>
-      </aside>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * SegmentedControl look with plan-locked segments: visible, `aria-disabled`, a 12 px lock, skipped by the arrow keys.
+ * shortcut: forks ui SegmentedControl (its items can't be disabled); fold back into ui/Tabs.tsx once they can.
+ */
+function QualitySegments({ label, items, value, onChange }: { label: string; items: QualityChoice[]; value: ScreenPresetId; onChange: (v: ScreenPresetId) => void }) {
+  const thumb = useId()
+  const open = items.filter((it) => !it.locked)
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const i = open.findIndex((it) => it.value === value)
+    const n = open.length
+    const next = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i - 1 + n) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1
+    if (next < 0) return
+    e.preventDefault()
+    const v = open[next]!.value
+    onChange(v)
+    e.currentTarget.querySelector<HTMLElement>(`[data-value="${v}"]`)?.focus()
+  }
+  return (
+    <div role="radiogroup" aria-label={label} className={ui.segmented} onKeyDown={onKeyDown}>
+      {items.map((it) => (
+        <button
+          key={it.label}
+          type="button"
+          role="radio"
+          data-value={it.value}
+          aria-checked={it.value === value}
+          aria-disabled={it.locked || undefined}
+          aria-label={it.locked ? `${it.label}, ${t.picker.plus}` : undefined}
+          tabIndex={it.value === value ? 0 : -1}
+          className={`${ui.segment} ${it.locked ? s.segmentLocked : ''}`}
+          onClick={() => !it.locked && onChange(it.value)}
+        >
+          {it.value === value && <motion.span layoutId={thumb} className={ui.segmentThumb} transition={{ duration: 0.18, ease: [0.165, 0.84, 0.44, 1] }} />}
+          <span className={ui.segmentLabel}>
+            {it.label}
+            {it.locked && <Icon icon={Lock} size={12} />}
+          </span>
+        </button>
+      ))}
     </div>
   )
 }

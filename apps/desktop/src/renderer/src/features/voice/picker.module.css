@@ -1,7 +1,7 @@
 .body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 248px;
-  gap: var(--s-5);
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--s-6);
   min-height: 0;
 }
 .left {
@@ -10,46 +10,43 @@
   gap: var(--s-3);
   min-width: 0;
 }
+/* Several sources: 3 columns (≈148×83 at full width) above the preview; past two rows the third peeks and it scrolls. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-content: start;
   gap: var(--s-3) var(--s-2);
-  height: 360px;
-  margin: 0 calc(var(--s-1) * -1);
+  max-height: 248px;
+  margin: calc(var(--s-1) * -1);
   padding: var(--s-1);
   overflow-y: auto;
 }
 .note {
-  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  padding: var(--s-6) 0;
   color: var(--text-tertiary);
   font: var(--type-ui);
 }
 .source {
   display: grid;
   gap: var(--s-1_5);
-  padding: var(--s-1);
-  border-radius: var(--r-lg);
+  min-width: 0;
+  border-radius: var(--r-sm);
   text-align: left;
-}
-.source:hover {
-  background: var(--state-hover);
-}
-.source[aria-checked='true'] {
-  background: var(--state-selected);
 }
 .thumb {
   position: relative;
   display: grid;
   place-items: center;
-  aspect-ratio: 16 / 10;
-  border-radius: var(--r-md);
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-sm);
   background: #000;
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
   overflow: hidden;
+}
+.source:hover .thumb {
+  box-shadow: 0 0 0 1px var(--border-strong);
 }
 .thumb img {
   width: 100%;
@@ -76,7 +73,6 @@
   align-items: center;
   gap: var(--s-1_5);
   min-width: 0;
-  padding: 0 var(--s-1);
   color: var(--text-secondary);
   font: var(--type-meta);
   font-weight: var(--w-medium);
@@ -98,25 +94,23 @@
 .right {
   display: flex;
   flex-direction: column;
-  gap: var(--s-3);
+  gap: var(--s-5);
   min-width: 0;
 }
+/* 464×261 at full width. */
 .preview {
   display: grid;
   place-items: center;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 9;
   border-radius: var(--r-md);
   background: #000;
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
   overflow: hidden;
 }
 .preview img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-}
-.preview .note {
-  padding: 0;
-  font: var(--type-meta);
 }
 .previewName {
   margin-top: calc(var(--s-1) * -1);
@@ -146,30 +140,11 @@
   font: var(--type-meta);
   text-wrap: pretty;
 }
-.options {
-  display: grid;
-  gap: 1px;
-}
-.option {
+.stack {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: var(--h-row);
-  padding: 0 var(--s-2);
-  border-radius: var(--r-sm);
-  color: var(--text-secondary);
-  font: var(--type-ui);
-  font-variant-numeric: tabular-nums;
-}
-.option:hover {
-  background: var(--state-hover);
-}
-.option[aria-checked='true'] {
-  background: var(--state-selected);
-  color: var(--text-primary);
-}
-.option svg {
-  color: var(--accent);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-1_5);
 }
 .switchRow {
   display: flex;
@@ -191,22 +166,10 @@
   font: var(--type-meta);
 }
 /* Sustained by this computer, not in the plan: readable, clearly not pickable, no accent (state, not a sale). */
-.optionLocked {
+.segmentLocked[aria-disabled='true'],
+.segmentLocked[aria-disabled='true']:hover {
   color: var(--text-disabled);
   cursor: default;
-}
-.optionLocked:hover {
-  background: none;
-}
-.plusTag {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-1);
-  color: var(--text-tertiary);
-  font: var(--type-meta);
-}
-.option .plusTag svg {
-  color: currentColor;
 }
 .hintLink {
   color: var(--accent);
