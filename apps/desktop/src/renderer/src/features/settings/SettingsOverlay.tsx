@@ -1,5 +1,5 @@
 import type { Session } from '@alga/shared'
-import { Bell, CreditCard, Gem, Keyboard, LogOut, Mic, Monitor, Palette, Power, User, Wrench, X, type LucideIcon } from 'lucide-react'
+import { Bell, CreditCard, Gem, Keyboard, LogOut, Mic, Monitor, Palette, Power, Shield, User, Wrench, X, type LucideIcon } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -17,6 +17,7 @@ import { StrengthMeter, strengthHint } from '../auth/PasswordStrength'
 import { openVerifyEmail } from '../auth/VerifyEmail'
 import { PlanSection, StreamPlanGroup } from '../billing/Plan'
 import { ShopSection } from '../billing/Shop'
+import { PrivacySection } from '../trust/Privacy'
 import { Group, Row, SettingsFrame } from './Frame'
 import { HOTKEY_ACTIONS, loadBindings, saveBindings, type SavedBinding } from './hotkeys'
 import { ImagePicker } from './ImagePicker'
@@ -29,6 +30,7 @@ const NAV: Array<{ group: string; items: Array<{ id: SettingsSection; icon: Luci
     group: t.groups.user,
     items: [
       { id: 'account', icon: User },
+      { id: 'privacy', icon: Shield },
       { id: 'plan', icon: CreditCard },
       { id: 'shop', icon: Gem },
     ],
@@ -75,6 +77,7 @@ function Panel({ section }: { section: SettingsSection }) {
       closeLabel={t.close}
     >
       {section === 'account' && <Account />}
+      {section === 'privacy' && <PrivacySection />}
       {section === 'plan' && <PlanSection />}
       {section === 'shop' && <ShopSection />}
       {section === 'voice' && <Voice />}

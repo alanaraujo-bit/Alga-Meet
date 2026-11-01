@@ -59,6 +59,24 @@ Afirmações que mudam:
 - A linha "Denúncias e moderação" agora tem prazo implementado: 6 meses depois da decisão. Denúncias `csam` não têm
   expurgo automático.
 
+### Desktop (2026-11-01)
+
+As telas de L1, L2, L4, L5, L7 e L10 existem no app (`apps/desktop/src/renderer/src/features/trust/`, telas em
+`docs/screenshots/2026-11-01-*`, descritas em `docs/design/design-system.md`). Os `[LACUNA]` abaixo descrevem algo que o
+produto agora faz e podem sair na revisão do texto. Os outros continuam valendo.
+
+| Arquivo e trecho | `[LACUNA]` | O que o app faz agora |
+|---|---|---|
+| Termos 3.1 | "o cadastro ainda não pede data de nascimento" | Cadastro com data de nascimento (sem valor pré-preenchido) e recusa abaixo de 16 anos sem enviar nada. Contas antigas declaram uma vez, antes de entrar |
+| Termos 3.2 e Política 10 | "o app ainda não diferencia contas de 16–17 anos" e "começam com as configurações mais protetivas" | Configurações › Privacidade mostra as proteções. Assinatura e Loja trocam o botão de compra pela explicação |
+| Termos 8.2 e Diretrizes "Como denunciar" | "ainda não existe botão de denúncia" | "Denunciar" no perfil (cartão e menu do membro, Amigos) e no espaço (menu do espaço). Para mensagens, a entrada está pronta e falta ligá-la no menu da mensagem |
+| Termos 8.4 e Diretrizes "Recurso" | "não há ferramenta de recurso no app" | Tela de conta suspensa ou encerrada com regra, prazo e recurso. Avisos são contestados em Configurações › Privacidade, em "Ações na minha conta" |
+| Termos 13, Política 7 e 8 | "a exclusão de conta ainda não existe" | Configurações › Privacidade › Excluir conta: senha, 7 dias de carência com a data, escolha sobre as mensagens e o destino de cada espaço próprio. Entrar de novo cancela, e o app avisa |
+| Termos 16 | "o registro de aceite ainda não existe" | Caixa desmarcada no cadastro com os links de `GET /legal`. Novo aceite antes de entrar quando a versão muda |
+| Política 2 | "Data de nascimento: ainda não coletada" | Coletada no cadastro, ou uma vez nas contas antigas |
+| Política 2 | "Denúncias e moderação: fluxo de denúncia ainda não existe" | Ver Termos 8.2 |
+| Política 7 | "exportação de dados" (2 linhas) | Configurações › Privacidade › Baixar uma cópia dos seus dados. O link vai por e-mail |
+
 ## 1. Lacunas que bloqueiam o lançamento
 
 Ordenadas por gravidade. "Grátis" bloqueia qualquer lançamento público. "Pago" bloqueia só a cobrança real.

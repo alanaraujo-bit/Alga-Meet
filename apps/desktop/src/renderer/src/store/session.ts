@@ -1,10 +1,13 @@
-import type { AuthResponse, ClientFrame, Dispatch, LoginBody, RegisterBody } from '@alga/shared'
+import { GatewayClose, type AccountRestriction, type AuthResponse, type ClientFrame, type Dispatch, type LoginBody, type RegisterBody } from '@alga/shared'
 import { create } from 'zustand'
-import { api, setApiToken } from '@/lib/api'
+import { api, ApiRequestError, setApiToken } from '@/lib/api'
 import { Gateway, type GatewayStatus } from '@/lib/gateway'
 import { useData } from './data'
 
 type Phase = 'booting' | 'signed_out' | 'signed_in'
+
+/** Why the auth screen opened, said once there: the gateway closed with 4010, or the account was just deleted. */
+export type AuthNotice = { kind: 'restricted' } | { kind: 'deletion'; purgeAfter: string }
 
 interface SessionState {
   phase: Phase
@@ -13,10 +16,17 @@ interface SessionState {
   retryInMs: number | null
   /** READY received at least once for this sign-in (data is usable). */
   hydrated: boolean
+  /** Login (or the birth-date declaration) answered 403 with a restriction: the restricted-account screen shows it. */
+  restricted: AccountRestriction | null
+  notice: AuthNotice | null
+  /** This login canceled a pending account deletion (AuthResponse.deletionCanceled): said once in the shell. */
+  deletionCanceled: boolean
   boot(): Promise<void>
   login(body: LoginBody): Promise<void>
   register(body: RegisterBody): Promise<void>
   logout(): Promise<void>
+  /** Local sign-out after the server already ended every session (deletion, restriction). */
+  signOutWith(notice: AuthNotice | null, restricted?: AccountRestriction): Promise<void>
   send(frame: ClientFrame): boolean
   /** Skip the backoff wait ("Tentar agora"). */
   reconnect(): void
@@ -48,7 +58,7 @@ export const useSession = create<SessionState>()((set, get) => {
         listeners.forEach((l) => l(d))
       },
       onStatus: (s, info) => set({ gateway: s, retryInMs: info?.retryInMs ?? null }),
-      onAuthLost: () => void signOutLocal(),
+      onAuthLost: (code) => void signOutLocal(code === GatewayClose.ACCOUNT_RESTRICTED && !get().notice ? { notice: { kind: 'restricted' } } : {}),
     })
     gw.start()
   }
@@ -56,17 +66,26 @@ export const useSession = create<SessionState>()((set, get) => {
   const signIn = async (res: AuthResponse) => {
     await tokenStore.set(res.token)
     setApiToken(res.token)
-    set({ phase: 'signed_in', hydrated: false })
+    set({ phase: 'signed_in', hydrated: false, restricted: null, notice: null, deletionCanceled: !!res.deletionCanceled })
     startGateway(res.token)
   }
 
-  const signOutLocal = async () => {
+  const signOutLocal = async (extra: Partial<Pick<SessionState, 'notice' | 'restricted'>> = {}) => {
     gw?.stop()
     gw = null
     setApiToken(null)
     await tokenStore.set(null)
     useData.getState().reset()
-    set({ phase: 'signed_out', hydrated: false, gateway: 'idle' })
+    set({ phase: 'signed_out', hydrated: false, gateway: 'idle', deletionCanceled: false, ...extra })
+  }
+
+  const authCall = async (path: string, body: LoginBody | RegisterBody) => {
+    try {
+      return await api<AuthResponse>('POST', path, body)
+    } catch (e) {
+      if (e instanceof ApiRequestError && e.restriction) set({ restricted: e.restriction, notice: null })
+      throw e
+    }
   }
 
   return {
@@ -74,6 +93,9 @@ export const useSession = create<SessionState>()((set, get) => {
     gateway: 'idle',
     retryInMs: null,
     hydrated: false,
+    restricted: null,
+    notice: null,
+    deletionCanceled: false,
 
     boot: async () => {
       const token = await tokenStore.get()
@@ -83,14 +105,15 @@ export const useSession = create<SessionState>()((set, get) => {
       startGateway(token)
     },
 
-    login: async (body) => signIn(await api<AuthResponse>('POST', '/auth/login', body)),
-    register: async (body) => signIn(await api<AuthResponse>('POST', '/auth/register', body)),
+    login: async (body) => signIn(await authCall('/auth/login', body)),
+    register: async (body) => signIn(await authCall('/auth/register', body)),
 
     logout: async () => {
       // Best effort server revoke; local sign-out happens regardless.
       await api('POST', '/auth/logout').catch((e: unknown) => console.warn('[session] logout request failed', e))
-      await signOutLocal()
+      await signOutLocal({ notice: null, restricted: null })
     },
+    signOutWith: (notice, restricted) => signOutLocal({ notice, restricted: restricted ?? null }),
 
     send: (frame) => gw?.send(frame) ?? false,
     reconnect: () => gw?.reconnectNow(),

@@ -5,8 +5,8 @@ export type GatewayStatus = 'idle' | 'connecting' | 'ready' | 'reconnecting' | '
 interface Handlers {
   onDispatch(d: Dispatch): void
   onStatus(s: GatewayStatus, info?: { retryInMs?: number }): void
-  /** Token rejected or session revoked: caller must sign out. */
-  onAuthLost(): void
+  /** Token rejected, session revoked or account restricted (4010): caller must sign out. */
+  onAuthLost(code: number): void
 }
 
 /** Realtime connection with heartbeat and jittered exponential backoff. One instance per signed-in session. */
@@ -87,9 +87,9 @@ export class Gateway {
       if (this.ws !== ws) return
       this.cleanup()
       this.ws = null
-      if (ev.code === GatewayClose.AUTH_FAILED || ev.code === GatewayClose.SESSION_REVOKED) {
+      if (ev.code === GatewayClose.AUTH_FAILED || ev.code === GatewayClose.SESSION_REVOKED || ev.code === GatewayClose.ACCOUNT_RESTRICTED) {
         this.stopped = true
-        this.h.onAuthLost()
+        this.h.onAuthLost(ev.code)
         return
       }
       if (this.stopped) return

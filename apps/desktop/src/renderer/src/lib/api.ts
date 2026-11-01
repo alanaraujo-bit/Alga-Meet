@@ -1,4 +1,4 @@
-import type { ApiError, ApiErrorCode } from '@alga/shared'
+import type { AccountRestriction, ApiError, ApiErrorCode } from '@alga/shared'
 
 export class ApiRequestError extends Error {
   constructor(
@@ -6,6 +6,8 @@ export class ApiRequestError extends Error {
     readonly code: ApiErrorCode | 'network',
     message: string,
     readonly fields?: Record<string, string>,
+    /** Suspended/banned account (403 on login, or a session that raced the action). */
+    readonly restriction?: AccountRestriction,
   ) {
     super(message)
   }
@@ -35,7 +37,7 @@ export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   const data = (await res.json().catch(() => null)) as (T & Partial<ApiError>) | null
   if (!res.ok) {
     const e = data?.error
-    throw new ApiRequestError(res.status, e?.code ?? 'internal', e?.message ?? `Erro inesperado (HTTP ${res.status}).`, e?.fields)
+    throw new ApiRequestError(res.status, e?.code ?? 'internal', e?.message ?? `Erro inesperado (HTTP ${res.status}).`, e?.fields, e?.restriction)
   }
   return data as T
 }

@@ -1,6 +1,7 @@
 .screen {
   position: relative;
   display: grid;
+  grid-template-rows: auto 1fr;
   justify-items: center;
   align-content: start;
   overflow: auto;
@@ -43,6 +44,7 @@
   font: var(--type-title-lg);
   letter-spacing: -0.015em;
   color: var(--text-primary);
+  text-wrap: balance;
 }
 .subtitle {
   margin-top: var(--s-1);
@@ -88,11 +90,10 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+/* In the flow, at the bottom: a tall form (signup) scrolls past it instead of under it. */
 .version {
-  position: absolute;
-  bottom: var(--s-4);
-  left: 0;
-  right: 0;
+  align-self: end;
+  margin: var(--s-6) 0 calc(-1 * var(--s-4));
   text-align: center;
   color: var(--text-disabled);
   font: var(--type-meta);
@@ -179,4 +180,32 @@
   display: flex;
   justify-content: space-between;
   gap: var(--s-3);
+}
+
+.info {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font: var(--type-ui);
+}
+.info svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--text-tertiary);
+}
+.body {
+  margin-top: var(--s-3);
+  color: var(--text-secondary);
+  font: var(--type-ui);
+  font-size: 14px;
+  line-height: 22px;
+  text-wrap: pretty;
+}
+.bodyQuiet {
+  color: var(--text-tertiary);
+  font: var(--type-ui);
 }

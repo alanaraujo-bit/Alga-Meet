@@ -6,6 +6,7 @@ import { copyText } from '@/lib/clipboard'
 import { errorText } from '@/lib/errors'
 import { fold } from '@/lib/fuzzy'
 import { openDm, removeRelationship, sendFriendRequest, setRelationship } from '@/store/actions'
+import { userReportEntries } from '../trust/Report'
 import { useData } from '@/store/data'
 import { presenceOf } from '@/store/selectors'
 import { useUi, type FriendsTab } from '@/store/ui'
@@ -131,6 +132,7 @@ function friendMenu(rel: Relationship): MenuEntry[] {
         { kind: 'separator' },
         { label: t.actions.remove, icon: UserMinus, danger: true, onSelect: () => void run(removeRelationship(u.id), t.done.removed(u.displayName)) },
         { label: t.actions.block, icon: Ban, danger: true, onSelect: () => void run(setRelationship(u.id, 'blocked'), t.done.blocked(u.displayName)) },
+        ...userReportEntries(u),
       ]
     case 'incoming':
       return [
@@ -139,11 +141,12 @@ function friendMenu(rel: Relationship): MenuEntry[] {
         copy,
         { kind: 'separator' },
         { label: t.actions.block, icon: Ban, danger: true, onSelect: () => void run(setRelationship(u.id, 'blocked'), t.done.blocked(u.displayName)) },
+        ...userReportEntries(u),
       ]
     case 'outgoing':
       return [{ label: t.actions.cancel, icon: X, onSelect: () => void run(removeRelationship(u.id)) }, copy]
     case 'blocked':
-      return [{ label: t.actions.unblock, icon: Ban, onSelect: () => void run(removeRelationship(u.id), t.done.unblocked(u.displayName)) }]
+      return [{ label: t.actions.unblock, icon: Ban, onSelect: () => void run(removeRelationship(u.id), t.done.unblocked(u.displayName)) }, ...userReportEntries(u)]
   }
 }
 

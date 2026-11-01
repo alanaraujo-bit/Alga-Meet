@@ -1,0 +1,593 @@
+/* Trust & Safety and privacy: gate, restricted account, report dialog, Configurações › Privacidade. */
+
+/* ── Shared form bits ── */
+.fieldset {
+  display: grid;
+  gap: var(--s-1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.textField {
+  display: grid;
+  gap: var(--s-1_5);
+}
+.textLabel {
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.textarea {
+  resize: vertical;
+  min-height: 84px;
+  padding: var(--s-2) var(--s-3);
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  color: var(--text-primary);
+  font: var(--type-ui);
+}
+.textarea::placeholder {
+  color: var(--text-tertiary);
+}
+.textarea:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.textareaInvalid,
+.textareaInvalid:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+.textHint {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.fieldError,
+.inlineError {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  color: var(--danger);
+  font: var(--type-meta);
+}
+.inlineError {
+  align-items: flex-start;
+  font: var(--type-ui);
+}
+.inlineError svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.inlineButton {
+  color: var(--accent);
+  font-weight: var(--w-medium);
+  border-radius: var(--r-xs);
+}
+.inlineButton:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.okLine {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  color: var(--text-secondary);
+}
+.okLine svg {
+  flex-shrink: 0;
+  color: var(--success);
+}
+
+/* Native radio, drawn like the settings choice (inset ring → filled center). Arrow keys come for free. */
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-1_5) var(--s-2);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.option:hover {
+  background: var(--state-hover);
+}
+.option:has(input:checked) {
+  background: var(--state-selected);
+}
+.option:has(input:focus-visible) {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.option input {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  border-radius: var(--r-full);
+  appearance: none;
+  box-shadow: inset 0 0 0 1.5px var(--border-strong);
+  cursor: pointer;
+}
+.option input:focus-visible {
+  outline: none;
+}
+.option input:checked {
+  box-shadow: inset 0 0 0 5px var(--accent-fill);
+}
+.optionText {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.optionLabel {
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+}
+.optionHint {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-wrap: pretty;
+}
+
+/* ── Checkbox (terms) ── */
+.checkField {
+  display: grid;
+  gap: var(--s-1);
+}
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  color: var(--text-secondary);
+  font: var(--type-ui);
+  text-wrap: pretty;
+}
+.check label {
+  cursor: pointer;
+}
+.check input {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  border-radius: var(--r-xs);
+  appearance: none;
+  box-shadow: inset 0 0 0 1.5px var(--border-strong);
+  cursor: pointer;
+}
+.check input:checked {
+  background: var(--accent-fill);
+  box-shadow: none;
+}
+.check input:checked::after {
+  content: '';
+  width: 9px;
+  height: 5px;
+  border-bottom: 2px solid var(--on-accent);
+  border-left: 2px solid var(--on-accent);
+  transform: translateY(-1px) rotate(-45deg);
+}
+.checkInvalid input:not(:checked) {
+  box-shadow: inset 0 0 0 1.5px var(--danger);
+}
+.checkError {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding-left: 24px;
+  color: var(--danger);
+  font: var(--type-meta);
+}
+.docLink {
+  color: var(--accent);
+  font-weight: var(--w-medium);
+  border-radius: var(--r-xs);
+}
+.docLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The three published texts as quiet rows. */
+.docs {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-radius: var(--r-lg);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  overflow: hidden;
+}
+.docs li + li {
+  box-shadow: inset 0 1px 0 var(--border-subtle);
+}
+.docRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: 40px;
+  padding: 0 var(--s-3);
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+}
+.docRow:hover {
+  background: var(--state-hover);
+  text-decoration: none;
+}
+.docRow:focus-visible {
+  outline-offset: -2px;
+}
+.docRowHint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  font-weight: var(--w-regular);
+}
+.quiet {
+  margin-top: var(--s-4);
+}
+
+/* ── Restricted account ── */
+.wideCard {
+  max-width: 480px;
+}
+.facts {
+  display: grid;
+  gap: var(--s-2);
+  margin: var(--s-5) 0 0;
+}
+.fact {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: var(--s-3);
+  font: var(--type-ui);
+}
+.fact dt {
+  color: var(--text-tertiary);
+}
+.fact dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: var(--w-medium);
+}
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  margin-top: var(--s-5);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font: var(--type-ui);
+}
+.note svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--text-tertiary);
+}
+.noteOk {
+  background: var(--success-tint);
+  color: var(--text-primary);
+}
+.noteOk svg {
+  color: var(--success);
+}
+.appeal {
+  display: grid;
+  gap: var(--s-3);
+}
+.wideCard .appeal {
+  margin-top: var(--s-5);
+  padding-top: var(--s-5);
+  box-shadow: inset 0 1px 0 var(--border-subtle);
+}
+.appealHead {
+  display: grid;
+  gap: var(--s-1);
+}
+.appealTitle {
+  color: var(--text-primary);
+  font: var(--type-ui-lg);
+  font-weight: var(--w-semibold);
+}
+.appealBody {
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+  text-wrap: pretty;
+}
+.appealActions,
+.flowActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+}
+
+/* ── Report dialog ── */
+.reportForm {
+  display: grid;
+  gap: var(--s-4);
+}
+.question {
+  margin-bottom: var(--s-2);
+  padding: 0;
+  color: var(--text-primary);
+  font: var(--type-ui-lg);
+  font-weight: var(--w-semibold);
+}
+.reasonGroup {
+  display: grid;
+  gap: 2px;
+}
+.reasonGroup + .reasonGroup {
+  margin-top: var(--s-2);
+}
+.groupLabel {
+  padding: var(--s-1) var(--s-2);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.more {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: var(--s-1);
+  height: 28px;
+  margin-top: var(--s-1);
+  padding: 0 var(--s-2);
+  border-radius: var(--r-sm);
+  color: var(--text-secondary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+}
+.more:hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+.subject {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  margin: 0;
+  padding: var(--s-3);
+  border-radius: var(--r-lg);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.subjectText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.subjectName {
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-semibold);
+}
+.subjectMeta {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.quote {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font: var(--type-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.chosen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: 32px;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--state-selected);
+  font: var(--type-ui);
+}
+.chosenLabel {
+  color: var(--text-primary);
+  font-weight: var(--w-medium);
+}
+.callout {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-lg);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  color: var(--text-secondary);
+  font: var(--type-ui);
+  text-wrap: pretty;
+}
+.callout > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.callout div {
+  display: grid;
+  gap: var(--s-1_5);
+}
+.calloutUrgent {
+  background: var(--warning-tint);
+  box-shadow: none;
+}
+.calloutUrgent > svg {
+  color: var(--warning);
+}
+.calloutTitle {
+  color: var(--text-primary);
+  font-weight: var(--w-semibold);
+}
+.anon {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.done {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-2);
+}
+.doneIcon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: var(--s-1);
+  border-radius: var(--r-full);
+  background: var(--success-tint);
+  color: var(--success);
+}
+.doneTitle {
+  color: var(--text-primary);
+  font: var(--type-title-sm);
+}
+.doneBody {
+  color: var(--text-secondary);
+  font: var(--type-ui);
+  text-wrap: pretty;
+}
+.blockOffer {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-2);
+  width: 100%;
+  margin-top: var(--s-2);
+  padding-top: var(--s-3);
+  box-shadow: inset 0 1px 0 var(--border-subtle);
+  color: var(--text-secondary);
+  font: var(--type-ui);
+}
+.done .flowActions {
+  justify-self: stretch;
+  margin-top: var(--s-2);
+}
+
+/* ── Configurações › Privacidade ── */
+.iconLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.iconLabel svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.iconQuiet svg {
+  color: var(--text-tertiary);
+}
+/* Hint lined up under the label text, past the 14 px icon + gap. */
+.indented {
+  padding-left: 22px;
+}
+.spaceTile {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border-radius: 10px;
+  color: var(--text-primary);
+  font: var(--type-meta);
+  font-weight: var(--w-semibold);
+}
+.spaceTile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: 24px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+  white-space: nowrap;
+}
+.chipOk svg {
+  color: var(--success);
+}
+.teenBuy {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  max-width: 420px;
+  padding: var(--s-3);
+  border-radius: var(--r-lg);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  text-align: left;
+}
+.teenBuy > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.teenBuyTitle {
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-semibold);
+}
+.teenBuyBody {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-wrap: pretty;
+}
+.deleteForm {
+  display: grid;
+  gap: var(--s-4);
+}
+.block {
+  display: grid;
+  gap: var(--s-1_5);
+}
+.spaces {
+  display: grid;
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-secondary);
+  font: var(--type-ui);
+}
+.spaceName {
+  color: var(--text-primary);
+  font-weight: var(--w-medium);
+}
+.facts2 {
+  display: grid;
+  gap: var(--s-1);
+  margin: 0;
+  padding: var(--s-3) var(--s-3) var(--s-3) var(--s-6);
+  list-style: disc;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-wrap: pretty;
+}
+.facts2 li::marker {
+  color: var(--text-disabled);
+}

@@ -7,6 +7,7 @@ import { Button, Icon, Modal, SegmentedControl, Spinner, toast } from '@/ui'
 import { needsVerification, openVerifyEmail, toastError } from '../auth/VerifyEmail'
 import { Group, Row } from '../settings/Frame'
 import { openSettings } from '../settings/store'
+import { TeenPurchaseNotice, useIsTeen } from '../trust/Privacy'
 import { historyOf, money } from './look'
 import { cancelRenewal, loadBilling, reopenCheckout, startCheckout, stopWaiting, useBilling } from './store'
 import { t } from './strings'
@@ -82,6 +83,7 @@ function PlanPage({ catalog, me }: { catalog: BillingCatalog; me: BillingMe }) {
   useEffect(() => () => void (useBilling.getState().arrived?.startsWith('plan:') && useBilling.setState({ arrived: null })), [])
   const planArrived = !!arrived?.startsWith('plan:')
   const planWaiting = waiting?.product.kind === 'plan' ? waiting : null
+  const teen = useIsTeen()
 
   return (
     <>
@@ -117,7 +119,7 @@ function PlanPage({ catalog, me }: { catalog: BillingCatalog; me: BillingMe }) {
       </Group>
 
       <Compare catalog={catalog} current={me.plan} />
-      {!plus && !planWaiting && plans.length > 0 && <Subscribe plans={plans} enabled={!!catalog.provider} sandbox={!!catalog.provider?.sandbox} />}
+      {!plus && !planWaiting && plans.length > 0 && (teen ? <Group><TeenPurchaseNotice /></Group> : <Subscribe plans={plans} enabled={!!catalog.provider} sandbox={!!catalog.provider?.sandbox} />)}
       <History catalog={catalog} me={me} />
     </>
   )

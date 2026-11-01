@@ -7,6 +7,7 @@ import { useData } from '@/store/data'
 import { Button, Icon } from '@/ui'
 import { needsVerification, openVerifyEmail } from '../auth/VerifyEmail'
 import { openSettings } from '../settings/store'
+import { TeenPurchaseNotice, useIsTeen } from '../trust/Privacy'
 import { CosmeticThumb, ProfileCard, type ProfileUser } from './Cosmetics'
 import { COSMETICS, isCosmeticId, itemState, lookFrom, money, type ItemState, type Slot } from './look'
 import { BillingGate, ProviderNotice, useBillingReady, Waiting } from './Plan'
@@ -91,6 +92,8 @@ function Tile({ product, user, state, selected, onSelect }: { product: Product; 
 function Detail({ product, state, arrived, enabled }: { product: Product; state: ItemState; arrived: boolean; enabled: boolean }) {
   const waiting = useBilling((x) => x.waiting)
   const declined = useBilling((x) => x.declined === product.id)
+  // 16–17: the explanation takes the button's place (no generic error from the server's refusal).
+  const teen = useIsTeen()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<{ text: string; gated: boolean } | null>(null)
   useEffect(() => setError(null), [product.id])
@@ -121,6 +124,8 @@ function Detail({ product, state, arrived, enabled }: { product: Product; state:
           </span>
         ) : waiting?.product.id === product.id ? (
           <Waiting />
+        ) : state === 'buy' && teen ? (
+          <TeenPurchaseNotice />
         ) : state === 'buy' ? (
           <>
             {error?.gated ? (

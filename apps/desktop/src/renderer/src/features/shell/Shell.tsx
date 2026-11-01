@@ -17,6 +17,8 @@ import { SpaceModals } from '../spaces/SpaceModals'
 import { SpaceSettingsOverlay } from '../spaceSettings/SpaceSettings'
 import { VerifyEmailDialog } from '../auth/VerifyEmail'
 import { QuickSwitcher } from '../switcher/QuickSwitcher'
+import { useDeletionCanceledNotice } from '../trust/Gate'
+import { ReportHost } from '../trust/Report'
 import { CallStage } from '../voice/CallStage'
 import { IncomingCall } from '../voice/IncomingCall'
 import { ScreenPicker } from '../voice/ScreenPicker'
@@ -34,6 +36,7 @@ export function Shell() {
   useEffect(() => startNotifications(), [])
   useEffect(() => startBilling(), [])
   useInviteLink()
+  useDeletionCanceledNotice()
   const view = useUi((st) => st.view)
   const order = useData((st) => st.spaceOrder)
 
@@ -67,6 +70,7 @@ export function Shell() {
       <SettingsOverlay />
       <SpaceSettingsOverlay />
       <VerifyEmailDialog />
+      <ReportHost />
     </motion.div>
   )
 }

@@ -1,5 +1,5 @@
-import { MIN_PASSWORD_LENGTH } from '@alga/shared'
-import { AlertCircle, CheckCircle2 } from 'lucide-react'
+import { MIN_AGE, MIN_PASSWORD_LENGTH, ageOn } from '@alga/shared'
+import { AlertCircle, CheckCircle2, Info } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { ApiRequestError } from '@/lib/api'
@@ -11,12 +11,16 @@ import { Button, Icon, TextField } from '@/ui'
 import { EASE_OUT_QUART } from '@/ui/motion'
 import { useDeepLink } from '../app/deepLinks'
 import { LogoMark } from '../app/Logo'
+import { parseBirth } from '../trust/birthDate'
+import { BirthField, birthError } from '../trust/Gate'
+import { AcceptTerms, loadLegal, useLegal } from '../trust/legal'
+import { longDate, t as tt } from '../trust/strings'
 import { StrengthMeter, strengthHint } from './PasswordStrength'
 import { t } from './strings'
 import s from './auth.module.css'
 
 type Mode = 'login' | 'register' | 'forgot' | 'reset'
-type Errors = Partial<Record<'login' | 'password' | 'email' | 'username' | 'displayName' | 'token', string>>
+type Errors = Partial<Record<'login' | 'password' | 'email' | 'username' | 'displayName' | 'token' | 'birthDate' | 'termsVersion', string>>
 
 const USERNAME = /^[a-z0-9_.]{2,32}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -104,7 +108,18 @@ function FormNote({ text }: { text: string }) {
   )
 }
 
+function FormInfo({ text }: { text: string }) {
+  return (
+    <div className={s.info} role="status">
+      <Icon icon={Info} size={14} />
+      <span>{text}</span>
+    </div>
+  )
+}
+
 function LoginForm({ resetDone, invite, onSwitch, onForgot }: { resetDone: boolean; invite: boolean; onSwitch: () => void; onForgot: () => void }) {
+  // Why we are here, once: the gateway closed with 4010, or the account was just scheduled for deletion.
+  const notice = useSession((x) => x.notice)
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<Errors>({})
@@ -131,6 +146,7 @@ function LoginForm({ resetDone, invite, onSwitch, onForgot }: { resetDone: boole
       <form className={s.form} onSubmit={onSubmit} noValidate>
         {resetDone && <FormNote text={t.login.resetDone} />}
         {invite && !resetDone && <FormNote text={t.login.invite} />}
+        {notice && <FormInfo text={notice.kind === 'restricted' ? tt.notice.restricted : tt.notice.deletion(longDate(notice.purgeAfter))} />}
         <TextField
           label={t.login.login}
           name="login"
@@ -175,20 +191,38 @@ function LoginForm({ resetDone, invite, onSwitch, onForgot }: { resetDone: boole
   )
 }
 
+const EMPTY = { email: '', displayName: '', username: '', password: '', birth: '' }
+
 function RegisterForm({ invite, onSwitch }: { invite: boolean; onSwitch: () => void }) {
-  const [v, setV] = useState({ email: '', displayName: '', username: '', password: '' })
+  const [v, setV] = useState(EMPTY)
+  const [accepted, setAccepted] = useState(false)
+  const [tooYoung, setTooYoung] = useState(false)
   const [errors, setErrors] = useState<Errors>({})
+  const { info } = useLegal()
   const { busy, error, submit } = useSubmit(
-    () =>
-      useSession.getState().register({
+    async () => {
+      const legal = info ?? (await loadLegal())
+      if (!legal) throw new ApiRequestError(0, 'network', tt.legal.loadError)
+      const birth = parseBirth(v.birth)
+      await useSession.getState().register({
         email: v.email.trim(),
         username: v.username.trim().toLowerCase(),
         displayName: v.displayName.trim() || undefined,
         password: v.password,
-      }),
-    setErrors,
+        birthDate: 'iso' in birth ? birth.iso : undefined,
+        termsVersion: legal.termsVersion,
+      })
+    },
+    (f) => {
+      // A newer version of the Termos went out meanwhile: fetch it and ask for the tick again.
+      if (f.termsVersion) {
+        setAccepted(false)
+        void loadLegal()
+      }
+      setErrors(f)
+    },
   )
-  const field = (k: keyof typeof v) => ({
+  const field = (k: Exclude<keyof typeof v, 'birth'>) => ({
     name: k,
     value: v[k],
     error: errors[k],
@@ -207,10 +241,21 @@ function RegisterForm({ invite, onSwitch }: { invite: boolean; onSwitch: () => v
     if (!v.username.trim()) next.username = t.errors.required
     else if (!USERNAME.test(v.username.trim().toLowerCase())) next.username = t.errors.username
     if (v.password.length < MIN_PASSWORD_LENGTH) next.password = t.errors.passwordShort
+    const birth = parseBirth(v.birth)
+    if ('error' in birth) next.birthDate = birthError(birth) ?? undefined
+    if (!accepted) next.termsVersion = tt.legal.acceptRequired
     setErrors(next)
-    if (Object.keys(next).length === 0) void submit()
+    if (Object.keys(next).length) return
+    // Under the minimum age nothing is sent: a child's birth date never leaves the machine.
+    if ('iso' in birth && ageOn(birth.iso) < MIN_AGE) {
+      setV(EMPTY)
+      setTooYoung(true)
+      return
+    }
+    void submit()
   }
 
+  if (tooYoung) return <TooYoung onBack={onSwitch} />
   return (
     <>
       <h1 className={s.title}>{t.register.title}</h1>
@@ -232,8 +277,25 @@ function RegisterForm({ invite, onSwitch }: { invite: boolean; onSwitch: () => v
             setErrors((x) => ({ ...x, username: undefined }))
           }}
         />
+        <BirthField
+          value={v.birth}
+          error={errors.birthDate}
+          onChange={(birth) => {
+            setV((x) => ({ ...x, birth }))
+            setErrors((x) => ({ ...x, birthDate: undefined }))
+          }}
+          hint={(words) => (words ? `${words} · ${tt.signup.birthHint}` : tt.signup.birthHint)}
+        />
         <TextField label={t.register.password} type="password" autoComplete="new-password" hint={v.password ? strengthHint(v.password, personal) : t.register.passwordHint} {...field('password')} />
         <StrengthMeter password={v.password} personal={personal} />
+        <AcceptTerms
+          checked={accepted}
+          error={errors.termsVersion}
+          onChange={(c) => {
+            setAccepted(c)
+            setErrors((x) => ({ ...x, termsVersion: undefined }))
+          }}
+        />
         <FormAlert text={error} />
         <Button type="submit" variant="primary" size="lg" full loading={busy} className={s.submit}>
           {t.register.submit}
@@ -245,6 +307,20 @@ function RegisterForm({ invite, onSwitch }: { invite: boolean; onSwitch: () => v
           {t.register.switchAction}
         </button>
       </p>
+    </>
+  )
+}
+
+/** Under 16: a calm, final answer for this attempt. No retry button, no hint about which date would pass. */
+function TooYoung({ onBack }: { onBack: () => void }) {
+  return (
+    <>
+      <h1 className={s.title}>{tt.signup.tooYoungTitle}</h1>
+      <p className={s.body}>{tt.signup.tooYoungBody}</p>
+      <p className={`${s.body} ${s.bodyQuiet}`}>{tt.signup.tooYoungNothingSaved}</p>
+      <Button variant="secondary" size="lg" full className={s.submit} onClick={onBack}>
+        {tt.signup.tooYoungBack}
+      </Button>
     </>
   )
 }

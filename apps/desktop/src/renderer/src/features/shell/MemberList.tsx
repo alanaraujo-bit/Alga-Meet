@@ -1,12 +1,14 @@
-import { Crown } from 'lucide-react'
+import { Crown, Flag } from 'lucide-react'
 import type { Member, PresenceStatus } from '@alga/shared'
 import { useMemo, useState } from 'react'
 import { useData } from '@/store/data'
 import { presenceOf, roleColor } from '@/store/selectors'
 import { useSession } from '@/store/session'
-import { Fronds, Icon, Popover, ScrollArea, Tooltip } from '@/ui'
+import { Button, contextMenuHandler, Fronds, Icon, Popover, ScrollArea, Tooltip } from '@/ui'
 import { DecoratedAvatar, Nameplate, ProfileCard } from '../billing/Cosmetics'
 import { useLook } from '../billing/store'
+import { openReport, userReportEntries } from '../trust/Report'
+import { t as tr } from '../trust/strings'
 import { t } from './strings'
 import s from './shell.module.css'
 
@@ -51,6 +53,7 @@ export function MemberList({ spaceId }: { spaceId: string }) {
 
 function MemberRow({ m, name, presence, color, inVoice, owner }: { m: Member; name: string; presence: PresenceStatus; color: string | null | undefined; inVoice: boolean; owner: boolean }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
+  const self = useData((st) => st.me?.id === m.user.id)
   // Cosmetics: subtle in a list (no motion unless hovered), the full card in the popover.
   const look = useLook(m.user.id)
   return (
@@ -62,6 +65,7 @@ function MemberRow({ m, name, presence, color, inVoice, owner }: { m: Member; na
         aria-expanded={!!anchor}
         data-cosmetic-hover
         onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}
+        onContextMenu={contextMenuHandler(() => userReportEntries(m.user), name)}
       >
         <DecoratedAvatar user={m.user} size={32} presence={presence === 'offline' ? undefined : presence} decoration={look.decoration} />
         <span className={s.memberName} style={color ? { color } : undefined}>
@@ -85,7 +89,23 @@ function MemberRow({ m, name, presence, color, inVoice, owner }: { m: Member; na
         )}
       </button>
       <Popover anchor={anchor} onClose={() => setAnchor(null)} side="left" align="start" gap={12} label={name} width={280}>
-        <ProfileCard user={m.user} look={look} name={name} presence={presence} />
+        <ProfileCard user={m.user} look={look} name={name} presence={presence}>
+          {!self && (
+            <div className={s.profileActions}>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={Flag}
+                onClick={() => {
+                  setAnchor(null)
+                  openReport({ kind: 'user', user: m.user })
+                }}
+              >
+                {tr.report.action}
+              </Button>
+            </div>
+          )}
+        </ProfileCard>
       </Popover>
     </>
   )

@@ -1,5 +1,5 @@
 // Visual validation loop: build → seed real data through the REST API → drive the REAL Electron app → PNGs.
-//   node scripts/screenshot.mjs [--skip-build] [--only=auth,home,chat,spaces,attachments,uploads,spacesettings,connection,sizes,settings,voice,billing,invites]
+//   node scripts/screenshot.mjs [--skip-build] [--only=auth,home,chat,spaces,attachments,uploads,spacesettings,connection,sizes,settings,voice,billing,invites,trust]
 // Another API (ALGA_API_URL=http://127.0.0.1:4100) gets its own users file, so runs never mix accounts.
 // Voice runs two real app instances (profiles shots + shots-b) through the local LiveKit with Chromium fake
 // devices: a generated speech WAV is B's microphone (so the speaking glow moves for real) and A's screen share
@@ -148,6 +148,16 @@ async function verifyEmail(u) {
   throw new Error(`no verification e-mail for ${u.username} in ${OUTBOX}`)
 }
 
+// Accounts declare a birth date and accept the current Termos (GET /legal), like the signup screen does.
+const ADULT_BIRTH = '1994-05-12'
+let legalVersion
+const termsVersion = async () => (legalVersion ??= (await api(null, 'GET', '/legal')).termsVersion)
+/** Accounts from before the age gate / an older Termos: declare and accept once, so the one-time prompts stay out of the way. */
+async function settleLegal(u) {
+  if (u.me.ageBracket === 'unknown') u.me = await api(u.token, 'PATCH', '/users/@me/birth-date', { birthDate: ADULT_BIRTH })
+  if (u.me.needsTermsAcceptance) u.me = await api(u.token, 'POST', '/users/@me/accept-terms', { termsVersion: await termsVersion() })
+}
+
 async function ensureUsers() {
   const saved = existsSync(usersFile) ? JSON.parse(readFileSync(usersFile, 'utf8')) : { users: {} }
   for (const [key, displayName] of PEOPLE) {
@@ -155,6 +165,7 @@ async function ensureUsers() {
     if (u?.token) {
       try {
         u.me = await api(u.token, 'GET', '/users/@me')
+        await settleLegal(u)
         continue
       } catch {
         /* token expired: log in again */
@@ -163,12 +174,13 @@ async function ensureUsers() {
     if (u) {
       const r = await api(null, 'POST', '/auth/login', { login: u.username, password: u.password })
       Object.assign(u, { token: r.token, me: r.user })
+      await settleLegal(u)
       continue
     }
     const suffix = randomBytes(2).toString('hex')
     const username = `${key}.${suffix}`
     const password = randomBytes(12).toString('base64url')
-    const r = await api(null, 'POST', '/auth/register', { email: `${username}@shots.alga.test`, username, displayName, password })
+    const r = await api(null, 'POST', '/auth/register', { email: `${username}@shots.alga.test`, username, displayName, password, birthDate: ADULT_BIRTH, termsVersion: await termsVersion() })
     saved.users[key] = { username, password, token: r.token, me: r.user }
     writeFileSync(usersFile, JSON.stringify(saved, null, 2))
   }
@@ -380,7 +392,9 @@ async function authShots(serverUp) {
   await page.getByLabel('E-mail', { exact: true }).fill(`${username}@shots.alga.test`)
   await page.getByLabel('Nome de exibição').fill('Marina Souza')
   await page.getByLabel('Nome de usuário').fill(username)
+  await page.getByLabel('Data de nascimento').fill('12051994')
   await page.getByLabel('Senha', { exact: true }).fill(randomBytes(12).toString('base64url'))
+  await page.getByRole('checkbox').check()
   await page.getByRole('button', { name: 'Criar conta' }).click()
   await page.getByText('Boas-vindas, Marina').waitFor({ timeout: 20_000 })
   await shot(page, 'onboarding')
@@ -1285,10 +1299,14 @@ function secondInstance(profile, link) {
   if (r.status !== 0) console.warn('  second instance exited with', r.status)
 }
 
-async function freshUser(key, displayName) {
+/** `birthDate: null` / `terms: false` = an account from before the age gate / the current Termos (dev servers allow it). */
+async function freshUser(key, displayName, { birthDate = ADULT_BIRTH, terms = true } = {}) {
   const username = `${key}.${randomBytes(2).toString('hex')}`
   const password = randomBytes(12).toString('base64url')
-  const r = await api(null, 'POST', '/auth/register', { email: `${username}@shots.alga.test`, username, displayName, password })
+  const r = await api(null, 'POST', '/auth/register', {
+    email: `${username}@shots.alga.test`, username, displayName, password,
+    ...(birthDate && { birthDate }), ...(terms && { termsVersion: await termsVersion() }),
+  })
   return { username, password, token: r.token, me: r.user }
 }
 
@@ -1500,6 +1518,323 @@ async function inviteShots(saved, ids) {
   await close(c.app)
 }
 
+// ── Trust & Safety (--only=trust): age gate, one-time prompts, reports, restricted account, privacy ──
+// Everything runs against the real API: staff actions go through /admin with a moderator that only
+// apps/server/scripts/grant-staff.ts can create. It is created once (saved in the users file); grant it with the
+// API stopped (PGlite allows one process), start the API again and re-run. Without the grant those shots are skipped.
+// Profile shots-t, so a parallel run on shots/shots-b is never disturbed.
+const TRUST_PROFILE = 'shots-t'
+const yearsAgo = (n) => {
+  const d = new Date()
+  d.setUTCFullYear(d.getUTCFullYear() - n)
+  d.setUTCDate(d.getUTCDate() - 3)
+  return d.toISOString().slice(0, 10)
+}
+const typedDate = (iso) => iso.split('-').reverse().join('')
+const inDays = (n) => new Date(Date.now() + n * 86_400_000).toISOString()
+
+/** Login form only: the screen after it (gate, restricted screen, shell) is the caller's to wait for. */
+async function signIn(page, u) {
+  await page.getByLabel('E-mail ou nome de usuário').fill(u.username)
+  await page.getByLabel('Senha', { exact: true }).fill(u.password)
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+}
+/** signIn until `target` shows, waiting out the auth rate limit (10/min) like login() does. */
+async function signInTo(page, u, target) {
+  for (let i = 0; i < 8; i++) {
+    await signIn(page, u)
+    const limited = page.getByText('Muitas tentativas')
+    await target.or(limited).first().waitFor({ timeout: 20_000 })
+    if (await target.isVisible()) return
+    await sleep(10_000)
+  }
+  await target.waitFor({ timeout: 20_000 })
+}
+/** POST /auth/login without throwing on 403 (a restricted account answers with the restriction). */
+async function rawLogin(u) {
+  const res = await fetch(`${API}/api/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ login: u.username, password: u.password }) })
+  return res.json()
+}
+
+async function trustShots() {
+  console.log('trust & safety…')
+  const saved = existsSync(usersFile) ? JSON.parse(readFileSync(usersFile, 'utf8')) : { users: {} }
+  if (!saved.trustStaff) {
+    saved.trustStaff = await freshUser('moderacao', 'Equipe Alga')
+    writeFileSync(usersFile, JSON.stringify(saved, null, 2))
+  }
+  const staff = saved.trustStaff
+  staff.token = (await api(null, 'POST', '/auth/login', { login: staff.username, password: staff.password })).token
+  writeFileSync(usersFile, JSON.stringify(saved, null, 2))
+  const isStaff = await api(staff.token, 'GET', '/admin/reports?limit=1').then(() => true, () => false)
+  if (!isStaff) console.warn(`  staff shots skipped: stop the API, run \`npx tsx scripts/grant-staff.ts ${staff.username} moderator\` against its PGLITE_DIR, start it and re-run`)
+  const act = (u, body) => api(staff.token, 'POST', `/admin/users/${u.me.id}/actions`, body)
+
+  // 1. Signup: birth date (typed, read back in words), the unticked terms box, the kind under-16 answer.
+  {
+    const { app, page } = await launch({ profile: TRUST_PROFILE })
+    await page.getByRole('button', { name: 'Criar conta' }).click()
+    await page.getByLabel('E-mail', { exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Criar conta' }).click()
+    await sleep(200)
+    await shot(page, 'auth-register-required')
+    await page.getByLabel('E-mail', { exact: true }).fill('lia.prado@shots.alga.test')
+    await page.getByLabel('Nome de exibição').fill('Lia Prado')
+    await page.getByLabel('Nome de usuário').fill(`lia.${randomBytes(2).toString('hex')}`)
+    await page.getByLabel('Data de nascimento').fill('23042005')
+    await page.getByLabel('Senha', { exact: true }).fill('Mar-Calmo-Ao-Fim-Da-Tarde')
+    await page.getByRole('checkbox').check()
+    await sleep(200)
+    await shot(page, 'auth-register-birth-terms')
+    await page.getByLabel('Data de nascimento').fill(typedDate(yearsAgo(14)))
+    await page.getByRole('button', { name: 'Criar conta' }).click()
+    await page.getByText('Ainda não dá para criar sua conta').waitFor()
+    await sleep(200)
+    await shot(page, 'auth-register-too-young')
+    await close(app)
+  }
+
+  // 2. One-time prompts for an account from before the gate: new Termos first, then the birth date. Declaring under
+  // 16 suspends the account at once (server) and the appeal opens right there.
+  {
+    const old = await freshUser('rafa', 'Rafael Antunes', { birthDate: null, terms: false })
+    const { app, page } = await launch({ profile: TRUST_PROFILE })
+    await signInTo(page, old, page.getByRole('heading', { name: 'Os Termos mudaram' }))
+    await sleep(300)
+    await shot(page, 'gate-terms')
+    await page.getByRole('button', { name: 'Aceitar e continuar' }).click()
+    await page.getByText('Marque a caixa para continuar.').waitFor()
+    await shot(page, 'gate-terms-unchecked')
+    await page.getByRole('button', { name: 'excluir sua conta' }).click()
+    await page.getByRole('dialog', { name: 'Excluir sua conta' }).waitFor()
+    await sleep(300)
+    await shot(page, 'gate-terms-delete')
+    await page.keyboard.press('Escape')
+    await page.getByRole('checkbox').check()
+    await page.getByRole('button', { name: 'Aceitar e continuar' }).click()
+    await page.getByRole('heading', { name: 'Qual é a sua data de nascimento?' }).waitFor()
+    await sleep(300)
+    await shot(page, 'gate-birth-date')
+    await page.getByLabel('Data de nascimento').fill(typedDate(yearsAgo(15)))
+    await sleep(150)
+    await shot(page, 'gate-birth-date-filled')
+    await page.getByRole('button', { name: 'Continuar' }).click()
+    await page.getByRole('heading', { name: 'Sua conta está suspensa' }).waitFor({ timeout: 20_000 })
+    await sleep(300)
+    await shot(page, 'restricted-underage')
+    await close(app)
+  }
+
+  // 3. 16–17: protections said in Privacidade, no checkout (the explanation takes the button's place).
+  {
+    const teen = await freshUser('bia', 'Bia Torres', { birthDate: yearsAgo(17) })
+    await verifyEmail(teen)
+    const { app, page } = await launch({ profile: TRUST_PROFILE })
+    await login(page, teen)
+    await userSection(page, 'Privacidade')
+    await page.getByText('Proteções da sua conta').waitFor()
+    await shot(page, 'settings-privacy-teen')
+    let dlg = await userSection(page, 'Assinatura')
+    await dlg.getByText('Compras pedem 18 anos').waitFor()
+    await dlg.getByText('Compras pedem 18 anos').evaluate((el) => el.scrollIntoView({ block: 'center' }))
+    await sleep(200)
+    await shot(page, 'billing-plan-teen')
+    dlg = await userSection(page, 'Personalização')
+    await dlg.getByText('Compras pedem 18 anos').waitFor()
+    await sleep(300)
+    await shot(page, 'shop-teen')
+    await close(app)
+  }
+
+  // 4. Reports: a profile from the member list, the space from its menu, the high-priority reason, the safety line,
+  // the receipt with "Bloquear", and the hourly limit.
+  {
+    const owner = await freshUser('caio', 'Caio Freitas')
+    const reporter = await freshUser('duda', 'Duda Siqueira')
+    await verifyEmail(owner)
+    await verifyEmail(reporter)
+    const sp = await api(owner.token, 'POST', '/spaces', { name: 'Clube do Livro' })
+    const inv = await api(owner.token, 'POST', `/spaces/${sp.id}/invites`, { maxAgeSeconds: 0, maxUses: 0 })
+    await api(reporter.token, 'POST', `/invites/${inv.code}`)
+    const geral = sp.channels.find((c) => c.type === 'text')
+    await api(owner.token, 'POST', `/channels/${geral.id}/messages`, { content: 'Bem-vindos ao clube! Este mês: "Torto Arado".' })
+    await api(reporter.token, 'POST', `/channels/${geral.id}/messages`, { content: 'Oi! Acabei de entrar. Já comecei o livro.' })
+
+    const { app, page } = await launch({ profile: TRUST_PROFILE })
+    await login(page, reporter)
+    await rail(page, /^Clube do Livro/).click()
+    const member = page.locator('button[aria-haspopup="dialog"]').filter({ hasText: 'Caio Freitas' }).last()
+    await member.waitFor({ timeout: 15_000 })
+    await member.click()
+    await page.getByRole('dialog', { name: 'Caio Freitas' }).getByRole('button', { name: 'Denunciar' }).waitFor()
+    await sleep(400)
+    await shot(page, 'profile-popover-report')
+    await page.getByRole('dialog', { name: 'Caio Freitas' }).getByRole('button', { name: 'Denunciar' }).click()
+    const report = page.getByRole('dialog', { name: 'Denunciar perfil' })
+    await report.waitFor()
+    await sleep(300)
+    await shot(page, 'report-reason')
+    await report.getByText('Assédio ou intimidação').click()
+    await sleep(150)
+    await shot(page, 'report-reason-picked')
+    await report.getByRole('button', { name: 'Continuar' }).click()
+    await report.getByLabel('Quer contar mais?').fill('Desde ontem ele manda mensagens me xingando depois que eu disse que não queria conversar.')
+    await sleep(150)
+    await shot(page, 'report-details')
+    await report.getByRole('button', { name: 'Enviar denúncia' }).click()
+    await report.getByText('Denúncia recebida').waitFor()
+    await sleep(300)
+    await shot(page, 'report-done')
+    await report.locator('footer').getByRole('button', { name: 'Fechar' }).click()
+
+    // Right click on the member: the same flow; "Autolesão" shows where to get help now.
+    await member.click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Denunciar perfil' }).waitFor()
+    await sleep(200)
+    await shot(page, 'member-menu-report')
+    await page.getByRole('menuitem', { name: 'Denunciar perfil' }).click()
+    await report.getByText('Autolesão ou suicídio').click()
+    await report.getByRole('button', { name: 'Continuar' }).click()
+    await report.getByText('Se alguém corre risco agora').waitFor()
+    await sleep(200)
+    await shot(page, 'report-details-life')
+    await page.keyboard.press('Escape')
+
+    // The space menu: report the space; the child-safety reason explains what happens before sending.
+    await page.getByRole('complementary', { name: 'Canais' }).getByRole('button', { name: 'Clube do Livro' }).click()
+    await page.getByRole('menuitem', { name: 'Denunciar espaço' }).waitFor()
+    await sleep(200)
+    await shot(page, 'space-menu-report')
+    await page.getByRole('menuitem', { name: 'Denunciar espaço' }).click()
+    const spaceReport = page.getByRole('dialog', { name: 'Denunciar espaço' })
+    await spaceReport.getByText('Sexualização de menores').click()
+    await sleep(150)
+    await shot(page, 'report-reason-csam')
+    await spaceReport.getByRole('button', { name: 'Continuar' }).click()
+    await spaceReport.getByText('Prioridade máxima').waitFor()
+    await sleep(200)
+    await shot(page, 'report-details-csam')
+    await page.keyboard.press('Escape')
+
+    // 10 per hour: fill the hour through the API, then the app says it plainly.
+    for (let i = 0; i < 12; i++) {
+      const r = await fetch(`${API}/api/v1/reports`, { method: 'POST', headers: { authorization: `Bearer ${reporter.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ targetType: 'space', targetId: sp.id, reason: 'spam' }) })
+      if (r.status === 429) break
+    }
+    await page.getByRole('complementary', { name: 'Canais' }).getByRole('button', { name: 'Clube do Livro' }).click()
+    await page.getByRole('menuitem', { name: 'Denunciar espaço' }).click()
+    await spaceReport.getByText('Spam', { exact: true }).click()
+    await spaceReport.getByRole('button', { name: 'Continuar' }).click()
+    await spaceReport.getByRole('button', { name: 'Enviar denúncia' }).click()
+    await spaceReport.getByRole('alert').waitFor()
+    await sleep(200)
+    await shot(page, 'report-rate-limited')
+    await page.keyboard.press('Escape')
+    await close(app)
+  }
+
+  // 5. Privacidade: actions on the account (warn, a suspension already lifted), appeal from the session, a copy of
+  // the data, deleting the account (7 days, messages choice, owned spaces), then logging in again cancels it.
+  {
+    const eva = await freshUser('eva', 'Eva Martins')
+    const friend = await freshUser('flor', 'Flor Batista')
+    await verifyEmail(eva)
+    await verifyEmail(friend)
+    const atelier = await api(eva.token, 'POST', '/spaces', { name: 'Ateliê da Eva' })
+    const inv = await api(eva.token, 'POST', `/spaces/${atelier.id}/invites`, { maxAgeSeconds: 0, maxUses: 0 })
+    await api(friend.token, 'POST', `/invites/${inv.code}`)
+    await api(eva.token, 'POST', '/spaces', { name: 'Rascunhos' })
+    if (isStaff) {
+      await act(eva, { type: 'warn', reason: 'spam', note: 'convites repetidos' })
+      await act(eva, { type: 'suspend', reason: 'harassment', until: inDays(3) })
+      await act(eva, { type: 'lift', reason: 'harassment', note: 'engano' })
+    }
+    const { app, page } = await launch({ profile: TRUST_PROFILE })
+    await login(page, eva)
+    let dlg = await userSection(page, 'Privacidade')
+    await dlg.getByText('Ações na minha conta').waitFor()
+    await sleep(400)
+    await shot(page, 'settings-privacy')
+    if (isStaff) {
+      await dlg.getByRole('button', { name: 'Contestar' }).last().click()
+      const appeal = page.getByRole('dialog', { name: 'Contestar a decisão' })
+      await appeal.getByLabel('O que aconteceu, do seu ponto de vista').fill('Eu mandei o mesmo convite para três amigos porque o primeiro link tinha expirado. Não era propaganda.')
+      await sleep(200)
+      await shot(page, 'settings-privacy-appeal')
+      await appeal.getByRole('button', { name: 'Enviar recurso' }).click()
+      await appeal.waitFor({ state: 'detached' })
+      await dlg.getByText('Recurso em análise').waitFor()
+      await sleep(300)
+      await shot(page, 'settings-privacy-appealed')
+    }
+    await dlg.getByRole('button', { name: 'Pedir cópia' }).click()
+    await dlg.getByText(/Pedido em/).waitFor()
+    await dlg.getByText(/Pedido em/).scrollIntoViewIfNeeded()
+    await sleep(200)
+    await shot(page, 'settings-privacy-export')
+    await dlg.getByRole('button', { name: 'Excluir conta…' }).click()
+    const del = page.getByRole('dialog', { name: 'Excluir sua conta' })
+    await del.waitFor()
+    await sleep(400)
+    await shot(page, 'settings-delete-account')
+    await del.getByLabel('Sua senha').fill('nao-e-a-senha-dela')
+    await del.getByRole('button', { name: 'Excluir minha conta' }).click()
+    await del.getByText('Senha incorreta.').waitFor()
+    await sleep(200)
+    await shot(page, 'settings-delete-wrong-password')
+    await del.getByLabel('Sua senha').fill(eva.password)
+    await del.getByRole('button', { name: 'Excluir minha conta' }).click()
+    await page.getByText(/Sua conta será excluída em/).waitFor({ timeout: 20_000 })
+    await sleep(300)
+    await shot(page, 'auth-login-deletion-scheduled')
+    await login(page, eva)
+    await page.getByText('Exclusão cancelada').waitFor()
+    await sleep(500)
+    await shot(page, 'deletion-canceled')
+    await close(app)
+  }
+
+  if (!isStaff) return
+  // 6. Restricted accounts: suspended while signed in (gateway 4010) → login explains → the screen with the appeal;
+  // banned with an appeal in analysis; a CSAM decision shows only the generic rule.
+  {
+    const gil = await freshUser('gil', 'Gil Ramos')
+    await verifyEmail(gil)
+    const { app, page } = await launch({ profile: TRUST_PROFILE })
+    await login(page, gil)
+    await act(gil, { type: 'suspend', reason: 'harassment', until: inDays(5) })
+    await page.getByText(/aplicou uma medida na sua conta/).waitFor({ timeout: 20_000 })
+    await sleep(300)
+    await shot(page, 'auth-login-restricted-notice')
+    await signInTo(page, gil, page.getByRole('heading', { name: 'Sua conta está suspensa' }))
+    await sleep(300)
+    await shot(page, 'restricted-suspended')
+    await page.getByLabel('O que aconteceu, do seu ponto de vista').fill('Foi uma discussão sobre o jogo que passou do ponto, dos dois lados. Já pedi desculpas a ele por DM antes da suspensão.')
+    await page.getByRole('button', { name: 'Enviar recurso' }).click()
+    await page.getByText('Recurso enviado.', { exact: false }).waitFor()
+    await sleep(200)
+    await shot(page, 'restricted-appeal-sent')
+    await close(app)
+  }
+  {
+    const hel = await freshUser('helena', 'Helena Duarte')
+    const ivo = await freshUser('ivo', 'Ivo Pacheco')
+    await act(hel, { type: 'ban', reason: 'scam' })
+    await act(ivo, { type: 'ban', reason: 'csam' })
+    const r = (await rawLogin(hel)).error.restriction
+    await api(null, 'POST', '/appeals', { actionId: r.actionId, message: 'Minha conta foi invadida e alguém mandou aqueles links. Troquei a senha do e-mail.', appealToken: r.appealToken })
+    const { app, page } = await launch({ profile: TRUST_PROFILE })
+    await signInTo(page, hel, page.getByRole('heading', { name: 'Sua conta foi encerrada' }))
+    await sleep(300)
+    await shot(page, 'restricted-banned-appeal-open')
+    await page.getByRole('button', { name: 'Voltar para o login' }).click()
+    await signInTo(page, ivo, page.getByRole('heading', { name: 'Sua conta foi encerrada' }))
+    await sleep(300)
+    await shot(page, 'restricted-banned-generic')
+    await close(app)
+  }
+}
+
 // ── main ──────────────────────────────────────────────────────
 if (!args.includes('--skip-build')) {
   console.log('building…')
@@ -1512,8 +1847,10 @@ try {
   serverUp = false
 }
 if (want('auth')) await authShots(serverUp)
+if (!serverUp) console.warn(`API at ${API} is not reachable: only auth screens were captured.`)
 if (serverUp && ['auth', 'home', 'chat', 'spaces', 'attachments', 'uploads', 'spacesettings', 'connection', 'sizes', 'settings', 'voice', 'billing', 'invites'].some(want)) {
   const saved = await ensureUsers()
   await mainShots(saved)
-} else console.warn(`API at ${API} is not reachable: only auth screens were captured.`)
+}
+if (serverUp && want('trust')) await trustShots()
 console.log(`\n${shots.length} screenshots.`)

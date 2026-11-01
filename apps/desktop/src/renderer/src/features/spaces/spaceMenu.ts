@@ -1,9 +1,11 @@
 import { Permission } from '@alga/shared'
-import { CheckCheck, Hash, LogOut, Settings, UserPlus, Volume2 } from 'lucide-react'
+import { CheckCheck, Flag, Hash, LogOut, Settings, UserPlus, Volume2 } from 'lucide-react'
 import { markSpaceRead } from '@/store/actions'
 import { useData } from '@/store/data'
 import { can, spacePermissions } from '@/store/selectors'
 import { useUi } from '@/store/ui'
+import { openReport } from '../trust/Report'
+import { t as tr } from '../trust/strings'
 import type { MenuEntry } from '@/ui'
 import { t } from '../shell/strings'
 import { actorFor, visibleSections } from '../spaceSettings/permissions'
@@ -30,7 +32,11 @@ export function spaceMenu(spaceId: string): MenuEntry[] {
   items.push({ label: t.space.markRead, icon: CheckCheck, onSelect: () => markSpaceRead(spaceId) })
   // The owner cannot leave (the server forbids it); deleting a space is a settings-wave action.
   if (sp.ownerId !== d.me?.id) {
-    items.push({ kind: 'separator' }, { label: t.space.leave, icon: LogOut, danger: true, onSelect: () => ui.openModal({ kind: 'leaveSpace', spaceId }) })
+    items.push(
+      { kind: 'separator' },
+      { label: tr.report.menu.space, icon: Flag, onSelect: () => openReport({ kind: 'space', spaceId }) },
+      { label: t.space.leave, icon: LogOut, danger: true, onSelect: () => ui.openModal({ kind: 'leaveSpace', spaceId }) },
+    )
   }
   return items
 }
