@@ -2,7 +2,7 @@ import type {
   Channel, Invite, Me, Member, Message, Presence, PublicUser, ReadState, Relationship,
   Role, Space, SpaceSnapshot, StatusPreference, VoiceDisconnectReason, VoiceState,
 } from './models.js'
-import type { Entitlements } from './billing.js'
+import type { Entitlements, Gift, SpaceUpgradeState } from './billing.js'
 import type { E2eeClientFrame, E2eeCommit, E2eeEpoch, E2eeProposals, E2eeResyncRequired, E2eeWelcome } from './e2ee.js'
 
 /**
@@ -64,6 +64,7 @@ export interface ReadyPayload {
 
 export type Dispatch =
   | { t: 'READY'; d: ReadyPayload }
+  /** Profile changes. To your voice channel it may carry `tryOn` (POST /billing/try-on); the next one without it ends it. */
   | { t: 'USER_UPDATE'; d: PublicUser }
   | { t: 'ME_UPDATE'; d: Me }
   | { t: 'PRESENCE_UPDATE'; d: Presence }
@@ -117,6 +118,21 @@ export type Dispatch =
    * a cancellation reaching its end, expiry, refund). ME_UPDATE with the new Me.plan follows when the plan changed.
    */
   | { t: 'ENTITLEMENTS_UPDATE'; d: Entitlements }
+  /**
+   * Only to the recipient, when a gift (or a Plus pass) is delivered: show it with "Abrir" / "Recusar". Nothing is
+   * usable until POST /billing/gifts/:id/accept.
+   */
+  | { t: 'GIFT_RECEIVED'; d: Gift }
+  /**
+   * A gift changed after delivery (accepted, declined, refunded by the payer = revoked from the recipient) or, for
+   * the sender, at payment/scheduling/delivery. Sent to whichever of sender and recipient may see it (Gift.status).
+   */
+  | { t: 'GIFT_UPDATE'; d: Gift }
+  /**
+   * To the space's members: its Casa changed (a contribution paid or refunded, tone or vanity invite changed, it
+   * ended). Replace Space.upgrade with `upgrade`.
+   */
+  | { t: 'SPACE_UPGRADE_UPDATE'; d: { spaceId: string; upgrade: SpaceUpgradeState | null } }
   /** New invite. Sent to members with MANAGE_SPACE and to its creator (the people GET /spaces/:id/invites shows it to). */
   | { t: 'INVITE_CREATE'; d: Invite }
   /**

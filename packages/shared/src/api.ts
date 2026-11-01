@@ -142,19 +142,82 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  *                                                          channel, never across a block, else 404)
  * DELETE /e2ee/devices/:id                               -> 204 (your device: its key packages go too and it leaves
  *                                                          any call group at once)
- * GET    /billing/catalog                               -> BillingCatalog (public, no auth)
- * GET    /billing/me                                     -> BillingMe (plan, subscriptions, entitlements, orders)
- * POST   /billing/checkout         CheckoutBody          -> CheckoutResponse (201; verified e-mail required; 10/h)
- *   Creates a pending subscription (plan products) or order (cosmetics) and returns the provider's page. Nothing is
- *   granted here: the provider's verified webhook (or an API re-fetch) confirms the payment, then ENTITLEMENTS_UPDATE
- *   (+ ME_UPDATE with the new Me.plan). 404 unknown/unsold product, 409 already subscribed / already owned, 503
- *   payments disabled on this server. `sandbox: true` = test provider (dev/test only), nothing is charged.
+ * Billing (models, bodies and limits in billing.ts; rules in docs/business/growth-plan.md §2–§3). Every purchase
+ * (checkout, gift, Casa contribution, Plus pass) needs a verified e-mail and 18+ (403 for 16–17; 403 for an unknown
+ * age where the birth date is required). Nothing is ever granted by these calls: only the provider's verified webhook
+ * (or API re-fetch) moves a payment, then ENTITLEMENTS_UPDATE / ME_UPDATE / GIFT_* / SPACE_UPGRADE_UPDATE. 503 =
+ * payments disabled on this server; `sandbox: true` = test provider (dev/test only), nothing is charged.
+ * GET    /billing/catalog                               -> BillingCatalog (public, no auth; catalog v2: Product.available,
+ *                                                          collections + waves, bundles, Casa perks/tones; retired v1
+ *                                                          items listed with `retired: true`, never sold)
+ * GET    /billing/me                                     -> BillingMe (plan, subscriptions, entitlements, orders, gifts,
+ *                                                          plus: tenure months, badge, passes left, annual item)
+ * GET    /billing/quote?productId=&recipientId=          -> Quote (what a checkout, or a gift to recipientId, would
+ *                                                          charge now: a bundle costs bundle × missing ÷ all, down to
+ *                                                          ,90; 409 when they already have it all; 60/min)
+ * POST   /billing/checkout         CheckoutBody          -> CheckoutResponse (201; 10/h)
+ *   Creates a pending subscription (recurring plan products) or order (cosmetics, bundles, one-time Plus) and returns
+ *   the provider's page. A one-time Plus (Product.billing 'one_time', Pix or card) becomes a Subscription with kind
+ *   'period' that never renews, stacked after the plan time you already have. 404 unknown/unsold product (Casa
+ *   products go through the space route), 409 not on sale yet (wave closed) / already subscribed / already owned /
+ *   one-time Plus while a renewing one is active.
  * POST   /billing/subscription/cancel                    -> Subscription (renewals stop now, the plan lasts until
  *                                                          currentPeriodEnd; idempotent; 404 without an active one;
  *                                                          10/h)
  * POST   /billing/subscription/resume                    -> Subscription (undoes cancel while the period is still
  *                                                          paid: cancelAtPeriodEnd false, renewals resume at the
  *                                                          provider; idempotent; 404 without an active one; 10/h)
+ *   A one-time period or a pass: cancel answers it unchanged (it never renews), resume is 409.
+ * POST   /billing/subscription/refund                    -> Subscription (the first charge of a renewing Plus, within
+ *                                                          REFUND_WINDOW_DAYS of its start: refund at the provider and
+ *                                                          renewals cancelled for good; refundRequestedAt now, status
+ *                                                          canceled when the provider confirms; idempotent; 404 none
+ *                                                          in the window, 409 charge not confirmed yet; 10/h)
+ * POST   /billing/orders/:id/refund                      -> Order (your order, paid, amount > 0, within
+ *                                                          REFUND_WINDOW_DAYS of paidAt (Order.refundableUntil): full
+ *                                                          refund asked; status refunded when the provider confirms,
+ *                                                          which revokes items, a gifted item (GIFT_UPDATE 'refunded'
+ *                                                          to the recipient), a one-time Plus and Casa days;
+ *                                                          idempotent; 409 outside the window; 10/h)
+ * POST   /billing/gifts            GiftBody              -> CheckoutResponse (201, giftId; 10/h): a cosmetic, bundle or
+ *   one-time Plus for a friend of GIFT_MIN_FRIENDSHIP_HOURS+ (403 otherwise or across a block; 400 yourself), message
+ *   up to GIFT_MESSAGE_MAX, deliverAt within GIFT_MAX_SCHEDULE_DAYS (400). 409 they own it / it is already on its way
+ *   to them, Plus to someone renewing, or past GIFT_PIX_LIMIT_CENTS of gifts in 24 h; past GIFT_CARD_LIMIT_CENTS the
+ *   provider page is Pix-only (pixOnly). Paid: GIFT_RECEIVED to the recipient (on deliverAt if scheduled), receipt mail.
+ * POST   /billing/gifts/:id/accept                       -> Gift (the recipient opens it: only now it is usable (items,
+ *                                                          or a Plus period / pass starting now); GIFT_UPDATE to the
+ *                                                          sender; idempotent; 409 Plus while renewing one; 20/min)
+ * POST   /billing/gifts/:id/decline                      -> Gift (the recipient refuses an unopened gift: the payer is
+ *                                                          refunded in full; 409 already opened; 20/h)
+ * POST   /billing/passes           PlusPassBody          -> Gift (201): a free PLUS_PASS_DAYS Plus pass from a paid
+ *   subscriber (403 otherwise) to an adult friend of GIFT_MIN_FRIENDSHIP_HOURS+ (403 for 16–17); PLUS_PASSES_PER_MONTH
+ *   per calendar month (America/Sao_Paulo; a declined one comes back), 409 above it, if they have Plus, or if they got
+ *   a pass in the last 12 months. GIFT_RECEIVED to them; it starts when opened. 10/h.
+ * POST   /billing/plus/annual-item AnnualItemBody        -> Order (annual Plus only, 403 otherwise: one Coleção 01 item
+ *                                                          on sale up to ANNUAL_ITEM_MAX_CENTS (400 otherwise), owned
+ *                                                          for good, amount 0, once per paid year (409); revoked if
+ *                                                          the annual plan is refunded; 10/h)
+ * GET    /billing/wishlist                               -> Wishlist (yours)
+ * PUT    /billing/wishlist/:productId                    -> Wishlist (adds a cosmetic or bundle; 404 other ids, 409
+ *                                                          owned or above WISHLIST_MAX; idempotent; 30/min)
+ * DELETE /billing/wishlist/:productId                    -> Wishlist (30/min)
+ * PATCH  /billing/wishlist         PatchWishlistBody     -> Wishlist (visible to friends; default on for 18+, off for
+ *                                                          16–17; 30/min)
+ * GET    /users/:id/wishlist                             -> Wishlist (friends only and only when visible, else 404;
+ *                                                          never announced; owned items left out; 60/min)
+ * POST   /billing/try-on           TryOnBody             -> TryOn (201) while in a call, not for 16–17 (403): an item on
+ *   sale shown on you for TRY_ON_SECONDS to your voice channel as PublicUser.tryOn in USER_UPDATE; one at a time (a new
+ *   one replaces it); TRY_ONS_PER_DAY a day (429); ends by itself (USER_UPDATE without tryOn). 409 not in a call, 404
+ *   unknown / private-slot / not-on-sale item.
+ * DELETE /billing/try-on                                 -> 204 (ends yours now)
+ * GET    /spaces/:id/upgrade                             -> SpaceUpgrade (members: the Casa, its perks and the Mural da
+ *                                                          Casa: who chose to appear, alphabetical, no amounts)
+ * POST   /spaces/:id/upgrade/contributions SpaceContributionBody -> CheckoutResponse (201; members 18+; a
+ *   space_upgrade product: paid, its days are added to the Casa (from its end, or from the payment if it had ended);
+ *   refunded, taken back. No renewal, no tiers. SPACE_UPGRADE_UPDATE to the members; Space.upgrade in snapshots. 10/h)
+ * PATCH  /spaces/:id/upgrade       PatchSpaceUpgradeBody -> SpaceUpgrade (MANAGE_SPACE, while the Casa is lit, else
+ *                                                          409: tone; inviteCode = a vanity Invite that expires with
+ *                                                          the Casa, 409 taken; SPACE_UPGRADE_UPDATE; 10/min)
  * POST   /billing/webhooks/:provider (provider-signed)   -> 200 (server-to-server; 401 bad signature, 404 unknown
  *                                                          provider; repeated events are acknowledged and ignored)
  * GET    /billing/sandbox/checkout/:reference?sig=&outcome=approve|decline -> HTML (sandbox provider only: the fake

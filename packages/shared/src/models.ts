@@ -1,5 +1,5 @@
 /** Wire models shared by server and desktop. Timestamps are ISO-8601 strings. */
-import type { EquippedCosmetics, PlanSummary } from './billing.js'
+import type { EquippedCosmetics, PlanSummary, PlusBadge, SpaceUpgradeState, TryOn } from './billing.js'
 import type { AgeBracket, StaffRole } from './trust-safety.js'
 
 
@@ -18,8 +18,16 @@ export interface PublicUser {
   /**
    * Equipped cosmetics (catalog product ids, see GET /billing/catalog). Omitted when nothing is equipped; a
    * USER_UPDATE without it means everything was unequipped. Plan-included items are unequipped when the plan ends.
+   * PRIVATE_COSMETIC_SLOTS (appIcon, appAccent) appear only in Me.cosmetics.
    */
   cosmetics?: EquippedCosmetics
+  /**
+   * Plus tenure badge (months of Plus summed over time, PLUS_BADGES), shown while the user has a paid Plus. Omitted
+   * otherwise. It is not re-sent when a threshold is crossed: the next profile fetch or READY carries it.
+   */
+  plusBadge?: PlusBadge
+  /** Only in USER_UPDATE to the user's voice channel: an item they are trying on ("provando") until expiresAt. */
+  tryOn?: TryOn
 }
 
 export interface Me extends PublicUser {
@@ -114,6 +122,8 @@ export interface Space {
    * /spaces/:id with MANAGE_SPACE). DM calls always are. Always sent by the server; optional for older fixtures.
    */
   e2ee?: boolean
+  /** The space's Casa (billing.ts SpaceUpgradeState); omitted if it never had one. Live: SPACE_UPGRADE_UPDATE. */
+  upgrade?: SpaceUpgradeState
 }
 
 /** Full space snapshot as delivered in READY / SPACE_CREATE. */
