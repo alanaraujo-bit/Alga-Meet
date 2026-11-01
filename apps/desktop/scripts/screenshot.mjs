@@ -1,5 +1,5 @@
 // Visual validation loop: build → seed real data through the REST API → drive the REAL Electron app → PNGs.
-//   node scripts/screenshot.mjs [--skip-build] [--only=auth,home,chat,spaces,attachments,uploads,spacesettings,connection,sizes,settings,voice,billing,invites,trust,wave6]
+//   node scripts/screenshot.mjs [--skip-build] [--only=auth,home,chat,spaces,attachments,uploads,spacesettings,connection,sizes,settings,voice,billing,invites,trust,wave6,r3]
 // Another API (ALGA_API_URL=http://127.0.0.1:4100) gets its own users file, so runs never mix accounts.
 // Voice runs two real app instances (profiles shots + shots-b) through the local LiveKit with Chromium fake
 // devices: a generated speech WAV is B's microphone (so the speaking glow moves for real) and A's screen share
@@ -7,9 +7,11 @@
 // :7880; pass LIVEKIT_PID (a LiveKit *you* started) to also capture the reconnecting state.
 // Output: docs/screenshots/<YYYY-MM-DD>-<screen>-v<n>.png (earlier versions are kept).
 // Test users (generated credentials) live in scripts/.shots-users.json (git-ignored).
+// ALGA_SHOTS_OUT=<dir> builds and runs the app from that directory instead of apps/desktop/out (so a dev app that
+// runs from out/ is never rewritten). LIVEKIT_HTTP points the voice parts at your own SFU (default :7880).
 import { execSync, spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { createServer, connect } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -29,6 +31,8 @@ const only = args.find((a) => a.startsWith('--only='))?.split('=')[1]?.split(','
 const want = (k) => !only || only.includes(k)
 const today = new Date().toISOString().slice(0, 10)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const SHOTS_OUT = process.env.ALGA_SHOTS_OUT ?? null
+const LK_HTTP = process.env.LIVEKIT_HTTP ?? 'http://127.0.0.1:7880'
 
 // ── output naming ─────────────────────────────────────────────
 mkdirSync(outDir, { recursive: true })
@@ -39,7 +43,16 @@ function nextPath(screen) {
   return join(outDir, `${today}-${screen}-v${n}.png`)
 }
 const shots = []
-async function shot(page, screen) {
+/** Toasts from earlier steps never leak into a capture (pass { toasts: true } when the toast is the subject). */
+async function shot(page, screen, { toasts = false } = {}) {
+  if (!toasts) {
+    const n = await page.evaluate(() => {
+      const list = [...document.querySelectorAll('[role="region"][aria-label="Notificações"] button[aria-label="Dispensar"]')]
+      for (const b of list) b.click()
+      return list.length
+    })
+    if (n) await sleep(300)
+  }
   await sleep(250)
   const p = nextPath(screen)
   await page.screenshot({ path: p, animations: 'disabled' })
@@ -177,10 +190,13 @@ async function ensureUsers() {
       await settleLegal(u)
       continue
     }
-    const suffix = randomBytes(2).toString('hex')
-    const username = `${key}.${suffix}`
+    // Real-looking handles (@carla.mendes) on a fresh API; a hex suffix only when the name is taken.
+    const clean = displayName.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ /g, '.')
     const password = randomBytes(12).toString('base64url')
-    const r = await api(null, 'POST', '/auth/register', { email: `${username}@shots.alga.test`, username, displayName, password, birthDate: ADULT_BIRTH, termsVersion: await termsVersion() })
+    const register = async (username) => api(null, 'POST', '/auth/register', { email: `${username}@shots.alga.test`, username, displayName, password, birthDate: ADULT_BIRTH, termsVersion: await termsVersion() })
+    let username = clean
+    let r = await register(username).catch((e) => (e.status === 409 ? null : Promise.reject(e)))
+    if (!r) r = await register((username = `${key}.${randomBytes(2).toString('hex')}`))
     saved.users[key] = { username, password, token: r.token, me: r.user }
     writeFileSync(usersFile, JSON.stringify(saved, null, 2))
   }
@@ -285,10 +301,10 @@ async function seed(saved) {
   // Coordenação > Moderação > Design > Convidados.
   const P = { CHANNELS: 4, INVITES: 32, ROLES: 16, KICK: 64, BAN: 128, MESSAGES: 512, MUTE: 1 << 15, DEAFEN: 1 << 16, MOVE: 1 << 17, NICKS: 1 << 19 }
   const role = (body) => api(T('ana'), 'POST', `/spaces/${s1.id}/roles`, body)
-  const coord = await role({ name: 'Coordenação', color: '#f2c25c', permissions: P.ROLES | P.KICK | P.BAN | P.NICKS | P.MUTE | P.DEAFEN | P.MOVE | P.MESSAGES | P.CHANNELS | P.INVITES })
-  const mod = await role({ name: 'Moderação', color: '#7fd88f', permissions: P.ROLES | P.KICK | P.NICKS | P.MUTE | P.MESSAGES | P.INVITES })
-  const des = await role({ name: 'Design', color: '#ef87c4' })
-  await role({ name: 'Convidados', color: '#a7b0b4' })
+  const coord = await role({ name: 'Coordenação', color: '#e3b47d', permissions: P.ROLES | P.KICK | P.BAN | P.NICKS | P.MUTE | P.DEAFEN | P.MOVE | P.MESSAGES | P.CHANNELS | P.INVITES })
+  const mod = await role({ name: 'Moderação', color: '#91c3f6', permissions: P.ROLES | P.KICK | P.NICKS | P.MUTE | P.MESSAGES | P.INVITES })
+  const des = await role({ name: 'Design', color: '#e6a7d0' })
+  await role({ name: 'Convidados', color: '#bbc581' })
   for (const [k, r] of [['diego', coord], ['carla', mod], ['bruno', des]]) await api(T('ana'), 'PUT', `/spaces/${s1.id}/members/${id(k)}/roles/${r.id}`)
   await api(T('ana'), 'PATCH', `/spaces/${s1.id}/members/${id('carla')}`, { nickname: 'Carlinha' })
   for (const k of ['elisa', 'fabio']) await api(T(k), 'POST', `/invites/${inv.code}`)
@@ -327,8 +343,8 @@ async function launch({ width = 1320, height = 840, scale, keepProfile, apiUrl, 
   if (apiUrl) env.ALGA_API_URL = apiUrl
   const app = await electron.launch({
     executablePath: electronPath,
-    args: [appDir, `--profile=${profile}`, ...(scale ? [`--force-device-scale-factor=${scale}`] : []), ...extra],
-    cwd: appDir,
+    args: [SHOTS_OUT ?? appDir, `--profile=${profile}`, ...(scale ? [`--force-device-scale-factor=${scale}`] : []), ...extra],
+    cwd: SHOTS_OUT ?? appDir,
     env,
   })
   const page = await app.firstWindow()
@@ -1008,8 +1024,8 @@ function stopPattern() {
 
 async function voiceShots(saved, ids) {
   console.log('voice (two instances)…')
-  const lk = await fetch('http://127.0.0.1:7880/').then((r) => r.ok, () => false)
-  if (!lk) return console.warn('LiveKit is not running on :7880: voice screens skipped.')
+  const lk = await fetch(`${LK_HTTP}/`).then((r) => r.ok, () => false)
+  if (!lk) return console.warn(`LiveKit is not reachable at ${LK_HTTP}: voice screens skipped.`)
   const U = saved.users
   const { speech, silence } = speechWav()
   const A = await launch({ extra: MEDIA_FLAGS(silence) })
@@ -2235,10 +2251,348 @@ async function wave6Shots() {
   // Caio stays suspended until the next run lifts it (w6Users).
 }
 
+// ── r3: every screen the design r3 wave changed, from one fixture (seed), two real instances in a real room ──
+// R3_STACK=<stack script> (start/stop for YOUR LiveKit: `node <it> lk-stop|lk-start`) adds the reconnecting state.
+const resize = (x, w, h) =>
+  x.app.evaluate(({ BrowserWindow }, [w, h]) => {
+    const win = BrowserWindow.getAllWindows()[0]
+    win.setContentSize(w, h)
+    win.center()
+  }, [w, h])
+const hasVideo = (page) => page.waitForFunction(() => [...document.querySelectorAll('video')].some((v) => v.readyState >= 2 && v.videoWidth > 0), null, { timeout: 20_000 })
+const park = async (page, x = 700, y = 120) => {
+  await page.mouse.move(x, y)
+  await page.evaluate(() => document.activeElement?.blur?.())
+}
+async function settingsAt(page, name) {
+  const dlg = userSettings(page)
+  if (!(await dlg.isVisible())) {
+    await page.keyboard.press('Control+,')
+    await dlg.waitFor()
+  }
+  await dlg.getByRole('navigation').getByRole('button', { name, exact: true }).click()
+  await sleep(500)
+  return dlg
+}
+
+async function r3Shots(saved) {
+  console.log('r3…')
+  const lk = await fetch(`${LK_HTTP}/`).then((r) => r.ok, () => false)
+  if (!lk) throw new Error(`LiveKit is not reachable at ${LK_HTTP}`)
+  const U = saved.users
+  const offs = [connectPresence(U.carla.token), connectPresence(U.diego.token, 'idle')]
+  const ids = await seed(saved)
+  const { speech, silence } = speechWav()
+  const part = (n) => !process.env.R3_PARTS || process.env.R3_PARTS.split(',').includes(n)
+  const A = await launch({ extra: MEDIA_FLAGS(silence) })
+  const B = await launch({ profile: 'shots-b', extra: MEDIA_FLAGS(speech) })
+  for (const [n, x] of [['A', A], ['B', B]]) {
+    x.page.on('console', (m) => m.type() === 'error' && console.log(`  ${n} console.error:`, m.text().slice(0, 240)))
+    x.page.on('pageerror', (e) => console.log(`  ${n} pageerror:`, e.message))
+  }
+  const bruno = U.bruno.me.id
+  try {
+    await login(A.page, U.ana)
+    await login(B.page, U.bruno)
+    await rail(B.page, /^Estúdio Alga/).click()
+    await channels(B.page).getByRole('button', { name: /Sala de foco/ }).click()
+    await waitConnected(B.page)
+
+    if (part('shell')) {
+      // Home: "Agora", the rail keeps fronds (bottom) and the mention (top) on the same space.
+      await A.page.getByRole('button', { name: 'Conversas', exact: true }).click()
+      await A.page.getByRole('region', { name: 'Agora' }).getByText('Sala de foco').waitFor({ timeout: 15_000 })
+      await park(A.page)
+      await sleep(500)
+      await shot(A.page, 'home-agora')
+      // Chat: voice in the header, "Em voz" opens the member list, straight reply stems.
+      await rail(A.page, /^Estúdio Alga/).click()
+      await channels(A.page).getByRole('button', { name: /^geral/ }).click()
+      await A.page.getByText('Eu topo testar também').waitFor()
+      await park(A.page)
+      await sleep(600)
+      await shot(A.page, 'chat-channel')
+      const row = A.page.getByLabel('Membros').getByRole('button', { name: /Bruno Costa/ })
+      await row.click({ button: 'right' })
+      await A.page.getByRole('menu').waitFor()
+      await sleep(300)
+      await shot(A.page, 'member-menu')
+      await A.page.keyboard.press('Escape')
+      await row.click()
+      await A.page.getByRole('dialog', { name: 'Bruno Costa' }).waitFor()
+      await sleep(1400)
+      await shot(A.page, 'profile-popover-others')
+      await A.page.keyboard.press('Escape')
+      // Not a friend yet (Ana's request is pending): the card offers the relationship as it stands.
+      await A.page.getByLabel('Membros').getByRole('button', { name: /Fábio Lima/ }).click()
+      await A.page.getByRole('dialog', { name: 'Fábio Lima' }).waitFor()
+      await sleep(1200)
+      await shot(A.page, 'profile-popover-pending')
+      await A.page.keyboard.press('Escape')
+      // The chat author opens the same card.
+      await A.page.getByRole('log').getByRole('button', { name: 'Carlinha', exact: true }).first().click()
+      await A.page.getByRole('dialog', { name: 'Carlinha' }).waitFor()
+      await sleep(1200)
+      await shot(A.page, 'chat-author-popover')
+      await A.page.keyboard.press('Escape')
+    }
+
+    // Pre-join (Ctrl+K opens the room without joining), then the stage.
+    await A.page.keyboard.press('Control+K')
+    await A.page.keyboard.type('Sala de foco')
+    await sleep(200)
+    await A.page.keyboard.press('Enter')
+    await A.page.getByRole('button', { name: 'Entrar em Sala de foco', exact: true }).waitFor()
+    await park(A.page, 820, 300)
+    await sleep(500)
+    await shot(A.page, 'voice-preview')
+    await A.page.getByRole('button', { name: 'Entrar em Sala de foco', exact: true }).click()
+    await waitConnected(A.page)
+    await sleep(1500)
+    console.log(`  bruno --speak at capture: ${(await waitSpeaking(A.page, bruno, 0.45)).toFixed(2)}`)
+    await park(A.page)
+    await shot(A.page, 'voice-stage')
+    await A.page.getByRole('img', { name: /^Conex/ }).first().hover()
+    await sleep(900)
+    await shot(A.page, 'voice-panel-link')
+    await waitSpeaking(B.page, bruno, 0.3)
+    await park(B.page)
+    await shot(B.page, 'voice-stage-self-speaking')
+
+    // One rule at every size: a toast rises above the dock (1320×840 here; 960×600 below).
+    await A.page.locator('[class*="userRow"] button[aria-haspopup="dialog"]').first().click()
+    await A.page.getByRole('button', { name: 'Copiar nome de usuário' }).click()
+    await A.page.getByText('Copiado', { exact: true }).waitFor()
+    await park(A.page, 700, 200)
+    await sleep(400)
+    await shot(A.page, 'voice-toast-above-dock', { toasts: true })
+    await sleep(4200)
+
+    // The same person menu on the call tile (reach, for you, moderation, relationship, report).
+    await A.page.locator(`[data-user-id="${bruno}"]`).click({ button: 'right' })
+    await A.page.getByRole('menu').waitFor()
+    await sleep(300)
+    await shot(A.page, 'voice-tile-moderation-menu')
+    await A.page.keyboard.press('Escape')
+
+    if (part('stream')) {
+      // Ana shares: the picker, then her own tile carries the stream (no second tile).
+      startPattern()
+      await sleep(1500)
+      await dock(A.page).getByRole('button', { name: 'Compartilhar tela' }).click()
+      const picker = A.page.getByRole('dialog', { name: 'Compartilhar tela' })
+      await picker.waitFor()
+      await picker.locator('img').first().waitFor({ timeout: 20_000 })
+      await sleep(1800)
+      await shot(A.page, 'screen-picker')
+      await picker.getByRole('button', { name: 'Transmitir' }).click()
+      await picker.waitFor({ state: 'detached', timeout: 15_000 })
+      stopPattern()
+      await A.page.getByText('Você está transmitindo').first().waitFor()
+      await sleep(2500)
+      await park(A.page)
+      await shot(A.page, 'screen-sharing-self')
+      // Bruno: Ana's tile says AO VIVO with Assistir; watching gives the stream the stage, people in a strip.
+      await B.page.getByRole('button', { name: 'Assistir' }).first().waitFor({ timeout: 15_000 })
+      await park(B.page)
+      await sleep(400)
+      await shot(B.page, 'stream-tile-unwatched')
+      await B.page.getByRole('button', { name: 'Assistir' }).first().click()
+      await hasVideo(B.page)
+      await sleep(2500)
+      await park(B.page, 10, 400)
+      await shot(B.page, 'stream-watching')
+      await B.page.keyboard.press('Control+Shift+E')
+      await sleep(1500)
+      await B.page.locator('video').first().hover()
+      await sleep(300)
+      await shot(B.page, 'stream-stats')
+      await B.page.keyboard.press('Control+Shift+E')
+      await resize(B, 960, 600)
+      await sleep(1200)
+      await park(B.page, 10, 300)
+      await shot(B.page, 'stream-watching-960x600')
+      await resize(B, 1320, 840)
+      // Ana, elsewhere in the app while live: the title bar chip is the reminder.
+      await channels(A.page).getByRole('button', { name: /^geral/ }).click()
+      await sleep(800)
+      await park(A.page)
+      await shot(A.page, 'screen-sharing-offstage')
+      await channels(A.page).getByRole('button', { name: /Sala de foco/ }).click()
+      await sleep(600)
+      await A.page.getByRole('button', { name: 'Parar transmissão' }).first().click()
+      await sleep(800)
+    }
+
+    // Narrow window: the call stage and the same toast rule.
+    await resize(A, 960, 600)
+    await sleep(1200)
+    await waitSpeaking(A.page, bruno, 0.4)
+    await park(A.page, 500, 100)
+    await shot(A.page, 'voice-stage-960x600')
+
+    // Reconnecting never lies: a chip on top of a greyed stage (only with our own SFU to stop).
+    if (process.env.R3_STACK) {
+      spawnSync('node', [process.env.R3_STACK, 'lk-stop'], { stdio: 'ignore' })
+      await A.page.getByText('Reconectando à voz…').first().waitFor({ timeout: 30_000 })
+      await sleep(800)
+      await shot(A.page, 'voice-reconnecting-960x600')
+      await resize(A, 1320, 840)
+      await sleep(800)
+      await shot(A.page, 'voice-reconnecting')
+      spawnSync('node', [process.env.R3_STACK, 'lk-start'], { stdio: 'ignore' })
+      await A.page.getByText('Voz conectada').first().waitFor({ timeout: 60_000 }).catch(() => undefined)
+    }
+    await resize(A, 1320, 840)
+    for (const x of [A, B]) await x.page.getByRole('button', { name: 'Desconectar' }).first().click().catch(() => undefined)
+    await sleep(800)
+
+    if (part('dm')) {
+      // DM call: the ring card sits in its own corner; the intro says "Em chamada".
+      await A.page.getByRole('button', { name: 'Conversas', exact: true }).click()
+      await A.page.getByRole('button', { name: /Bruno Costa/ }).first().click()
+      await A.page.getByRole('button', { name: 'Iniciar chamada de voz' }).click()
+      await B.page.getByRole('alertdialog').waitFor({ timeout: 20_000 })
+      await sleep(500)
+      await shot(B.page, 'call-incoming')
+      await B.page.getByRole('button', { name: 'Atender' }).click()
+      await waitConnected(B.page)
+      await sleep(1500)
+      await waitSpeaking(A.page, bruno, 0.4)
+      await park(A.page, 1000, 470)
+      await shot(A.page, 'dm-call')
+      for (const x of [A, B]) await x.page.getByRole('button', { name: 'Desconectar' }).first().click().catch(() => undefined)
+      await sleep(600)
+    }
+
+    if (part('settings')) {
+      let dlg = await settingsAt(A.page, 'Aparência')
+      await park(A.page, 10, 300)
+      await shot(A.page, 'settings-appearance')
+      dlg = await settingsAt(A.page, 'Voz e vídeo')
+      await dlg.getByRole('button', { name: /^Microfone:/ }).click()
+      await A.page.getByRole('menu').waitFor()
+      await sleep(300)
+      await shot(A.page, 'settings-voice-devices')
+      await A.page.keyboard.press('Escape')
+      dlg = await settingsAt(A.page, 'Minha conta')
+      await dlg.getByText('Sessões', { exact: true }).scrollIntoViewIfNeeded()
+      await sleep(400)
+      await shot(A.page, 'settings-account-security')
+      await settingsAt(A.page, 'Personalização')
+      await sleep(600)
+      await shot(A.page, 'shop')
+      await resize(A, 1920, 1080)
+      await sleep(800)
+      await shot(A.page, 'shop-1920x1080')
+      await settingsAt(A.page, 'Aparência')
+      await shot(A.page, 'settings-1920x1080')
+      await resize(A, 960, 600)
+      await sleep(800)
+      await shot(A.page, 'settings-960x600')
+      await resize(A, 1320, 840)
+      // Compact for real: 20 px lines, then no avatars (IRC-like).
+      dlg = await settingsAt(A.page, 'Aparência')
+      await dlg.getByRole('radio', { name: 'Compacta' }).click()
+      await dlg.getByRole('switch', { name: 'Avatares nas mensagens' }).click()
+      await A.page.keyboard.press('Escape')
+      await userSettings(A.page).waitFor({ state: 'detached' })
+      await rail(A.page, /^Estúdio Alga/).click()
+      await channels(A.page).getByRole('button', { name: /^geral/ }).click()
+      await sleep(600)
+      await park(A.page)
+      await shot(A.page, 'density-compact')
+      dlg = await settingsAt(A.page, 'Aparência')
+      await dlg.getByRole('radio', { name: 'Confortável' }).click()
+      await A.page.keyboard.press('Escape')
+      await userSettings(A.page).waitFor({ state: 'detached' })
+      // Space: the menu matches the header, roles use the state-safe palette, delete is quiet at rest.
+      await channels(A.page).getByRole('button', { name: 'Estúdio Alga' }).click()
+      await A.page.getByRole('menu').waitFor()
+      await sleep(300)
+      await shot(A.page, 'space-menu')
+      await A.page.getByRole('menuitem', { name: 'Configurações do espaço' }).click()
+      const ss = A.page.locator('[data-settings]')
+      await ss.waitFor()
+      await sleep(500)
+      await shot(A.page, 'space-settings-overview')
+      await ss.getByRole('navigation').getByRole('button', { name: 'Cargos', exact: true }).click()
+      await ss.getByRole('button', { name: /Design/ }).first().click()
+      await sleep(500)
+      await shot(A.page, 'space-settings-role-editor')
+      await ss.getByRole('button', { name: /^Fechar/ }).first().click().catch(() => A.page.keyboard.press('Escape'))
+      await ss.waitFor({ state: 'detached' })
+    }
+
+    // Narrow shell: home and chat.
+    await resize(A, 960, 600)
+    await A.page.getByRole('button', { name: 'Conversas', exact: true }).click()
+    await sleep(600)
+    await park(A.page, 600, 300)
+    await shot(A.page, 'home-960x600')
+    await rail(A.page, /^Estúdio Alga/).click()
+    await channels(A.page).getByRole('button', { name: /^geral/ }).click()
+    await sleep(600)
+    await shot(A.page, 'shell-960x600')
+  } catch (e) {
+    await A.page.screenshot({ path: join(work, 'r3-fail-a.png') }).catch(() => undefined)
+    await B.page.screenshot({ path: join(work, 'r3-fail-b.png') }).catch(() => undefined)
+    throw e
+  } finally {
+    stopPattern()
+    await close(A.app)
+    await close(B.app)
+  }
+
+  // 1920×1080 at 125 % (1536×864 CSS px): shell, chat, call stage, settings; Bruno talks from a normal instance.
+  if (part('hidpi')) {
+    const C = await launch({ width: 1536, height: 864, scale: 1.25, extra: MEDIA_FLAGS(silence) })
+    const D = await launch({ profile: 'shots-b', extra: MEDIA_FLAGS(speech) })
+    try {
+      await login(C.page, U.ana)
+      await login(D.page, U.bruno)
+      await rail(D.page, /^Estúdio Alga/).click()
+      await channels(D.page).getByRole('button', { name: /Sala de foco/ }).click()
+      await waitConnected(D.page)
+      await C.page.getByRole('button', { name: 'Conversas', exact: true }).click()
+      await C.page.getByRole('region', { name: 'Agora' }).getByText('Sala de foco').waitFor({ timeout: 15_000 })
+      await park(C.page, 900, 400)
+      await sleep(500)
+      await shot(C.page, 'home-1920x1080@125')
+      await rail(C.page, /^Estúdio Alga/).click()
+      await channels(C.page).getByRole('button', { name: /^geral/ }).click()
+      await C.page.getByText('Eu topo testar também').waitFor()
+      await park(C.page)
+      await sleep(500)
+      await shot(C.page, 'shell-1920x1080@125')
+      await channels(C.page).getByRole('button', { name: /Sala de foco/ }).click()
+      await waitConnected(C.page)
+      await sleep(1500)
+      await waitSpeaking(C.page, bruno, 0.45)
+      await park(C.page)
+      await shot(C.page, 'voice-stage-1920x1080@125')
+      await settingsAt(C.page, 'Aparência')
+      await park(C.page, 10, 300)
+      await shot(C.page, 'settings-1920x1080@125')
+      await C.page.keyboard.press('Escape')
+      for (const x of [C, D]) await x.page.getByRole('button', { name: 'Desconectar' }).first().click().catch(() => undefined)
+    } finally {
+      await close(C.app)
+      await close(D.app)
+    }
+  }
+  offs.forEach((off) => off())
+  return ids
+}
+
 // ── main ──────────────────────────────────────────────────────
 if (!args.includes('--skip-build')) {
   console.log('building…')
-  execSync('npx electron-vite build', { cwd: appDir, stdio: 'inherit' })
+  execSync(`npx electron-vite build${SHOTS_OUT ? ` --outDir "${SHOTS_OUT}"` : ''}`, { cwd: appDir, stdio: 'inherit' })
+  if (SHOTS_OUT) {
+    writeFileSync(join(SHOTS_OUT, 'package.json'), JSON.stringify({ name: '@alga/desktop', productName: 'Alga Meet', version: '0.1.0', main: './main/index.js' }, null, 2))
+    cpSync(join(appDir, 'build', 'runtime'), join(SHOTS_OUT, 'build', 'runtime'), { recursive: true })
+  }
 }
 let serverUp = false
 try {
@@ -2252,6 +2606,7 @@ if (serverUp && ['auth', 'home', 'chat', 'spaces', 'attachments', 'uploads', 'sp
   const saved = await ensureUsers()
   await mainShots(saved)
 }
+if (serverUp && only?.includes('r3')) await r3Shots(await ensureUsers())
 if (serverUp && want('trust')) await trustShots()
 if (serverUp && want('wave6')) await wave6Shots()
 console.log(`\n${shots.length} screenshots.`)

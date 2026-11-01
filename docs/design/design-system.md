@@ -13,7 +13,7 @@
 5. **Resposta direta é instantânea.** Hover entra em 0 ms e sai em 120 ms; seleção em lista muda no mesmo quadro. Só mudança de contexto anima (≤ 300 ms, ease-out).
 6. **Progresso no lugar da ação.** "Enviando…" no próprio balão, "Não enviada · Tentar de novo" na mensagem, banner de reconexão com contagem regressiva, splash que explica a falha. Spinner sem texto é bug.
 7. **Estado nunca só por cor.** Presença tem forma (ponto, lua, barra, anel); mudo/ensurdecido têm ícone riscado + tooltip; não lido = peso 590 + ponto de 6 px.
-8. **Voz e presença primeiro.** O esqueleto continua familiar para quem vem do Discord (espaços à esquerda, canais, chat), mas o que o produto mostra primeiro é *onde as pessoas estão agora*: "Agora" no topo da Home, frondes vivas no rail e nos canais de voz, painel "Voz conectada" sempre visível, palco de chamada como tela principal do canal de voz.
+8. **Voz e presença primeiro.** O esqueleto continua familiar para quem vem do Discord (espaços à esquerda, canais, chat), mas o que o produto mostra primeiro é *onde as pessoas estão agora*: "Agora" no topo da Home, frondes vivas no rail e nos canais de voz, "3 em Sala de foco" no header do chat, "Em voz" abrindo a lista de membros, painel "Voz conectada" sempre visível, palco de chamada como tela principal do canal de voz.
 9. **A UI nunca mente sobre o estado.** Sem conexão de tempo real, presença fica incerta (ponto a 40 %) e o status diz "Reconectando…"; sem mídia, os tiles ficam cinza, sem brilho, e o palco diz que você não está ouvindo ninguém.
 
 ## 2. Tokens
@@ -48,6 +48,7 @@ Overlays de estado sobre qualquer nível: `--state-hover` 4%, `--state-selected`
 - **Vermelho só para @menção e erro** (e perigo: sair, desconectar, recusar). Contadores informativos (pedidos, DMs não lidas, Pendentes) usam `Badge` neutro (branco 14 %); `Badge mention` é o vermelho. A linha "Novas" é acento a 45 % com o rótulo "furando" a linha.
 - **Ao vivo = acento.** "AO VIVO" é preenchimento `--accent-fill` + texto escuro, com ponto que respira. Transmitir é um sinal de voz, não um alarme.
 - **Avatares:** 8 matizes OKLCH (L .50, C .07, H 150–338, pula a faixa 40–110 que vira marrom). Espaços sem ícone usam o mesmo hash como tinta de 12 % (`tintFor`). Em 20 px ou menos, só o disco de cor.
+- **Cores de cargo** (`ROLE_COLORS`, `spaceSettings/strings.ts`): 8 tons OKLCH L .80 C .09 nos matizes 250 · 280 · 310 · 340 · 10 · 40 · 70 · 115 (`#91c3f6 #b2b8f7 #d0aeea #e6a7d0 #f1a6b0 #f1aa92 #e3b47d #bbc581`). A faixa H 140–215 fica de fora (verde de online e o acento) e o croma fica muito abaixo do âmbar de aviso: um nome colorido nunca lê como estado. Nenhuma cor de cargo é igual a um token semântico.
 - **Mistura de cor em sRGB.** `color-mix(in oklch, X, transparent)` desloca o matiz no Chromium (o cartão de login ficou marrom na v1). Use `in srgb` ou `rgba()`.
 
 ### Tipografia
@@ -93,8 +94,9 @@ Profundidade no escuro = luminância + borda translúcida + anel escuro. `--elev
 
 - Saída ≈ 0,75× a entrada, curva in-quad.
 - **Troca de espaço:** a folha entra 10 px na direção do item do rail escolhido (continuidade espacial), 180 ms, sem animação de saída.
-- **Brilho de quem fala:** `useEnvelope(ref, getLevel)` aplica envelope tipo compressor (ataque 60 ms, release 240 ms) direto em `--speak`, num rAF, sem re-render. Não é anel liga/desliga. O tile do palco recebe o envelope e tudo dentro dele herda (`--speak` não é redefinido no avatar): contorno interno de 2 px em `--accent` com `opacity: min(1, speak × 2.5)` e o halo do avatar. O nível remoto do SFU é amplitude linear (fala ≈ 0,03–0,3), então vira dB (−50 dB → 0, −20 dB → 1, `loudness()`) para o brilho de outra pessoa ser tão legível quanto o seu. Com movimento reduzido, o valor salta entre 0 e 1 (estado visível, sem movimento contínuo).
-- **Frondes (`Fronds`):** o glifo de 3 barras do logo é a linguagem de "vivo/falando". `getLevel` = barras seguem o envelope (sua sala); `breathing` = respiração lenta para "tem gente aqui agora" (salas onde você não está, cujo nível não conhecemos); sem nada = ícone estático.
+- **Brilho de quem fala: luz embaixo d'água, não anel.** `useEnvelope(ref, getLevel)` aplica envelope tipo compressor (ataque 60 ms, release 240 ms) direto em `--speak`, num rAF, sem re-render. O tile do palco recebe o envelope e tudo dentro dele herda (`--speak` não é redefinido no avatar): uma luz interna `radial-gradient(60% 80% at 50% 45%, rgba(77,220,220,.12), transparent 70%)` com `opacity: var(--speak)`, um contorno interno de 2 px em `--accent` que nunca passa de 70 % (`min(.7, speak × 2)`) e, no avatar, um fio de 1,5–2 px mais um halo cujo spread (2 → 8 px) e alfa (até .35) crescem com a voz. Luz e contorno são camadas próprias animadas só por `opacity` (nenhum repaint por quadro). `--halo-k` encolhe o halo onde os avatares ficam juntos (linhas da sidebar, "Agora", faixa do palco, header do chat). O nível remoto já chega perceptual do motor (0..1); com movimento reduzido, o valor salta entre 0 e 1.
+- **A sala respira com a conversa.** A área do palco recebe o envelope da voz mais alta (`roomLevelNow`) e um `::before` com `radial-gradient(1200px 600px at 50% 110%, rgba(33,201,202,.10), transparent 60%)` usa `opacity: var(--speak)`: uma luz baixa, de baixo para cima, que sobe quando alguém fala. Uma variável, sem blur, atrás dos tiles (nunca sobre vídeo), desligada com movimento reduzido (um palco que pisca é pior que um parado).
+- **Frondes (`Fronds`) = a marca (Marca v1):** o glifo de 3 barras é o logo do app (ícone do Windows, bandeja, instalador; ver `apps/desktop/build/README.md`) e a linguagem de "vivo/falando". Geometria única: barras de `u` com intervalo `u`, alturas 3u/5u/3u, grupo quadrado de 5u, `u = max(2, round(tamanho/7))` px (14 px → `u` 2, as barras do ícone de 16). `LogoMark` renderiza `Fronds` em `--accent` (`mono` = `currentColor`). `getLevel` = barras seguem o envelope (sua sala); `breathing` = respiração lenta (`scaleY` 0,55 → 1, 1,6 s) para "tem gente aqui agora"; sem nada = ícone estático, que é o próprio logo.
 - **Entrar/sair da chamada:** tile cresce de 96 % + fade em 180 ms (out-quart), sai em 130 ms; a grade se reorganiza com `layout` em 220 ms (in-out-cubic). Mudo/desmudo é resposta direta: muda no mesmo quadro.
 - `prefers-reduced-motion` **e** a opção "Reduzir animações" (classe `html.reduce-motion`, menu de configurações do painel do usuário) zeram durações CSS e mudam o `MotionConfig` para `always`.
 
@@ -102,17 +104,17 @@ Profundidade no escuro = luminância + borda translúcida + anel escuro. `--elev
 
 | Componente | Notas |
 |---|---|
-| `Button` | `primary` (acento, texto escuro) · `secondary` · `ghost` · `danger`; `sm/md/lg`; `loading` mantém a largura e põe spinner. |
+| `Button` | `primary` (acento, texto escuro) · `secondary` · `secondary-danger` · `ghost` · `danger`; `sm/md/lg`; `loading` mantém a largura e põe spinner. `secondary-danger` = superfície secundária com texto `--danger`: ação destrutiva em repouso (Sair da conta, Sair de todas as outras sessões, Excluir espaço, Excluir cargo, Recusar chamada). O fill `danger` fica no modal de confirmação e em Desconectar. |
 | `IconButton` | Sempre com `label` (vira tooltip + `aria-label`). `disabledReason` mantém o foco e explica por quê (`aria-disabled`). `aria-pressed` para toggles (mudo/ensurdecido). |
 | `Icon` | Wrapper do lucide: tamanhos 12–24, traço 1,75 (2 em ≤14 px), `aria-hidden` por padrão. |
 | `TextField` | Rótulo, dica, erro (`role=alert`), ícone à esquerda, slot à direita; senha com mostrar/ocultar e aviso de Caps Lock (o aviso não some no blur para não deslocar o botão sob o cursor). |
 | `Avatar` | Imagem ou iniciais (matiz estável por id, croma baixo); recorte real sob o ponto de presença (máscara, funciona em qualquer fundo); `glowRef` para o brilho de fala. |
 | `PresenceGlyph` | Online = ponto · Ausente = lua · Não perturbe = barra · Offline = anel. |
 | `Tooltip` | 450 ms de atraso, instantâneo entre controles vizinhos (janela de 300 ms), aparece no foco por teclado, Esc fecha. |
-| `Menu` / `contextMenuHandler` / `MenuButton` | Dados (`MenuEntry[]`), setas/Home/End/typeahead, Enter/Espaço, Esc devolve o foco, separador e rótulo de grupo, item `danger`, `checked`. Um host global (`MenuHost`). |
+| `Menu` / `contextMenuHandler` / `MenuButton` | Dados (`MenuEntry[]`), setas/Home/End/typeahead, Enter/Espaço, Esc devolve o foco, separador e rótulo de grupo, item `danger`, `checked`. Um host global (`MenuHost`). Aberto por um gatilho com mais de 200 px, tem no mínimo a largura dele e as bordas alinhadas (cabeçalho do espaço, dispositivos). |
 | `Modal` | Portal, scrim, foco preso (Tab cicla), Esc fecha só o do topo, devolve o foco, `data-autofocus` escolhe o primeiro foco. |
 | `Popover` | Conteúdo rico ancorado (status, perfil). Fecha com Esc/clique fora. |
-| `toast` / `ToastHost` | `toast.info/success/error(texto, { action })`, pausa no hover. Só para feedback longe do ponto de ação. Canto inferior direito; quando o dock da chamada encosta embaixo desse canto (janela estreita), a pilha sobe acima dele (`--toast-bottom`, medido pelo próprio dock) e nunca cobre Desconectar. |
+| `toast` / `ToastHost` | `toast.info/success/error(texto, { action })`, pausa no hover. Só para feedback longe do ponto de ação. Canto inferior direito. **Uma regra, qualquer tamanho de janela:** com o dock da chamada na tela, a pilha sobe acima dele (`--toast-bottom` = topo do dock + 12 px, medido pelo próprio dock) e nunca cobre Desconectar. As capturas limpam os toasts antes de cada tela (`shot(..., { toasts: true })` quando o toast é o assunto). |
 | `Tabs` / `SegmentedControl` | Roving focus com setas; o segmented tem thumb deslizante. |
 | `Fronds` | Glifo vivo de 3 barras: `getLevel` (envelope), `breathing` (gente aqui agora) ou estático. |
 | `useEnvelope` / `useSpeakingGlow` | Envelope de voz em `--speak` no próprio elemento / no avatar (via `glowRef`). `Avatar glow` desenha o halo herdando `--speak` de um ancestral (tile). |
@@ -122,6 +124,8 @@ Profundidade no escuro = luminância + borda translúcida + anel escuro. `--elev
 ## 5. Padrões de tela
 
 - **Lista densa:** linhas de 28 px (canais) ou 40 px (DMs), sem separadores; não lido = peso 590 + texto primário; menções = badge vermelho.
+- **Resposta:** uma linha 12/510 acima da mensagem ("↩ Carlinha · Só achei que…") e uma haste reta de 2 px (`rgba(255,255,255,.14)`) na coluna do avatar, descendo até ele. Sem o conector curvo: a conversa ganha um ritmo vertical próprio, e o clique na linha leva à original. No composer: "Respondendo a **Bruno Costa** · citação".
+- **Autor:** nome e foto abrem o mesmo cartão de perfil da lista de membros (Mensagem, Ligar, amizade, ⋯).
 - **Mensagens:** agrupadas por autor em janelas de 7 min (resposta sempre abre grupo), separador de dia, linha "Novas" presa ao marcador de leitura do momento em que o canal abriu, barra de ações no hover (reações rápidas, responder, editar, excluir), Shift+clique em excluir pula a confirmação.
 - **Composer:** Enter envia, Shift+Enter quebra linha, ↑ edita a última mensagem sua, contador aparece faltando 400 caracteres e fica vermelho acima de 4000, rascunho por canal.
 - **Vazios:** ícone em quadro de 48 px, título curto, uma frase em `text-tertiary`, no máximo um CTA.
@@ -198,7 +202,7 @@ Configurações › Usuário › **Assinatura**. O Grátis é bom de verdade e a
 
 ### Personalização e cosméticos (`features/billing/Shop.tsx`, `Cosmetics.tsx`, `look.ts`)
 
-- **Loja:** prateleiras por tipo à esquerda (tiles de 128 px ou mais: amostra de 64 px em `--bg-raised`, nome, preço ou estado) e **prévia fixa** à direita (`sticky`, 288 px): o seu cartão de perfil com o item escolhido sobre o que você já usa; embaixo tipo, nome, descrição e a ação. Seleção do tile é neutra (`--state-selected` + borda forte), nunca acento. Estados: preço, "Em uso", "Na sua conta", "Coleção Plus" (leva ao plano), "Alga Plus" (incluído no seu).
+- **Loja:** a exceção ao quadro de 1040: até 1240 px, crescendo para a direita (a navegação não pula). Prateleiras por tipo à esquerda em `repeat(auto-fill, minmax(152px, 1fr))` (amostra de 96 px em `--bg-raised` com avatar de 56, nome, preço ou estado) e **prévia fixa** à direita (`sticky`, 320 px): o seu cartão de perfil (avatar 80) com o item escolhido sobre o que você já usa e, para decoração e placa, também a linha da lista (32) e o palco (96); temas e efeitos dizem que só aparecem no cartão. Placa = só gradiente, raio 6, padding 2 8, sem contorno. Em 40 px ou menos as decorações usam geometria simplificada (kelp com 3 folhas largas, coral com galhos grossos e pólipos grandes, sem brilho); embaixo tipo, nome, descrição e a ação. Seleção do tile é neutra (`--state-selected` + borda forte), nunca acento. Estados: preço, "Em uso", "Na sua conta", "Coleção Plus" (leva ao plano), "Alga Plus" (incluído no seu).
 - **Texto de posse** segue os termos (licença ligada à conta, não propriedade): "Comprou uma vez, fica na sua conta, sem renovação". Nunca "para sempre". Antes de comprar: "Pagamento único, sem renovação: fica na sua conta. Você pode pedir reembolso em até 7 dias."
 - **Equipar é do servidor** (`PUT /users/@me/cosmetics`, um item por lugar de `COSMETIC_SLOTS`): no detalhe da loja, "Usar no perfil" (primário) para o que está na sua conta ou vem com o Plus, "Tirar do perfil" (secundário) para o que está em uso; se outro item ocupa o lugar, a linha diz "Usar troca Coral no seu perfil". O chip do tile vira "Em uso" e a prévia já mostra. Logo depois de uma compra confirmada, a linha de confirmação vem com "Usar no perfil" ao lado (nada é equipado sozinho). Erro no lugar (10/min, item que saiu da conta).
 - **O dos outros também aparece, ao vivo:** `useLook(id)` lê `PublicUser.cosmetics` do store (`lookOf`, testado: SKU desconhecido ou no lugar errado é ignorado), que `USER_UPDATE`/`ME_UPDATE` atualizam. Lista de membros (decoração e placa, discretas, movimento só no hover), popover de perfil (o cartão completo) e, no palco, só a decoração no avatar do tile (nunca na faixa de 40 px, nunca com movimento: o brilho da voz manda). A lista de membros usa o perfil de `users` (o `Member.user` não recebe `USER_UPDATE`). Autores no chat ainda não (o chat está com o agente de desempenho).
@@ -217,41 +221,54 @@ Configurações › Usuário › **Assinatura**. O Grátis é bom de verdade e a
 
 - **Quem está:** a ocupação vem do servidor (`voiceStates`); nível, mudo e transmissões vêm do motor de mídia quando você está conectado. Ordem = ordem de entrada.
 - **Tiles:** 16:9, gap 8, raio 12, `--bg-raised`, **sem borda**. A largura sai de `fitGrid()` (maior 16:9 que cabe; arranjo mais alto que largo só vence com 20 % de vantagem, porque pessoas lado a lado leem melhor numa tela paisagem), mínimo 200, máximo 880. Avatar 96/80/56 conforme o tile. **Linhas equilibradas** (`balancedRows`): 7 pessoas ficam 3·2·2 e 5 ficam 3·2, nunca 3·3·1 com um tile solto; cada linha é centralizada (quebra de linha invisível no mesmo contêiner flex, então nenhum tile remonta e a animação de reorganização continua). O nome é o **apelido do espaço** (`displayName(state, id, spaceId)`) no tile, na prévia e no mini-player. Rótulo no canto inferior esquerdo: pílula `rgba(0,0,0,.5)` 12/510 com o ícone de estado em `--danger` (mic riscado, fone riscado, escudo = silenciado pela moderação). Qualidade ruim/sem sinal aparece no canto superior direito; boa não ocupa espaço.
-- **Menu do tile (botão direito):** "Para você" (silenciar só para mim, volume 0–200 % no botão ⋯) e, com permissão (`computePermissions`), "Moderação": silenciar/ensurdecer para todos, mover para outro canal de voz, desconectar.
-- **Transmissões:** tile próprio com "AO VIVO" e **Assistir** — nada é baixado antes disso. Assistindo: vídeo `contain` em preto, barra no hover (volume da live se houver áudio, Automática/Original, estatísticas, ampliar, janela flutuante via `requestPictureInPicture`, tela cheia no contêiner via `requestFullscreen`, parar de assistir). Duplo clique = tela cheia. Estatísticas (Ctrl Shift E): resolução, fps, taxa, codec, decodificador e HW/SW, perda, congelamentos. Sair do palco mantém só uma transmissão (no mini-player) e para as outras.
-- **Transmissão assistida em destaque:** quando você assiste a alguém (e há mais gente na sala), a transmissão ganha um tile 16:9 grande no topo (até 64 % da altura do palco) e as pessoas continuam numa grade normal e equilibrada embaixo (`stageLayout`). Prioridade sem sequestrar o palco: ninguém some numa faixa, e o modo foco continua a um clique (Ampliar na barra da transmissão).
-- **Foco:** a transmissão ocupa o palco e as pessoas viram uma faixa de tiles de 160×90 embaixo.
+- **Menu do tile (botão direito):** o mesmo menu de pessoa da lista de membros (`personEntries`): Mensagem, Ligar; "Para você" (silenciar só para mim, volume 0–200 % no botão ⋯ do tile); "Moderação" com permissão (`voiceModEntries`: silenciar/ensurdecer para todos, mover, desconectar; "Gerenciar em Membros"); amizade conforme o estado; Copiar nome de usuário; Denunciar (vermelho, por último).
+- **Uma pessoa, um tile.** Transmitir é uma propriedade da pessoa, não um segundo tile: o tile de quem transmite ganha o selo **AO VIVO** no canto superior esquerdo e, se você ainda não assiste, **Assistir** (`Button primary sm`, 28 px) embaixo do avatar. Nada é baixado antes do clique. Na faixa, o selo é o próprio botão.
+- **Assistir toma o palco**, com qualquer número de pessoas: a transmissão vira o maior 16:9 que cabe acima de uma faixa de pessoas (`featuredWidth`: `min(largura, (altura − faixa − 8) × 16/9)` dentro da área, que já desconta o padding e o dock). A faixa tem tiles de 160×90, ou 120×68 quando o palco é baixo (área < 620 px, ou seja, palco < 720). Outras transmissões que você assiste ficam na faixa (clique = trocar qual está no palco, `focus`). Vídeo `contain` em preto, barra no hover (volume da live se houver áudio, Automática/Original, estatísticas, janela flutuante via `requestPictureInPicture`, tela cheia no contêiner via `requestFullscreen`, parar de assistir). Duplo clique = tela cheia. Estatísticas (Ctrl Shift E): resolução, fps, taxa, codec, decodificador e HW/SW, perda, congelamentos, em pt-BR (`4,1 Mb/s`, `0,0 %`). Sair do palco mantém só uma transmissão (no mini-player) e para as outras.
 - **Mini-player** (montado no `Shell`, não mais dentro do cartão de chamada recebida): saiu do palco da sua chamada (outro canal, DM, Home) com uma transmissão assistida: ela continua num quadro de 320×180 (raio 12, `--elev-overlay`, `--z-call-overlay`) no canto inferior direito, acima do compositor. Arrastar move 1:1; ao soltar, encaixa no canto mais próximo (220 ms out-quart; sem animação com movimento reduzido). No hover: **Voltar para a chamada** e **Parar de assistir**; duplo clique volta. Pílula "AO VIVO · apelido" no canto inferior esquerdo. É a mesma inscrição (nada novo é baixado); sair do palco mantém só a transmissão em foco (ou a primeira) e para as outras.
-- **Sua transmissão:** cartão "Você está transmitindo" com a melhor camada realmente enviada (resolução · fps · taxa · encoder HW/SW), "Trocar fonte" e "Parar transmissão". Enquanto você transmite, um chip "Você está transmitindo · Parar" fica na title bar, visível até por cima das configurações. Se o plano muda no meio, um aviso único e calmo diz o novo teto ("Seu plano não inclui 1080p 60 fps: a transmissão continua, em 720p 60 fps.") e nada para.
-- **Estados honestos:** conectando = chip âmbar + "Conectando…" no seu tile; reconectando = tiles em cinza a 40 %, `--speak` forçado a 0 e cartão "Reconectando à voz…" explicando que você não está ouvindo ninguém; desconectado = motivo do motor + "Entrar de novo". O dock continua lá para você sair.
+- **Sua transmissão, no seu tile:** "Você está transmitindo", a melhor camada realmente enviada (resolução · fps · taxa · HW/SW), "Trocar fonte" e "Parar transmissão" (`Button secondary sm` com o ícone `Square`: parar não destrói nada, o vermelho é do Desconectar). Se o plano muda no meio, a frase do motor ("Seu plano não inclui 1080p 60 fps: a transmissão continua, em 720p 60 fps.") aparece **no tile**, 12/510 em `--warning`, por 8 s, e nada para; fora do palco ela continua um toast (`routeStreamNotice`). Com o palco à vista, o estado "ao vivo" fica em dois lugares só: o botão Tela preenchido no dock e o seu tile. O chip "Você está transmitindo · Parar" da title bar aparece fora do palco (outro canal, Home) ou com as configurações por cima dele.
+- **Estados honestos:** conectando = "Conectando…" no seu tile; reconectando = tiles em cinza a 40 %, `--speak` forçado a 0 e um chip de 32 px no topo do palco ("Reconectando à voz…" em âmbar + "Você não está ouvindo ninguém agora."), sem cobrir ninguém; desconectado = cartão com o motivo do motor + "Entrar de novo". O dock continua lá para você sair.
+- **Header do palco:** só o nome e o tema do canal. O status da chamada mora num lugar só, o painel "Voz conectada", e a contagem só na prévia.
 - **Prévia (antes de entrar):** quem está na sala, contagem e um botão primário "Entrar em <canal>". Vazio: frondes com halo, "Ninguém aqui ainda / Entre e chame alguém. Quem chegar já te ouve."
 
 ### Dock de controles
 
-Flutuante, centralizado, 16 px do fundo, `--bg-overlay` + `--elev-overlay`, raio cheio, padding 6, botões de 40 px com gap 8 e separadores de 1 px: **Microfone** (anel interno segue o seu próprio envelope: você vê que está sendo ouvido) · **Fone** | **Tela** (desligado: abre o seletor; ao vivo: preenchido em acento, menu com "Trocar fonte" e "Parar transmissão") · **Configurações de voz** | **Desconectar** (56 px, `--danger` cheio). Desligado = ícone riscado + `--danger` + tinta vermelha; nunca só cor. Silenciado pela moderação: o botão fica `aria-disabled` e o tooltip diz por quê.
+Flutuante, centralizado, 16 px do fundo, `--bg-overlay` + `--elev-overlay`, raio cheio, padding 6, botões de 40 px com gap 8 e separadores de 1 px: **Microfone** (anel interno segue o seu próprio envelope: você vê que está sendo ouvido) · **Fone** | **Tela** (desligado: abre o seletor; ao vivo: preenchido em acento, menu com "Trocar fonte" e "Parar transmissão", sem vermelho) · **Configurações de voz** | **Desconectar** (56 px, `--danger` cheio). Desligado = ícone riscado + `--danger` + tinta vermelha; nunca só cor. Silenciado pela moderação: o botão fica `aria-disabled` e o tooltip diz por quê.
 
 ### Seletor de tela
 
-Modal de 800 px: abas Telas / Janelas com miniaturas ao vivo (atualizadas em cadeia a cada 1,5 s, sem empilhar pedidos), a principal pré-selecionada; à direita, prévia grande da fonte escolhida, **Qualidade** = `screen.offered` (o que o computador sustenta **e** o plano inclui), **O que você vai mostrar** (Jogo ou vídeo = fps / Texto ou código = nitidez, em linguagem simples) e **Compartilhar áudio** (com aviso de que em janela vai o áudio do sistema inteiro). O texto de consentimento está no topo: só o escolhido é transmitido, só para quem clicar em Assistir.
-- **Fora do plano:** o que este computador conseguiria mandar mas o plano não inclui (`screen.locked`) aparece na mesma lista, em `--text-disabled`, não selecionável (`aria-disabled`), com cadeado de 12 px e "Alga Plus" à direita; embaixo, uma linha só: "1080p 60 fps vem com o Alga Plus. **Ver o Alga Plus**" (link em acento que fecha o seletor e abre Configurações › Assinatura). Nada de modal, selo ou contador, e nunca um preset que o hardware não aguentaria (num monitor 1080p, 1440p60/4K não aparecem).
-- **Com transmissão ativa**, o mesmo seletor troca a fonte **e/ou** a qualidade sem derrubar quem assiste ("Trocar fonte" quando a fonte muda, "Aplicar" quando só a qualidade muda; dica: "Muda na hora, sem interromper quem assiste."). Assinou o Plus no meio da transmissão: 1080p60 fica selecionável ali mesmo.
+Modal de 836 px em duas colunas. À esquerda (464 px): abas Telas / Janelas e a prévia grande da fonte escolhida (464×261, raio 8), com miniaturas ao vivo atualizadas em cadeia a cada 1,5 s, sem empilhar pedidos. Com uma fonte só não há grade: a prévia é a escolha. Com várias, grade de 3 colunas (≈148×83, 16:9) acima da prévia; passou de duas linhas, a terceira aparece pela metade e a grade rola. A principal vem pré-selecionada; trocar de aba escolhe a primeira fonte dela (transmitindo uma janela, o seletor abre em Janelas). À direita (300 px): **Qualidade** em dois controles segmentados, resolução e quadros por segundo, tirados de `screen.offered` + `screen.locked` (`qualityAxes`, testado). Trocar a resolução mantém o fps quando dá; senão vai para o par oferecido mais próximo. Um fps que não existe naquela resolução não aparece (1440p só 60, 4K só 30). Depois vêm **O que você vai mostrar** (Jogo ou vídeo / Texto ou código) e **Compartilhar áudio** (em janela, avisa que vai o áudio do sistema inteiro). O texto de consentimento fica no topo: só o escolhido é transmitido, só para quem clicar em Assistir.
+- **Fora do plano:** o segmento continua visível, em `--text-disabled`, `aria-disabled`, com cadeado de 12 px, lido como "1440p, Alga Plus" e pulado pelas setas. Embaixo, uma linha só: "1080p 60 fps vem com o Alga Plus. **Ver o Alga Plus**" (link em acento que fecha o seletor e abre Configurações › Assinatura). Nada de modal, selo ou contador, e nunca um preset que o hardware não aguentaria.
+- **Com transmissão ativa:** o mesmo seletor troca a fonte e/ou a qualidade sem derrubar quem assiste ("Trocar fonte" / "Aplicar"; dica: "Muda na hora, sem interromper quem assiste."). Assinou o Plus no meio: o par liberado fica selecionável ali mesmo.
 
 ### Presença de voz no cromo
 
 - **Agora (Home):** salas com gente agora em todos os seus espaços e chamadas de DM; sua sala primeiro, depois as com mais amigos. Linha de 44 px: pilha de até 3 avatares de 20 px (com brilho real se for a sua sala), nome, onde ("Estúdio Alga" / "Chamada"), "ao vivo" se alguém transmite. Um clique entra.
-- **Rail:** espaço com gente em voz ganha frondes de 12 px no canto (vivas se você está lá, respirando se não); menções têm prioridade no mesmo canto. Home ganha frondes quando há chamada de DM.
+- **Rail, cantos separados:** frondes de 12 px no canto inferior direito (vivas se você está lá, respirando se não) e o badge de menção de 16 px no canto superior direito (−4/−4). A frase do produto ("tem gente falando ali") nunca some atrás de um contador. Home ganha frondes quando há chamada de DM e o badge neutro em cima.
+- **Header do chat (voz dentro do chat):** num canal de texto, quando um canal de voz do espaço tem gente, o header mostra a pilha de avatares de 20 px (com o brilho real se é a sua sala), frondes e "3 em Sala de foco", com "Entrar" (ghost sm) ou "Abrir" se você já está lá. A sala em que você está ganha; senão, a mais cheia (`VoiceHere`).
+- **Lista de membros:** abre com **Em voz · N** (frondes de 12 px no rótulo; cada linha com o nome do canal embaixo), depois Online e Offline. Presença efetiva: quem tem `voiceState` nunca aparece como Offline (`presenceOf`).
+- **Cartão de perfil (300 px):** banner, avatar de 80, nome 17/590, @usuário em terciário, cargos em chips de 20 px com ponto de 6 na cor do cargo, a linha "Em Sala de foco" (tinta de acento, frondes, "Entrar") se a pessoa está em voz, e o rodapé: **Mensagem** (primário, flex 1), Ligar (abre o DM e chama), Adicionar amigo / Aceitar / pedido enviado conforme o estado, e ⋯ com o resto (amizade, bloquear, copiar nome de usuário, Denunciar por último em vermelho). Bloqueado: só "Desbloquear". O seu: "Editar perfil". Abre pela lista de membros e pelo autor no chat.
 - **Sidebar:** canal de voz ocupado troca o alto-falante pelas frondes em acento; ocupantes em linhas de 26 px com avatar de 20 px e o mesmo brilho, "AO VIVO" e ícones de estado. **Um clique num canal de voz entra nele** (hábito do Discord mantido).
-- **Painel "Voz conectada":** acima da sua linha no dock: frondes vivas + estado (13/590 acento; âmbar quando não conectado) + ping `tnum` à direita; canal · espaço em 12 terciário; ações Tela e Desconectar; quando ao vivo, uma faixa "Transmitindo · Parar".
-- **Chamada de DM:** botão de telefone no header do DM (vira "Entrar na chamada" em acento quando já há alguém); o palco ocupa o topo da conversa (clamp 240–460 px) e o chat continua embaixo. Chamada recebida: cartão no topo da janela (avatar que respira, Recusar / Atender com foco em Atender, Esc recusa, some em 30 s ou quando quem ligou desiste) + notificação do Windows e piscar na barra de tarefas se a janela não está em foco. **Som:** toque sintetizado na mesma voz dos outros sons (seno + triângulo uma oitava acima): mi–sol♯–si leve, duas vezes, a cada 3,2 s; para ao atender, recusar, expirar ou quando quem ligou desiste. Quem liga ouve um tom de chamada baixo (lá–dó♯ em crescendo, a cada 3 s, volume 0,07) até alguém entrar, você sair ou 30 s. Os dois obedecem "Sons de chamada".
+- **Painel "Voz conectada" (o único lugar do status):** acima da sua linha no dock: frondes vivas + estado (13/590 acento; âmbar quando não conectado; o rótulo nunca trunca, `flex-shrink: 0`) + qualidade em 3 barras de 12 px à direita (a nota do SFU, senão o ping), com os números no tooltip ("34 ms · perda 0,0 %"; abaixo de 5 ms, "< 5 ms"); canal · espaço em 12 terciário; ações Tela e Desconectar.
+- **Chamada de DM:** botão de telefone no header do DM (vira "Entrar na chamada" em acento quando já há alguém); o palco ocupa o topo da conversa (clamp 240–460 px) e o chat continua embaixo. Com a chamada em curso, a abertura da conversa troca "Ligar" por "Em chamada". Chamada recebida: cartão de 360 px no canto superior direito, logo abaixo do header (`--elev-overlay`, `--z-call-overlay`), sem cobrir nenhum título (avatar que respira, nome, e embaixo Recusar em `secondary-danger` / Atender com foco em Atender, Esc recusa, some em 30 s ou quando quem ligou desiste) + notificação do Windows e piscar na barra de tarefas se a janela não está em foco. **Som:** toque sintetizado na mesma voz dos outros sons (seno + triângulo uma oitava acima): mi–sol♯–si leve, duas vezes, a cada 3,2 s; para ao atender, recusar, expirar ou quando quem ligou desiste. Quem liga ouve um tom de chamada baixo (lá–dó♯ em crescendo, a cada 3 s, volume 0,07) até alguém entrar, você sair ou 30 s. Os dois obedecem "Sons de chamada".
 
 ### Configurações (`features/settings`)
 
-Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, botões nativos, chip de transmissão). Navegação à esquerda no estilo Linear, agrupada por rótulo (Usuário / Aplicativo); Esc, o ✕ ou Ctrl+, fecham e o foco volta para quem abriu. Cada controle faz algo de verdade; o que não tem backend não aparece (fixar):
+Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, botões nativos, chip de transmissão). Quadro centrado em telas largas: navegação 232 + conteúdo 808 = 1040 px (`minmax(232px, calc(50% - 288px))`); a Personalização usa 1240 e cresce para a direita, sem mover a navegação. Navegação à esquerda no estilo Linear, agrupada por rótulo (Usuário / Aplicativo); Esc, o ✕ ou Ctrl+, fecham e o foco volta para quem abriu. Cada controle faz algo de verdade; o que não tem backend não aparece (fixar):
 - **Assinatura** e **Personalização:** ver as seções acima. **Privacidade:** ver Confiança e segurança.
-- **Minha conta:** foto (recorte + upload), nome, usuário, bio (190), cor do perfil (PATCH /users/@me); e-mail e se está confirmado; trocar senha com força (POST /auth/password, encerra as outras sessões); sessões com "Encerrar" e "Sair de todas as outras sessões"; sair da conta.
-- **Voz e vídeo:** qualidade de transmissão do plano (ver Assinatura), microfone e saída, teste com medidor ao vivo e "ouvir a mim mesmo", processamento (Padrão / Supressão avançada / Desligado, uma frase honesta cada; aviso se a supressão avançada não carregou), detecção de voz vs aperte para falar, sensibilidade (automática ou manual: a linha do limiar sobre o nível em dB, arrastável), atraso ao soltar o PTT, sons de chamada.
+- **Minha conta:** foto (recorte + upload), nome, usuário, bio (190), cor do perfil (PATCH /users/@me); e-mail e se está confirmado; trocar senha com força (POST /auth/password, encerra as outras sessões); sessões distinguíveis (app e versão · sistema, "Conectado desde … · último uso …", chip neutro "Este dispositivo") com "Encerrar" e "Sair de todas as outras sessões"; sair da conta (os dois em `secondary-danger`, o vermelho cheio só na confirmação).
+- **Voz e vídeo:** qualidade de transmissão do plano (ver Assinatura), microfone e saída (`MenuButton` + `Menu`, ✓ no atual, "Padrão do sistema · <aparelho>"), teste com medidor ao vivo e "ouvir a mim mesmo", processamento (Padrão / Supressão avançada / Desligado, uma frase honesta cada; aviso se a supressão avançada não carregou), detecção de voz vs aperte para falar, sensibilidade (automática ou manual: a linha do limiar sobre o nível em dB, arrastável), atraso ao soltar o PTT, sons de chamada.
 - **Atalhos:** gravar via `window.alga.hotkeys.record`, rótulo do sistema, salvos em `localStorage` (`alga.hotkeys.v1`) e reaplicados no boot.
-- **Notificações:** DMs e menções, chamadas, contador na barra de tarefas. **Aparência:** densidade Confortável/Compacta (linhas de 24 px, sem respiro entre grupos), reduzir animações. **Inicialização:** abrir com o Windows, fechar para a bandeja. **Avançado:** versão, procurar atualizações (com estados), abrir pasta de registros.
+- **Notificações:** DMs e menções, chamadas, contador na barra de tarefas. **Aparência:** Tamanho do texto 14/15/16/17 (`html[data-text-size]` → `--msg-size`/`--msg-line` → `--type-message`); densidade Confortável/Compacta (linhas de 20 px, sem respiro; "Avatares nas mensagens" desligado vira linha estilo IRC); reduzir animações. Zoom da interface depende de `webContents.setZoomFactor` no preload (pedido em aberto): CSS `zoom` desalinharia menus e popovers. **Inicialização:** abrir com o Windows, fechar para a bandeja. **Avançado:** versão, procurar atualizações (com estados), abrir pasta de registros.
+
+## 5b. Identidade além do matiz (rodada 3)
+
+A crítica r2 (§4) mostrou que, num print do chat, o esqueleto ainda é o do Discord e que o próprio brilho de fala, no pico, vira o anel do Discord em outra cor. Escolhemos três movimentos que mudam a sensação sem mexer no esqueleto que o migrante conhece (espaços à esquerda, canais, chat, palco), mais os cantos separados do rail que a crítica pediu como correção:
+
+1. **Luz, não anel.** O brilho de quem fala é luz embaixo d'água (luz interna + halo que cresce, contorno nunca acima de 70 %) e **a sala respira**: uma luz baixa no fundo do palco sobe com a voz mais alta. Por quê: é o ponto mais citado como "cópia" no palco, e o envelope de voz já é a nossa assinatura (§3); estendê-lo do tile para a sala dá ao palco um tempo próprio que nenhum concorrente tem, a custo de duas camadas de `opacity`.
+2. **Voz dentro do chat.** O header de um canal de texto diz onde o espaço está falando agora ("3 em Sala de foco", rostos com brilho real, Entrar) e a lista de membros abre com "Em voz". Por quê: o chat é 80 % do tempo; "voz e presença primeiro" tem de aparecer na tela mais vista, não só no palco. Para o migrante, é informação a mais no mesmo lugar, não um lugar novo.
+3. **Ritmo vertical na resposta.** A resposta é uma linha 12/510 com uma haste reta na coluna do avatar, sem o conector curvo. Por quê: é o detalhe que mais denuncia "Discord" num print do chat; a haste reta conversa com as barras da marca e mantém a função (clicar leva à original).
+
+Também da rodada: uma marca só (as frondes, Marca v1), presente do ícone do Windows ao glifo que se move com a voz. Ficaram para depois, por custo de migração ou de implementação: a folha que nasce do espaço escolhido no lugar da pílula branca do rail e a bandeja que respira enquanto você está em voz (precisa do processo principal).
 
 ## 6. Faça / não faça
 
@@ -262,6 +279,10 @@ Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, bo
 | Bordas brancas translúcidas | Cinza sólido como borda |
 | Raio externo = interno + padding | Mesmo raio no contêiner e no filho |
 | Feedback no ponto da ação | Toast para algo que já está na tela |
+| Uma pessoa, um tile (o "ao vivo" é um selo no tile) | Segundo tile repetindo o avatar de quem transmite |
+| Status da chamada só no painel "Voz conectada" | Repetir "Voz conectada"/ping no header |
+| Vermelho cheio só em Desconectar e na confirmação | Fill vermelho em Parar transmissão, Sair da conta, Excluir em repouso |
+| Cor de cargo da paleta `ROLE_COLORS` | Cargo em teal, verde de online ou âmbar de aviso |
 | `IconButton` com `label` | Ícone clicável sem nome acessível |
 | Badge neutro para contagem; vermelho só para @menção | Vermelho para "tem coisa nova" |
 | Estado degradado visível (cinza, "Reconectando…") | Mostrar pessoas "bem" sem mídia |
@@ -275,43 +296,87 @@ Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, bo
 
 ## 7. Telas (versões mais recentes)
 
+### Rodada 3 (crítica r2)
+
+| Tela | Screenshot |
+|---|---|
+| Home com "Agora"; rail com menção em cima e frondes embaixo | [2026-11-01-home-agora-v5.png](../screenshots/2026-11-01-home-agora-v5.png) |
+| Chat: voz no header, "Em voz" na lista, resposta com haste reta | [2026-11-01-chat-channel-v8.png](../screenshots/2026-11-01-chat-channel-v8.png) |
+| Menu de pessoa (lista de membros): alcançar, moderação, amizade, denunciar | [2026-11-01-member-menu-v2.png](../screenshots/2026-11-01-member-menu-v2.png) |
+| Cartão de perfil: em voz + Entrar, cargos, Mensagem / Ligar / ⋯ | [2026-11-01-profile-popover-others-v3.png](../screenshots/2026-11-01-profile-popover-others-v3.png) |
+| Cartão de perfil com pedido de amizade pendente | [2026-11-01-profile-popover-pending-v2.png](../screenshots/2026-11-01-profile-popover-pending-v2.png) |
+| O autor no chat abre o mesmo cartão | [2026-11-01-chat-author-popover-v2.png](../screenshots/2026-11-01-chat-author-popover-v2.png) |
+| Prévia do canal de voz (header só com o nome) | [2026-11-01-voice-preview-v7.png](../screenshots/2026-11-01-voice-preview-v7.png) |
+| Palco: luz de quem fala, sala que respira, status só no painel | [2026-11-01-voice-stage-v7.png](../screenshots/2026-11-01-voice-stage-v7.png) |
+| Qualidade da conexão: 3 barras, números no tooltip | [2026-11-01-voice-panel-link-v2.png](../screenshots/2026-11-01-voice-panel-link-v2.png) |
+| Toast acima do dock em 1320×840 (uma regra só) | [2026-11-01-voice-toast-above-dock-v2.png](../screenshots/2026-11-01-voice-toast-above-dock-v2.png) |
+| Menu do tile: o mesmo menu de pessoa | [2026-11-01-voice-tile-moderation-menu-v5.png](../screenshots/2026-11-01-voice-tile-moderation-menu-v5.png) |
+| Seletor de tela: prévia grande, qualidade em dois controles | [2026-11-01-screen-picker-v5.png](../screenshots/2026-11-01-screen-picker-v5.png) |
+| Você transmitindo: o seu tile carrega a transmissão | [2026-11-01-screen-sharing-self-v5.png](../screenshots/2026-11-01-screen-sharing-self-v5.png) |
+| Transmitindo fora do palco: o chip da title bar | [2026-11-01-screen-sharing-offstage-v2.png](../screenshots/2026-11-01-screen-sharing-offstage-v2.png) |
+| Transmissão de outra pessoa: AO VIVO + Assistir no tile dela | [2026-11-01-stream-tile-unwatched-v5.png](../screenshots/2026-11-01-stream-tile-unwatched-v5.png) |
+| Assistindo: a transmissão toma o palco, pessoas na faixa | [2026-11-01-stream-watching-v5.png](../screenshots/2026-11-01-stream-watching-v5.png) |
+| Assistindo em 960×600 (faixa de 120×68) | [2026-11-01-stream-watching-960x600-v2.png](../screenshots/2026-11-01-stream-watching-960x600-v2.png) |
+| Estatísticas em pt-BR | [2026-11-01-stream-stats-v5.png](../screenshots/2026-11-01-stream-stats-v5.png) |
+| Reconectando: chip no topo, tiles em cinza | [2026-11-01-voice-reconnecting-v5.png](../screenshots/2026-11-01-voice-reconnecting-v5.png) |
+| Chamada recebida: cartão no canto, abaixo do header | [2026-11-01-call-incoming-v5.png](../screenshots/2026-11-01-call-incoming-v5.png) |
+| Chamada de DM: abertura diz "Em chamada" | [2026-11-01-dm-call-v5.png](../screenshots/2026-11-01-dm-call-v5.png) |
+| Palco em 960×600 | [2026-11-01-voice-stage-960x600-v2.png](../screenshots/2026-11-01-voice-stage-960x600-v2.png) |
+| Palco em 1920×1080 a 125 % | [2026-11-01-voice-stage-1920x1080@125-v1.png](../screenshots/2026-11-01-voice-stage-1920x1080@125-v1.png) |
+| Chat em 960×600 | [2026-11-01-shell-960x600-v4.png](../screenshots/2026-11-01-shell-960x600-v4.png) |
+| Home em 960×600 | [2026-11-01-home-960x600-v1.png](../screenshots/2026-11-01-home-960x600-v1.png) |
+| Home em 1920×1080 a 125 % | [2026-11-01-home-1920x1080@125-v1.png](../screenshots/2026-11-01-home-1920x1080@125-v1.png) |
+| Chat em 1920×1080 a 125 % | [2026-11-01-shell-1920x1080@125-v4.png](../screenshots/2026-11-01-shell-1920x1080@125-v4.png) |
+| Aparência: tamanho do texto | [2026-11-01-settings-appearance-v4.png](../screenshots/2026-11-01-settings-appearance-v4.png) |
+| Configurações em 960×600 | [2026-11-01-settings-960x600-v1.png](../screenshots/2026-11-01-settings-960x600-v1.png) |
+| Configurações em 1920×1080 (quadro centrado) | [2026-11-01-settings-1920x1080-v1.png](../screenshots/2026-11-01-settings-1920x1080-v1.png) |
+| Configurações em 1920×1080 a 125 % | [2026-11-01-settings-1920x1080@125-v1.png](../screenshots/2026-11-01-settings-1920x1080@125-v1.png) |
+| Dispositivos no menu do app | [2026-11-01-settings-voice-devices-v1.png](../screenshots/2026-11-01-settings-voice-devices-v1.png) |
+| Sessões distinguíveis, sair em secundário | [2026-11-01-settings-account-security-v3.png](../screenshots/2026-11-01-settings-account-security-v3.png) |
+| Loja: grade de 152, prévia em 3 tamanhos | [2026-11-01-shop-v1.png](../screenshots/2026-11-01-shop-v1.png) |
+| Loja em 1920×1080 | [2026-11-01-shop-1920x1080-v2.png](../screenshots/2026-11-01-shop-1920x1080-v2.png) |
+| Compacta sem avatares (IRC) | [2026-11-01-density-compact-v4.png](../screenshots/2026-11-01-density-compact-v4.png) |
+| Menu do espaço na largura do header | [2026-11-01-space-menu-v9.png](../screenshots/2026-11-01-space-menu-v9.png) |
+| Visão geral do espaço: Excluir em repouso sem fill | [2026-11-01-space-settings-overview-v5.png](../screenshots/2026-11-01-space-settings-overview-v5.png) |
+| Cargo com a paleta fora das cores de estado | [2026-11-01-space-settings-role-editor-v5.png](../screenshots/2026-11-01-space-settings-role-editor-v5.png) |
+
 | Tela | Screenshot |
 |---|---|
 | **Voz e presença** | |
-| Agora: onde seus amigos estão (Home) | [2026-11-01-home-agora-v3.png](../screenshots/2026-11-01-home-agora-v3.png) |
-| Canal de voz antes de entrar (prévia, apelidos do espaço) | [2026-11-01-voice-preview-v5.png](../screenshots/2026-11-01-voice-preview-v5.png) |
+| Agora: onde seus amigos estão (Home) | [2026-11-01-home-agora-v5.png](../screenshots/2026-11-01-home-agora-v5.png) |
+| Canal de voz antes de entrar (prévia, apelidos do espaço) | [2026-11-01-voice-preview-v7.png](../screenshots/2026-11-01-voice-preview-v7.png) |
 | Palco com 3 / 5 / 7 pessoas (linhas equilibradas, apelidos) | [3](../screenshots/2026-11-01-voice-stage-3-v2.png) · [5](../screenshots/2026-11-01-voice-stage-5-v2.png) · [7](../screenshots/2026-11-01-voice-stage-7-v2.png) |
 | Transmissão assistida em destaque, sala embaixo | [2026-11-01-stream-featured-v2.png](../screenshots/2026-11-01-stream-featured-v2.png) |
 | Mini-player fora do palco (hover) e encaixado em outro canto | [2026-11-01-stream-mini-player-v2.png](../screenshots/2026-11-01-stream-mini-player-v2.png) · [2026-11-01-stream-mini-player-snapped-v2.png](../screenshots/2026-11-01-stream-mini-player-snapped-v2.png) |
 | Seletor no Grátis: 1080p60 fora do plano, dica do Alga Plus | [2026-11-01-screen-picker-plan-locked-v1.png](../screenshots/2026-11-01-screen-picker-plan-locked-v1.png) |
 | Seletor ao vivo depois do upgrade (qualidade aplicada sem parar) | [2026-11-01-screen-picker-live-plus-v1.png](../screenshots/2026-11-01-screen-picker-live-plus-v1.png) |
 | Plano caiu no meio da transmissão: recapada, um aviso | [2026-11-01-screen-sharing-recapped-v2.png](../screenshots/2026-11-01-screen-sharing-recapped-v2.png) |
-| Palco: Bruno falando (brilho real, envelope da voz) | [2026-11-01-voice-stage-v5.png](../screenshots/2026-11-01-voice-stage-v5.png) |
-| Palco: você falando (anel do microfone no dock) | [2026-11-01-voice-stage-self-speaking-v3.png](../screenshots/2026-11-01-voice-stage-self-speaking-v3.png) |
+| Palco: Bruno falando (brilho real, envelope da voz) | [2026-11-01-voice-stage-v7.png](../screenshots/2026-11-01-voice-stage-v7.png) |
+| Palco: você falando (anel do microfone no dock) | [2026-11-01-voice-stage-self-speaking-v5.png](../screenshots/2026-11-01-voice-stage-self-speaking-v5.png) |
 | Mudo + ensurdecido | [2026-11-01-voice-self-muted-deafened-v3.png](../screenshots/2026-11-01-voice-self-muted-deafened-v3.png) |
-| Menu do tile: para você + moderação | [2026-11-01-voice-tile-moderation-menu-v3.png](../screenshots/2026-11-01-voice-tile-moderation-menu-v3.png) |
+| Menu do tile: para você + moderação | [2026-11-01-voice-tile-moderation-menu-v5.png](../screenshots/2026-11-01-voice-tile-moderation-menu-v5.png) |
 | Silenciado pela moderação (visão de quem foi silenciado) | [2026-11-01-voice-server-muted-v3.png](../screenshots/2026-11-01-voice-server-muted-v3.png) |
 | Movido por um moderador (VOICE_MOVE) | [2026-11-01-voice-moved-v3.png](../screenshots/2026-11-01-voice-moved-v3.png) |
 | Desconectado por um moderador (VOICE_DISCONNECT) | [2026-11-01-voice-disconnected-moderator-v3.png](../screenshots/2026-11-01-voice-disconnected-moderator-v3.png) |
-| Reconectando: o palco não finge que está tudo bem | [2026-11-01-voice-reconnecting-v3.png](../screenshots/2026-11-01-voice-reconnecting-v3.png) |
-| Seletor de tela (prévia, qualidade, conteúdo, áudio) | [2026-11-01-screen-picker-v3.png](../screenshots/2026-11-01-screen-picker-v3.png) |
-| Você transmitindo (chip na title bar + painel) | [2026-11-01-screen-sharing-self-v3.png](../screenshots/2026-11-01-screen-sharing-self-v3.png) |
-| Transmissão de outra pessoa: nada baixa até Assistir | [2026-11-01-stream-tile-unwatched-v3.png](../screenshots/2026-11-01-stream-tile-unwatched-v3.png) |
-| Assistindo (vídeo real via SFU) | [2026-11-01-stream-watching-v3.png](../screenshots/2026-11-01-stream-watching-v3.png) |
-| Estatísticas (Ctrl Shift E) | [2026-11-01-stream-stats-v3.png](../screenshots/2026-11-01-stream-stats-v3.png) |
+| Reconectando: o palco não finge que está tudo bem | [2026-11-01-voice-reconnecting-v5.png](../screenshots/2026-11-01-voice-reconnecting-v5.png) |
+| Seletor de tela (prévia, qualidade, conteúdo, áudio) | [2026-11-01-screen-picker-v5.png](../screenshots/2026-11-01-screen-picker-v5.png) |
+| Você transmitindo (chip na title bar + painel) | [2026-11-01-screen-sharing-self-v5.png](../screenshots/2026-11-01-screen-sharing-self-v5.png) |
+| Transmissão de outra pessoa: nada baixa até Assistir | [2026-11-01-stream-tile-unwatched-v5.png](../screenshots/2026-11-01-stream-tile-unwatched-v5.png) |
+| Assistindo (vídeo real via SFU) | [2026-11-01-stream-watching-v5.png](../screenshots/2026-11-01-stream-watching-v5.png) |
+| Estatísticas (Ctrl Shift E) | [2026-11-01-stream-stats-v5.png](../screenshots/2026-11-01-stream-stats-v5.png) |
 | Modo foco | [2026-11-01-stream-focus-v3.png](../screenshots/2026-11-01-stream-focus-v3.png) |
-| Chamada recebida (DM) | [2026-11-01-call-incoming-v3.png](../screenshots/2026-11-01-call-incoming-v3.png) |
-| Chamada no DM (palco no topo da conversa) | [2026-11-01-dm-call-v3.png](../screenshots/2026-11-01-dm-call-v3.png) |
+| Chamada recebida (DM) | [2026-11-01-call-incoming-v5.png](../screenshots/2026-11-01-call-incoming-v5.png) |
+| Chamada no DM (palco no topo da conversa) | [2026-11-01-dm-call-v5.png](../screenshots/2026-11-01-dm-call-v5.png) |
 | **Configurações** | |
 | Minha conta (foto enviada, perfil, e-mail) | [2026-11-01-settings-account-v3.png](../screenshots/2026-11-01-settings-account-v3.png) |
 | Recorte da foto (zoom + arrasto, círculo) | [2026-11-01-settings-avatar-crop-v2.png](../screenshots/2026-11-01-settings-avatar-crop-v2.png) |
-| Senha: força fraca + sair das outras sessões | [2026-11-01-settings-account-security-v2.png](../screenshots/2026-11-01-settings-account-security-v2.png) |
+| Senha: força fraca + sair das outras sessões | [2026-11-01-settings-account-security-v3.png](../screenshots/2026-11-01-settings-account-security-v3.png) |
 | Senha: força forte | [2026-11-01-settings-password-strong-v2.png](../screenshots/2026-11-01-settings-password-strong-v2.png) |
 | Voz e vídeo (teste de microfone ao vivo) | [2026-11-01-settings-voice-v3.png](../screenshots/2026-11-01-settings-voice-v3.png) |
 | Atalhos globais | [2026-11-01-settings-hotkeys-v3.png](../screenshots/2026-11-01-settings-hotkeys-v3.png) |
 | Notificações | [2026-11-01-settings-notifications-v3.png](../screenshots/2026-11-01-settings-notifications-v3.png) |
-| Aparência | [2026-11-01-settings-appearance-v3.png](../screenshots/2026-11-01-settings-appearance-v3.png) |
-| Densidade compacta aplicada | [2026-11-01-density-compact-v3.png](../screenshots/2026-11-01-density-compact-v3.png) |
+| Aparência | [2026-11-01-settings-appearance-v4.png](../screenshots/2026-11-01-settings-appearance-v4.png) |
+| Densidade compacta aplicada | [2026-11-01-density-compact-v4.png](../screenshots/2026-11-01-density-compact-v4.png) |
 | Inicialização | [2026-11-01-settings-startup-v3.png](../screenshots/2026-11-01-settings-startup-v3.png) |
 | Avançado (versão, atualizações, registros) | [2026-11-01-settings-advanced-v3.png](../screenshots/2026-11-01-settings-advanced-v3.png) |
 | **Anexos** | |
@@ -327,12 +392,12 @@ Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, bo
 | Reenviado | [2026-11-01-chat-upload-retried-v1.png](../screenshots/2026-11-01-chat-upload-retried-v1.png) |
 | Apelido + cor de cargo nas mensagens | [2026-11-01-chat-nicknames-v2.png](../screenshots/2026-11-01-chat-nicknames-v2.png) |
 | **Configurações do espaço** | |
-| Visão geral (ícone enviado) | [2026-11-01-space-settings-overview-v4.png](../screenshots/2026-11-01-space-settings-overview-v4.png) |
+| Visão geral (ícone enviado) | [2026-11-01-space-settings-overview-v5.png](../screenshots/2026-11-01-space-settings-overview-v5.png) |
 | Recorte do ícone | [2026-11-01-space-settings-icon-crop-v4.png](../screenshots/2026-11-01-space-settings-icon-crop-v4.png) |
 | Ícone no rail | [2026-11-01-space-icon-rail-v2.png](../screenshots/2026-11-01-space-icon-rail-v2.png) |
 | Cargos (dono) | [2026-11-01-space-settings-roles-v4.png](../screenshots/2026-11-01-space-settings-roles-v4.png) |
 | Cargos reordenados | [2026-11-01-space-settings-roles-reordered-v3.png](../screenshots/2026-11-01-space-settings-roles-reordered-v3.png) |
-| Editor de cargo | [2026-11-01-space-settings-role-editor-v4.png](../screenshots/2026-11-01-space-settings-role-editor-v4.png) |
+| Editor de cargo | [2026-11-01-space-settings-role-editor-v5.png](../screenshots/2026-11-01-space-settings-role-editor-v5.png) |
 | Cargos vistos pela Moderação (acima dela: cadeado) | [2026-11-01-space-settings-roles-limited-v2.png](../screenshots/2026-11-01-space-settings-roles-limited-v2.png) |
 | Cargo acima do seu: tudo desabilitado, com o motivo | [2026-11-01-space-settings-role-locked-v2.png](../screenshots/2026-11-01-space-settings-role-locked-v2.png) |
 | Membros | [2026-11-01-space-settings-members-v3.png](../screenshots/2026-11-01-space-settings-members-v3.png) |
@@ -386,7 +451,7 @@ Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, bo
 | Loja: item na sua conta, "Usar no perfil" | [2026-11-01-shop-equip-owned-v1.png](../screenshots/2026-11-01-shop-equip-owned-v1.png) |
 | Loja: em uso, "Tirar do perfil" | [2026-11-01-shop-equipped-v1.png](../screenshots/2026-11-01-shop-equipped-v1.png) |
 | Cosméticos de outra pessoa na lista de membros (USER_UPDATE) | [2026-11-01-members-cosmetics-others-v1.png](../screenshots/2026-11-01-members-cosmetics-others-v1.png) |
-| Popover de perfil de outra pessoa com cosméticos | [2026-11-01-profile-popover-others-v1.png](../screenshots/2026-11-01-profile-popover-others-v1.png) |
+| Popover de perfil de outra pessoa com cosméticos | [2026-11-01-profile-popover-others-v3.png](../screenshots/2026-11-01-profile-popover-others-v3.png) |
 | Placa tirada em outro aparelho: some sem recarregar | [2026-11-01-members-cosmetics-live-unequipped-v1.png](../screenshots/2026-11-01-members-cosmetics-live-unequipped-v1.png) |
 | Palco: decoração discreta no tile | [2026-11-01-voice-tile-cosmetics-v1.png](../screenshots/2026-11-01-voice-tile-cosmetics-v1.png) |
 | 960×600 em chamada: toast acima do dock | [2026-11-01-voice-toast-above-dock-960x600-v1.png](../screenshots/2026-11-01-voice-toast-above-dock-960x600-v1.png) |
@@ -425,7 +490,7 @@ Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, bo
 | Amigos: menu de contexto | [2026-11-01-friends-context-menu-v3.png](../screenshots/2026-11-01-friends-context-menu-v3.png) |
 | Adicionar amigo: erro no lugar | [2026-11-01-friends-add-error-v3.png](../screenshots/2026-11-01-friends-add-error-v3.png) |
 | Mensagem direta | [2026-11-01-dm-v6.png](../screenshots/2026-11-01-dm-v6.png) |
-| Canal | [2026-11-01-chat-channel-v6.png](../screenshots/2026-11-01-chat-channel-v6.png) |
+| Canal | [2026-11-01-chat-channel-v8.png](../screenshots/2026-11-01-chat-channel-v8.png) |
 | Barra de ações no hover (3 reações, +reação, responder, mais) | [2026-11-01-chat-hover-toolbar-v6.png](../screenshots/2026-11-01-chat-hover-toolbar-v6.png) |
 | Menu de contexto da mensagem (agrupado por rótulo) | [2026-11-01-chat-context-menu-v6.png](../screenshots/2026-11-01-chat-context-menu-v6.png) |
 | Respondendo no composer | [2026-11-01-chat-reply-composer-v6.png](../screenshots/2026-11-01-chat-reply-composer-v6.png) |
@@ -440,12 +505,12 @@ Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, bo
 | Ctrl+K: seções (Precisa de você, Conversas, Canais, Pessoas, Espaços) | [2026-11-01-switcher-v5.png](../screenshots/2026-11-01-switcher-v5.png) |
 | Ctrl+K com busca: agrupado por tipo, trecho que casou em 590 | [2026-11-01-switcher-query-v5.png](../screenshots/2026-11-01-switcher-query-v5.png) |
 | Status e perfil | [2026-11-01-user-status-v4.png](../screenshots/2026-11-01-user-status-v4.png) |
-| Menu do espaço (com "Configurações do espaço") | [2026-11-01-space-menu-v8.png](../screenshots/2026-11-01-space-menu-v8.png) |
+| Menu do espaço (com "Configurações do espaço") | [2026-11-01-space-menu-v9.png](../screenshots/2026-11-01-space-menu-v9.png) |
 | Convite | [2026-11-01-space-invite-v4.png](../screenshots/2026-11-01-space-invite-v4.png) |
 | Criar canal (selecionado sobe em luminância) | [2026-11-01-space-create-channel-v3.png](../screenshots/2026-11-01-space-create-channel-v3.png) |
 | Entrar com convite: prévia | [2026-11-01-space-join-preview-v3.png](../screenshots/2026-11-01-space-join-preview-v3.png) |
-| Tamanho mínimo 960×600 | [2026-11-01-shell-960x600-v3.png](../screenshots/2026-11-01-shell-960x600-v3.png) |
-| 1920×1080 a 125% | [2026-11-01-shell-1920x1080@125-v3.png](../screenshots/2026-11-01-shell-1920x1080@125-v3.png) |
+| Tamanho mínimo 960×600 | [2026-11-01-shell-960x600-v4.png](../screenshots/2026-11-01-shell-960x600-v4.png) |
+| 1920×1080 a 125% | [2026-11-01-shell-1920x1080@125-v4.png](../screenshots/2026-11-01-shell-1920x1080@125-v4.png) |
 | **Confiança e segurança** | |
 | Cadastro: campos obrigatórios, caixa desmarcada | [2026-11-01-auth-register-required-v3.png](../screenshots/2026-11-01-auth-register-required-v3.png) |
 | Cadastro: data por extenso + Termos aceitos | [2026-11-01-auth-register-birth-terms-v3.png](../screenshots/2026-11-01-auth-register-birth-terms-v3.png) |
