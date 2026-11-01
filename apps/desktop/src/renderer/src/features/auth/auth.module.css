@@ -1,3 +1,5 @@
+/* First contact (critique r3 #8 and sexy move 5): no card, no template. One 340 px column whose center sits at
+   ~42 % of the window, the mark at 40 px, a 28/590 display title, and a single indigo light from above. */
 .screen {
   position: relative;
   display: grid;
@@ -7,76 +9,74 @@
   overflow: auto;
   padding: var(--s-8) var(--s-4);
 }
-/* One soft indigo dawn above the card, nothing more. */
 .screen::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(720px 380px at 50% -12%, rgba(139, 142, 247, 0.09), transparent 70%);
+  background: radial-gradient(900px 520px at 50% -12%, rgba(139, 142, 247, 0.12), transparent 70%);
   pointer-events: none;
 }
 
+/* .card: the same column for the trust gates (birth date, restricted) that still use the old name. */
+.column,
 .card {
   position: relative;
-  /* Anchored from the top: an error or hint appearing never moves the field under the cursor. */
-  margin-top: clamp(16px, 12vh, 140px);
+  /* Anchored from the top (an error or hint appearing never moves the field under the cursor), placed so the login
+     column's center lands near 42 % of the window. */
+  margin-top: clamp(8px, calc(42vh - 250px), 320px);
   width: 100%;
-  max-width: 400px;
-  padding: var(--s-8);
-  border-radius: var(--r-xl);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 120px), rgba(15, 16, 17, 0.94);
-  box-shadow: var(--elev-modal), inset 0 0 0 1px var(--border-default);
+  max-width: 340px;
 }
 
 .mark {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  margin-bottom: var(--s-5);
-  margin-left: -8px;
+  width: 40px;
+  height: 40px;
+  margin-bottom: var(--s-6);
 }
 .title {
-  font: var(--type-title-lg);
+  font: var(--w-semibold) 28px/34px var(--font-ui);
   font-variation-settings: var(--opsz-display);
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
   text-wrap: balance;
 }
 .subtitle {
-  margin-top: var(--s-1);
+  margin-top: var(--s-2);
   text-wrap: balance;
   color: var(--text-tertiary);
   font: var(--type-ui);
   font-size: 14px;
+  line-height: 21px;
 }
 .form {
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
-  margin-top: var(--s-6);
+  margin-top: var(--s-8);
 }
 .alert {
   display: flex;
   align-items: flex-start;
-  gap: var(--s-2);
-  padding: var(--s-2) var(--s-3);
-  border-radius: var(--r-md);
-  background: var(--danger-tint);
+  gap: var(--s-1_5);
+  margin-top: calc(var(--s-1) * -1);
   color: var(--danger);
-  font: var(--type-ui);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+  text-wrap: pretty;
 }
 .alert svg {
+  flex-shrink: 0;
   margin-top: 2px;
 }
 .submit {
   margin-top: var(--s-2);
 }
 .switch {
-  margin-top: var(--s-5);
+  margin-top: var(--s-6);
   color: var(--text-tertiary);
   font: var(--type-ui);
-  text-align: center;
 }
 .link {
   color: var(--accent);

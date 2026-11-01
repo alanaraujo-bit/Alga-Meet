@@ -2,6 +2,7 @@ import { AlertCircle, ArrowBigUp, Eye, EyeOff, type Glyph } from './icons'
 import { useId, useState, type InputHTMLAttributes, type ReactNode, type Ref } from 'react'
 import { IconButton } from './Button'
 import { Icon } from './Icon'
+import { Tooltip } from './Tooltip'
 import s from './TextField.module.css'
 
 export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
@@ -17,7 +18,9 @@ export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   ref?: Ref<HTMLInputElement>
 }
 
-/** Label + input + help/error line. Password fields get show/hide and a Caps Lock hint. */
+const CAPS = 'Caps Lock está ativado'
+
+/** Label + input + help/error line. Password fields get show/hide and a Caps Lock glyph in the field. */
 export function TextField({ label, ariaLabel, hint, error, optional, leadingIcon, trailing, size = 'md', type = 'text', id, onKeyDown, onKeyUp, onBlur, ...rest }: TextFieldProps) {
   const autoId = useId()
   const inputId = id ?? autoId
@@ -27,15 +30,13 @@ export function TextField({ label, ariaLabel, hint, error, optional, leadingIcon
   const [caps, setCaps] = useState(false)
   const capsCheck = (e: React.KeyboardEvent<HTMLInputElement>) => isPassword && setCaps(e.getModifierState('CapsLock'))
 
+  // Caps Lock is a 14 px amber glyph in the field's right slot (tooltip + read by screen readers), never a line of
+  // its own: an error, a hint and Caps Lock no longer stack in amber, red and indigo under one field (critique r3 #8).
+  const capsId = `${inputId}-caps`
   const help = error ? (
     <span className={`${s.help} ${s.error}`} id={helpId} role="alert">
       <Icon icon={AlertCircle} size={12} />
       {error}
-    </span>
-  ) : caps ? (
-    <span className={`${s.help} ${s.caps}`} id={helpId}>
-      <Icon icon={ArrowBigUp} size={12} />
-      Caps Lock está ativado
     </span>
   ) : hint ? (
     <span className={s.help} id={helpId}>
@@ -62,7 +63,7 @@ export function TextField({ label, ariaLabel, hint, error, optional, leadingIcon
           type={isPassword && reveal ? 'text' : type}
           aria-label={label ? undefined : ariaLabel}
           aria-invalid={!!error || undefined}
-          aria-describedby={help ? helpId : undefined}
+          aria-describedby={[help ? helpId : '', caps ? capsId : ''].filter(Boolean).join(' ') || undefined}
           className={s.input}
           spellCheck={isPassword ? false : rest.spellCheck}
           onKeyDown={(e) => {
@@ -80,6 +81,16 @@ export function TextField({ label, ariaLabel, hint, error, optional, leadingIcon
         {(isPassword || trailing) && (
           <span className={s.trailing}>
             {trailing}
+            {caps && (
+              <Tooltip content={CAPS}>
+                <span className={s.caps} role="img" aria-label={CAPS}>
+                  <Icon icon={ArrowBigUp} size={14} />
+                  <span id={capsId} className="sr-only">
+                    {CAPS}
+                  </span>
+                </span>
+              </Tooltip>
+            )}
             {isPassword && (
               <IconButton
                 icon={reveal ? EyeOff : Eye}

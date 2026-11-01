@@ -49,13 +49,13 @@ export function AuthScreen() {
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={mode}
-          className={s.card}
+          className={s.column}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: EASE_OUT_QUART } }}
           exit={{ opacity: 0, transition: { duration: 0.1 } }}
         >
           <div className={s.mark}>
-            <LogoMark size={36} />
+            <LogoMark size={40} />
           </div>
           {mode === 'login' && <LoginForm resetDone={!!note.resetDone} invite={invite} onSwitch={() => go('register')} onForgot={() => go('forgot')} />}
           {mode === 'register' && <RegisterForm invite={invite} onSwitch={() => go('login')} />}
@@ -89,13 +89,14 @@ function useSubmit(run: () => Promise<void>, onFields: (f: Errors) => void, unau
   return { busy, error, submit }
 }
 
+/** A form-level error is a line of text under the fields (12/510 danger), not a red box (critique r3 #8). */
 function FormAlert({ text }: { text: string | null }) {
   if (!text) return null
   return (
-    <div className={s.alert} role="alert">
-      <Icon icon={AlertCircle} size={14} />
+    <p className={s.alert} role="alert">
+      <Icon icon={AlertCircle} size={12} />
       <span>{text}</span>
-    </div>
+    </p>
   )
 }
 

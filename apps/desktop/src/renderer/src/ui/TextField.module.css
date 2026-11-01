@@ -96,6 +96,10 @@
   color: var(--danger);
 }
 .caps {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
   color: var(--warning);
 }
 .input:disabled {
