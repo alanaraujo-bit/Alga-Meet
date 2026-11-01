@@ -28,6 +28,7 @@ Todas com prefixo `alga_` (as de processo seguem os nomes padrão). Rótulos só
 | `alga_http_requests_total` | counter | `method`, `route` (template, ex. `/api/v1/channels/:id/messages`; `unmatched` para 404 sem rota), `status_class` (`2xx`…`5xx`) | hook `onResponse` |
 | `alga_http_request_duration_seconds` | histogram | idem | idem |
 | `alga_rate_limited_total` | counter | `route` (`gateway` = socket fechado com 4008) | `@fastify/rate-limit` + gateway |
+| `alga_ratelimit_evictions_total` | counter | `route` | limitador em memória (5000 chaves por rota): chaves descartadas sob carga = limites vazando; alerta se `increase()[15m] > 0` de forma sustentada → hora de mover para Redis |
 | `alga_gateway_connections` / `alga_gateway_users_online` | gauge | — | `Hub`, na hora da coleta |
 | `alga_gateway_dispatches_total` / `alga_gateway_frames_sent_total` | counter | `type` (evento) | `Hub.dispatch`: eventos com destinatário online / frames escritos (= fan-out) |
 | `alga_gateway_ready_seconds` | histogram | — | frame `identify` → READY enviado |

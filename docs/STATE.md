@@ -34,7 +34,7 @@
 | Trust & Safety + LGPD (servidor) | `apps/server`, `docs/trust-safety` | **feito** — ver Validado |
 | UI onda 5 (telas de T&S/LGPD) | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Servidor: complementos de T&S (1c059e2, 165 testes) | `apps/server` | **feito** |
-| Servidor: endurecimento de T&S (download de exportação com senha, CSAM sem legal hold automático, limites por denunciante, avisos de exclusão) | `apps/server`, `docs/trust-safety` | em andamento |
+| Servidor: endurecimento de T&S (0b08eec, 167 testes em PGlite e PG 18) | `apps/server` | **feito** |
 | Desenho de E2EE (`docs/decisions/0004-e2ee.md`) | docs | em andamento |
 | Servidor: cosméticos equipáveis/públicos, eventos de convite, retomar renovação, observabilidade | `apps/server` | **feito** — ver Validado |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
