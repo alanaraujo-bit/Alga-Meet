@@ -21,6 +21,9 @@ Estudo do heyparker.ai em `docs/research/site-reference-heyparker.md`. Seções:
 ## Repositório (2026-11-01)
 **Público:** https://github.com/alanaraujo-bit/Alga-Meet (decisão do dono). Antes do primeiro push o histórico foi reescrito (git filter-repo) trocando os dados reais da rede de casa por valores genéricos (IP público, rede local, nome/MAC do servidor, domínio DuckDNS, provedor). Valores reais ficam só em `docs/private/` (git-ignored). Hooks locais `pre-commit` + `commit-msg` (`.git/hooks/public_guard.py`, regras em `.git/info/public-replacements.txt`) bloqueiam commits que reintroduzam esses dados. Política: o Maestro faz push para `origin/main` depois de cada lote de commits verificados. Auto-update (`electron-builder.yml`) e Railway IaC apontam para esse repositório.
 
+## Release pública
+**v0.1.1 (beta fechado)**: https://github.com/alanaraujo-bit/Alga-Meet/releases/tag/v0.1.1 — build limpo de `eca519f` (typecheck + 266 testes do desktop passando), aponta para o staging. Link estável sempre da última versão: `https://github.com/alanaraujo-bit/Alga-Meet/releases/latest/download/AlgaMeet-Setup.exe`. **Auto-update verificado de ponta a ponta:** o app 0.1.0 instalado no PC do dono encontrou e baixou a 0.1.1 sozinho (instala ao sair). Não assinado (SmartScreen avisa). Como publicar a próxima: subir a versão em `apps/desktop/package.json`, build limpo numa worktree com `MAIN_VITE_API_URL`, `gh release create vX.Y.Z` com `.exe`, `.blockmap`, `latest.yml` e a cópia `AlgaMeet-Setup.exe`.
+
 ## Versão executável
 - Dev: `npm install && npm run dev` (ver `README.md`). Multiusuário local: `npm run dev -- --profiles=bob` — abre duas janelas; crie uma conta em cada, adicione como amigo, crie um espaço, convide, entre no canal de voz e transmita a tela.
 - Funciona só nesta máquina/rede local até o deploy (API no Railway + SFU em VPS) — ver Bloqueios humanos.
@@ -166,7 +169,6 @@ Percursos só por teclado 3/10 → **10/10**; achados da auditoria 31 → 1; reg
 | O quê | Por quê | O que fazer | Sem isso |
 |---|---|---|---|
 | Certificado de assinatura de código (OV/EV ou Azure Trusted Signing) | Windows SmartScreen e confiança do updater | Contratar certificado; fornecer `CSC_LINK`/`CSC_KEY_PASSWORD` ou credenciais Azure | Instalador mostra aviso "editor desconhecido" |
-| Repositório GitHub de releases `alanaraujo-bit/alga-meet` | Canal do auto-update. Precisa ser **público** (ou um repo público só de releases), senão o app teria que embutir um token | Autorizar criação | Auto-update não tem de onde baixar |
 | Domínio próprio (ex. `algameet.com.br`) | URLs estáveis, e-mail, links de convite | Comprar domínio e apontar DNS | Staging fica em `*.up.railway.app` |
 | Servidor com UDP para o SFU: VM São Paulo (Vultr ~US$ 40–80/mês + banda) **ou** LiveKit Cloud plano grátis | Railway não expõe UDP | Criar conta Vultr (ou LiveKit Cloud) e autorizar custo | Voz/tela só funcionam em rede local/dev |
 | Conta Resend + domínio de envio verificado (DKIM/SPF/DMARC) | E-mails de verificação e reset em produção | Criar conta, configurar DNS (ver `docs/infra/deploy.md`) | Produção não sobe sem provedor de e-mail |
