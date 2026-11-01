@@ -1,5 +1,17 @@
 # Alga Meet — Estado do projeto
 
+## HANDOFF — 2026-11-01 (rotação do Maestro por contexto cheio)
+**Agentes que estavam rodando na sessão anterior** (commitam direto no `main`; conferir `git log` e os docs de saída antes de relançar):
+1. **Site v2 cinematográfico** (`apps/site`, storyboard `docs/site/storyboard-v2.md`): prontos 3/7 momentos (abertura Hora Azul WebGL, sala de voz, lente 1080p×720p). Faltam: mergulho, vista explodida, "Leve como uma alga", fechamento, transições, mobile/tablet, Lighthouse. Dev ao vivo: `npm run dev -w apps/site` em :3100 (servidor único; preview em `.claude/launch.json` "site").
+2. **Pacote C — loja/provador/presentes/Plus v2/Casa** + correção do vazamento de memória dos cosméticos (`features/billing/**`, `features/settings/**`, `features/spaces/upgrade/**`, `docs/benchmarks/cosmetics-perf.md`).
+3. **Onda de design 9 + UI de E2EE** (palco só de voz, cor das pessoas, coreografia de entrada com 3 sons, Ctrl+K da barra de título, ponto índigo "em voz", login novo, cadeado + códigos de verificação + alerta de mismatch, DM sempre E2EE no cliente, conteúdo de demonstração digno) — `features/{voice,shell,auth,app,switcher,chat}`.
+4. **Mídia — captura de jogo ~30 fps**: teste real entre casas mostrou 720p60 de jogo (tela inteira "Tela 1", jogo a 191 fps) chegando a 32 fps com rede limpa → investigar captura de monitor no Windows/Chromium, corrigir e expor diagnóstico para quem transmite (`docs/benchmarks/game-capture.md`).
+
+**Próxima tarefa exata do novo Maestro:** (a) `git log --oneline -30` e ler os relatórios novos em `docs/` para saber o que os 4 agentes concluíram; (b) se algum não terminou (sem commits finais/doc), relançar com escopo restante; (c) quando 2–4 fecharem: build limpo numa worktree + Release v0.1.2 (passos em "Release pública") para o dono e o amigo testarem de novo entre casas; (d) depois: pacote D (retenção), crítica de design r4 e de "desejo" dos cosméticos, teste com CGNAT/4G.
+
+**Acessos operacionais:** staging Railway (`docs/infra/staging.md`), SFU de casa via SSH (valores reais em `docs/private/home-network.md`, fora do git), GitHub público com hook anti-vazamento (`.git/hooks/public_guard.py`). Memórias do dono: design Linear/índigo "sexy", site espetacular, trilha de monetização, uso livre do PC com explicação de atividade visível.
+
+
 > Fonte de verdade. Só entra como "Validado" o que tem evidência (teste, medição, screenshot). Atualizado: 2026-11-01.
 
 ## Staging (Railway, criado 2026-11-01 com aprovação do dono)
