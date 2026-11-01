@@ -146,13 +146,50 @@ Mesmo quadro das configurações do usuário (`settings/Frame.tsx`: `SettingsFra
 - **Visão geral** (`MANAGE_SPACE`): ícone (mesmo recorte do avatar, máscara de canto 22 %), nome, e "Excluir espaço" só para o dono, confirmando com o nome digitado.
 - **Cargos** (`MANAGE_ROLES`): do mais alto para o mais baixo, @everyone por último; ponto de cor, nome na cor, contagem, "Seu cargo mais alto", subir/descer (o cargo toma a posição do vizinho; o servidor reordena). Editor: ← volta (Esc também), nome, 9 cores + "sem cor", permissões em 4 grupos (Geral, Membros, Texto, Voz) com uma frase cada; cada chave salva na hora. **A regra do servidor está espelhada** (`permissions.ts`, testada): fora o dono, só se edita cargo abaixo do seu mais alto (@everyone é editável por qualquer gestor, só permissões) e só se concede o que se tem. O que não dá fica desabilitado com o motivo: cadeado com tooltip na lista, aviso no topo do editor ("Você só pode editar cargos abaixo do seu cargo mais alto (Moderação)"), e a dica da permissão diz "Você não tem esta permissão…".
 - **Membros:** busca, linhas de 48 px (apelido na cor do cargo, nome real e @usuário em terciário, coroa do dono), chips de cargo com ✕ e "+" (menu com marcação) para atribuir; ⋯ = mudar apelido, expulsar, banir com motivo. O menu só lista o que suas permissões permitem; se a pessoa está no seu nível ou acima, as ações aparecem desabilitadas e o motivo vem uma vez no topo do menu.
-- **Banimentos** (`BAN_MEMBERS`): quem, motivo, data, "Revogar banimento". **Convites** (`CREATE_INVITES`): prazo (1 h … 30 dias, nunca com aviso) e usos (sem limite, 1 … 100), copiar com "Copiado" no próprio botão (a API ainda não lista convites antigos; a tela diz isso).
+- **Banimentos** (`BAN_MEMBERS`): quem, motivo, data, "Revogar banimento". **Convites** (`CREATE_INVITES`): prazo (1 h … 30 dias, nunca com aviso) e usos (sem limite, 1 … 100); embaixo, **Convites ativos** de `GET /spaces/:id/invites` (com `MANAGE_SPACE`, todos; sem, só os seus, e a descrição diz qual). Linha de 48 px: avatar de quem criou, link em mono, "Criado por … · 3 de 10 usos · expira 2 de nov., 14:00", Copiar ("Copiado" no próprio botão) e lixeira. O convite recém-gerado ganha borda de 2 px em acento e o Copiar primário. Revogar confirma num modal ("…para de funcionar na hora. Quem já entrou por ele continua no espaço."); 404 conta como feito. Sem permissão para revogar, a lixeira fica `aria-disabled` com o motivo. A lista se atualiza a cada 20 s e no foco da janela (usos mudam e não há evento de convite no gateway).
 
 ### Conta: foto, e-mail, senha
 
 - **Foto do perfil / ícone do espaço (`settings/ImagePicker.tsx`):** prévia de 80 px, "Enviar/Trocar imagem", "Remover" e a regra numa linha. PNG/JPEG/WebP/GIF até 8 MB (`checkAvatar`, antes de qualquer envio). Recorte quadrado de 280 px: arrastar, roda do mouse, controle de zoom 1–4×, setas (Shift = passo maior) e +/−; o que o círculo não mostra fica escurecido. Sai num canvas como WebP de no máximo 1024 px (EXIF e o que ficou fora não saem da máquina). GIF pula o recorte para manter a animação. Ninguém mais manda URL externa de avatar: só `PUT /users/@me/avatar`, `PUT /spaces/:id/icon` ou `null`.
 - **E-mail não confirmado:** uma faixa calma no topo da Home ("Confirme seu e-mail · Para convidar pessoas e criar mais espaços"), nunca modal, nunca vermelho; em Minha conta, a linha do e-mail diz o que fica bloqueado. Os 403 do servidor (convite, segundo espaço, DM com quem não é amigo) viram a frase do servidor + "Confirmar e-mail" no lugar do erro (`needsVerification`, `toastError`). O diálogo aceita o código ou o link inteiro (`parseEmailToken`: `?token=` ou o código puro), "Reenviar e-mail" com contagem ("Reenviar em 52 s"; 5 min depois de um 429) e fecha sozinho se a confirmação chegar por outro lado (`ME_UPDATE`).
 - **Senha:** mínimo `MIN_PASSWORD_LENGTH` (10). Força em 4 barras sob o campo (`passwordStrength`: comprimento pesa mais, variedade ajuda, repetição/nome/e-mail derrubam) e a frase no hint; o servidor ainda recusa senha comum, repetida ou com seu usuário, e essa frase aparece no campo como veio. "Esqueci minha senha" no rótulo da senha → e-mail → (sempre 204) "Se houver uma conta com…, o link vale 1 hora" → colar link ou código + nova senha → volta ao login com "Senha trocada". Login por e-mail só depois de confirmar; o erro sugere entrar pelo nome de usuário. "Sair de todas as outras sessões" (`DELETE /auth/sessions`) aparece sempre, desabilitado quando só há este dispositivo; trocar a senha recarrega a lista.
+
+### Links algameet:// (`features/app/deepLinks.ts`)
+
+`window.alga.deepLinks` no boot do `App` (com ou sem sessão; sem a ponte, nada acontece): primeiro `onLink`, depois `takePending()` uma vez. Token e código são segredos: só vão para a API, nunca aparecem na tela nem no log.
+- **verify-email:** confirma direto (`POST /auth/verify-email`, não precisa de sessão) e diz o resultado num toast ("E-mail confirmado. Tudo liberado.", "Entre para continuar." sem sessão, ou o erro com o caminho para pedir outro). A faixa "Confirme seu e-mail" some sozinha (`ME_UPDATE`).
+- **password-reset:** sem sessão, a tela de nova senha abre com o token em uso e **sem o campo do código** ("Link do e-mail aberto. Agora é só escolher a senha nova."); se o servidor recusar, o campo volta com o erro. Com sessão, um toast explica que trocar a senha encerra todas as sessões e oferece "Sair e trocar".
+- **invite:** com sessão, abre a prévia de "Entrar em um espaço". Sem sessão, o link espera: login e cadastro dizem "Você abriu um convite. Entre ou crie sua conta e ele abre em seguida." e a prévia abre quando o shell existe.
+
+### Assinatura (`features/billing/Plan.tsx`, `store.ts`)
+
+Configurações › Usuário › **Assinatura**. O Grátis é bom de verdade e a tela o trata assim: nada de modal, contador, selo piscando ou "oferta por tempo limitado".
+- **Aviso do provedor** no topo quando `catalog.provider.sandbox` ("SANDBOX" em âmbar + "a página de pagamento é simulada e nada é cobrado") ou quando pagamentos estão desligados (`provider: null`: botões desabilitados, "seu plano e seus itens continuam valendo"). Linhas sandbox do histórico levam o chip "TESTE".
+- **Seu plano:** cartão `--bg-raised` raio 12. Grátis: "Sem prazo e sem cartão…". Plus: "Mensal · renova em 1 de dez. de 2026 · R$ 14,90" + "Cancelar renovação" (ghost) e um fio de 1 px em acento a 30 % no topo (estado, não enfeite). Renovação cancelada: até quando vale e que nada comprado se perde. `past_due` em âmbar.
+- **Grátis e Alga Plus:** tabela de 3 colunas montada do catálogo (`plans`, presets, teto de anexo, coleção Plus), "· seu plano" no cabeçalho da coluna atual, voz "Igual para todos" nas duas. O "+" das qualidades extras é o único acento.
+- **Assinar:** Mensal/Anual (segmented), preço 24/32 `tnum`, "Equivale a R$ 12,42 por mês" no anual, botão primário grande e "O pagamento abre no seu navegador". **Antes do clique**, no mesmo cartão: renova sozinho, cancele quando quiser, "Você pode pedir reembolso em até 7 dias".
+- **Checkout:** `POST /billing/checkout` → `openExternal(url)` → **"Aguardando a confirmação do pagamento…"** (spinner com texto, "Abrir a página de novo", "Não vou pagar agora"). O app **nunca** marca nada como pago: só o `ENTITLEMENTS_UPDATE` (webhook verificado no servidor) muda o estado. Recusado ou abandonado aparece ao voltar para a janela (foco → `GET /billing/me`): "O pagamento não foi concluído. Nada foi cobrado."
+- **Momento de confirmação:** quando o `ENTITLEMENTS_UPDATE` traz o SKU esperado com a página aberta, uma faixa de luz atravessa o cartão uma vez (1,1 s, out-quart, só `transform`) e a linha vira "Pagamento confirmado. Obrigado por apoiar o Alga Meet." em `--success`; "Cancelar renovação" fica escondido nesse momento. Com movimento reduzido a faixa não roda (o último quadro fica fora do cartão) e a linha fica. Página fechada: um toast com "Ver".
+- **Cancelar renovação:** modal honesto ("Nada muda até 1 de dez.… Depois, sua conta volta ao Grátis (transmissão até 1080p30, anexos até 25 MB). O que você comprou na loja continua na sua conta."), foco em "Manter o Plus", confirmação em `danger`.
+- **Histórico de compras:** assinaturas e pedidos juntos, do mais novo; disco de 28 px (✓ em `--success` para pago/ativa, relógio para pendente, traço para o resto), nome, data · estado por tipo (pedido recusado = "Pagamento não concluído"), valor `tnum` à direita.
+- **Voz e vídeo › Qualidade da transmissão:** um chip de 26 px por preset de `STREAM_PRESETS`: ✓ preenchido para os de `Me.plan.streamPresets`, cadeado com contorno para os outros; uma linha ("1080p60, 1440p60 e 4K vêm com o Alga Plus. O resto, incluindo 1080p30, é grátis.") e "Ver planos" em ghost. Quem limita é o seletor de tela (voz); aqui é informação.
+
+### Personalização e cosméticos (`features/billing/Shop.tsx`, `Cosmetics.tsx`, `look.ts`)
+
+- **Loja:** prateleiras por tipo à esquerda (tiles de 128 px ou mais: amostra de 64 px em `--bg-raised`, nome, preço ou estado) e **prévia fixa** à direita (`sticky`, 288 px): o seu cartão de perfil com o item escolhido sobre o que você já usa; embaixo tipo, nome, descrição e a ação. Seleção do tile é neutra (`--state-selected` + borda forte), nunca acento. Estados: preço, "Em uso", "Na sua conta", "Coleção Plus" (leva ao plano), "Alga Plus" (incluído no seu).
+- **Texto de posse** segue os termos (licença ligada à conta, não propriedade): "Comprou uma vez, fica na sua conta, sem renovação". Nunca "para sempre". Antes de comprar: "Pagamento único, sem renovação: fica na sua conta. Você pode pedir reembolso em até 7 dias."
+- **Sem rota de equipar:** o visual é derivado (`lookFrom`, testado): um item por lugar; o comprado ganha do emprestado pelo plano e, entre comprados, o mais recente. A tela avisa quando você tem dois do mesmo tipo.
+- **Só o seu é conhecido:** a API não expõe cosméticos de outras pessoas (`PublicUser` não tem o campo), então `useLook(userId)` devolve vazio para os outros. Os lugares já estão prontos: lista de membros (discreto), popover de perfil (clique no membro) e o seu painel.
+- **Renderizadores (CSS/SVG, sem imagem),** cada um com a própria paleta, sempre contida:
+  - *Folha de alga:* cinco folhas de kelp em gradiente verde-mar com nervura clara, abraçando o lado esquerdo e o topo do avatar, pontas soltas; fio fino de anel.
+  - *Coral:* recife de coral-chifre (galhos com pontas de pólipo claras) crescendo de uma base curva no canto inferior esquerdo, brilho estático de 2 px.
+  - Decorações ocupam 140 % do avatar e **nunca** o quadrante inferior direito (ponto de presença).
+  - *Noite paulistana:* céu índigo, névoas magenta e âmbar baixas, prédios com janelas de luz de sódio; o cartão inteiro ganha tinta índigo.
+  - *Maré (Plus):* gradiente verde-água com duas linhas de onda a 9–14 %.
+  - *Bioluminescência:* 16 pontos de luz sobem ao abrir o perfil e assentam como plâncton a 55 %.
+  - *Cardume:* placa azul-marinho com quatro peixinhos na cauda da placa, nunca sobre o nome.
+  - *Correnteza (Plus):* placa verde-água com uma faixa de luz que cruza uma vez.
+- **Movimento:** só ao abrir o perfil (uma vez) ou enquanto a linha da lista está sob o mouse (`data-cosmetic-hover`); só `transform`/`opacity`; nada contínuo, nada no chat. O último quadro de cada animação é o repouso, então o movimento reduzido (que colapsa as animações) mostra o item completo e parado.
 
 ### Palco de chamada (`features/voice/CallStage.tsx`)
 
@@ -184,8 +221,9 @@ Modal de 800 px: abas Telas / Janelas com miniaturas ao vivo (atualizadas em cad
 ### Configurações (`features/settings`)
 
 Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, botões nativos, chip de transmissão). Navegação à esquerda no estilo Linear, agrupada por rótulo (Usuário / Aplicativo); Esc, o ✕ ou Ctrl+, fecham e o foco volta para quem abriu. Cada controle faz algo de verdade; o que não tem backend não aparece (privacidade, fixar, denunciar):
+- **Assinatura** e **Personalização:** ver as seções acima.
 - **Minha conta:** foto (recorte + upload), nome, usuário, bio (190), cor do perfil (PATCH /users/@me); e-mail e se está confirmado; trocar senha com força (POST /auth/password, encerra as outras sessões); sessões com "Encerrar" e "Sair de todas as outras sessões"; sair da conta.
-- **Voz e vídeo:** microfone e saída, teste com medidor ao vivo e "ouvir a mim mesmo", processamento (Padrão / Supressão avançada / Desligado, uma frase honesta cada; aviso se a supressão avançada não carregou), detecção de voz vs aperte para falar, sensibilidade (automática ou manual: a linha do limiar sobre o nível em dB, arrastável), atraso ao soltar o PTT, sons de chamada.
+- **Voz e vídeo:** qualidade de transmissão do plano (ver Assinatura), microfone e saída, teste com medidor ao vivo e "ouvir a mim mesmo", processamento (Padrão / Supressão avançada / Desligado, uma frase honesta cada; aviso se a supressão avançada não carregou), detecção de voz vs aperte para falar, sensibilidade (automática ou manual: a linha do limiar sobre o nível em dB, arrastável), atraso ao soltar o PTT, sons de chamada.
 - **Atalhos:** gravar via `window.alga.hotkeys.record`, rótulo do sistema, salvos em `localStorage` (`alga.hotkeys.v1`) e reaplicados no boot.
 - **Notificações:** DMs e menções, chamadas, contador na barra de tarefas. **Aparência:** densidade Confortável/Compacta (linhas de 24 px, sem respiro entre grupos), reduzir animações. **Inicialização:** abrir com o Windows, fechar para a bandeja. **Avançado:** versão, procurar atualizações (com estados), abrir pasta de registros.
 
@@ -205,6 +243,9 @@ Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, bo
 | `useEffect(() => { el.scrollTo(…) })` com chaves | Devolver o resultado de `scrollTo` (no Chromium 156 é uma Promise; o React a trata como cleanup e quebra) |
 | Animar só troca de contexto | Animar resposta a clique/tecla |
 | Textos pt-BR no `strings.ts` da feature | String solta no JSX de componente compartilhado |
+| Esperar o `ENTITLEMENTS_UPDATE` para mostrar algo como pago | Marcar como pago ao abrir o checkout ou ao voltar do navegador |
+| Renovação e reembolso em 7 dias ditos antes do clique | Letra miúda depois do pagamento, "para sempre", contagem regressiva |
+| Cosmético que se move uma vez, ao abrir, com repouso = movimento reduzido | Animação contínua em lista, no chat ou fora da tela |
 
 ## 7. Telas (versões mais recentes)
 
@@ -267,7 +308,6 @@ Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, bo
 | Ações bloqueadas pela hierarquia | [2026-11-01-space-settings-members-limited-v2.png](../screenshots/2026-11-01-space-settings-members-limited-v2.png) |
 | Banir com motivo | [2026-11-01-space-settings-ban-v3.png](../screenshots/2026-11-01-space-settings-ban-v3.png) |
 | Banimentos | [2026-11-01-space-settings-bans-v2.png](../screenshots/2026-11-01-space-settings-bans-v2.png) |
-| Convites (prazo, usos, copiado) | [2026-11-01-space-settings-invites-v2.png](../screenshots/2026-11-01-space-settings-invites-v2.png) |
 | **E-mail e senha** | |
 | Faixa "Confirme seu e-mail" na Home | [2026-11-01-home-verify-strip-v1.png](../screenshots/2026-11-01-home-verify-strip-v1.png) |
 | Convite sem e-mail confirmado: frase + "Confirmar e-mail" | [2026-11-01-space-invite-unverified-v1.png](../screenshots/2026-11-01-space-invite-unverified-v1.png) |
@@ -277,6 +317,39 @@ Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, bo
 | Esqueci minha senha | [2026-11-01-auth-forgot-v1.png](../screenshots/2026-11-01-auth-forgot-v1.png) |
 | Nova senha recusada pelo servidor (repetição) | [2026-11-01-auth-reset-weak-v1.png](../screenshots/2026-11-01-auth-reset-weak-v1.png) |
 | Senha trocada, de volta ao login | [2026-11-01-auth-reset-done-v1.png](../screenshots/2026-11-01-auth-reset-done-v1.png) |
+| **Links, convites, plano e loja** | |
+| Deep link de confirmação de e-mail (segunda instância) | [2026-11-01-deeplink-verify-email-v5.png](../screenshots/2026-11-01-deeplink-verify-email-v5.png) |
+| Deep link de convite com sessão: prévia | [2026-11-01-deeplink-invite-signed-in-v2.png](../screenshots/2026-11-01-deeplink-invite-signed-in-v2.png) |
+| Deep link de convite sem sessão: aviso no login | [2026-11-01-deeplink-invite-signed-out-v2.png](../screenshots/2026-11-01-deeplink-invite-signed-out-v2.png) |
+| … e a prévia depois de entrar | [2026-11-01-deeplink-invite-after-login-v2.png](../screenshots/2026-11-01-deeplink-invite-after-login-v2.png) |
+| Deep link de nova senha (token em uso, nunca exibido) | [2026-11-01-deeplink-reset-password-v2.png](../screenshots/2026-11-01-deeplink-reset-password-v2.png) |
+| Convites ativos | [2026-11-01-space-settings-invites-list-v2.png](../screenshots/2026-11-01-space-settings-invites-list-v2.png) |
+| Convite recém-gerado (borda + Copiado) | [2026-11-01-space-settings-invites-created-v2.png](../screenshots/2026-11-01-space-settings-invites-created-v2.png) |
+| Revogar convite | [2026-11-01-space-settings-invite-revoke-v2.png](../screenshots/2026-11-01-space-settings-invite-revoke-v2.png) |
+| Convite revogado | [2026-11-01-space-settings-invite-revoked-v2.png](../screenshots/2026-11-01-space-settings-invite-revoked-v2.png) |
+| Assinatura: Grátis + comparação (sandbox) | [2026-11-01-billing-plan-free-v5.png](../screenshots/2026-11-01-billing-plan-free-v5.png) |
+| Assinar (anual): renovação e reembolso antes do clique | [2026-11-01-billing-subscribe-yearly-v5.png](../screenshots/2026-11-01-billing-subscribe-yearly-v5.png) |
+| Aguardando a confirmação do pagamento | [2026-11-01-billing-checkout-waiting-v5.png](../screenshots/2026-11-01-billing-checkout-waiting-v5.png) |
+| Pagamento confirmado (ENTITLEMENTS_UPDATE) | [2026-11-01-billing-plan-arrived-v5.png](../screenshots/2026-11-01-billing-plan-arrived-v5.png) |
+| Plus ativo | [2026-11-01-billing-plan-plus-v5.png](../screenshots/2026-11-01-billing-plan-plus-v5.png) |
+| Histórico de compras | [2026-11-01-billing-history-v5.png](../screenshots/2026-11-01-billing-history-v5.png) |
+| Cancelar renovação | [2026-11-01-billing-cancel-confirm-v5.png](../screenshots/2026-11-01-billing-cancel-confirm-v5.png) |
+| Renovação cancelada | [2026-11-01-billing-plan-canceled-v5.png](../screenshots/2026-11-01-billing-plan-canceled-v5.png) |
+| Voz e vídeo: qualidades do plano (Grátis) | [2026-11-01-settings-voice-plan-free-v5.png](../screenshots/2026-11-01-settings-voice-plan-free-v5.png) |
+| Voz e vídeo: qualidades do plano (Plus) | [2026-11-01-settings-voice-plan-plus-v5.png](../screenshots/2026-11-01-settings-voice-plan-plus-v5.png) |
+| Loja: prévia da decoração Folha de alga | [2026-11-01-shop-preview-decoration-v5.png](../screenshots/2026-11-01-shop-preview-decoration-v5.png) |
+| Loja: tema Noite paulistana | [2026-11-01-shop-preview-theme-v5.png](../screenshots/2026-11-01-shop-preview-theme-v5.png) |
+| Loja: efeito Bioluminescência | [2026-11-01-shop-preview-effect-v5.png](../screenshots/2026-11-01-shop-preview-effect-v5.png) |
+| Loja: placa Cardume | [2026-11-01-shop-preview-nameplate-v5.png](../screenshots/2026-11-01-shop-preview-nameplate-v5.png) |
+| Loja: item só da Coleção Plus | [2026-11-01-shop-plus-only-v5.png](../screenshots/2026-11-01-shop-plus-only-v5.png) |
+| Compra aguardando | [2026-11-01-shop-checkout-waiting-v5.png](../screenshots/2026-11-01-shop-checkout-waiting-v5.png) |
+| Comprado: Coral em uso | [2026-11-01-shop-purchased-v5.png](../screenshots/2026-11-01-shop-purchased-v5.png) |
+| Compra recusada | [2026-11-01-shop-checkout-declined-v5.png](../screenshots/2026-11-01-shop-checkout-declined-v5.png) |
+| Loja com a Coleção Plus em uso | [2026-11-01-shop-plus-collection-v5.png](../screenshots/2026-11-01-shop-plus-collection-v5.png) |
+| Lista de membros com cosméticos (discreto) | [2026-11-01-members-cosmetics-v5.png](../screenshots/2026-11-01-members-cosmetics-v5.png) |
+| Popover de perfil com cosméticos | [2026-11-01-profile-popover-cosmetics-v5.png](../screenshots/2026-11-01-profile-popover-cosmetics-v5.png) |
+| Popover de perfil sem cosméticos | [2026-11-01-profile-popover-plain-v5.png](../screenshots/2026-11-01-profile-popover-plain-v5.png) |
+| Seu painel: cartão de perfil + status | [2026-11-01-user-panel-profile-v5.png](../screenshots/2026-11-01-user-panel-profile-v5.png) |
 | **Conversa** | |
 | Login ("Esqueci minha senha" no rótulo) | [2026-11-01-auth-login-v9.png](../screenshots/2026-11-01-auth-login-v9.png) |
 | Login: erro + Caps Lock (cartão ancorado no topo) | [2026-11-01-auth-login-error-v8.png](../screenshots/2026-11-01-auth-login-error-v8.png) |
@@ -313,6 +386,8 @@ Sobreposição de janela inteira abaixo da title bar (que continua: arrastar, bo
 | 1920×1080 a 125% | [2026-11-01-shell-1920x1080@125-v3.png](../screenshots/2026-11-01-shell-1920x1080@125-v3.png) |
 
 Onda 3 (anexos, configurações do espaço, conta): API própria na porta 4100 (`ALGA_API_URL`, banco PGlite, uploads e caixa de e-mail em diretório temporário; `ALGA_OUTBOX_DIR` lê os tokens de confirmação e de redefinição), mídia sintética gerada com ffmpeg (gradientes, fractal, padrões de teste, vídeo e áudio de teste; nenhum arquivo pessoal), progresso e queda de upload por um proxy TCP com taxa limitada que depois é derrubado, URL vencida por um interceptador que responde 403 na primeira carga.
+
+Onda 4 (links, convites, plano, loja; `--only=billing,invites`): API própria na porta 4100 com `BILLING_PROVIDER=sandbox`. O checkout é o fluxo real: o `shell.openExternal` do main é trocado por um gravador (o handler IPC do app ainda valida a URL), o script abre a URL como o navegador abriria, o provedor sandbox confirma pelo mesmo caminho de um webhook verificado e o `ENTITLEMENTS_UPDATE` chega ao app; "recusado" é a mesma página com `outcome=decline`. Uma pessoa nova (Íris) a cada execução, porque o histórico de compras não se apaga. Deep links: segunda instância do Electron no mesmo perfil com `algameet://…` (o main repassa para a instância aberta) e partida a frio com o link no argv, com tokens tirados da caixa de e-mail da API de teste.
 
 Validação: cada tela foi capturada no app Electron real (`--profile=shots`) com dados criados pela API REST real; estados de rede (lento, servidor fora, boot sem servidor) vêm de um proxy TCP no script, não de dados falsos no app. Tamanhos: 1320×840 (padrão), 960×600 (mínimo) e 1920×1080 a 125%.
 

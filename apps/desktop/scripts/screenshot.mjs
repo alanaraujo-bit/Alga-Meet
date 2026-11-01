@@ -1,5 +1,5 @@
 // Visual validation loop: build → seed real data through the REST API → drive the REAL Electron app → PNGs.
-//   node scripts/screenshot.mjs [--skip-build] [--only=auth,home,chat,spaces,attachments,uploads,spacesettings,connection,sizes,settings,voice]
+//   node scripts/screenshot.mjs [--skip-build] [--only=auth,home,chat,spaces,attachments,uploads,spacesettings,connection,sizes,settings,voice,billing,invites]
 // Another API (ALGA_API_URL=http://127.0.0.1:4100) gets its own users file, so runs never mix accounts.
 // Voice runs two real app instances (profiles shots + shots-b) through the local LiveKit with Chromium fake
 // devices: a generated speech WAV is B's microphone (so the speaking glow moves for real) and A's screen share
@@ -485,6 +485,8 @@ async function mainShots(saved) {
     if (want('voice')) await voiceShots(saved, ids)
     if (want('connection')) await connectionShots(saved, ids)
     if (want('sizes')) await sizeShots(saved)
+    if (want('billing')) await billingShots(saved, ids)
+    if (want('invites')) await inviteShots(saved, ids)
   } finally {
     offs.forEach((off) => off())
   }
@@ -1250,6 +1252,254 @@ async function sizeShots(saved) {
   }
 }
 
+// ── wave 4: deep links, invites list, Assinatura, Personalização ──
+// Checkout runs the real sandbox flow: POST /billing/checkout → the app opens the returned URL (captured in main,
+// so no real browser opens) → the script loads that URL like the browser would → the sandbox provider confirms
+// through the same path a verified webhook takes → ENTITLEMENTS_UPDATE reaches the app.
+
+/** Swap shell.openExternal in main for a recorder: the app's own IPC handler still validates and calls it. */
+async function captureExternal(app) {
+  await app.evaluate(({ shell }) => {
+    globalThis.__algaExternal = []
+    shell.openExternal = async (url) => void globalThis.__algaExternal.push(url)
+  })
+}
+async function nextExternal(app, n) {
+  for (let i = 0; i < 80; i++) {
+    const urls = await app.evaluate(() => globalThis.__algaExternal)
+    if (urls.length >= n) return urls[n - 1]
+    await sleep(250)
+  }
+  throw new Error(`openExternal #${n} never happened`)
+}
+/** What the user's browser does on the sandbox page. */
+async function payInBrowser(url, outcome = 'approve') {
+  const res = await fetch(outcome === 'approve' ? url : `${url}&outcome=decline`)
+  if (!res.ok) throw new Error(`sandbox page → ${res.status}`)
+}
+
+/** A second app process with a deep link on the same profile: main forwards it to the running instance and quits. */
+function secondInstance(profile, link) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'ELECTRON_RENDERER_URL'))
+  const r = spawnSync(electronPath, [appDir, `--profile=${profile}`, link], { cwd: appDir, env, timeout: 30_000 })
+  if (r.status !== 0) console.warn('  second instance exited with', r.status)
+}
+
+async function freshUser(key, displayName) {
+  const username = `${key}.${randomBytes(2).toString('hex')}`
+  const password = randomBytes(12).toString('base64url')
+  const r = await api(null, 'POST', '/auth/register', { email: `${username}@shots.alga.test`, username, displayName, password })
+  return { username, password, token: r.token, me: r.user }
+}
+
+const userSettings = (page) => page.getByRole('dialog', { name: 'Configurações' })
+async function userSection(page, name) {
+  const dlg = userSettings(page)
+  if (!(await dlg.isVisible())) {
+    await page.getByRole('button', { name: 'Configurações', exact: true }).click()
+    await dlg.waitFor()
+  }
+  await dlg.getByRole('navigation').getByRole('button', { name, exact: true }).click()
+  await sleep(400)
+  return dlg
+}
+
+async function billingShots(saved, ids) {
+  console.log('plan, shop, deep links…')
+  // A new person every run: billing history is permanent, so the story always starts on the free plan.
+  const iris = await freshUser('iris', 'Íris Prado')
+  await api(iris.token, 'POST', `/invites/${saved.inviteCode}`)
+  // Initials on a calm accent: decorations are judged against a plain disc, not a loud test picture.
+  await api(iris.token, 'PATCH', '/users/@me', { bio: 'Som, luz e protótipos. Testo tudo com fone e café.', accentColor: '#3f7fbf' })
+
+  const { app, page } = await launch()
+  await captureExternal(app)
+  await login(page, iris)
+
+  // Deep link while running: verify-email → confirmed in place, the calm strip goes away (ME_UPDATE).
+  const verifyToken = await mailedToken(iris.me.email, 'verify_email')
+  secondInstance(PROFILE, `algameet://auth/verify-email?token=${verifyToken}`)
+  await page.getByText('E-mail confirmado. Tudo liberado.').waitFor({ timeout: 20_000 })
+  await shot(page, 'deeplink-verify-email')
+
+  // Free plan: what you have, what Plus adds, nothing pushy.
+  let dlg = await userSection(page, 'Assinatura')
+  await dlg.getByText('Grátis e Alga Plus').waitFor()
+  await shot(page, 'billing-plan-free')
+  await dlg.getByRole('radio', { name: 'Anual' }).click()
+  await dlg.getByRole('radio', { name: 'Anual' }).evaluate((el) => el.closest('section').scrollIntoView({ block: 'end' }))
+  await sleep(200)
+  await shot(page, 'billing-subscribe-yearly')
+  await dlg.getByRole('radio', { name: 'Mensal' }).click()
+  dlg = await userSection(page, 'Voz e vídeo')
+  await dlg.getByText('Qualidade da transmissão').scrollIntoViewIfNeeded()
+  await sleep(200)
+  await shot(page, 'settings-voice-plan-free')
+
+  // Shop: preview on your own card before buying.
+  dlg = await userSection(page, 'Personalização')
+  await dlg.getByText('Prévia no seu perfil').waitFor()
+  await sleep(300)
+  await shot(page, 'shop-preview-decoration')
+  for (const [name, screen] of [
+    [/Noite paulistana/, 'shop-preview-theme'],
+    [/Bioluminescência/, 'shop-preview-effect'],
+    [/Cardume/, 'shop-preview-nameplate'],
+    [/Tema Maré/, 'shop-plus-only'],
+  ]) {
+    await dlg.getByRole('button', { name }).click()
+    await sleep(300)
+    await shot(page, screen)
+  }
+
+  // Buy Coral: waiting (never assumed paid) → the provider confirms → the moment, in place.
+  await dlg.getByRole('button', { name: /Coral/ }).click()
+  await dlg.getByRole('button', { name: /^Comprar por/ }).click()
+  await dlg.getByText('Aguardando a confirmação do pagamento…').waitFor()
+  await shot(page, 'shop-checkout-waiting')
+  await payInBrowser(await nextExternal(app, 1))
+  await dlg.getByText(/^Pronto: está na sua conta/).waitFor({ timeout: 20_000 })
+  await shot(page, 'shop-purchased')
+
+  // Declined: nothing is granted, the page says so when you come back to the app.
+  await dlg.getByRole('button', { name: /Cardume/ }).click()
+  await dlg.getByRole('button', { name: /^Comprar por/ }).click()
+  await dlg.getByText('Aguardando a confirmação do pagamento…').waitFor()
+  await payInBrowser(await nextExternal(app, 2), 'decline')
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await dlg.getByText('O pagamento não foi concluído. Nada foi cobrado.').waitFor({ timeout: 20_000 })
+  await shot(page, 'shop-checkout-declined')
+
+  // Subscribe monthly through the same flow.
+  dlg = await userSection(page, 'Assinatura')
+  await dlg.getByRole('button', { name: 'Assinar o Alga Plus' }).click()
+  await dlg.getByText('Aguardando a confirmação do pagamento…').waitFor()
+  await shot(page, 'billing-checkout-waiting')
+  await payInBrowser(await nextExternal(app, 3))
+  await dlg.getByText('Pagamento confirmado. Obrigado por apoiar o Alga Meet.').waitFor({ timeout: 20_000 })
+  await shot(page, 'billing-plan-arrived')
+  dlg = await userSection(page, 'Voz e vídeo')
+  await dlg.getByText('Qualidade da transmissão').scrollIntoViewIfNeeded()
+  await sleep(200)
+  await shot(page, 'settings-voice-plan-plus')
+  dlg = await userSection(page, 'Assinatura')
+  await dlg.getByText(/renova em/).waitFor()
+  await shot(page, 'billing-plan-plus')
+  await dlg.getByText('Histórico de compras').evaluate((el) => el.closest('section').scrollIntoView({ block: 'end' }))
+  await sleep(200)
+  await shot(page, 'billing-history')
+
+  // Cancel at period end: honest copy, nothing changes until the date.
+  await dlg.getByRole('button', { name: 'Cancelar renovação' }).click()
+  const modal = page.getByRole('dialog', { name: 'Cancelar a renovação do Plus?' })
+  await modal.waitFor()
+  await sleep(300)
+  await shot(page, 'billing-cancel-confirm')
+  await modal.getByRole('button', { name: 'Cancelar renovação' }).click()
+  await dlg.getByText(/^Renovação cancelada\. O Plus vale até/).waitFor({ timeout: 15_000 })
+  await sleep(300)
+  await shot(page, 'billing-plan-canceled')
+
+  dlg = await userSection(page, 'Personalização')
+  await dlg.getByText('Prévia no seu perfil').waitFor()
+  await sleep(300)
+  await shot(page, 'shop-plus-collection')
+  await page.keyboard.press('Escape')
+  await dlg.waitFor({ state: 'detached' })
+
+  // Where profiles show: the member list (subtle), the profile popover, your own panel.
+  await rail(page, /^Estúdio Alga/).click()
+  await channels(page).getByRole('button', { name: /^geral/ }).click()
+  await page.getByText('Eu topo testar também').waitFor()
+  const row = page.getByLabel('Membros').getByRole('button', { name: /Íris Prado/ })
+  await row.hover()
+  await sleep(300)
+  await shot(page, 'members-cosmetics')
+  await row.click()
+  await page.getByRole('dialog', { name: 'Íris Prado' }).waitFor()
+  await sleep(400)
+  await shot(page, 'profile-popover-cosmetics')
+  await page.keyboard.press('Escape')
+  await page.getByLabel('Membros').getByRole('button', { name: /Bruno Costa/ }).click()
+  await page.getByRole('dialog', { name: 'Bruno Costa' }).waitFor()
+  await sleep(300)
+  await shot(page, 'profile-popover-plain')
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: /^Íris Prado\s*Online$/ }).click()
+  await page.getByRole('dialog', { name: 'Definir status' }).waitFor()
+  await sleep(400)
+  await shot(page, 'user-panel-profile')
+  await page.keyboard.press('Escape')
+  await close(app)
+  return iris
+}
+
+async function inviteShots(saved, ids) {
+  console.log('invites list, deep link invites…')
+  const U = saved.users
+  const T = (k) => U[k].token
+  // More invites with different makers, limits and expiries (Carla is Moderação: she may create invites).
+  await api(T('carla'), 'POST', `/spaces/${ids.s1.id}/invites`, { maxAgeSeconds: 86400, maxUses: 10 })
+  await api(T('ana'), 'POST', `/spaces/${ids.s1.id}/invites`, { maxAgeSeconds: 3600, maxUses: 1 })
+  // A space Ana is not in yet, for the deep link.
+  const atelie = await api(T('diego'), 'POST', '/spaces', { name: 'Ateliê de Som' })
+  saved.spaces.push({ id: atelie.id, owner: 'diego' })
+  writeFileSync(usersFile, JSON.stringify(saved, null, 2))
+  const code = (await api(T('diego'), 'POST', `/spaces/${atelie.id}/invites`, { maxAgeSeconds: 604800, maxUses: 0 })).code
+
+  const { app, page } = await launch()
+  await login(page, U.ana)
+  await openSpaceSettings(page)
+  const dlg = spaceSettings(page)
+  await navTo(page, 'Convites')
+  await dlg.getByText('Convites ativos').waitFor()
+  await dlg.getByText(/Criado por Carlinha|Criado por Carla Mendes/).waitFor()
+  await sleep(300)
+  await shot(page, 'space-settings-invites-list')
+  await dlg.getByRole('button', { name: 'Gerar convite' }).click()
+  await dlg.getByRole('button', { name: 'Copiar' }).first().click()
+  await sleep(300)
+  await shot(page, 'space-settings-invites-created')
+  await dlg.getByRole('button', { name: 'Revogar convite' }).nth(1).click()
+  const modal = page.getByRole('dialog', { name: 'Revogar este convite?' })
+  await modal.waitFor()
+  await sleep(300)
+  await shot(page, 'space-settings-invite-revoke')
+  await modal.getByRole('button', { name: 'Revogar convite' }).click()
+  await page.getByText('Convite revogado.').waitFor()
+  await shot(page, 'space-settings-invite-revoked')
+  await page.keyboard.press('Escape')
+  await dlg.waitFor({ state: 'detached' })
+
+  // Signed in: a second-instance launch with algameet://invite/<code> opens the join preview.
+  secondInstance(PROFILE, `algameet://invite/${code}`)
+  await page.getByRole('dialog', { name: 'Entrar em um espaço' }).getByText('Ateliê de Som').waitFor({ timeout: 20_000 })
+  await sleep(300)
+  await shot(page, 'deeplink-invite-signed-in')
+  await close(app)
+
+  // Signed out (cold start with the link): the login says what will happen, the preview opens after sign-in.
+  const b = await launch({ profile: 'shots-b', extra: [`algameet://invite/${code}`] })
+  await b.page.getByText('Você abriu um convite.', { exact: false }).waitFor({ timeout: 20_000 })
+  await shot(b.page, 'deeplink-invite-signed-out')
+  await login(b.page, U.fabio)
+  await b.page.getByRole('dialog', { name: 'Entrar em um espaço' }).getByText('Ateliê de Som').waitFor({ timeout: 20_000 })
+  await sleep(300)
+  await shot(b.page, 'deeplink-invite-after-login')
+  await close(b.app)
+
+  // Password reset link, signed out: the form opens with the token in use but never shown.
+  const t0 = Date.now()
+  await api(null, 'POST', '/auth/password-reset/request', { email: U.gui.me.email })
+  const resetToken = await mailedToken(U.gui.me.email, 'password_reset', t0 - 1000)
+  const c = await launch({ profile: 'shots-b', extra: [`algameet://auth/reset-password?token=${resetToken}`] })
+  await c.page.getByText('Link do e-mail aberto.', { exact: false }).waitFor({ timeout: 20_000 })
+  await c.page.getByLabel('Nova senha').fill('Mar-Calmo-Ao-Fim-Da-Tarde')
+  await sleep(200)
+  await shot(c.page, 'deeplink-reset-password')
+  await close(c.app)
+}
+
 // ── main ──────────────────────────────────────────────────────
 if (!args.includes('--skip-build')) {
   console.log('building…')
@@ -1262,7 +1512,7 @@ try {
   serverUp = false
 }
 if (want('auth')) await authShots(serverUp)
-if (serverUp && ['auth', 'home', 'chat', 'spaces', 'attachments', 'uploads', 'spacesettings', 'connection', 'sizes', 'settings', 'voice'].some(want)) {
+if (serverUp && ['auth', 'home', 'chat', 'spaces', 'attachments', 'uploads', 'spacesettings', 'connection', 'sizes', 'settings', 'voice', 'billing', 'invites'].some(want)) {
   const saved = await ensureUsers()
   await mainShots(saved)
 } else console.warn(`API at ${API} is not reachable: only auth screens were captured.`)
