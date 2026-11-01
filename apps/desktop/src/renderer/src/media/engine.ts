@@ -22,7 +22,7 @@ import {
 import { STREAM_PRESETS_ATTRIBUTE } from '@alga/shared'
 import { PttLatch, perceptualLevel, rmsDb } from './vad'
 import { PrefsStore, type InputMode, type ProcessingMode } from './prefs'
-import { availablePresets, clampPreset, contentSettings, gatePresets, isPresetId, pickCodec, recordSustain, simulcastFor, type ContentType, type ScreenPreset, type ScreenPresetId, type VideoCodecId } from './presets'
+import { aboveContract, availablePresets, clampPreset, contentSettings, gatePresets, isPresetId, pickCodec, recordSustain, simulcastFor, type ContentType, type ScreenPreset, type ScreenPresetId, type VideoCodecId } from './presets'
 import { VoiceGraph, VoiceProcessor, captureConstraints } from './processing'
 import { playCue, setCueOutput, startRing, stopRing, type Cue, type RingKind } from './sounds'
 import { stallStep, type StallState } from './stall'
@@ -85,6 +85,8 @@ const TERMINAL = new Set([DisconnectReason.CLIENT_INITIATED, DisconnectReason.DU
 /** protobuf TrackSource.MICROPHONE in ParticipantPermission.canPublishSources (livekit-client doesn't re-export the enum). */
 const PROTO_MICROPHONE = 2
 const LEVEL_TICK_MS = 50
+/** Longest a republished share keeps the old publication (well inside the server's 10 s PLAN_RECHECK_MS). */
+const REPUBLISH_OVERLAP_MS = 3000
 /** Stall guard (viewer side) poll period. */
 const STALL_TICK_MS = 200
 
@@ -117,7 +119,8 @@ class MediaEngine {
   private deltas = new Map<string, StatsDelta>()
   private audioEls = new Set<HTMLMediaElement>()
   private viewerEls = new Map<string, Set<HTMLVideoElement>>()
-  private screenPub: { video: LocalTrackPublication; audio: LocalTrackPublication | null; preset: ScreenPreset; cpuLimited: boolean[]; sourceId: string | null } | null = null
+  /** `declared`: the preset of the video publication (the SFU keeps its layers; an in-place re-cap changes `preset` only). */
+  private screenPub: { video: LocalTrackPublication; audio: LocalTrackPublication | null; preset: ScreenPreset; declared: ScreenPreset; cpuLimited: boolean[]; sourceId: string | null } | null = null
   /** Presets this machine sustains (probeEncoder); the conservative software list until the probe answers. */
   private capable: ScreenPreset[] = availablePresets({ hardware: false })
   /** Presets the user's plan allows (join response, token attribute, Me.plan); null = unknown. */
@@ -380,7 +383,8 @@ class MediaEngine {
         }
       })
       .on(RoomEvent.TrackUnpublished, (pub, rp) => {
-        if (pub.source === Track.Source.ScreenShare) this.unwatch(rp.identity)
+        // Another one left = a republish (plan downgrade): whoever watched follows the new one.
+        if (pub.source === Track.Source.ScreenShare && !screenOf(rp)) this.unwatch(rp.identity)
       })
       .on(RoomEvent.SignalReconnecting, () => this.onReconnecting())
       .on(RoomEvent.Reconnecting, () => this.onReconnecting())
@@ -524,7 +528,7 @@ class MediaEngine {
   private onRemotePublished(pub: RemoteTrackPublication, rp: RemoteParticipant): void {
     if (pub.source === Track.Source.Microphone) pub.setSubscribed(true)
     else if (pub.source === Track.Source.ScreenShare) {
-      this.cue('streamStart')
+      if (!useMedia.getState().participants[rp.identity]?.streaming) this.cue('streamStart') // not on a republish
       if (useMedia.getState().viewers[rp.identity]?.subscribed) this.watch(rp.identity, useMedia.getState().viewers[rp.identity]!.quality)
     }
   }
@@ -539,7 +543,10 @@ class MediaEngine {
       if (pub.source === Track.Source.Microphone) this.addMeter(rp.identity, track.mediaStreamTrack)
     } else if (pub.source === Track.Source.ScreenShare) {
       if (this.room) this.room.options.adaptiveStream = ADAPTIVE
-      for (const el of this.viewerEls.get(rp.identity) ?? []) track.attach(el)
+      const els = [...(this.viewerEls.get(rp.identity) ?? [])]
+      // Republish: take the elements off the old publication first (its later detach would reload them).
+      for (const p of rp.trackPublications.values()) if (p !== pub && p.source === Track.Source.ScreenShare) for (const el of els) p.track?.detach(el)
+      for (const el of els) track.attach(el)
     }
   }
 
@@ -892,7 +899,7 @@ class MediaEngine {
     }
     try {
       const pub = await this.publishScreen(room, stream, preset, contentType, codec)
-      this.screenPub = { ...pub, preset, cpuLimited: [], sourceId: opts.sourceId ?? null }
+      this.screenPub = { ...pub, preset, declared: preset, cpuLimited: [], sourceId: opts.sourceId ?? null }
       for (const el of this.ownEls) pub.video.track?.attach(el)
       patch('screen', { active: true, sourceId: opts.sourceId ?? null })
       this.cue('streamStart')
@@ -904,13 +911,21 @@ class MediaEngine {
   }
 
   private async publishScreen(room: Room, stream: MediaStream, preset: ScreenPreset, contentType: ContentType, codec: VideoCodecId) {
-    const video = stream.getVideoTracks()[0]!
+    const vpub = await this.publishScreenVideo(room, stream.getVideoTracks()[0]!, preset, contentType, codec)
+    const a = stream.getAudioTracks()[0]
+    const apub = a
+      ? await room.localParticipant.publishTrack(a, { source: Track.Source.ScreenShareAudio, name: 'screen_audio', dtx: false, red: true, forceStereo: true, audioPreset: AudioPresets.musicHighQualityStereo })
+      : null
+    return { video: vpub, audio: apub }
+  }
+
+  private publishScreenVideo(room: Room, video: MediaStreamTrack, preset: ScreenPreset, contentType: ContentType, codec: VideoCodecId): Promise<LocalTrackPublication> {
     const { hint, degradation } = contentSettings(contentType)
     video.contentHint = hint
     video.addEventListener('ended', () => void this.stopScreenShare())
     const size = video.getSettings()
     const svc = codec === 'vp9' || codec === 'av1'
-    const vpub = await room.localParticipant.publishTrack(video, {
+    return room.localParticipant.publishTrack(video, {
       source: Track.Source.ScreenShare,
       name: 'screen',
       videoCodec: codec,
@@ -919,11 +934,6 @@ class MediaEngine {
       scalabilityMode: svc ? 'L3T3_KEY' : undefined,
       degradationPreference: degradation,
     })
-    const a = stream.getAudioTracks()[0]
-    const apub = a
-      ? await room.localParticipant.publishTrack(a, { source: Track.Source.ScreenShareAudio, name: 'screen_audio', dtx: false, red: true, forceStereo: true, audioPreset: AudioPresets.musicHighQualityStereo })
-      : null
-    return { video: vpub, audio: apub }
   }
 
   /** Change what is being captured without stopping the stream (viewers stay subscribed). */
@@ -956,26 +966,31 @@ class MediaEngine {
     const cur = this.screenPub
     if (!cur) return
     this.screenPub = null
-    const room = this.room
-    // LiveKit's unpublish only makes the transceivers inactive. Chromium keeps their send streams, and with
-    // them every encoder instance (3 simulcast layers + backup codec), for the life of the connection:
-    // +39 MB per share with OpenH264, +165 MB with VP9 (docs/benchmarks/media-baseline.md §4). Stopping
-    // the transceivers releases them.
-    const tracks = [cur.video.track, cur.audio?.track].filter((t) => !!t)
-    const senders = new Set(tracks.flatMap((t) => [t.sender, ...('simulcastCodecs' in t ? [...(t as LocalVideoTrack).simulcastCodecs.values()].map((c) => c.sender) : [])]))
-    const transceivers = room?.engine.pcManager?.publisher.getTransceivers().filter((t) => senders.has(t.sender)) ?? []
     for (const el of this.ownEls) cur.video.track?.detach(el)
-    for (const track of tracks) {
-      track.stop()
-      await room?.localParticipant.unpublishTrack(track, true).catch(() => undefined)
-    }
-    if (room && transceivers.length) await releaseTransceivers(room, transceivers)
+    await this.dropScreenTracks(this.room, [cur.video, cur.audio])
     if (cur.cpuLimited.length >= 10) {
       this.prefs.set({ encoderSustain: recordSustain(this.prefs.get().encoderSustain, cur.preset.id, cur.cpuLimited) })
       void this.probeEncoder()
     }
     patch('screen', { active: false, stats: null, sourceId: null })
     if (!silent) this.cue('streamStop')
+  }
+
+  /**
+   * Unpublish screen publications and free their encoders. LiveKit's unpublish only makes the transceivers inactive.
+   * Chromium keeps their send streams, and with them every encoder instance (3 simulcast layers + backup codec), for
+   * the life of the connection: +39 MB per share with OpenH264, +165 MB with VP9 (docs/benchmarks/media-baseline.md
+   * §4). Stopping the transceivers releases them.
+   */
+  private async dropScreenTracks(room: Room | null, pubs: (LocalTrackPublication | null)[]): Promise<void> {
+    const tracks = pubs.map((p) => p?.track).filter((t) => !!t)
+    const senders = new Set(tracks.flatMap((t) => [t.sender, ...('simulcastCodecs' in t ? [...(t as LocalVideoTrack).simulcastCodecs.values()].map((c) => c.sender) : [])]))
+    const transceivers = room?.engine.pcManager?.publisher.getTransceivers().filter((t) => senders.has(t.sender)) ?? []
+    for (const track of tracks) {
+      track.stop()
+      await room?.localParticipant.unpublishTrack(track, true).catch(() => undefined)
+    }
+    if (room && transceivers.length) await releaseTransceivers(room, transceivers)
   }
 
   /** Hardware encoder probe per codec -> automatic codec + which presets this machine can sustain. */
@@ -1025,11 +1040,15 @@ class MediaEngine {
     const { offered, locked } = gatePresets(this.capable, this.plan)
     const target = clampPreset(this.prefs.get().screenPreset, offered, useMedia.getState().screen.contentType)
     patch('screen', { offered, locked, plan: this.plan, ...(!this.screenPub && { preset: target.id }) })
-    const live = this.screenPub?.preset
-    if (!live || live.id === target.id) return
+    const cur = this.screenPub
+    if (!cur) return
+    // Declared above the new plan: the server mutes it PLAN_RECHECK_MS (10 s) after the change, re-capped or not.
+    const republish = aboveContract(cur.declared, this.plan)
+    const live = cur.preset
+    if (live.id === target.id && !republish) return
     // Say it once, calmly: the stream keeps going, only its ceiling moved.
-    this.notify(offered.some((p) => p.id === live.id) ? `A transmissão agora vai em ${target.label}.` : `Seu plano não inclui ${live.label}: a transmissão continua, em ${target.label}.`)
-    void this.recap(target)
+    if (live.id !== target.id) this.notify(offered.some((p) => p.id === live.id) ? `A transmissão agora vai em ${target.label}.` : `Seu plano não inclui ${live.label}: a transmissão continua, em ${target.label}.`)
+    void (republish ? this.republish(target) : this.recap(target))
   }
 
   /** Quality of the live share (applied in place, viewers stay) or of the next one. */
@@ -1083,6 +1102,60 @@ class MediaEngine {
       cur.cpuLimited = []
       patch('screen', { preset: preset.id })
     }
+    return this.queueRecap(run)
+  }
+
+  /**
+   * Plan downgrade below what the share declared: the SFU keeps a publication's declared layers, so an in-place
+   * re-cap would still be muted by the server's re-check. Publish the same source again at `preset` (a fresh capture
+   * of it, no picker; system audio stays published as is), then drop the old video publication. Viewers follow the
+   * new one (onRemotePublished / onSubscribed) without going back to "Assistir".
+   */
+  private republish(preset: ScreenPreset): Promise<void> {
+    const run = async () => {
+      const cur = this.screenPub
+      const room = this.room
+      if (!cur || !room) return
+      const old = cur.video
+      const s = useMedia.getState().screen
+      let video: MediaStreamTrack
+      if (cur.sourceId) video = (await this.capture(cur.sourceId, false, preset)).getVideoTracks()[0]!
+      else {
+        // Injected stream or no picker bridge: a clone of the live capture (same source, nothing to pick).
+        video = old.track!.mediaStreamTrack.clone()
+        await video.applyConstraints({ width: { max: preset.width }, height: { max: preset.height }, frameRate: { ideal: preset.fps, max: preset.fps } }).catch(() => undefined)
+      }
+      if (this.screenPub !== cur || this.room !== room) return video.stop()
+      let vpub: LocalTrackPublication
+      try {
+        vpub = await this.publishScreenVideo(room, video, preset, s.contentType, s.codec)
+      } catch (e) {
+        video.stop()
+        throw e
+      }
+      // Stopped or left meanwhile: the new publication goes too.
+      if (this.screenPub !== cur || this.room !== room) return this.dropScreenTracks(room, [vpub])
+      for (const el of this.ownEls) old.track?.detach(el), vpub.track?.attach(el)
+      Object.assign(cur, { video: vpub, preset, declared: preset, cpuLimited: [] })
+      patch('screen', { preset: preset.id })
+      // The SFU announces the new track only once its media flows: dropped earlier, viewers saw the share end
+      // (measured). Wait for the first viewer to move over, or REPUBLISH_OVERLAP_MS when nobody watches.
+      await new Promise<void>((resolve) => {
+        const done = (p?: LocalTrackPublication) => {
+          if (p && p.trackSid !== vpub.trackSid) return
+          clearTimeout(t)
+          room.off(RoomEvent.LocalTrackSubscribed, done)
+          resolve()
+        }
+        const t = setTimeout(done, REPUBLISH_OVERLAP_MS)
+        room.on(RoomEvent.LocalTrackSubscribed, done)
+      })
+      await this.dropScreenTracks(room, [old])
+    }
+    return this.queueRecap(run)
+  }
+
+  private queueRecap(run: () => Promise<void>): Promise<void> {
     this.recapOp = this.recapOp.then(run, run).catch((e: unknown) => this.notify(`Não foi possível ajustar a qualidade da transmissão: ${errText(e)}`))
     return this.recapOp
   }
@@ -1102,7 +1175,7 @@ class MediaEngine {
   watch(identity: string, quality: StreamQuality = 'auto'): void {
     const room = this.room
     const rp = room?.remoteParticipants.get(identity)
-    const vpub = rp?.getTrackPublication(Track.Source.ScreenShare)
+    const vpub = screenOf(rp)
     useMedia.setState((s) => ({ viewers: { ...s.viewers, [identity]: { identity, quality, subscribed: true, volume: this.prefs.streamVolumeOf(identity), stats: null } } }))
     if (!room || !vpub) return
     // adaptiveStream is fixed per track at subscription time; "source" subscribes this one track without it.
@@ -1116,7 +1189,7 @@ class MediaEngine {
 
   unwatch(identity: string): void {
     const rp = this.room?.remoteParticipants.get(identity)
-    rp?.getTrackPublication(Track.Source.ScreenShare)?.setSubscribed(false)
+    screenOf(rp)?.setSubscribed(false)
     rp?.getTrackPublication(Track.Source.ScreenShareAudio)?.setSubscribed(false)
     this.deltas.delete(`v:${identity}`)
     this.stalls.delete(identity)
@@ -1131,7 +1204,7 @@ class MediaEngine {
   async setStreamQuality(identity: string, quality: StreamQuality): Promise<void> {
     const v = useMedia.getState().viewers[identity]
     if (!v || v.quality === quality) return
-    const pub = this.room?.remoteParticipants.get(identity)?.getTrackPublication(Track.Source.ScreenShare)
+    const pub = screenOf(this.room?.remoteParticipants.get(identity))
     if (pub?.isSubscribed && this.room) {
       const room = this.room
       await new Promise<void>((resolve) => {
@@ -1154,11 +1227,11 @@ class MediaEngine {
     const set = this.viewerEls.get(identity) ?? new Set()
     set.add(el)
     this.viewerEls.set(identity, set)
-    const track = this.room?.remoteParticipants.get(identity)?.getTrackPublication(Track.Source.ScreenShare)?.track
+    const track = screenOf(this.room?.remoteParticipants.get(identity))?.track
     track?.attach(el)
     return () => {
       set.delete(el)
-      this.room?.remoteParticipants.get(identity)?.getTrackPublication(Track.Source.ScreenShare)?.track?.detach(el)
+      screenOf(this.room?.remoteParticipants.get(identity))?.track?.detach(el)
     }
   }
 
@@ -1203,7 +1276,7 @@ class MediaEngine {
     if (!room || !this.stallGuard) return
     const now = performance.now()
     for (const id of Object.keys(useMedia.getState().viewers)) {
-      const pub = room.remoteParticipants.get(id)?.getTrackPublication(Track.Source.ScreenShare)
+      const pub = screenOf(room.remoteParticipants.get(id))
       const track = pub?.track
       if (!pub || !track || !pub.isEnabled) {
         this.stalls.delete(id)
@@ -1309,7 +1382,7 @@ class MediaEngine {
     }
     const viewers = { ...useMedia.getState().viewers }
     for (const id of Object.keys(viewers)) {
-      const t = room.remoteParticipants.get(id)?.getTrackPublication(Track.Source.ScreenShare)?.track
+      const t = screenOf(room.remoteParticipants.get(id))?.track
       viewers[id] = { ...viewers[id]!, stats: t ? videoIn(this.delta(`v:${id}`).next(await t.getRTCStatsReport())) : null }
     }
     if (this.room !== room) return
@@ -1355,6 +1428,13 @@ class MediaEngine {
   }
 }
 
+/** Newest screen publication of a participant: a republish (plan downgrade) briefly overlaps the old one. */
+function screenOf(rp: RemoteParticipant | undefined): RemoteTrackPublication | undefined {
+  let last: RemoteTrackPublication | undefined
+  for (const p of rp?.trackPublications.values() ?? []) if (p.source === Track.Source.ScreenShare) last = p
+  return last
+}
+
 /**
  * Free a finished share's encoders: stop its transceivers (an inactive one keeps its send stream and every
  * encoder instance alive). Chromium then recycles the freed m-lines for the next share, and on a recycled
@@ -1368,7 +1448,8 @@ async function releaseTransceivers(room: Room, transceivers: RTCRtpTransceiver[]
   const kinds = transceivers.map((t) => t.receiver.track.kind as 'audio' | 'video')
   for (const t of transceivers) t.stop()
   await room.engine.negotiate().catch(() => undefined)
-  // shortcut: placeholders add one m-line per stopped transceiver (as many as before the fix, minus encoders); revisit if SDP size starts to show in negotiation time.
+  // shortcut: placeholders add one m-line per stopped transceiver (as many as before the fix, minus encoders); revisit if SDP size starts to show in negotiation time
+  // (measured: ~1.2 MB and 659 → 962 ms renegotiation after 40 plan republishes in one share, media-plan.json republishCycles).
   for (const kind of kinds) pc.addTransceiverOfKind(kind, { direction: 'inactive' })
   await room.engine.negotiate().catch(() => undefined)
 }

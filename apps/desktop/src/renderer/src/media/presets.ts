@@ -113,6 +113,16 @@ export function gatePresets(capable: readonly ScreenPreset[], allowed: readonly 
 }
 
 /**
+ * Would the server mute a share published at `declared` under this plan? Its check reads the layers declared at
+ * publish (short side, top bitrate) against the plan's biggest preset; the SFU never updates them after publish.
+ */
+export function aboveContract(declared: ScreenPreset, allowed: readonly ScreenPresetId[] | null): boolean {
+  if (!allowed?.length) return false
+  const cap = allowed.map(getPreset)
+  return declared.height > Math.max(...cap.map((p) => p.height)) || declared.maxBitrate > Math.max(...cap.map((p) => p.maxBitrate))
+}
+
+/**
  * What to really publish when `want` isn't offered (plan or machine): the best offered preset not above it.
  * Motion keeps the frame rate (1080p60 -> 720p60), detail keeps the resolution (1080p60 -> 1080p30).
  */

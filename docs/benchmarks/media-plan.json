@@ -1,6 +1,6 @@
 {
   "plan": {
-    "when": "2026-11-01T09:15:03.377Z",
+    "when": "2026-11-01T10:31:54.394Z",
     "steps": [
       {
         "name": "ana entra (Grátis)",
@@ -28,9 +28,9 @@
       {
         "name": "pede 1080p60 no Grátis",
         "publishedPreset": "720p60",
-        "sentTop": "1280x720@51",
+        "sentTop": "1280x720@50",
         "bruno": {
-          "fps": 54.9,
+          "fps": 50.3,
           "size": "1280x720"
         },
         "sfu": {
@@ -44,9 +44,9 @@
       },
       {
         "name": "upgrade (sandbox) durante a transmissão",
-        "planAttributeMs": 48,
-        "liftedMs": 302,
-        "brunoSees1080Ms": 420,
+        "planAttributeMs": 90,
+        "liftedMs": 335,
+        "brunoSees1080Ms": 445,
         "offered": [
           "720p30",
           "720p60",
@@ -55,9 +55,9 @@
         ],
         "locked": [],
         "publishedPreset": "1080p60",
-        "sentTop": "1920x1080@54",
+        "sentTop": "1920x1080@47",
         "bruno": {
-          "fps": 52.3,
+          "fps": 54.4,
           "size": "1920x1080"
         },
         "sfu": {
@@ -72,13 +72,13 @@
       },
       {
         "name": "downgrade (webhook revoked) durante a transmissão",
-        "planAttributeMs": 35,
-        "recappedMs": 93,
-        "brunoSees720Ms": 200,
+        "planAttributeMs": 45,
+        "recappedMs": 111,
+        "brunoSees720Ms": 231,
         "publishedPreset": "720p60",
-        "sentTop": "1280x720@49",
+        "sentTop": "1280x720@52",
         "bruno": {
-          "fps": 52.1,
+          "fps": 49.5,
           "size": "1280x720"
         },
         "sfu": {
@@ -103,6 +103,2601 @@
           ]
         },
         "apiLog": 1
+      }
+    ]
+  },
+  "republish": {
+    "when": "2026-11-01T10:25:18.148Z",
+    "source": "janela ffplay testsrc2 1920x1080@60, Ana (Plus) pede 1080p60 (movimento) com áudio do sistema; Bruno assiste em Original; downgrade = webhook sandbox revoked assinado",
+    "runs": [
+      {
+        "before": {
+          "preset": "1080p60",
+          "audio": true,
+          "sentTop": "1920x1080@41",
+          "bruno": {
+            "fps": 48.4,
+            "size": "1920x1080"
+          },
+          "sfu": [
+            {
+              "sid": "TR_As8aG8ReoPg8qX",
+              "source": "screen_audio",
+              "muted": false,
+              "layers": []
+            },
+            {
+              "sid": "TR_VSV5vmC3FsAcaA",
+              "source": "screen",
+              "muted": false,
+              "layers": [
+                "640x360@400k",
+                "1280x720@1700k",
+                "1920x1080@8000k"
+              ]
+            }
+          ]
+        },
+        "after": {
+          "planAttributeMs": 58,
+          "republishedMs": 126,
+          "sfuSingle720Ms": 872,
+          "brunoSees720Ms": 2797,
+          "at": "+12.5 s",
+          "preset": "720p60",
+          "sentTop": "1280x720@49",
+          "sfu": [
+            {
+              "sid": "TR_As8aG8ReoPg8qX",
+              "source": "screen_audio",
+              "muted": false,
+              "layers": []
+            },
+            {
+              "sid": "TR_VSuxxYw7tAHB8u",
+              "source": "screen",
+              "muted": false,
+              "layers": [
+                "320x180@100k",
+                "640x360@425k",
+                "1280x720@3000k"
+              ]
+            }
+          ],
+          "serverAboveThePlanLogs": 0,
+          "notices": 1,
+          "notice": "Seu plano não inclui 1080p 60 fps: a transmissão continua, em 720p 60 fps.",
+          "brunoStillWatching": true,
+          "bruno": {
+            "fps": 52.3,
+            "size": "1280x720"
+          },
+          "viewerFrames": {
+            "maxGapMs": 167,
+            "atMsAfterEvent": 269,
+            "sizeAfter": "1920x1080",
+            "usualGapP50Ms": 17.1,
+            "usualGapP99Ms": 44.4,
+            "gapsOver100ms": [
+              150,
+              167,
+              134
+            ],
+            "events": [
+              "emptied@+710",
+              "waiting@+710",
+              "loadeddata@+744",
+              "playing@+744"
+            ]
+          },
+          "screenAudio": {
+            "subscribed": true,
+            "sid": "TR_As8aG8ReoPg8qX",
+            "packets": 683,
+            "longestSilenceMs": 0
+          }
+        }
+      },
+      {
+        "before": {
+          "preset": "1080p60",
+          "audio": true,
+          "sentTop": "1920x1080@48",
+          "bruno": {
+            "fps": 47,
+            "size": "1920x1080"
+          },
+          "sfu": [
+            {
+              "sid": "TR_AsGbsPMhkF3Wye",
+              "source": "screen_audio",
+              "muted": false,
+              "layers": []
+            },
+            {
+              "sid": "TR_VSEyKnm3dhUbb2",
+              "source": "screen",
+              "muted": false,
+              "layers": [
+                "640x360@400k",
+                "1280x720@1700k",
+                "1920x1080@8000k"
+              ]
+            }
+          ]
+        },
+        "after": {
+          "planAttributeMs": 40,
+          "republishedMs": 157,
+          "sfuSingle720Ms": 890,
+          "brunoSees720Ms": 951,
+          "at": "+12.5 s",
+          "preset": "720p60",
+          "sentTop": "1280x720@45",
+          "sfu": [
+            {
+              "sid": "TR_AsGbsPMhkF3Wye",
+              "source": "screen_audio",
+              "muted": false,
+              "layers": []
+            },
+            {
+              "sid": "TR_VSHN3DySojxGLm",
+              "source": "screen",
+              "muted": false,
+              "layers": [
+                "320x180@100k",
+                "640x360@425k",
+                "1280x720@3000k"
+              ]
+            }
+          ],
+          "serverAboveThePlanLogs": 0,
+          "notices": 1,
+          "notice": "Seu plano não inclui 1080p 60 fps: a transmissão continua, em 720p 60 fps.",
+          "brunoStillWatching": true,
+          "bruno": {
+            "fps": 48.9,
+            "size": "1280x720"
+          },
+          "viewerFrames": {
+            "maxGapMs": 223,
+            "atMsAfterEvent": 292,
+            "sizeAfter": "1920x1080",
+            "usualGapP50Ms": 16.9,
+            "usualGapP99Ms": 55.8,
+            "gapsOver100ms": [
+              167,
+              223,
+              166
+            ],
+            "events": [
+              "emptied@+842",
+              "waiting@+842",
+              "loadeddata@+883",
+              "playing@+883"
+            ]
+          },
+          "screenAudio": {
+            "subscribed": true,
+            "sid": "TR_AsGbsPMhkF3Wye",
+            "packets": 683,
+            "longestSilenceMs": 0
+          }
+        }
+      },
+      {
+        "before": {
+          "preset": "1080p60",
+          "audio": true,
+          "sentTop": "1920x1080@46",
+          "bruno": {
+            "fps": 50.1,
+            "size": "1920x1080"
+          },
+          "sfu": [
+            {
+              "sid": "TR_AsHJBeer5fhKNj",
+              "source": "screen_audio",
+              "muted": false,
+              "layers": []
+            },
+            {
+              "sid": "TR_VSNHAUsDxJh7BZ",
+              "source": "screen",
+              "muted": false,
+              "layers": [
+                "640x360@400k",
+                "1280x720@1700k",
+                "1920x1080@8000k"
+              ]
+            }
+          ]
+        },
+        "after": {
+          "planAttributeMs": 42,
+          "republishedMs": 171,
+          "sfuSingle720Ms": 794,
+          "brunoSees720Ms": 2782,
+          "at": "+12.5 s",
+          "preset": "720p60",
+          "sentTop": "1280x720@53",
+          "sfu": [
+            {
+              "sid": "TR_VSM2JQV7YZH2cK",
+              "source": "screen",
+              "muted": false,
+              "layers": [
+                "320x180@100k",
+                "640x360@425k",
+                "1280x720@3000k"
+              ]
+            },
+            {
+              "sid": "TR_AsHJBeer5fhKNj",
+              "source": "screen_audio",
+              "muted": false,
+              "layers": []
+            }
+          ],
+          "serverAboveThePlanLogs": 0,
+          "notices": 1,
+          "notice": "Seu plano não inclui 1080p 60 fps: a transmissão continua, em 720p 60 fps.",
+          "brunoStillWatching": true,
+          "bruno": {
+            "fps": 47.4,
+            "size": "1280x720"
+          },
+          "viewerFrames": {
+            "maxGapMs": 150,
+            "atMsAfterEvent": 131,
+            "sizeAfter": "1920x1080",
+            "usualGapP50Ms": 16.9,
+            "usualGapP99Ms": 50.1,
+            "gapsOver100ms": [
+              150,
+              150,
+              139
+            ],
+            "events": [
+              "emptied@+706",
+              "waiting@+706",
+              "loadeddata@+732",
+              "playing@+732"
+            ]
+          },
+          "screenAudio": {
+            "subscribed": true,
+            "sid": "TR_AsHJBeer5fhKNj",
+            "packets": 686,
+            "longestSilenceMs": 0
+          }
+        }
+      }
+    ]
+  },
+  "republishCycles": {
+    "when": "2026-11-01T10:17:24.974Z",
+    "cycles": 20,
+    "source": "janela ffplay testsrc2 1920x1080@60, 1080p60 com áudio do sistema, Diego assiste em Original",
+    "a": [
+      {
+        "totalMB": 681.6,
+        "byType": {
+          "Browser": 122.8,
+          "GPU": 385.6,
+          "Utility": 86.6,
+          "Tab": 86.6
+        },
+        "heapMB": 8.3,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 10,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 669.3,
+        "byType": {
+          "Browser": 124.9,
+          "GPU": 369.6,
+          "Utility": 86.4,
+          "Tab": 88.4
+        },
+        "heapMB": 8.4,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 12,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 662.7,
+        "byType": {
+          "Browser": 113.5,
+          "GPU": 371.7,
+          "Utility": 86.4,
+          "Tab": 91.2
+        },
+        "heapMB": 8.5,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 14,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 638.8,
+        "byType": {
+          "Browser": 114.5,
+          "GPU": 344.6,
+          "Utility": 86.3,
+          "Tab": 93.4
+        },
+        "heapMB": 8.5,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 16,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 665.8,
+        "byType": {
+          "Browser": 117.5,
+          "GPU": 359.1,
+          "Utility": 86.3,
+          "Tab": 102.8
+        },
+        "heapMB": 8.7,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 18,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 661.8,
+        "byType": {
+          "Browser": 115.9,
+          "GPU": 362,
+          "Utility": 86.4,
+          "Tab": 97.5
+        },
+        "heapMB": 8.6,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 20,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 677,
+        "byType": {
+          "Browser": 116.1,
+          "GPU": 371,
+          "Utility": 86.3,
+          "Tab": 103.5
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 22,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 660.6,
+        "byType": {
+          "Browser": 113.6,
+          "GPU": 364.6,
+          "Utility": 85.8,
+          "Tab": 96.6
+        },
+        "heapMB": 8.7,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 24,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 656.3,
+        "byType": {
+          "Browser": 113.5,
+          "GPU": 347.8,
+          "Utility": 85.8,
+          "Tab": 109.2
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 26,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 666.6,
+        "byType": {
+          "Browser": 114.4,
+          "GPU": 360,
+          "Utility": 85.7,
+          "Tab": 106.5
+        },
+        "heapMB": 9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 28,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 692,
+        "byType": {
+          "Browser": 113,
+          "GPU": 381.9,
+          "Utility": 85.7,
+          "Tab": 111.4
+        },
+        "heapMB": 8.9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 30,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 679.4,
+        "byType": {
+          "Browser": 114.9,
+          "GPU": 369.4,
+          "Utility": 85.7,
+          "Tab": 109.4
+        },
+        "heapMB": 9.1,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 32,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 668.5,
+        "byType": {
+          "Browser": 113.6,
+          "GPU": 350.7,
+          "Utility": 85.9,
+          "Tab": 118.3
+        },
+        "heapMB": 9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 34,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 680.6,
+        "byType": {
+          "Browser": 113.8,
+          "GPU": 360.7,
+          "Utility": 85.8,
+          "Tab": 120.2
+        },
+        "heapMB": 9.1,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 36,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 699.3,
+        "byType": {
+          "Browser": 115.2,
+          "GPU": 357.7,
+          "Utility": 85.7,
+          "Tab": 140.8
+        },
+        "heapMB": 9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 38,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 699.3,
+        "byType": {
+          "Browser": 114.8,
+          "GPU": 357.5,
+          "Utility": 85.6,
+          "Tab": 141.3
+        },
+        "heapMB": 9.2,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 40,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 686.9,
+        "byType": {
+          "Browser": 115.8,
+          "GPU": 348.7,
+          "Utility": 85.6,
+          "Tab": 136.8
+        },
+        "heapMB": 9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 42,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 678.8,
+        "byType": {
+          "Browser": 113.9,
+          "GPU": 340.9,
+          "Utility": 85.4,
+          "Tab": 138.6
+        },
+        "heapMB": 9.3,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 44,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 713,
+        "byType": {
+          "Browser": 117.4,
+          "GPU": 370.5,
+          "Utility": 85.6,
+          "Tab": 139.6
+        },
+        "heapMB": 9.1,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 46,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 719.5,
+        "byType": {
+          "Browser": 114.5,
+          "GPU": 375.5,
+          "Utility": 85.6,
+          "Tab": 143.9
+        },
+        "heapMB": 9.3,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 48,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      }
+    ],
+    "b": [
+      {
+        "totalMB": 412.1,
+        "byType": {
+          "Browser": 82.7,
+          "GPU": 151.5,
+          "Utility": 85.1,
+          "Tab": 92.9
+        },
+        "heapMB": 8.6,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 418.9,
+        "byType": {
+          "Browser": 83,
+          "GPU": 154.8,
+          "Utility": 84.9,
+          "Tab": 96.2
+        },
+        "heapMB": 8.7,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 415.6,
+        "byType": {
+          "Browser": 77.9,
+          "GPU": 157.9,
+          "Utility": 84.9,
+          "Tab": 94.9
+        },
+        "heapMB": 8.9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 417.4,
+        "byType": {
+          "Browser": 77.7,
+          "GPU": 159.6,
+          "Utility": 85.1,
+          "Tab": 95
+        },
+        "heapMB": 8.9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 419.2,
+        "byType": {
+          "Browser": 77.7,
+          "GPU": 161.8,
+          "Utility": 84.9,
+          "Tab": 94.8
+        },
+        "heapMB": 8.9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 413.2,
+        "byType": {
+          "Browser": 77.7,
+          "GPU": 155.2,
+          "Utility": 84.9,
+          "Tab": 95.4
+        },
+        "heapMB": 8.9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 394.2,
+        "byType": {
+          "Browser": 76.1,
+          "GPU": 144.1,
+          "Utility": 84.7,
+          "Tab": 89.3
+        },
+        "heapMB": 8.9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 399.5,
+        "byType": {
+          "Browser": 76,
+          "GPU": 152.8,
+          "Utility": 84.6,
+          "Tab": 86.1
+        },
+        "heapMB": 8.9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 395.4,
+        "byType": {
+          "Browser": 76,
+          "GPU": 148.1,
+          "Utility": 84.7,
+          "Tab": 86.7
+        },
+        "heapMB": 9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 405.9,
+        "byType": {
+          "Browser": 76.3,
+          "GPU": 154.6,
+          "Utility": 84.6,
+          "Tab": 90.4
+        },
+        "heapMB": 9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 390.8,
+        "byType": {
+          "Browser": 76.3,
+          "GPU": 144.5,
+          "Utility": 84.7,
+          "Tab": 85.4
+        },
+        "heapMB": 9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 390.9,
+        "byType": {
+          "Browser": 76.3,
+          "GPU": 142.9,
+          "Utility": 84.5,
+          "Tab": 87.2
+        },
+        "heapMB": 9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 396.5,
+        "byType": {
+          "Browser": 76.3,
+          "GPU": 149.1,
+          "Utility": 84.6,
+          "Tab": 86.5
+        },
+        "heapMB": 9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 388.8,
+        "byType": {
+          "Browser": 76.3,
+          "GPU": 142.9,
+          "Utility": 84.6,
+          "Tab": 85
+        },
+        "heapMB": 9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 394.5,
+        "byType": {
+          "Browser": 76.3,
+          "GPU": 147.2,
+          "Utility": 84.6,
+          "Tab": 86.4
+        },
+        "heapMB": 9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 399.5,
+        "byType": {
+          "Browser": 74.9,
+          "GPU": 156.1,
+          "Utility": 84.6,
+          "Tab": 83.9
+        },
+        "heapMB": 9.1,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 415.2,
+        "byType": {
+          "Browser": 75.1,
+          "GPU": 171.6,
+          "Utility": 84.6,
+          "Tab": 83.9
+        },
+        "heapMB": 9.1,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 390.3,
+        "byType": {
+          "Browser": 75.1,
+          "GPU": 145.1,
+          "Utility": 84.4,
+          "Tab": 85.7
+        },
+        "heapMB": 9.1,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 394.5,
+        "byType": {
+          "Browser": 75.1,
+          "GPU": 148.1,
+          "Utility": 84.4,
+          "Tab": 86.9
+        },
+        "heapMB": 9.1,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 391.7,
+        "byType": {
+          "Browser": 75.1,
+          "GPU": 146.1,
+          "Utility": 84.3,
+          "Tab": 86.2
+        },
+        "heapMB": 9.1,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      }
+    ],
+    "steps": [
+      {
+        "downMs": 123,
+        "liftMs": 256,
+        "redeclareMs": 659,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 123,
+        "liftMs": 250,
+        "redeclareMs": 653,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 123,
+        "liftMs": 315,
+        "redeclareMs": 651,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 111,
+        "liftMs": 253,
+        "redeclareMs": 661,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 123,
+        "liftMs": 256,
+        "redeclareMs": 720,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 120,
+        "liftMs": 251,
+        "redeclareMs": 690,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 125,
+        "liftMs": 253,
+        "redeclareMs": 748,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 129,
+        "liftMs": 317,
+        "redeclareMs": 809,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 127,
+        "liftMs": 250,
+        "redeclareMs": 793,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 125,
+        "liftMs": 299,
+        "redeclareMs": 780,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 126,
+        "liftMs": 249,
+        "redeclareMs": 792,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 139,
+        "liftMs": 256,
+        "redeclareMs": 842,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 128,
+        "liftMs": 252,
+        "redeclareMs": 819,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 134,
+        "liftMs": 255,
+        "redeclareMs": 867,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 183,
+        "liftMs": 252,
+        "redeclareMs": 885,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 142,
+        "liftMs": 251,
+        "redeclareMs": 901,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 140,
+        "liftMs": 251,
+        "redeclareMs": 934,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 144,
+        "liftMs": 250,
+        "redeclareMs": 892,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 184,
+        "liftMs": 316,
+        "redeclareMs": 941,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 185,
+        "liftMs": 251,
+        "redeclareMs": 962,
+        "diegoVideoWidth": 1920
+      }
+    ],
+    "baseline": {
+      "a": {
+        "totalMB": 552.5,
+        "byType": {
+          "Browser": 121.5,
+          "GPU": 260.1,
+          "Utility": 86.5,
+          "Tab": 84.4
+        },
+        "heapMB": 7.9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 8,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      "b": {
+        "totalMB": 413.7,
+        "byType": {
+          "Browser": 82.2,
+          "GPU": 151.9,
+          "Utility": 85.1,
+          "Tab": 94.6
+        },
+        "heapMB": 8.4,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      }
+    },
+    "sfuEnd": [
+      {
+        "sid": "TR_AsosZoHJKBNdTN",
+        "source": "screen_audio",
+        "muted": false,
+        "layers": []
+      },
+      {
+        "sid": "TR_VSMLigKF5AD49b",
+        "source": "screen",
+        "muted": false,
+        "layers": [
+          "640x360@400k",
+          "1280x720@1700k",
+          "1920x1080@8000k"
+        ]
+      }
+    ],
+    "digestA": {
+      "slopeMBPerCycle": 2.4,
+      "first": 681.6,
+      "last": 719.5,
+      "min": 638.8,
+      "max": 719.5
+    },
+    "digestB": {
+      "slopeMBPerCycle": -1.3,
+      "first": 412.1,
+      "last": 391.7,
+      "min": 388.8,
+      "max": 419.2
+    },
+    "digestATab": {
+      "slopeMBPerCycle": 3.2,
+      "first": 86.6,
+      "last": 143.9,
+      "min": 86.6,
+      "max": 143.9
+    },
+    "digestAGpu": {
+      "slopeMBPerCycle": -0.5,
+      "first": 385.6,
+      "last": 375.5,
+      "min": 340.9,
+      "max": 385.6
+    }
+  },
+  "planCycles": {
+    "when": "2026-11-01T10:21:42.259Z",
+    "cycles": 20,
+    "redeclare": false,
+    "source": "janela ffplay testsrc2 1920x1080@60, 1080p60 com áudio do sistema, Diego assiste em Original",
+    "a": [
+      {
+        "totalMB": 684.1,
+        "byType": {
+          "Browser": 121.7,
+          "GPU": 391.4,
+          "Utility": 86.3,
+          "Tab": 84.7
+        },
+        "heapMB": 8.2,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 681.7,
+        "byType": {
+          "Browser": 122.3,
+          "GPU": 388.3,
+          "Utility": 86.3,
+          "Tab": 84.8
+        },
+        "heapMB": 8.2,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 679.5,
+        "byType": {
+          "Browser": 120.8,
+          "GPU": 389.2,
+          "Utility": 86.3,
+          "Tab": 83.2
+        },
+        "heapMB": 8.3,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 672.7,
+        "byType": {
+          "Browser": 111,
+          "GPU": 390.8,
+          "Utility": 86.2,
+          "Tab": 84.7
+        },
+        "heapMB": 8.3,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 673.4,
+        "byType": {
+          "Browser": 111.1,
+          "GPU": 391.2,
+          "Utility": 86.2,
+          "Tab": 84.9
+        },
+        "heapMB": 8.3,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 672.9,
+        "byType": {
+          "Browser": 111.4,
+          "GPU": 391.4,
+          "Utility": 86.2,
+          "Tab": 83.9
+        },
+        "heapMB": 8.3,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 674.8,
+        "byType": {
+          "Browser": 113.2,
+          "GPU": 391.5,
+          "Utility": 86.2,
+          "Tab": 84
+        },
+        "heapMB": 8.4,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 660.8,
+        "byType": {
+          "Browser": 110.2,
+          "GPU": 391.1,
+          "Utility": 85.6,
+          "Tab": 73.9
+        },
+        "heapMB": 8.5,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 658.7,
+        "byType": {
+          "Browser": 108.8,
+          "GPU": 391.1,
+          "Utility": 85.7,
+          "Tab": 73.1
+        },
+        "heapMB": 8.4,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 663.9,
+        "byType": {
+          "Browser": 110.2,
+          "GPU": 391.1,
+          "Utility": 85.7,
+          "Tab": 76.9
+        },
+        "heapMB": 8.4,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 660.7,
+        "byType": {
+          "Browser": 110.3,
+          "GPU": 391.3,
+          "Utility": 85.6,
+          "Tab": 73.6
+        },
+        "heapMB": 8.5,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 660.2,
+        "byType": {
+          "Browser": 109.1,
+          "GPU": 391.4,
+          "Utility": 85.7,
+          "Tab": 74.1
+        },
+        "heapMB": 8.6,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 662.4,
+        "byType": {
+          "Browser": 110.3,
+          "GPU": 391.3,
+          "Utility": 85.7,
+          "Tab": 75.1
+        },
+        "heapMB": 8.6,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 664.4,
+        "byType": {
+          "Browser": 110.6,
+          "GPU": 391.5,
+          "Utility": 85.6,
+          "Tab": 76.7
+        },
+        "heapMB": 8.5,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 664.9,
+        "byType": {
+          "Browser": 111.1,
+          "GPU": 391.5,
+          "Utility": 85.6,
+          "Tab": 76.8
+        },
+        "heapMB": 8.6,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 662.5,
+        "byType": {
+          "Browser": 108.6,
+          "GPU": 391.4,
+          "Utility": 85.6,
+          "Tab": 76.9
+        },
+        "heapMB": 8.6,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 662.8,
+        "byType": {
+          "Browser": 110.8,
+          "GPU": 391.5,
+          "Utility": 85.7,
+          "Tab": 74.9
+        },
+        "heapMB": 8.6,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 664.1,
+        "byType": {
+          "Browser": 110.7,
+          "GPU": 391.4,
+          "Utility": 85.4,
+          "Tab": 76.6
+        },
+        "heapMB": 8.6,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 662.5,
+        "byType": {
+          "Browser": 110.8,
+          "GPU": 391.3,
+          "Utility": 85.4,
+          "Tab": 75
+        },
+        "heapMB": 8.6,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      {
+        "totalMB": 662.4,
+        "byType": {
+          "Browser": 110.7,
+          "GPU": 391.3,
+          "Utility": 85.4,
+          "Tab": 75
+        },
+        "heapMB": 8.6,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 9,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      }
+    ],
+    "b": [
+      {
+        "totalMB": 411.3,
+        "byType": {
+          "Browser": 82.8,
+          "GPU": 148.7,
+          "Utility": 84.9,
+          "Tab": 94.8
+        },
+        "heapMB": 8.5,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 412.6,
+        "byType": {
+          "Browser": 82.8,
+          "GPU": 148.3,
+          "Utility": 84.9,
+          "Tab": 96.5
+        },
+        "heapMB": 8.7,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 415.5,
+        "byType": {
+          "Browser": 82.3,
+          "GPU": 153.3,
+          "Utility": 85,
+          "Tab": 94.8
+        },
+        "heapMB": 8.7,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 402.2,
+        "byType": {
+          "Browser": 75.4,
+          "GPU": 148.6,
+          "Utility": 84.9,
+          "Tab": 93.3
+        },
+        "heapMB": 8.7,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 410.8,
+        "byType": {
+          "Browser": 75.4,
+          "GPU": 155.9,
+          "Utility": 85,
+          "Tab": 94.5
+        },
+        "heapMB": 8.7,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 400.5,
+        "byType": {
+          "Browser": 75.4,
+          "GPU": 146.1,
+          "Utility": 85,
+          "Tab": 94
+        },
+        "heapMB": 8.7,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 401.2,
+        "byType": {
+          "Browser": 75.5,
+          "GPU": 146.3,
+          "Utility": 85,
+          "Tab": 94.4
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 393.4,
+        "byType": {
+          "Browser": 73.5,
+          "GPU": 148.6,
+          "Utility": 84.7,
+          "Tab": 86.7
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 392.1,
+        "byType": {
+          "Browser": 73.6,
+          "GPU": 149.2,
+          "Utility": 84.6,
+          "Tab": 84.7
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 396.3,
+        "byType": {
+          "Browser": 73.6,
+          "GPU": 149.4,
+          "Utility": 85.2,
+          "Tab": 88.2
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 385,
+        "byType": {
+          "Browser": 73.6,
+          "GPU": 139.8,
+          "Utility": 85.2,
+          "Tab": 86.6
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 386.7,
+        "byType": {
+          "Browser": 73.6,
+          "GPU": 140.5,
+          "Utility": 85.2,
+          "Tab": 87.4
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 387.2,
+        "byType": {
+          "Browser": 73.6,
+          "GPU": 142.3,
+          "Utility": 85.3,
+          "Tab": 86
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 387.3,
+        "byType": {
+          "Browser": 73.8,
+          "GPU": 141.3,
+          "Utility": 85.2,
+          "Tab": 87
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 386.1,
+        "byType": {
+          "Browser": 73.8,
+          "GPU": 139.6,
+          "Utility": 85.2,
+          "Tab": 87.5
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 385.2,
+        "byType": {
+          "Browser": 73.8,
+          "GPU": 140.2,
+          "Utility": 85.3,
+          "Tab": 85.9
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 386.6,
+        "byType": {
+          "Browser": 74.1,
+          "GPU": 141.1,
+          "Utility": 85.1,
+          "Tab": 86.3
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 385.3,
+        "byType": {
+          "Browser": 74.1,
+          "GPU": 140.4,
+          "Utility": 85.1,
+          "Tab": 85.7
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 385.7,
+        "byType": {
+          "Browser": 74.1,
+          "GPU": 140.1,
+          "Utility": 85,
+          "Tab": 86.5
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      },
+      {
+        "totalMB": 385,
+        "byType": {
+          "Browser": 74.1,
+          "GPU": 140.2,
+          "Utility": 84.8,
+          "Tab": 85.9
+        },
+        "heapMB": 8.8,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      }
+    ],
+    "steps": [
+      {
+        "downMs": 120,
+        "liftMs": 255,
+        "redeclareMs": false,
+        "republished": true,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 77,
+        "liftMs": 252,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 76,
+        "liftMs": 316,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 75,
+        "liftMs": 253,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 64,
+        "liftMs": 257,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 61,
+        "liftMs": 251,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 73,
+        "liftMs": 315,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 81,
+        "liftMs": 376,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 73,
+        "liftMs": 252,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 63,
+        "liftMs": 316,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 77,
+        "liftMs": 316,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 81,
+        "liftMs": 378,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 77,
+        "liftMs": 299,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 64,
+        "liftMs": 251,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 63,
+        "liftMs": 317,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 76,
+        "liftMs": 317,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 78,
+        "liftMs": 314,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 75,
+        "liftMs": 313,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 63,
+        "liftMs": 378,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      },
+      {
+        "downMs": 74,
+        "liftMs": 318,
+        "redeclareMs": false,
+        "republished": false,
+        "diegoVideoWidth": 1920
+      }
+    ],
+    "baseline": {
+      "a": {
+        "totalMB": 553.7,
+        "byType": {
+          "Browser": 120.4,
+          "GPU": 264.1,
+          "Utility": 86.2,
+          "Tab": 83
+        },
+        "heapMB": 7.9,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:System audio",
+          "video:"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 8,
+        "sendersWithTrack": 2,
+        "mediaElements": 1,
+        "attachedVideoTracks": 0
+      },
+      "b": {
+        "totalMB": 412.4,
+        "byType": {
+          "Browser": 82.3,
+          "GPU": 149.6,
+          "Utility": 84.7,
+          "Tab": 95.8
+        },
+        "heapMB": 8.4,
+        "liveTracks": 2,
+        "liveTracksByKind": [
+          "audio:MediaStreamAudioDestinat",
+          "audio:Fake Default Audio Input"
+        ],
+        "audioContexts": 3,
+        "peerConnections": 1,
+        "transceivers": 7,
+        "sendersWithTrack": 1,
+        "mediaElements": 2,
+        "attachedVideoTracks": 1
+      }
+    },
+    "sfuEnd": [
+      {
+        "sid": "TR_AsX7NRpBZ5xmwM",
+        "source": "screen_audio",
+        "muted": false,
+        "layers": []
+      },
+      {
+        "sid": "TR_VSJG92dXZuR73N",
+        "source": "screen",
+        "muted": false,
+        "layers": [
+          "320x180@100k",
+          "640x360@425k",
+          "1280x720@3000k"
+        ]
+      }
+    ],
+    "digestA": {
+      "slopeMBPerCycle": -1,
+      "first": 684.1,
+      "last": 662.4,
+      "min": 658.7,
+      "max": 684.1
+    },
+    "digestB": {
+      "slopeMBPerCycle": -1.6,
+      "first": 411.3,
+      "last": 385,
+      "min": 385,
+      "max": 415.5
+    },
+    "digestATab": {
+      "slopeMBPerCycle": -0.6,
+      "first": 84.7,
+      "last": 75,
+      "min": 73.1,
+      "max": 84.9
+    },
+    "digestAGpu": {
+      "slopeMBPerCycle": 0.1,
+      "first": 391.4,
+      "last": 391.3,
+      "min": 388.3,
+      "max": 391.5
+    }
+  },
+  "republish_auto": {
+    "when": "2026-11-01T10:27:48.851Z",
+    "source": "janela ffplay testsrc2 1920x1080@60, Ana (Plus) pede 1080p60 (movimento) com áudio do sistema; Bruno assiste em Automático; downgrade = webhook sandbox revoked assinado",
+    "runs": [
+      {
+        "before": {
+          "preset": "1080p60",
+          "audio": true,
+          "sentTop": "1920x1080@14",
+          "bruno": {
+            "fps": 29.7,
+            "size": "1280x720"
+          },
+          "sfu": [
+            {
+              "sid": "TR_AsjUndxsYozv3n",
+              "source": "screen_audio",
+              "muted": false,
+              "layers": []
+            },
+            {
+              "sid": "TR_VSoaTtrEs2ZrSf",
+              "source": "screen",
+              "muted": false,
+              "layers": [
+                "640x360@400k",
+                "1280x720@1700k",
+                "1920x1080@8000k"
+              ]
+            }
+          ]
+        },
+        "after": {
+          "planAttributeMs": 55,
+          "republishedMs": 124,
+          "sfuSingle720Ms": 756,
+          "brunoSees720Ms": 2816,
+          "at": "+12.5 s",
+          "preset": "720p60",
+          "sentTop": "1280x720@52",
+          "sfu": [
+            {
+              "sid": "TR_AsjUndxsYozv3n",
+              "source": "screen_audio",
+              "muted": false,
+              "layers": []
+            },
+            {
+              "sid": "TR_VSfkY8swLaMhA9",
+              "source": "screen",
+              "muted": false,
+              "layers": [
+                "320x180@100k",
+                "640x360@425k",
+                "1280x720@3000k"
+              ]
+            }
+          ],
+          "serverAboveThePlanLogs": 0,
+          "notices": 1,
+          "notice": "Seu plano não inclui 1080p 60 fps: a transmissão continua, em 720p 60 fps.",
+          "brunoStillWatching": true,
+          "bruno": {
+            "fps": 53.2,
+            "size": "1280x720"
+          },
+          "viewerFrames": {
+            "maxGapMs": 356,
+            "atMsAfterEvent": 76,
+            "sizeAfter": "1280x720",
+            "usualGapP50Ms": 33.4,
+            "usualGapP99Ms": 55.6,
+            "gapsOver100ms": [
+              356,
+              156,
+              180,
+              110
+            ],
+            "events": [
+              "emptied@+652",
+              "waiting@+652",
+              "loadeddata@+687",
+              "playing@+687"
+            ]
+          },
+          "screenAudio": {
+            "subscribed": true,
+            "sid": "TR_AsjUndxsYozv3n",
+            "packets": 683,
+            "longestSilenceMs": 0
+          }
+        }
+      },
+      {
+        "before": {
+          "preset": "1080p60",
+          "audio": true,
+          "sentTop": "1920x1080@44",
+          "bruno": {
+            "fps": 29.7,
+            "size": "1280x720"
+          },
+          "sfu": [
+            {
+              "sid": "TR_AsKc3zmkSernd8",
+              "source": "screen_audio",
+              "muted": false,
+              "layers": []
+            },
+            {
+              "sid": "TR_VSukGaUTwAJj5s",
+              "source": "screen",
+              "muted": false,
+              "layers": [
+                "640x360@400k",
+                "1280x720@1700k",
+                "1920x1080@8000k"
+              ]
+            }
+          ]
+        },
+        "after": {
+          "planAttributeMs": 40,
+          "republishedMs": 155,
+          "sfuSingle720Ms": 763,
+          "brunoSees720Ms": 1878,
+          "at": "+12.5 s",
+          "preset": "720p60",
+          "sentTop": "1280x720@43",
+          "sfu": [
+            {
+              "sid": "TR_AsKc3zmkSernd8",
+              "source": "screen_audio",
+              "muted": false,
+              "layers": []
+            },
+            {
+              "sid": "TR_VSvn4z4WpUcnH9",
+              "source": "screen",
+              "muted": false,
+              "layers": [
+                "320x180@100k",
+                "640x360@425k",
+                "1280x720@3000k"
+              ]
+            }
+          ],
+          "serverAboveThePlanLogs": 0,
+          "notices": 1,
+          "notice": "Seu plano não inclui 1080p 60 fps: a transmissão continua, em 720p 60 fps.",
+          "brunoStillWatching": true,
+          "bruno": {
+            "fps": 49.7,
+            "size": "1280x720"
+          },
+          "viewerFrames": {
+            "maxGapMs": 512,
+            "atMsAfterEvent": 117,
+            "sizeAfter": "1280x720",
+            "usualGapP50Ms": 33.4,
+            "usualGapP99Ms": 50.2,
+            "gapsOver100ms": [
+              512,
+              190
+            ],
+            "events": [
+              "emptied@+721",
+              "waiting@+721",
+              "loadeddata@+755",
+              "playing@+756"
+            ]
+          },
+          "screenAudio": {
+            "subscribed": true,
+            "sid": "TR_AsKc3zmkSernd8",
+            "packets": 683,
+            "longestSilenceMs": 0
+          }
+        }
       }
     ]
   }

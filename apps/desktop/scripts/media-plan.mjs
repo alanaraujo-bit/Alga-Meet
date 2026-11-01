@@ -3,7 +3,7 @@
 // (API :4000, LiveKit :7880): an API child process on :4350 (own PGlite/uploads/outbox in <tmp>/alga-media-plan,
 // billing sandbox with a known webhook secret) and a LiveKit on :7980 whose webhooks reach that API.
 //
-//   node apps/desktop/scripts/media-plan.mjs [--no-build] [--part=plan,shots,recap]
+//   node apps/desktop/scripts/media-plan.mjs [--no-build] [--part=plan,shots,recap,republish,cycles] [--cycles=20]
 //
 // plan:  two lab pages (the same media engine the app uses) joined with tokens from POST /voice/join. Ana (free)
 //        shares a real 1920x1080@60 window asking for 1080p60, Bruno watches in Original. Upgrade through the
@@ -15,6 +15,9 @@
 //        to fill the room; screens go to docs/screenshots/<date>-<screen>-v<n>.png (numbering continues). A full-screen
 //        test pattern covers the desktop while a picker is open, so thumbnails never show the real screen.
 // recap: diagnostics of an in-place 720p60 → 1080p60 change (capture size, encodings, what is sent, every 500 ms).
+// republish: Plus → Free (signed sandbox webhook) with a 1080p60 share on the air: the client republishes, the
+//        server's re-check 10 s later must not mute it, the viewer keeps watching (frame gap measured). cycles: N
+//        downgrade/upgrade cycles, private memory per cycle. Both → media-plan.json (republish, republishCycles).
 import { spawn, spawnSync } from 'node:child_process'
 import { createHmac, randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -320,6 +323,207 @@ async function partPlan(seedData, sig) {
   }
 }
 
+/** Every screen track of `identity` as the SFU lists it (listParticipants, like the server's re-check reads it). */
+async function sfuScreens(rooms, room, identity) {
+  const p = (await rooms.listParticipants(room)).find((x) => x.identity === identity)
+  return (p?.tracks ?? []).filter((t) => t.source === TrackSource.SCREEN_SHARE || t.source === TrackSource.SCREEN_SHARE_AUDIO).map((t) => ({
+    sid: t.sid, source: t.source === TrackSource.SCREEN_SHARE ? 'screen' : 'screen_audio', muted: t.muted,
+    layers: t.layers.map((l) => `${l.width}x${l.height}@${Math.round(l.bitrate / 1000)}k`),
+  }))
+}
+const aboveLines = () => readFileSync(join(DIR, 'api.log'), 'utf8').split('\n').filter((l) => l.includes('above the plan'))
+/** Frames presented by the viewer's <video> (requestVideoFrameCallback, epoch ms) and its media events. */
+const recordFrames = (b, id) => ev(b, (id) => {
+  const v = document.querySelector(`[data-testid="video-${id}"]`)
+  const w = (window.__rv = { frames: [], events: [] })
+  const now = () => performance.timeOrigin + performance.now()
+  let h = 0
+  const tick = (_t, m) => (w.frames.push([now(), m.width, m.height]), (h = v.requestVideoFrameCallback(tick)))
+  // A new srcObject restarts the element: re-arm so no frame after it is missed.
+  v.addEventListener('loadeddata', () => (v.cancelVideoFrameCallback(h), (h = v.requestVideoFrameCallback(tick))))
+  for (const e of ['emptied', 'loadeddata', 'playing', 'waiting']) v.addEventListener(e, () => w.events.push([e, now()]))
+  h = v.requestVideoFrameCallback(tick)
+}, id)
+/** Longest gap between presented frames in [from, to] (epoch ms), plus the usual (p50/p99) gap before `from`. */
+async function frameGaps(b, from, to) {
+  const { frames, events } = await ev(b, () => window.__rv)
+  const gaps = frames.slice(1).map((f, i) => ({ at: frames[i][0], ms: f[0] - frames[i][0], size: `${f[1]}x${f[2]}` }))
+  const win = gaps.filter((g) => g.at >= from && g.at <= to)
+  const base = gaps.filter((g) => g.at < from).map((g) => g.ms).sort((x, y) => x - y)
+  const worst = win.reduce((m, g) => (g.ms > m.ms ? g : m), { ms: 0, at: from })
+  return { maxGapMs: Math.round(worst.ms), atMsAfterEvent: Math.round(worst.at - from), sizeAfter: worst.size ?? null, usualGapP50Ms: r1(base[Math.floor(base.length / 2)]), usualGapP99Ms: r1(base[Math.floor(base.length * 0.99)]), gapsOver100ms: win.filter((g) => g.ms > 100).map((g) => Math.round(g.ms)), events: events.filter(([, t]) => t >= from && t <= to).map(([e, t]) => `${e}@+${Math.round(t - from)}`) }
+}
+/** Opus packets of the screen audio Bruno receives, sampled every 100 ms over `ms`: the longest run without new packets. */
+async function audioContinuity(b, id, ms) {
+  return ev(b, async ({ id, ms }) => {
+    const pub = window.__mediaLab.media.debug.room?.remoteParticipants.get(id)?.getTrackPublication('screen_share_audio')
+    const pkts = async () => {
+      let n = 0
+      ;(await pub?.track?.getRTCStatsReport())?.forEach((s) => s.type === 'inbound-rtp' && (n = s.packetsReceived))
+      return n
+    }
+    let last = await pkts()
+    let still = 0
+    let worst = 0
+    const t0 = performance.now()
+    while (performance.now() - t0 < ms) {
+      await new Promise((r) => setTimeout(r, 100))
+      const n = await pkts()
+      still = n > last ? 0 : still + 100
+      worst = Math.max(worst, still)
+      last = n
+    }
+    return { subscribed: !!pub?.isSubscribed, sid: pub?.trackSid ?? null, packets: last, longestSilenceMs: worst }
+  }, { id, ms })
+}
+
+/**
+ * Plus → Free with a 1080p60 share on the air. The SFU keeps the layers declared at publish, so the client must
+ * republish (not only re-cap in place) or the server's re-check mutes it PLAN_RECHECK_MS (10 s) later. Checks: the
+ * stream goes on at 720p60, not muted after 10 s (listParticipants + API log), Bruno keeps watching (no "Assistir"),
+ * screen audio continues; viewer interruption = longest gap between frames presented in Bruno's <video>.
+ */
+async function partRepublish(seedData, sig) {
+  const { U, focus } = seedData
+  const runs = Number(arg('repeat', 3))
+  const mode = arg('watch', 'source') // the call stage uses 'auto' (adaptive stream)
+  const rooms = new RoomServiceClient(LK_HTTP, 'devkey', L.secret)
+  await startPattern1080()
+  let up = await upgrade(U.ana)
+  const a = await launch('lab-plan-a', sig.silence, [], false)
+  const b = await launch('lab-plan-b', sig.silence, [], true)
+  const R = (results[mode === 'source' ? 'republish' : `republish_${mode}`] = { when: new Date().toISOString(), source: `janela ffplay testsrc2 1920x1080@60, Ana (Plus) pede 1080p60 (movimento) com áudio do sistema; Bruno assiste em ${mode === 'source' ? 'Original' : 'Automático'}; downgrade = webhook sandbox revoked assinado`, runs: [] })
+  try {
+    const ja = await labJoin(a, U.ana, focus.id, false)
+    if (!ja.streamPresets.includes('1080p60')) throw new Error(`Ana is not Plus: ${ja.streamPresets}`)
+    await labJoin(b, U.bruno, focus.id, true)
+    await until(async () => (await mediaState(a)).connection.state === 'connected')
+    const sourceId = await ev(a, async () => (await window.__mediaLab.media.getScreenSources()).find((s) => s.kind === 'window' && s.name.includes('AlgaPattern1080'))?.id ?? null)
+    if (!sourceId) throw new Error('pattern window not found')
+    for (let i = 0; i < runs; i++) {
+      if (i > 0) {
+        up = await upgrade(U.ana)
+        if (!(await until(async () => (await mediaState(a)).screen.plan?.includes('1080p60')))) throw new Error('upgrade did not reach the client')
+      }
+      await ev(a, (o) => window.__mediaLab.media.startScreenShare(o), { sourceId, audio: true, quality: '1080p60', contentType: 'motion' })
+      await sleep(800)
+      await ev(b, ([id, q]) => window.__mediaLab.media.watch(id, q), [U.ana.me.id, mode])
+      await sleep(6000)
+      let sa = await mediaState(a)
+      const before = { preset: sa.screen.preset, audio: sa.screen.audio, sentTop: sentTop(sa), bruno: await received(b, U.ana.me.id, 2000), sfu: await sfuScreens(rooms, ja.room, U.ana.me.id) }
+      log('before', JSON.stringify(before))
+      await recordFrames(b, U.ana.me.id)
+      await sleep(1500)
+      const notice0 = sa.notice?.id ?? 0
+      const above0 = aboveLines().length
+      const audioRun = audioContinuity(b, U.ana.me.id, 4000)
+      const tDn = await revoke(up.reference)
+      const tAttr = (await until(async () => (await mediaState(a)).screen.plan?.includes('1080p60') === false)) && Date.now()
+      const tRepub = (await until(async () => (await ev(a, () => window.__mediaLab.media.debug.screen?.declared.id)) === '720p60')) && Date.now()
+      const tSfu = (await until(async () => {
+        const t = (await sfuScreens(rooms, ja.room, U.ana.me.id)).filter((x) => x.source === 'screen')
+        return t.length === 1 && t[0].layers.at(-1)?.startsWith('1280x720')
+      }, 10_000, 100)) && Date.now()
+      const tSeen = (await until(async () => (await ev(b, async (id) => (await window.__mediaLab.rawStats({ remote: id, source: 'screen' })).find((x) => x.type === 'inbound-rtp')?.frameHeight, U.ana.me.id)) === 720, 10_000, 50)) && Date.now()
+      const audio = await audioRun
+      // Past the server's re-check (PLAN_RECHECK_MS = 10 s after the plan change) with margin.
+      await sleep(Math.max(0, tDn + 12_500 - Date.now()))
+      sa = await mediaState(a)
+      const sb = await mediaState(b)
+      const after = {
+        planAttributeMs: tAttr ? tAttr - tDn : null, republishedMs: tRepub ? tRepub - tDn : null, sfuSingle720Ms: tSfu ? tSfu - tDn : null, brunoSees720Ms: tSeen ? tSeen - tDn : null,
+        at: `+${((Date.now() - tDn) / 1000).toFixed(1)} s`, preset: sa.screen.preset, sentTop: sentTop(sa), sfu: await sfuScreens(rooms, ja.room, U.ana.me.id),
+        serverAboveThePlanLogs: aboveLines().length - above0, notices: (sa.notice?.id ?? 0) - notice0, notice: sa.notice?.text ?? null,
+        brunoStillWatching: !!sb.viewers[U.ana.me.id]?.subscribed, bruno: await received(b, U.ana.me.id, 2000),
+        viewerFrames: await frameGaps(b, tDn, tDn + 6000), screenAudio: audio,
+      }
+      log('after', JSON.stringify(after))
+      R.runs.push({ before, after })
+      save()
+      await ev(b, (id) => window.__mediaLab.media.unwatch(id), U.ana.me.id)
+      await ev(a, () => window.__mediaLab.media.stopScreenShare())
+      await sleep(2000)
+    }
+  } finally {
+    stopPattern()
+    await L.close(a)
+    await L.close(b)
+  }
+}
+
+/**
+ * Memory across plan changes on a live share: N × (downgrade → upgrade) with Bruno watching. Each downgrade must
+ * republish, so each upgrade re-declares 1080p60 (republish called directly: an in-place lift keeps the 720p
+ * declaration and the next downgrade would only re-cap). Private MB after a forced GC, per cycle (≤ 2 MB/cycle).
+ */
+async function partCycles(seedData, sig) {
+  const { U, focus } = seedData
+  const N = Number(arg('cycles', 20))
+  // 1 (stress): every upgrade re-declares 1080p60, so every downgrade republishes. 0 (real flow): only the first does.
+  const redeclare = arg('redeclare', '1') === '1'
+  await startPattern1080()
+  await upgrade(U.carla)
+  const a = await launch('lab-plan-a', sig.silence, L.MEM_FLAGS, false)
+  const b = await launch('lab-plan-b', sig.silence, L.MEM_FLAGS, true)
+  const out = (results[redeclare ? 'republishCycles' : 'planCycles'] = { when: new Date().toISOString(), cycles: N, redeclare, source: 'janela ffplay testsrc2 1920x1080@60, 1080p60 com áudio do sistema, Diego assiste em Original', a: [], b: [], steps: [] })
+  try {
+    const ja = await labJoin(a, U.carla, focus.id, false)
+    await labJoin(b, U.diego, focus.id, true)
+    await until(async () => (await mediaState(a)).connection.state === 'connected')
+    const sourceId = await ev(a, async () => (await window.__mediaLab.media.getScreenSources()).find((s) => s.kind === 'window' && s.name.includes('AlgaPattern1080'))?.id ?? null)
+    await ev(a, (o) => window.__mediaLab.media.startScreenShare(o), { sourceId, audio: true, quality: '1080p60', contentType: 'motion' })
+    await sleep(800)
+    await ev(b, (id) => window.__mediaLab.media.watch(id, 'source'), U.carla.me.id)
+    await sleep(5000)
+    const FREE = ['720p30', '720p60', '1080p30']
+    const declared = () => ev(a, () => window.__mediaLab.media.debug.screen?.declared.id ?? null)
+    const preset = async () => (await mediaState(a)).screen.preset
+    out.baseline = { a: await L.memSample(a), b: await L.memSample(b) }
+    for (let i = 0; i < N; i++) {
+      const republished = (await declared()) !== '720p60'
+      let t = Date.now()
+      await ev(a, (l) => window.__mediaLab.media.setPlanPresets(l), FREE)
+      const down = (await until(async () => (await declared()) === '720p60' && (await preset()) === '720p60')) && Date.now() - t
+      await sleep(1500)
+      t = Date.now()
+      await ev(a, (l) => window.__mediaLab.media.setPlanPresets(l), ja.streamPresets)
+      const lift = (await until(async () => (await preset()) === '1080p60')) && Date.now() - t
+      t = Date.now()
+      if (redeclare) await ev(a, () => window.__mediaLab.media.republish(window.__mediaLab.useMedia.getState().screen.offered.find((p) => p.id === '1080p60')))
+      const redeclareMs = redeclare && (await declared()) === '1080p60' && Date.now() - t
+      await sleep(2500)
+      const watching = await ev(b, (id) => !!window.__mediaLab.useMedia.getState().viewers[id]?.subscribed && (document.querySelector(`[data-testid="video-${id}"]`)?.videoWidth ?? 0), U.carla.me.id)
+      out.a.push(await L.memSample(a))
+      out.b.push(await L.memSample(b))
+      out.steps.push({ downMs: down, liftMs: lift, redeclareMs, republished, diegoVideoWidth: watching })
+      const s = out.a.at(-1)
+      log(`cycle ${i + 1}: A ${s.totalMB} MB (Tab ${s.byType.Tab}, GPU ${s.byType.GPU}) tx ${s.transceivers} tracks ${s.liveTracks} · B ${out.b.at(-1).totalMB} MB · down ${down} ms, redeclare ${redeclareMs} ms, Diego ${watching}px`)
+    }
+    out.sfuEnd = await sfuScreens(new RoomServiceClient(LK_HTTP, 'devkey', L.secret), ja.room, U.carla.me.id)
+    out.digestA = slope(out.a.map((s) => s.totalMB))
+    out.digestB = slope(out.b.map((s) => s.totalMB))
+    out.digestATab = slope(out.a.map((s) => s.byType.Tab))
+    out.digestAGpu = slope(out.a.map((s) => s.byType.GPU))
+    save()
+    log('A total', JSON.stringify(out.digestA), 'B total', JSON.stringify(out.digestB))
+    await ev(a, () => window.__mediaLab.media.stopScreenShare())
+  } finally {
+    stopPattern()
+    await L.close(a)
+    await L.close(b)
+  }
+}
+/** Least-squares MB per cycle. */
+function slope(xs) {
+  const n = xs.length
+  const mx = (n - 1) / 2
+  const my = xs.reduce((s, x) => s + x, 0) / n
+  let num = 0
+  let den = 0
+  xs.forEach((y, i) => ((num += (i - mx) * (y - my)), (den += (i - mx) ** 2)))
+  return { slopeMBPerCycle: r1(num / den), first: xs[0], last: xs.at(-1), min: Math.min(...xs), max: Math.max(...xs) }
+}
+
 /** Diagnostics of an in-place upgrade (720p60 → 1080p60): capture, encodings and what is sent, every 500 ms. */
 async function partRecap(seedData, sig) {
   const { U, focus } = seedData
@@ -574,6 +778,8 @@ try {
   log('seeded', Object.keys(data.U).length, 'people')
   if (parts.includes('plan')) await partPlan(data, sig)
   if (parts.includes('recap')) await partRecap(data, sig)
+  if (parts.includes('republish')) await partRepublish(data, sig)
+  if (parts.includes('cycles')) await partCycles(data, sig)
   if (parts.includes('shots')) await partShots(data, sig)
   log('done', shots.length ? `${shots.length} screenshots` : '')
 } catch (e) {

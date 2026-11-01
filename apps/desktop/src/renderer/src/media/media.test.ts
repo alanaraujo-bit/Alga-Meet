@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_HANGOVER_MS, PttLatch, VadGate, perceptualLevel, rmsDb } from './vad'
 import { STREAM_PRESETS } from '@alga/shared'
-import { SCREEN_PRESETS, availablePresets, clampPreset, contentSettings, defaultPreset, gatePresets, getPreset, pickCodec, recordSustain, simulcastFor } from './presets'
+import { SCREEN_PRESETS, aboveContract, availablePresets, clampPreset, contentSettings, defaultPreset, gatePresets, getPreset, pickCodec, recordSustain, simulcastFor } from './presets'
 import { PrefsStore } from './prefs'
 import { stallStep, type StallState } from './stall'
 
@@ -109,6 +109,13 @@ describe('presets', () => {
     expect(clampPreset('720p60', offered).id).toBe('720p60')
     expect(clampPreset('2160p30', offered, 'motion').id).toBe('1080p30') // 4K30 never becomes 60 fps
     expect(clampPreset('720p30', [getPreset('1080p30')]).id).toBe('1080p30') // nothing below: the lowest offered
+  })
+  it('above contract: what the server re-check mutes (declared layers vs the plan), so a downgrade must republish', () => {
+    const free = ['720p30', '720p60', '1080p30'] as const
+    expect(aboveContract(getPreset('1080p60'), free)).toBe(true) // 8 Mbps > 1080p30's 5 Mbps
+    expect(aboveContract(getPreset('720p60'), free)).toBe(false) // an in-place re-cap is enough
+    expect(aboveContract(getPreset('1440p60'), ['720p30', '720p60', '1080p30', '1080p60'])).toBe(true) // short side
+    expect(aboveContract(getPreset('1080p60'), null)).toBe(false) // plan unknown
   })
   it('hides a preset whose encoder was CPU-limited in most of its shares (a calm screen at low fps is not a failure)', () => {
     const cpu = (n: number) => Array.from({ length: 20 }, (_, i) => i < n)
