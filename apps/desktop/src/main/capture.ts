@@ -15,7 +15,7 @@ async function getSources(raw: unknown): Promise<CaptureSource[]> {
   if (!types.length || types.some((t) => t !== 'screen' && t !== 'window')) throw new TypeError('types must be screen/window')
   const sources = await desktopCapturer.getSources({
     types: types as Array<'screen' | 'window'>,
-    thumbnailSize: { width: 320, height: 200 },
+    thumbnailSize: { width: 640, height: 360 }, // picker shows a large preview; 320px upscaled looked soft
     fetchWindowIcons: true,
   })
   return sources

@@ -12,7 +12,7 @@ const GLYPHS: Record<string, string[]> = {
   '9': ['01110', '10001', '10001', '01111', '00001', '00010', '01100'],
   '+': ['000', '000', '010', '111', '010', '000', '000'],
 }
-const RED = [0x4d, 0x48, 0xe5] // BGR of #e5484d
+const RED = [0x59, 0x5d, 0xf7] // BGR of #f75d59 (design-system danger on the taskbar)
 
 export function badgeText(count: number): string | null {
   if (!Number.isFinite(count) || count < 1) return null
