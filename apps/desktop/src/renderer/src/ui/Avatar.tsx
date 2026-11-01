@@ -78,7 +78,9 @@ export function Avatar({
   /** Name is already visible next to it. */
   decorative?: boolean
 }) {
-  const [broken, setBroken] = useState(false)
+  // Remember which URL failed, so a new avatar gets a fresh try.
+  const [brokenUrl, setBrokenUrl] = useState<string | null>(null)
+  const broken = !!user.avatarUrl && brokenUrl === user.avatarUrl
   const hue = hueFor(user.id)
   const showDot = presence && DOT[size] > 0
   const label = decorative ? undefined : presence ? `${user.displayName}, ${PRESENCE_LABEL[presence]}` : user.displayName
@@ -99,7 +101,7 @@ export function Avatar({
         }}
       >
         {/* At 20px and below initials are noise: the color disc alone identifies. */}
-        {user.avatarUrl && !broken ? <img src={user.avatarUrl} alt="" draggable={false} onError={() => setBroken(true)} /> : size > 20 ? initials(user.displayName) : null}
+        {user.avatarUrl && !broken ? <img src={user.avatarUrl} alt="" draggable={false} onError={() => setBrokenUrl(user.avatarUrl)} /> : size > 20 ? initials(user.displayName) : null}
       </span>
       {(speaking || glowRef || glow) && <span ref={glowRef} className={s.glow} />}
       {showDot && (

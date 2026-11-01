@@ -39,3 +39,25 @@ export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   }
   return data as T
 }
+
+/**
+ * Multipart upload with progress (fetch has no upload progress, XHR does). `onProgress` gets 0..1.
+ * Same errors as `api` (status 0 = network failure or abort).
+ */
+export function upload<T>(method: 'POST' | 'PUT', path: string, body: FormData, onProgress?: (p: number) => void): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open(method, `${window.alga.config.apiUrl}/api/v1${path}`)
+    if (token) xhr.setRequestHeader('authorization', `Bearer ${token}`)
+    xhr.responseType = 'json'
+    if (onProgress) xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total)
+    xhr.onerror = xhr.onabort = () => reject(new ApiRequestError(0, 'network', 'Não foi possível falar com o servidor. Verifique sua conexão.'))
+    xhr.onload = () => {
+      const data = xhr.response as (T & Partial<ApiError>) | null
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(data as T)
+      const e = data?.error
+      reject(new ApiRequestError(xhr.status, e?.code ?? 'internal', e?.message ?? `Erro inesperado (HTTP ${xhr.status}).`, e?.fields))
+    }
+    xhr.send(body)
+  })
+}

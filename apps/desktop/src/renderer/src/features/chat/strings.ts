@@ -54,6 +54,35 @@ export const t = {
   header: {
     members: 'Lista de membros',
   },
+  files: {
+    attach: 'Anexar arquivos',
+    noPermission: 'Você não tem permissão para enviar arquivos neste canal.',
+    remove: (name: string) => `Remover ${name}`,
+    problem: { empty: 'Arquivo vazio.', tooBig: (max: string) => `Maior que ${max}.`, tooMany: (n: number) => `Máximo de ${n} arquivos por mensagem.` },
+    notSent: 'Não vai ser enviado',
+    dropTitle: (target: string) => `Solte para enviar em ${target}`,
+    dropBody: (n: number, max: string) => `Até ${n} arquivos de ${max} cada.`,
+    dropDenied: 'Você não pode enviar arquivos aqui.',
+    uploading: (n: number, pct: number) => `Enviando ${n} ${n === 1 ? 'arquivo' : 'arquivos'} · ${pct}%`,
+    summary: (n: number, images: boolean) => (images ? (n === 1 ? 'Imagem' : `${n} imagens`) : n === 1 ? 'Anexo' : `${n} anexos`),
+    download: (name: string) => `Baixar ${name}`,
+    open: (name: string) => `Abrir ${name}`,
+    broken: 'Não foi possível carregar.',
+    retry: 'Tentar de novo',
+    saveError: 'Não foi possível baixar o arquivo.',
+    pasted: 'imagem-colada',
+  },
+  lightbox: {
+    label: 'Visualizar imagem',
+    position: (i: number, n: number) => `${i} de ${n}`,
+    prev: 'Anterior',
+    next: 'Próxima',
+    fit: 'Ajustar à tela',
+    actual: 'Tamanho real',
+    openExternal: 'Abrir no navegador',
+    save: 'Salvar',
+    close: 'Fechar',
+  },
 } as const
 
 /** Quick reactions in the hover toolbar. */

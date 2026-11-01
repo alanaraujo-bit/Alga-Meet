@@ -1,6 +1,6 @@
 import type { PublicUser } from '@alga/shared'
-import { SendHorizontal, Smile, X } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type Ref } from 'react'
+import { Paperclip, SendHorizontal, Smile, X } from 'lucide-react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type Ref } from 'react'
 import { fold } from '@/lib/fuzzy'
 import { toPlainText } from '@/lib/markdown'
 import { sendMessage, typing } from '@/store/actions'
@@ -9,8 +9,10 @@ import { displayName } from '@/store/selectors'
 import { useSession } from '@/store/session'
 import { useUi } from '@/store/ui'
 import { Avatar, IconButton } from '@/ui'
+import { AttachmentTray, attachmentSummary } from './Attachments'
 import { EmojiPicker } from './EmojiPicker'
 import { encodeMentions } from './mentions'
+import { addFiles, namePasted, takeFiles, useTray, type TrayItem } from './tray'
 import { t } from './strings'
 import s from './chat.module.css'
 
@@ -37,11 +39,13 @@ export const MAX_LEN = 4000
 const TYPING_EVERY_MS = 8000
 /** Drafts survive channel switches (in-memory for the session). */
 const drafts = new Map<string, string>()
+const NO_FILES: TrayItem[] = []
 export function Composer({
   channelId,
   spaceId,
   target,
   canSend,
+  canAttach,
   inputRef,
 }: {
   channelId: string
@@ -49,6 +53,8 @@ export function Composer({
   /** "#geral" or "@Ana", used in the placeholder. */
   target: string
   canSend: boolean
+  /** ATTACH_FILES in a space (always true in DMs). */
+  canAttach: boolean
   inputRef: Ref<HTMLTextAreaElement>
 }) {
   const [value, setValue] = useState(() => drafts.get(channelId) ?? '')
@@ -63,6 +69,9 @@ export function Composer({
   const picked = useRef(new Map<string, string>())
   const [mention, setMention] = useState<{ start: number; query: string; index: number } | null>(null)
   const [emojiAt, setEmojiAt] = useState<HTMLElement | null>(null)
+  const files = useTray((st) => st.byChannel[channelId]) ?? NO_FILES
+  const sendableFiles = files.some((f) => !f.problem)
+  const picker = useRef<HTMLInputElement>(null)
   const suggestions = useMemo(() => {
     if (!mention) return []
     const q = fold(mention.query)
@@ -100,14 +109,23 @@ export function Composer({
 
   const submit = () => {
     const content = encodeMentions(value.trim(), picked.current)
-    if (!content || over > 0 || !canSend) return
+    if ((!content && !sendableFiles) || over > 0 || !canSend) return
+    const outgoing = takeFiles(channelId)
     setValue('')
     setMention(null)
     picked.current.clear()
     lastTyping.current = 0
     useUi.getState().setReplyTo(channelId, undefined)
     // Failure keeps the message in the list with retry/discard; nothing else to do here.
-    sendMessage(channelId, content, replyToId).catch((e: unknown) => console.warn('[send] failed', e))
+    sendMessage(channelId, content, replyToId, undefined, outgoing).catch((e: unknown) => console.warn('[send] failed', e))
+  }
+
+  // Pasted screenshots/images become attachments; text (even with an image alongside, e.g. from Word) pastes as text.
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const list = Array.from(e.clipboardData.files)
+    if (!list.length || e.clipboardData.types.includes('text/plain') || !canAttach) return
+    e.preventDefault()
+    addFiles(channelId, list.map((f) => namePasted(f, t.files.pasted)))
   }
 
   const pick = (c: Candidate) => {
@@ -227,12 +245,33 @@ export function Composer({
           <div className={s.replyBar}>
             <span>
               {t.replyingTo} <strong>{replyName}</strong>
-              <span className={s.replyBarText}> {toPlainText(reply.content, (id) => users[id]?.displayName ?? t.unknownUser)}</span>
+              <span className={s.replyBarText}> {reply.content ? toPlainText(reply.content, (id) => users[id]?.displayName ?? t.unknownUser) : attachmentSummary(reply)}</span>
             </span>
             <IconButton icon={X} label={t.cancelReply} shortcut="Esc" size="sm" onClick={() => useUi.getState().setReplyTo(channelId, undefined)} />
           </div>
         )}
+        <AttachmentTray channelId={channelId} items={files} onRemoved={() => ref.current?.focus()} />
         <div className={s.inputRow}>
+          <IconButton
+            icon={Paperclip}
+            label={t.files.attach}
+            disabledReason={!canSend ? t.noPermission : !canAttach ? t.files.noPermission : undefined}
+            className={s.attachBtn}
+            onClick={() => picker.current?.click()}
+          />
+          <input
+            ref={picker}
+            type="file"
+            multiple
+            hidden
+            aria-hidden
+            tabIndex={-1}
+            onChange={(e) => {
+              addFiles(channelId, Array.from(e.target.files ?? []))
+              e.target.value = ''
+              ref.current?.focus()
+            }}
+          />
           <textarea
             ref={setRefs}
             className={s.input}
@@ -247,6 +286,7 @@ export function Composer({
             aria-activedescendant={active ? `${listId}-${active.user.id}` : undefined}
             onChange={(e) => onChange(e.target.value, e.target)}
             onKeyDown={onKeyDown}
+            onPaste={onPaste}
             onClick={(e) => trackMention(e.currentTarget)}
             onBlur={() => setMention(null)}
           />
@@ -261,7 +301,7 @@ export function Composer({
             label={t.send}
             shortcut={t.sendHint}
             disabledReason={over > 0 ? t.tooLong(over) : undefined}
-            className={value.trim() && over <= 0 ? s.sendReady : s.sendIdle}
+            className={(value.trim() || sendableFiles) && over <= 0 ? s.sendReady : s.sendIdle}
             onClick={submit}
           />
         </div>

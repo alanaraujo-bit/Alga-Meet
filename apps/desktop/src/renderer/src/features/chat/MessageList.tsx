@@ -146,7 +146,7 @@ export function MessageList({ channelId, spaceId, unreadAfter, title, isDm }: { 
                       spaceId={spaceId}
                       meId={me?.id}
                       mentioned={!!me && r.message.author.id !== me.id && mentionedIds(r.message.content).includes(me.id)}
-                      failed={!!failures[r.message.id]}
+                      failed={failures[r.message.id] ?? false}
                       editing={editingId === r.message.id}
                     />
                 ),

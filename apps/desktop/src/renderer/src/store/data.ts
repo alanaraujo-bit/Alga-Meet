@@ -31,14 +31,17 @@ export interface DataState {
   messages: Record<string, MessageList>
   /** channelId -> userId -> expiry epoch ms */
   typing: Record<string, Record<string, number>>
-  /** Optimistic messages (keyed by nonce) whose send failed: kept in place for retry/discard. */
-  sendFailures: Record<string, true>
+  /** Optimistic messages (keyed by nonce) whose send failed: kept in place for retry/discard. A string = why. */
+  sendFailures: Record<string, true | string>
+  /** Upload progress 0..1 of optimistic messages with files (keyed by nonce). */
+  uploads: Record<string, number>
   apply(d: Dispatch): void
   /** Insert a page of history (newest-first from the API) or optimistic messages. */
   upsertMessages(channelId: string, msgs: Message[], opts?: { hasMoreBefore?: boolean }): void
   removeMessage(channelId: string, id: string): void
   setMessagesLoading(channelId: string, loading: boolean): void
-  setSendFailed(nonce: string, failed: boolean): void
+  setSendFailed(nonce: string, failed: boolean | string): void
+  setUpload(nonce: string, progress: number | null): void
   /** Local read-state move (ack is optimistic; the server echoes READ_STATE_UPDATE). */
   markRead(channelId: string, messageId: string): void
   reset(): void
@@ -59,7 +62,8 @@ const empty = {
   messages: {},
   typing: {},
   sendFailures: {},
-} satisfies Omit<DataState, 'apply' | 'upsertMessages' | 'removeMessage' | 'setMessagesLoading' | 'setSendFailed' | 'markRead' | 'reset'>
+  uploads: {},
+} satisfies Omit<DataState, 'apply' | 'upsertMessages' | 'removeMessage' | 'setMessagesLoading' | 'setSendFailed' | 'setUpload' | 'markRead' | 'reset'>
 
 const byId = <T extends { id: string }>(xs: T[]): Record<string, T> => Object.fromEntries(xs.map((x) => [x.id, x]))
 const omit = <T>(rec: Record<string, T>, key: string): Record<string, T> => {
@@ -97,7 +101,9 @@ export const useData = create<DataState>()((set, get) => ({
   reset: () => set(empty),
 
   setSendFailed: (nonce, failed) =>
-    set((s) => ({ sendFailures: failed ? { ...s.sendFailures, [nonce]: true } : omit(s.sendFailures, nonce) })),
+    set((s) => ({ sendFailures: failed ? { ...s.sendFailures, [nonce]: failed } : omit(s.sendFailures, nonce) })),
+
+  setUpload: (nonce, progress) => set((s) => ({ uploads: progress === null ? omit(s.uploads, nonce) : { ...s.uploads, [nonce]: progress } })),
 
   markRead: (channelId, messageId) =>
     set((s) => {
@@ -213,8 +219,17 @@ export const useData = create<DataState>()((set, get) => ({
         return set({ members: { ...s.members, [ev.d.spaceId]: omit(s.members[ev.d.spaceId] ?? {}, ev.d.userId) } })
       case 'ROLE_UPSERT':
         return set({ roles: { ...s.roles, [ev.d.spaceId]: { ...s.roles[ev.d.spaceId], [ev.d.id]: ev.d } } })
-      case 'ROLE_DELETE':
-        return set({ roles: { ...s.roles, [ev.d.spaceId]: omit(s.roles[ev.d.spaceId] ?? {}, ev.d.id) } })
+      case 'ROLE_DELETE': {
+        const ms = s.members[ev.d.spaceId] ?? {}
+        const id = ev.d.id
+        return set({
+          roles: { ...s.roles, [ev.d.spaceId]: omit(s.roles[ev.d.spaceId] ?? {}, id) },
+          members: {
+            ...s.members,
+            [ev.d.spaceId]: Object.fromEntries(Object.entries(ms).map(([k, m]) => [k, m.roleIds.includes(id) ? { ...m, roleIds: m.roleIds.filter((r) => r !== id) } : m])),
+          },
+        })
+      }
       case 'CHANNEL_CREATE':
       case 'CHANNEL_UPDATE':
         return set({ channels: { ...s.channels, [ev.d.id]: ev.d } })

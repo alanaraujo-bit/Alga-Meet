@@ -1,6 +1,7 @@
-import { Permission } from '@alga/shared'
-import { Hash, Phone, PhoneIncoming, Users } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { DEFAULT_MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, Permission } from '@alga/shared'
+import { Ban, FileUp, Hash, Phone, PhoneIncoming, Users } from 'lucide-react'
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { formatBytes } from '@/lib/files'
 import { useMedia } from '@/media'
 import { useData } from '@/store/data'
 import { can, channelTitle, dmPeers, presenceOf, spacePermissions } from '@/store/selectors'
@@ -10,9 +11,11 @@ import { CallStage } from '../voice/CallStage'
 import { t as tv } from '../voice/strings'
 import { joinVoice } from '../voice/voice'
 import { Composer } from './Composer'
+import { Lightbox } from './Lightbox'
 import { DeleteConfirm } from './MessageItem'
 import { MessageList } from './MessageList'
 import { TypingIndicator } from './TypingIndicator'
+import { addFiles } from './tray'
 import { t } from './strings'
 import sh from '../shell/shell.module.css'
 import s from './chat.module.css'
@@ -24,6 +27,9 @@ export function ChatView({ channelId, aside }: { channelId: string; aside?: Reac
   const peer = useData((st) => (channel?.type === 'dm' ? (dmPeers(st, channel)[0] ?? null) : null))
   const presence = useData((st) => (peer ? presenceOf(st, peer.id) : null))
   const canSend = useData((st) => !channel?.spaceId || can(spacePermissions(st, channel.spaceId), Permission.SEND_MESSAGES))
+  const canAttach = useData((st) => !channel?.spaceId || can(spacePermissions(st, channel.spaceId), Permission.SEND_MESSAGES | Permission.ATTACH_FILES))
+  // Drag enter/leave fire per child element: count them so the drop zone does not flicker.
+  const [dragging, setDragging] = useState(0)
   const memberList = useUi((st) => st.memberList)
   const callPeople = useData((st) => Object.values(st.voiceStates).filter((v) => v.channelId === channelId).length)
   const inCall = useMedia((st) => st.connection.channelId === channelId && st.connection.state !== 'idle')
@@ -50,9 +56,37 @@ export function ChatView({ channelId, aside }: { channelId: string; aside?: Reac
 
   if (!channel) return null
   const isDm = channel.type === 'dm' || channel.type === 'group_dm'
+  const target = isDm ? title : `#${title}`
+  const hasFiles = (e: DragEvent) => e.dataTransfer.types.includes('Files')
+  const drop = {
+    onDragEnter: (e: DragEvent) => hasFiles(e) && setDragging((n) => n + 1),
+    onDragLeave: (e: DragEvent) => hasFiles(e) && setDragging((n) => Math.max(0, n - 1)),
+    onDragOver: (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = canAttach ? 'copy' : 'none'
+    },
+    onDrop: (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      setDragging(0)
+      if (!canAttach) return
+      addFiles(channelId, Array.from(e.dataTransfer.files))
+      input.current?.focus()
+    },
+  }
   return (
     <div className={sh.mainInner}>
-      <div className={sh.mainCol}>
+      <div className={sh.mainCol} style={{ position: 'relative' }} {...drop}>
+        {dragging > 0 && (
+          <div className={`${s.dropZone} ${canAttach ? '' : s.dropDenied}`} aria-hidden>
+            <span className={s.dropIcon}>
+              <Icon icon={canAttach ? FileUp : Ban} size={24} />
+            </span>
+            <strong>{canAttach ? t.files.dropTitle(target) : t.files.dropDenied}</strong>
+            {canAttach && <span>{t.files.dropBody(MAX_ATTACHMENTS, formatBytes(DEFAULT_MAX_ATTACHMENT_BYTES))}</span>}
+          </div>
+        )}
         <header className={sh.header}>
           <h1 className={sh.headerTitle}>
             {peer ? <Avatar user={peer} size={24} presence={presence ?? undefined} decorative /> : <Icon icon={Hash} size={18} />}
@@ -96,12 +130,13 @@ export function ChatView({ channelId, aside }: { channelId: string; aside?: Reac
         {isDm && (callPeople > 0 || inCall) && <CallStage channel={channel} variant="dm" />}
         <MessageList channelId={channelId} spaceId={channel.spaceId} unreadAfter={unreadAfter} title={title} isDm={isDm} />
         <div className={s.bottom}>
-          <Composer channelId={channelId} spaceId={channel.spaceId} target={isDm ? title : `#${title}`} canSend={canSend} inputRef={input} />
+          <Composer channelId={channelId} spaceId={channel.spaceId} target={target} canSend={canSend} canAttach={canAttach} inputRef={input} />
           <TypingIndicator channelId={channelId} spaceId={channel.spaceId} />
         </div>
       </div>
       {aside}
       <DeleteConfirm />
+      <Lightbox />
     </div>
   )
 }

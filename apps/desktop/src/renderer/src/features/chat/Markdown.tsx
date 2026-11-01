@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from 'react'
+import { createContext, memo, useContext, type ReactNode } from 'react'
 import { openExternal } from '@/lib/clipboard'
 import { parseMarkdown, type MdNode } from '@/lib/markdown'
 import { useData } from '@/store/data'
@@ -6,8 +6,12 @@ import s from './chat.module.css'
 
 const JUMBO = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|‍|️|\s){1,24}$/u
 
+/** Space of the message being rendered: mentions show the member's nickname there. */
+const SpaceCtx = createContext<string | null>(null)
+
 function Mention({ id }: { id: string }) {
-  const name = useData((st) => st.users[id]?.displayName)
+  const spaceId = useContext(SpaceCtx)
+  const name = useData((st) => (spaceId && st.members[spaceId]?.[id]?.nickname) || st.users[id]?.displayName)
   const isMe = useData((st) => st.me?.id === id)
   return <span className={`${s.mention} ${isMe ? s.mentionMe : ''}`}>@{name ?? 'usuário desconhecido'}</span>
 }
@@ -58,7 +62,11 @@ function render(nodes: MdNode[], key = ''): ReactNode[] {
 }
 
 /** Renders chat markdown as React elements (no HTML injection path). */
-export const Markdown = memo(function Markdown({ source }: { source: string }) {
+export const Markdown = memo(function Markdown({ source, spaceId = null }: { source: string; spaceId?: string | null }) {
   const jumbo = JUMBO.test(source) && /\p{Extended_Pictographic}/u.test(source)
-  return <span className={jumbo ? s.jumbo : undefined}>{render(parseMarkdown(source))}</span>
+  return (
+    <SpaceCtx.Provider value={spaceId}>
+      <span className={jumbo ? s.jumbo : undefined}>{render(parseMarkdown(source))}</span>
+    </SpaceCtx.Provider>
+  )
 })

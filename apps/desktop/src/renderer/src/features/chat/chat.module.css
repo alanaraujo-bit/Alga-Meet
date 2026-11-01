@@ -279,6 +279,9 @@
 .failedSep {
   color: var(--text-tertiary);
 }
+.failedReason {
+  color: var(--text-secondary);
+}
 
 .reactions {
   display: flex;
@@ -529,7 +532,7 @@ button.replyBody:hover {
   flex: 1;
   min-height: 44px;
   max-height: 40vh;
-  padding: 11px var(--s-2) 11px var(--s-4);
+  padding: 11px var(--s-2) 11px var(--s-1);
   resize: none;
   border: 0;
   background: transparent;
@@ -736,4 +739,327 @@ button.replyBody:hover {
   padding: var(--s-4) var(--s-2);
   color: var(--text-tertiary);
   font: var(--type-meta);
+}
+
+/* ── Attachments ── */
+.attachments {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-1_5);
+  margin-top: var(--s-1);
+}
+.uploading .imageGrid,
+.uploading .video,
+.uploading .fileCard {
+  opacity: 0.55;
+}
+/* Concentric: the grid clips at 8, cells are square inside it with a 2 px gutter. */
+.imageGrid {
+  display: grid;
+  gap: 2px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.imageRow {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+.imageCell {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  background: var(--bg-raised);
+  cursor: zoom-in;
+}
+.imageGrid > .imageCell {
+  width: 100%;
+  height: auto;
+}
+.imageCell img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.imageCell:hover img {
+  filter: brightness(1.06);
+}
+.imageCell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.broken {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-1);
+  min-height: 72px;
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-align: center;
+}
+.video {
+  display: block;
+  width: 480px;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-md);
+  background: #000;
+}
+.fileCard {
+  display: grid;
+  gap: var(--s-2);
+  width: 400px;
+  max-width: 100%;
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+}
+.fileTop {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+}
+.fileIcon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+}
+.fileText {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.fileName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+}
+.fileSize {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.audio {
+  width: 100%;
+  height: 36px;
+}
+.uploadProgress {
+  display: grid;
+  gap: var(--s-1);
+  width: 240px;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.uploadBar {
+  height: 2px;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.uploadBar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent-fill);
+  transform-origin: left;
+  transition: transform var(--dur-base) linear;
+}
+
+/* ── Composer tray ── */
+.tray {
+  display: flex;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-3) var(--s-1);
+  overflow-x: auto;
+  list-style: none;
+}
+.trayItem {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+  grid-template-rows: 88px auto auto;
+  width: 120px;
+  padding: var(--s-1_5);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.04);
+}
+.trayProblem {
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+.trayThumb {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: var(--bg-content);
+  color: var(--text-tertiary);
+}
+.trayThumb img,
+.trayThumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.trayProblem .trayThumb {
+  color: var(--danger);
+}
+.trayName {
+  margin-top: var(--s-1_5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.traySize {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.trayProblem .traySize {
+  color: var(--danger);
+}
+.trayRemove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: var(--bg-overlay);
+  box-shadow: var(--elev-overlay);
+}
+.attachBtn {
+  margin-left: var(--s-1_5);
+  color: var(--text-tertiary);
+}
+
+/* ── Drop target ── */
+.dropZone {
+  position: absolute;
+  inset: var(--s-2);
+  z-index: 5;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--s-2);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--bg-content), transparent 8%);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+  text-align: center;
+  pointer-events: none;
+  animation: dropIn var(--dur-pop) var(--ease-out-quart);
+}
+@keyframes dropIn {
+  from {
+    opacity: 0;
+  }
+}
+.dropZone strong {
+  color: var(--text-primary);
+  font: var(--type-title-sm);
+}
+.dropIcon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--s-1);
+  border-radius: var(--r-lg);
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.dropDenied {
+  box-shadow: inset 0 0 0 2px var(--border-strong);
+}
+.dropDenied .dropIcon {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-tertiary);
+}
+
+/* ── Lightbox (below the title bar, like settings) ── */
+.lightbox {
+  position: fixed;
+  inset: var(--titlebar-h) 0 0 0;
+  z-index: var(--z-modal);
+  display: grid;
+  grid-template-rows: 48px minmax(0, 1fr);
+  background: rgba(4, 6, 7, 0.94);
+}
+.lightbox:focus-visible {
+  outline: none;
+}
+.lightboxBar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: 0 var(--s-3) 0 var(--s-4);
+}
+.lightboxTitle {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.lightboxName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+}
+.lightboxMeta {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.lightboxStage {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: var(--s-4) 72px var(--s-8);
+  overflow: hidden;
+}
+.lightboxImg {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: var(--r-sm);
+  cursor: zoom-in;
+  user-select: none;
+}
+.lightboxActual {
+  place-items: start center;
+  overflow: auto;
+}
+.lightboxActual .lightboxImg {
+  max-width: none;
+  max-height: none;
+  cursor: zoom-out;
+}
+.lightboxNav {
+  position: absolute;
+  top: 50%;
+  background: rgba(255, 255, 255, 0.06);
+}
+.lightboxPrev {
+  left: var(--s-4);
+}
+.lightboxNext {
+  right: var(--s-4);
 }

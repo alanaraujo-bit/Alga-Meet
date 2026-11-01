@@ -11,6 +11,7 @@ import { useData } from '@/store/data'
 import { displayName, roleColor } from '@/store/selectors'
 import { useUi } from '@/store/ui'
 import { Avatar, Button, contextMenuHandler, Icon, IconButton, Kbd, MenuButton, Modal, Tooltip, toast, type MenuEntry } from '@/ui'
+import { Attachments, attachmentSummary } from './Attachments'
 import { EmojiPicker } from './EmojiPicker'
 import { Markdown } from './Markdown'
 import { QUICK_EMOJI, t } from './strings'
@@ -48,7 +49,8 @@ export const MessageItem = memo(function MessageItem({
   spaceId: string | null
   meId: string | undefined
   mentioned: boolean
-  failed: boolean
+  /** Send failed: true, or the server's reason. */
+  failed: boolean | string
   editing: boolean
 }) {
   const mine = m.author.id === meId
@@ -58,7 +60,6 @@ export const MessageItem = memo(function MessageItem({
   const at = new Date(m.createdAt)
   const row = useRef<HTMLDivElement>(null)
   const [pickerAt, setPickerAt] = useState<HTMLElement | null>(null)
-  const users = useData((st) => st.users)
 
   // Grouped by label, not by lines; only actions that really exist (no fake "Fixar"/"Denunciar" without a backend).
   const menu = (): MenuEntry[] => {
@@ -66,9 +67,13 @@ export const MessageItem = memo(function MessageItem({
     const items: MenuEntry[] = [
       { label: t.emoji.react, icon: SmilePlus, onSelect: () => setPickerAt(row.current?.querySelector<HTMLElement>('[data-react-anchor]') ?? row.current) },
       { label: t.actions.reply, icon: CornerUpLeft, onSelect: () => useUi.getState().setReplyTo(m.channelId, m.id) },
-      { kind: 'group', label: t.actions.copyGroup },
-      { label: t.actions.copy, icon: Copy, onSelect: () => void copyText(toPlainText(m.content, (id) => users[id]?.displayName ?? t.unknownUser)) },
     ]
+    if (m.content) {
+      items.push(
+        { kind: 'group', label: t.actions.copyGroup },
+        { label: t.actions.copy, icon: Copy, onSelect: () => void copyText(toPlainText(m.content, (id) => displayName(useData.getState(), id, spaceId))) },
+      )
+    }
     if (mine) {
       items.push(
         { kind: 'group', label: t.actions.yours },
@@ -114,19 +119,23 @@ export const MessageItem = memo(function MessageItem({
         {editing ? (
           <InlineEditor message={m} />
         ) : (
-          <div className={`${s.content} ${pending && !failed ? s.pending : ''} ${failed ? s.failedText : ''}`} data-selectable>
-            <Markdown source={m.content} />
-            {m.editedAt && (
-              <Tooltip content={t.editedAt(fullDate(new Date(m.editedAt)))}>
-                <span className={s.edited}> {t.edited}</span>
-              </Tooltip>
-            )}
-          </div>
+          m.content && (
+            <div className={`${s.content} ${pending && !failed ? s.pending : ''} ${failed ? s.failedText : ''}`} data-selectable>
+              <Markdown source={m.content} spaceId={spaceId} />
+              {m.editedAt && (
+                <Tooltip content={t.editedAt(fullDate(new Date(m.editedAt)))}>
+                  <span className={s.edited}> {t.edited}</span>
+                </Tooltip>
+              )}
+            </div>
+          )
         )}
+        {m.attachments.length > 0 && <Attachments message={m} />}
         {failed && (
           <div className={s.failed} role="alert">
             <Icon icon={AlertCircle} size={14} />
             {t.failed}
+            {typeof failed === 'string' && <span className={s.failedReason}>{failed}</span>}
             <button type="button" className={s.failedAction} onClick={() => retrySend(m.channelId, m.id).catch(() => undefined)}>
               {t.retry}
             </button>
@@ -194,7 +203,6 @@ export const MessageItem = memo(function MessageItem({
 function ReplyPreview({ channelId, replyToId, spaceId }: { channelId: string; replyToId: string; spaceId: string | null }) {
   const target = useData((st) => st.messages[channelId]?.byId[replyToId])
   const name = useData((st) => (target ? displayName(st, target.author.id, spaceId) : ''))
-  const users = useData((st) => st.users)
   const jump = () => {
     const el = document.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(replyToId)}"]`)
     if (!el) return
@@ -209,7 +217,7 @@ function ReplyPreview({ channelId, replyToId, spaceId }: { channelId: string; re
         <button type="button" className={s.replyBody} onClick={jump}>
           <Avatar user={target.author} size={16} decorative />
           <span className={s.replyName}>{name}</span>
-          <span className={s.replyText}>{toPlainText(target.content, (id) => users[id]?.displayName ?? t.unknownUser)}</span>
+          <span className={s.replyText}>{target.content ? toPlainText(target.content, (id) => displayName(useData.getState(), id, spaceId)) : attachmentSummary(target)}</span>
         </button>
       ) : (
         <span className={`${s.replyBody} ${s.replyMissing}`}>{t.replyMissing}</span>
@@ -242,7 +250,8 @@ function InlineEditor({ message: m }: { message: Message }) {
     if (next === m.content.trim()) return cancel()
     if (!next) {
       cancel()
-      return requestDelete(m)
+      // Clearing the text of a message with files keeps the files (the server needs some text to edit).
+      return m.attachments.length ? undefined : requestDelete(m)
     }
     if (next.length > 4000) return
     setBusy(true)
@@ -312,9 +321,7 @@ export function DeleteConfirm() {
             <Avatar user={m.author} size={24} decorative />
             <div style={{ minWidth: 0 }}>
               <div className={s.author}>{m.author.displayName}</div>
-              <div className={s.content}>
-                <Markdown source={m.content} />
-              </div>
+              <div className={s.content}>{m.content ? <Markdown source={m.content} /> : attachmentSummary(m)}</div>
             </div>
           </div>
           <p className={s.deleteTip}>{t.deleteTip}</p>

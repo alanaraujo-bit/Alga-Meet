@@ -1,4 +1,5 @@
 import { toPlainText, mentionedIds } from '@/lib/markdown'
+import { attachmentSummary } from '../chat/Attachments'
 import { isUnread, useData } from '@/store/data'
 import { channelTitle, displayName } from '@/store/selectors'
 import { onDispatch } from '@/store/session'
@@ -25,7 +26,7 @@ export function startNotifications(): () => void {
       const who = displayName(st, m.author.id, ch.spaceId)
       b?.notify?.({
         title: dm ? who : `${who} em #${channelTitle(st, ch)}`,
-        body: toPlainText(m.content, (id) => st.users[id]?.displayName ?? 'alguém').slice(0, 180),
+        body: (m.content ? toPlainText(m.content, (id) => displayName(st, id, ch.spaceId)) : attachmentSummary(m)).slice(0, 180),
         tag: `msg:${ch.id}`,
       })
     }),
