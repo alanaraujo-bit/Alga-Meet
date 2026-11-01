@@ -4,6 +4,7 @@ import { app, ipcMain, shell } from 'electron'
 import type { AppConfig } from '../shared/bridge'
 import { IPC } from '../shared/ipc'
 import { initCapture } from './capture'
+import { receiveDeepLink, registerDeepLinkIpc, trackDeepLinkPage } from './deep-links'
 import { registerHotkeyIpc, stopHotkeys } from './hotkeys'
 import { bool, handle, isTrustedSender, on, str } from './ipc'
 import { initLog, log, logDir } from './log'
@@ -34,6 +35,17 @@ const config: AppConfig = {
   isPackaged: app.isPackaged,
 }
 
+// Dev only, opt-in: route algameet:// to this checkout (and profile). Packaged builds are registered by the
+// NSIS installer (build/installer.nsh). ALGA_REGISTER_PROTOCOL=0 removes the dev registration again.
+if (!app.isPackaged && (process.env.ALGA_REGISTER_PROTOCOL === '1' || process.env.ALGA_REGISTER_PROTOCOL === '0')) {
+  const args = [app.getAppPath(), ...(profile === 'default' ? [] : [`--profile=${profile}`])]
+  const register = process.env.ALGA_REGISTER_PROTOCOL === '1'
+  const ok = register
+    ? app.setAsDefaultProtocolClient('algameet', process.execPath, args)
+    : app.removeAsDefaultProtocolClient('algameet', process.execPath, args)
+  log.info(`dev protocol ${register ? 'registration' : 'removal'}`, ok)
+}
+
 // Started by the login item: come up in the tray only.
 const startHidden = process.argv.includes('--hidden')
 const loginArgs = app.isPackaged ? ['--hidden'] : [app.getAppPath(), '--hidden']
@@ -62,16 +74,21 @@ function registerAppIpc(): void {
   registerTrayIpc()
   registerHotkeyIpc()
   registerNotificationIpc()
+  registerDeepLinkIpc()
 }
 
 if (!app.requestSingleInstanceLock()) app.quit()
 else {
-  app.on('second-instance', showMainWindow)
+  app.on('second-instance', (_e, argv) => {
+    receiveDeepLink(argv)
+    showMainWindow()
+  })
   registerAppIpc()
+  const launchedWithLink = receiveDeepLink(process.argv) // a link click always shows the window
   app.whenReady().then(() => {
     applySecurity()
     initCapture()
-    createMainWindow(profile === 'default' ? 'Alga Meet' : `Alga Meet (${profile})`, startHidden)
+    trackDeepLinkPage(createMainWindow(profile === 'default' ? 'Alga Meet' : `Alga Meet (${profile})`, startHidden && !launchedWithLink))
     createTray()
     initPower()
     initUpdater()

@@ -85,6 +85,11 @@ const bridge: AlgaBridge = {
     install: () => ipcRenderer.send(IPC.updatesInstall),
   },
 
+  deepLinks: {
+    onLink: (cb) => subscribe(IPC.deepLink, cb),
+    takePending: () => ipcRenderer.invoke(IPC.deepLinksTakePending),
+  },
+
   app: {
     getStartAtLogin: () => ipcRenderer.invoke(IPC.appGetStartAtLogin),
     setStartAtLogin: (enabled) => ipcRenderer.invoke(IPC.appSetStartAtLogin, enabled === true),

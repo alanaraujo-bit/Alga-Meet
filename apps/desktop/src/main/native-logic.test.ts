@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { badgeBitmap, badgeText } from './badge'
 import { fitBounds } from './bounds'
+import { findDeepLinkArg, parseDeepLink, redactLink } from './deep-link-logic'
 import { ChordMatcher, ChordRecorder, ESC, chordLabel } from './hotkey-logic'
 
 const CTRL = 29
@@ -138,5 +139,69 @@ describe('badge', () => {
     let white = 0
     for (let i = 0; i < px.length; i += 4) if (px[i] === 255 && px[i + 1] === 255 && px[i + 2] === 255) white++
     expect(white).toBeGreaterThan(8)
+  })
+})
+
+describe('deep links', () => {
+  const T = 'q3Zr8Hk-_0aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456' // 43 chars, like the server's base64url tokens
+
+  it('accepts exactly the links the server and invites generate', () => {
+    expect(parseDeepLink(`algameet://auth/verify-email?token=${T}`)).toEqual({ kind: 'verify-email', token: T })
+    expect(parseDeepLink(`algameet://auth/reset-password?token=${T}`)).toEqual({ kind: 'password-reset', token: T })
+    expect(parseDeepLink('algameet://invite/Ab3dE6gH')).toEqual({ kind: 'invite', code: 'Ab3dE6gH' })
+    // trailing slash some Windows launchers add
+    expect(parseDeepLink('algameet://invite/Ab3dE6gH/')).toEqual({ kind: 'invite', code: 'Ab3dE6gH' })
+    expect(parseDeepLink(`algameet://auth/verify-email/?token=${T}`)).toEqual({ kind: 'verify-email', token: T })
+  })
+
+  it('rejects everything else', () => {
+    for (const bad of [
+      '',
+      'algameet:',
+      'algameet://',
+      'algameet://auth/verify-email',
+      'algameet://auth/verify-email?token=',
+      'algameet://auth/verify-email?token=short',
+      `algameet://auth/verify-email?token=${'a'.repeat(129)}`,
+      `algameet://auth/verify-email?token=${T}&next=https://evil.example`,
+      `algameet://auth/verify-email?next=x&token=${T}`,
+      `algameet://auth/verify-email?token=${T}#frag`,
+      `algameet://auth/verify-email?token=${T.slice(0, 20)}%41${T.slice(20)}`,
+      `algameet://auth/verify-email?token=${T.slice(0, 20)}+${T.slice(20)}`,
+      `algameet://auth/delete-account?token=${T}`,
+      `algameet://AUTH/verify-email?token=${T}`,
+      `AlgaMeet://auth/verify-email?token=${T}`,
+      `algameet://user:pw@auth/verify-email?token=${T}`,
+      `algameet://auth:80/verify-email?token=${T}`,
+      `algameet://evil/verify-email?token=${T}`,
+      `algameet:auth/verify-email?token=${T}`,
+      `https://auth/verify-email?token=${T}`,
+      'algameet://invite/',
+      'algameet://invite/Ab3dE6gH?x=1',
+      'algameet://invite/Ab3dE6gH//',
+      'algameet://invite/Ab3d-E6gH',
+      'algameet://invite/Ab3dE6gH/extra',
+      'algameet://invite/../auth',
+      'algameet://invite/%41b3dE6gH',
+      `algameet://invite/${'a'.repeat(33)}`,
+      'algameet://invite/Ab3dE6gH" --inspect',
+      'algameet://invite/Ab3dE6gH\n',
+      `algameet://invite/x${' '.repeat(600)}`,
+    ])
+      expect(parseDeepLink(bad), bad).toBeNull()
+    expect(parseDeepLink(null)).toBeNull()
+    expect(parseDeepLink(42)).toBeNull()
+  })
+
+  it('finds the link argument in argv (any position, scheme case-insensitive)', () => {
+    expect(findDeepLinkArg(['electron.exe', '.', '--profile=x', 'algameet://invite/abc'])).toBe('algameet://invite/abc')
+    expect(findDeepLinkArg(['Alga Meet.exe', 'ALGAMEET://invite/abc'])).toBe('ALGAMEET://invite/abc')
+    expect(findDeepLinkArg(['Alga Meet.exe', '--hidden'])).toBeUndefined()
+  })
+
+  it('redacts rejected links down to scheme + host', () => {
+    expect(redactLink(`algameet://invite/SECRET123/x`)).toBe('algameet://invite (29 chars)')
+    expect(redactLink(`algameet://auth/verify-email?token=${T}&x`)).toBe(`algameet://auth (${35 + T.length + 2} chars)`)
+    expect(redactLink('algameet:SECRET')).toBe('algameet: (15 chars)')
   })
 })

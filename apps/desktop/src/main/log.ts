@@ -1,6 +1,7 @@
 import { appendFileSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, crashReporter } from 'electron'
+import { isDeepLinkArg, redactLink } from './deep-link-logic'
 
 // Tiny rotating file log: userData/logs/main.log, rotated at 1 MB, 3 old files kept.
 const MAX_BYTES = 1_000_000
@@ -76,5 +77,8 @@ export function initLog(): void {
   process.on('unhandledRejection', (reason) => log.error('unhandledRejection', reason))
   app.on('render-process-gone', (_e, wc, d) => log.error('render-process-gone', { url: wc.getURL(), ...d }))
   app.on('child-process-gone', (_e, d) => log.error('child-process-gone', d))
-  log.info(`start v${app.getVersion()} electron ${process.versions.electron} pid ${process.pid} argv`, process.argv.slice(1))
+  log.info(`start v${app.getVersion()} electron ${process.versions.electron} pid ${process.pid} argv`,
+    // a deep link carries a bearer token/invite code: log its scheme + host only
+    process.argv.slice(1).map((a) => (isDeepLinkArg(a) ? redactLink(a) : a)),
+  )
 }

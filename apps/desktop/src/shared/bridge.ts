@@ -55,6 +55,15 @@ export type UpdateStatus =
 
 export type TrayAction = 'toggleMute' | 'toggleDeafen' | 'disconnect'
 
+/**
+ * A validated algameet:// link (e-mail verification, password reset, invite).
+ * token/code are bearer secrets: post them to the API, never log or display them.
+ */
+export type DeepLink =
+  | { kind: 'verify-email'; token: string }
+  | { kind: 'password-reset'; token: string }
+  | { kind: 'invite'; code: string }
+
 export interface AlgaBridge {
   config: AppConfig
 
@@ -116,6 +125,16 @@ export interface AlgaBridge {
     onStatus(cb: (s: UpdateStatus) => void): Unsubscribe
     /** Quit and install a downloaded update. */
     install(): void
+  }
+
+  deepLinks: {
+    /** Links opened while the app is running. Subscribe first, then call takePending(). */
+    onLink(cb: (l: DeepLink) => void): Unsubscribe
+    /**
+     * The link the app was started with (or that arrived before the page was ready), once; null if none.
+     * Calling it tells main the page is listening: later links are pushed to onLink instead.
+     */
+    takePending(): Promise<DeepLink | null>
   }
 
   app: {

@@ -1,7 +1,7 @@
 # 0003 — Distribuição, assinatura de código e atualizações
 
 - Status: **aceita** (2026-11-01). A assinatura de código depende de uma ação humana (ver "Bloqueios").
-- Escopo: `apps/desktop/electron-builder.yml`, `apps/desktop/build/installer.nsh`, `apps/desktop/src/main/updater.ts`
+- Escopo: `apps/desktop/electron-builder.yml`, `apps/desktop/build/installer.nsh`, `apps/desktop/src/main/updater.ts`, `src/main/deep-link*.ts`, `src/main/secure-store.ts`
 
 ## Decisões
 
@@ -80,3 +80,74 @@ Publicar: `GH_TOKEN=… npx electron-builder --win --publish always` (dentro de 
 
 - Em dev, apareceu o prompt do **Firewall do Windows** para `electron.exe` ("Deseja permitir que redes públicas e privadas acessem este aplicativo?"). A causa provável são os sockets UDP do WebRTC. O mesmo deve acontecer com `Alga Meet.exe` na primeira chamada. Um instalador por usuário não pode criar regra de firewall (exige admin). Se medirmos que a mídia funciona com "Cancelar" (só UDP de saída), documentar para o suporte.
 - `default_app.asar` (108 KB) vai junto porque usamos `electronDist`. Ele é inerte quando existe `app.asar`.
+
+## Deep links `algameet://` (2026-11-01)
+
+### Links aceitos
+
+O parser (`src/main/deep-link-logic.ts`) é uma **allowlist**: duas regex aplicadas à string crua, sem `new URL()` e sem normalização. Tudo o que não casar exatamente é descartado.
+
+| Link | Origem | Chega ao renderer como |
+|---|---|---|
+| `algameet://auth/verify-email?token=<t>` | e-mail de verificação (`Mailer.link` com `EMAIL_LINK_URL=algameet://auth`) | `{ kind: 'verify-email', token }` |
+| `algameet://auth/reset-password?token=<t>` | e-mail de redefinição de senha | `{ kind: 'password-reset', token }` |
+| `algameet://invite/<code>` | convite | `{ kind: 'invite', code }` |
+
+- `token`: `[A-Za-z0-9_-]{16,128}`. O servidor gera 43 caracteres (32 bytes em base64url) e recusa mais de 128.
+- `code`: `[0-9A-Za-z]{1,32}`, a mesma regra do `codeParam` do servidor (ele emite 8).
+- O link inteiro tem no máximo 512 caracteres. Uma barra final é tolerada, porque alguns launchers do Windows a acrescentam.
+- **Recusados**: host ou caminho desconhecido, parâmetro extra ou fora de ordem, `#`, escapes `%`, `+`, `..`, maiúsculas, usuário/senha/porta, quebra de linha. O log registra só `deep link rejected algameet://<host> (<n> chars)`, sem caminho nem query.
+- **Segredos fora do log.** Token e código são credenciais de portador. O log de início (`argv`) também passa pela redação, e um link aceito é logado só pelo `kind`. O `verify-native` confere que nem o token nem o código aparecem no `main.log`.
+
+### Entrega ao renderer (`window.alga.deepLinks`)
+
+```ts
+type DeepLink = { kind: 'verify-email'; token: string } | { kind: 'password-reset'; token: string } | { kind: 'invite'; code: string }
+deepLinks: { onLink(cb: (l: DeepLink) => void): Unsubscribe; takePending(): Promise<DeepLink | null> }
+```
+
+- **Partida a frio** (link no `argv` do primeiro processo): o main guarda o link. A janela abre mesmo com `--hidden`, porque um clique em link sempre mostra o app.
+- **App já aberto**: o Windows inicia um segundo processo com o link; o `second-instance` recebe o `argv` dele, valida o link, restaura e foca a janela.
+- **Ordem no renderer**: primeiro assinar `onLink`, depois chamar `takePending()` uma vez. Até essa chamada o main segura o link mais recente. Depois dela, empurra cada link por `onLink`. Um reload ou crash da página volta a segurar até a nova página chamar `takePending()`.
+- **O renderer trata o link como entrada não confiável.** O token só vai no corpo do POST para a API, nunca numa URL ou em HTML. Para um convite, mostrar a prévia (`GET /invites/:code`) antes de entrar.
+
+### Registro do protocolo
+
+- **App instalado (NSIS).** O electron-builder 26 aplica `protocols` só em mac/appx/linux; no NSIS a opção é ignorada. Por isso o `customInstall` de `build/installer.nsh` grava `HKCU\Software\Classes\algameet` (`URL Protocol`, `DefaultIcon` e `shell\open\command` = `"<Alga Meet.exe>" "%1"`). O `customUnInstall` apaga a chave, exceto em updates (`--updated`). A entrada `protocols` do `electron-builder.yml` fica para os outros alvos e documenta o esquema.
+- **A URL é sempre o último argumento.** O Electron se recusa a iniciar quando há switches depois de um argumento URL (mitigação do CVE-2018-1000006). Assim, um link forjado com aspas não consegue injetar flags do Chromium/Node.
+- **Dev: nada é registrado por padrão**, para um checkout não sequestrar o app instalado. Opt-in:
+  - `ALGA_REGISTER_PROTOCOL=1` registra `electron.exe "<apps/desktop>" [--profile=<perfil>] "%1"` (`app.setAsDefaultProtocolClient`);
+  - `ALGA_REGISTER_PROTOCOL=0` remove (`app.removeAsDefaultProtocolClient`, com o mesmo perfil).
+
+  Instalar o app depois sobrescreve o registro de dev.
+
+### Medições (2026-11-01, Windows 11 Pro 10.0.26300)
+
+| Verificação | Resultado |
+|---|---|
+| `verify-native` (Playwright `_electron`), partida a frio com `--hidden` + link | `takePending()` devolve o link uma vez; a janela fica visível |
+| Segundo processo real (`electron . --profile=e2e-native <link>`) com a janela minimizada | `onLink` recebe `{ kind: 'invite', code }`; a janela é restaurada e focada; o segundo processo sai com 0 |
+| Links malformados via segundo processo | nenhum evento; 2 linhas `deep link rejected`; token e código ausentes do log |
+| Caminho real do SO: `Start-Process 'algameet://invite/…'` com o registro de dev | o link chega ao `onLink` da instância em execução; com `=0` a chave some (conferido no registro) |
+| Instalador | build ~23 s; instalação silenciosa 8,8 s cria a chave com `"…\Alga Meet.exe" "%1"`; desinstalação silenciosa remove a chave, a pasta, os atalhos e a entrada de desinstalação |
+
+Não testado: abrir um link pelo **app instalado**. Ele usa o mesmo `userData` do perfil `default` de dev, que estava em uso, e o link iria para aquela instância.
+
+## Token de sessão: API assíncrona do safeStorage (2026-11-01)
+
+- `secure-store.ts` agora usa `isAsyncEncryptionAvailable`, `encryptStringAsync` e `decryptStringAsync`; a API síncrona está deprecada no Electron 45.
+- **Compatibilidade.** Um `session.bin` gravado pelo `encryptString` antigo continua sendo lido. O `verify-native` grava um token com a API síncrona e o lê pelo bridge.
+- **Rotação de chave.** Se `decryptStringAsync` responder `shouldReEncrypt`, o token é regravado com a chave atual. Uma falha nessa regravação é logada e o token continua sendo devolvido.
+- **Regra mantida.** Sem criptografia disponível, o token fica só em memória; texto puro nunca vai para o disco.
+
+## Verificações nativas visuais (2026-11-01, dev, perfil isolado `native-verify`)
+
+| Item | Resultado | Captura |
+|---|---|---|
+| Toast do Windows | Aparece no canto inferior direito com o ícone do app (`icon.png`), título e corpo. Em dev o cabeçalho diz **"Electron"**: sem atalho no Menu Iniciar com o AppUserModelID, o Windows usa o nome do executável. No app instalado o atalho deve trocar isso por "Alga Meet" (não capturado). | `docs/screenshots/2026-11-01-native-toast.png` |
+| Clique no toast | Clique real do mouse no corpo do toast. `onNotificationClick` recebeu `'native-verify'`. A janela minimizada foi restaurada e virou a janela em primeiro plano (antes estava outro app). Nada ficou na Central de Notificações. | — |
+| Badge na barra de tarefas | `setBadge(7)`: círculo vermelho com "7" no botão do app; `setBadge(0)` remove. Em dev, todos os perfis (e o Electron de outros checkouts) dividem o mesmo AppUserModelID e o mesmo botão agrupado. | `2026-11-01-native-badge.png`, `2026-11-01-native-badge-cleared.png` |
+| Iniciar com o Windows | `setStartAtLogin(true)`: `getStartAtLogin()` devolve `true` e `HKCU\…\Run\com.alga.meet` = `"…\electron.exe" "…\apps\desktop" --hidden`. `setStartAtLogin(false)` remove a entrada. O estado original do dono (desligado, sem entrada `Run` nem `StartupApproved`) foi restaurado e conferido no registro. | — |
+| Partida com `--hidden` | Nenhuma janela visível, a bandeja é criada. O ícone ficou no overflow da bandeja ("^"), por isso não há captura útil. | — |
+
+Como as capturas foram feitas: Playwright + `Graphics.CopyFromScreen` com processo DPI-aware. Nesta máquina o host dos toasts não aparece na UI Automation. O toast foi localizado por diferença de pixels contra uma captura anterior, e o clique só acontece se a caixa tiver o formato de um card de toast; senão o teste para sem clicar. A barra de tarefas se oculta sozinha, então o cursor foi levado à borda inferior esquerda e depois devolvido à posição original.

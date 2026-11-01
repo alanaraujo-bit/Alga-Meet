@@ -2,11 +2,12 @@
 //   npx electron-vite build && node scripts/verify-native.mjs [screenshot.png]
 // Uses an isolated profile (userData/profiles/e2e-native), deleted at the end.
 // Note: the hotkey checks inject real F13/Esc key presses through SendInput (harmless in normal apps).
-import { execFileSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { execFileSync, spawn } from 'node:child_process'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -24,8 +25,8 @@ function check(name, ok, detail) {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail === undefined ? '' : ` — ${JSON.stringify(detail)}`}`)
 }
 
-async function launch() {
-  const app = await electron.launch({ args: ['.', `--profile=${PROFILE}`], cwd: appDir, env })
+async function launch(extraArgs = []) {
+  const app = await electron.launch({ args: ['.', `--profile=${PROFILE}`, ...extraArgs], cwd: appDir, env })
   const page = await app.firstWindow()
   await page.waitForFunction(() => !!window.alga?.config)
   return { app, page }
@@ -97,11 +98,19 @@ const tray2 = await hook(app, () => globalThis.__alga.trayState())
 check('tray reflects voice state', tray2.voice.connected && tray2.voice.muted && tray2.voice.channelName === 'Geral', tray2.voice)
 await page.evaluate(() => window.alga.tray.setVoiceState({ connected: false, muted: false, deafened: false }))
 
-const enc = await hook(app, ({ safeStorage }) => ({
-  available: safeStorage.isEncryptionAvailable(),
-  roundTrip: safeStorage.decryptString(safeStorage.encryptString('alga-e2e')) === 'alga-e2e',
+const enc = await hook(app, async ({ safeStorage }) => ({
+  available: await safeStorage.isAsyncEncryptionAvailable(),
+  roundTrip: (await safeStorage.decryptStringAsync(await safeStorage.encryptStringAsync('alga-e2e'))).result === 'alga-e2e',
 }))
-check('safeStorage (DPAPI) available + round-trip in main', enc.available && enc.roundTrip, enc)
+check('safeStorage async (DPAPI) available + round-trip in main', enc.available && enc.roundTrip, enc)
+// A session.bin written by the old sync encryptString (before the async migration) must still load.
+const legacy = `legacy-${randomUUID()}`
+await hook(
+  app,
+  ({ safeStorage }, [file, t]) => globalThis.__alga.require('node:fs').writeFileSync(file, safeStorage.encryptString(t)),
+  [join(userData, 'session.bin'), legacy],
+)
+check('token stored by the legacy sync API still decrypts', (await page.evaluate(() => window.alga.auth.getToken())) === legacy)
 const token = `e2e-${randomUUID()}`
 await page.evaluate((t) => window.alga.auth.setToken(t), token)
 const tokenBack = await page.evaluate(() => window.alga.auth.getToken())
@@ -216,6 +225,63 @@ await page.evaluate(() => window.alga.auth.setToken(null))
 check('setToken(null) deletes the file', !existsSync(join(userData, 'session.bin')))
 const log = readFileSync(join(userData, 'logs', 'main.log'), 'utf8')
 check('main log written, no IPC rejections', log.includes(' INFO start v') && !/rejected|untrusted/.test(log), log.split('\n').length - 1 + ' lines')
+await app.close()
+
+// ---------- run 3: algameet:// deep links ----------
+const T = randomBytes(32).toString('base64url') // same shape as the server's e-mail tokens
+;({ app, page } = await launch(['--hidden', `algameet://auth/verify-email?token=${T}`]))
+const win = () =>
+  hook(app, ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0]
+    return { visible: w.isVisible(), minimized: w.isMinimized(), focused: w.isFocused() }
+  })
+for (let i = 0; i < 20 && !(await win()).visible; i++) await sleep(100)
+await page.evaluate(() => {
+  window.__links = []
+  window.alga.deepLinks.onLink((l) => window.__links.push(l))
+})
+const cold = await page.evaluate(() => window.alga.deepLinks.takePending())
+const coldWin = await win()
+check('cold start: argv link is pending and overrides --hidden', cold?.kind === 'verify-email' && cold.token === T && coldWin.visible, {
+  kind: cold?.kind,
+  tokenMatches: cold?.token === T,
+  ...coldWin,
+})
+check('takePending is one-shot', (await page.evaluate(() => window.alga.deepLinks.takePending())) === null)
+
+/** A real second process with the link as its last argument, exactly like Windows' "%1" launch. */
+const secondInstance = (link) =>
+  new Promise((resolve) => {
+    const p = spawn(electronPath, ['.', `--profile=${PROFILE}`, link], { cwd: appDir, env, stdio: 'ignore' })
+    const t = setTimeout(() => p.kill(), 15000)
+    p.on("exit", (code) => {
+      clearTimeout(t)
+      resolve(code)
+    })
+  })
+await hook(app, ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].minimize())
+await sleep(300)
+const exit = await secondInstance('algameet://invite/Ab3dE6gH')
+await page.waitForFunction(() => window.__links.length > 0, null, { timeout: 5000 }).catch(() => {})
+const live = await page.evaluate(() => window.__links)
+const liveWin = await win()
+check(
+  'second instance: link pushed to onLink, window restored and focused',
+  exit === 0 && JSON.stringify(live) === JSON.stringify([{ kind: 'invite', code: 'Ab3dE6gH' }]) && liveWin.visible && !liveWin.minimized && liveWin.focused,
+  { exit, live, ...liveWin },
+)
+await secondInstance(`algameet://auth/verify-email?token=${T}&next=https://evil.example`)
+await secondInstance('algameet://invite/../auth/x')
+await sleep(500)
+const dlLog = readFileSync(join(userData, 'logs', 'main.log'), 'utf8')
+check(
+  'malformed links are dropped and logged without their secret',
+  (await page.evaluate(() => window.__links.length)) === 1 &&
+    (dlLog.match(/deep link rejected/g) ?? []).length === 2 &&
+    !dlLog.includes(T) &&
+    !dlLog.includes('Ab3dE6gH'),
+  dlLog.split('\n').filter((l) => l.includes('deep link')),
+)
 await app.close()
 
 rmSync(userData, { recursive: true, force: true })

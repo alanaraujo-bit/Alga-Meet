@@ -38,6 +38,9 @@ export const IPC = {
   updatesStatus: 'alga:updates:status', // event
   updatesInstall: 'alga:updates:install', // send
 
+  deepLink: 'alga:deep-link', // event
+  deepLinksTakePending: 'alga:deep-links:take-pending', // invoke
+
   appGetStartAtLogin: 'alga:app:get-start-at-login', // invoke
   appSetStartAtLogin: 'alga:app:set-start-at-login', // invoke
   appGetCloseToTray: 'alga:app:get-close-to-tray', // invoke

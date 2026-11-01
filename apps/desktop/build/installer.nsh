@@ -11,9 +11,19 @@
   !insertmacro MUI_PAGE_WELCOME
 !macroend
 
+; algameet:// deep links (per-user, HKCU\Software\Classes). The URL is the last argument: Electron refuses
+; to start when switches follow a URL argument (CVE-2018-1000006 mitigation), so a crafted link cannot inject flags.
+!macro customInstall
+  WriteRegStr HKCU "Software\Classes\algameet" "" "URL:Alga Meet"
+  WriteRegStr HKCU "Software\Classes\algameet" "URL Protocol" ""
+  WriteRegStr HKCU "Software\Classes\algameet\DefaultIcon" "" "$appExe,0"
+  WriteRegStr HKCU "Software\Classes\algameet\shell\open\command" "" '"$appExe" "%1"'
+!macroend
+
 !macro customUnInstall
   ; Updates run the old uninstaller silently with --updated: never touch user state then.
   ${ifNot} ${isUpdated}
+    DeleteRegKey HKCU "Software\Classes\algameet"
     ; "Iniciar com o Windows" entry written by app.setLoginItemSettings (value name = AppUserModelId).
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "com.alga.meet"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "com.alga.meet"

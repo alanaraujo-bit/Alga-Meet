@@ -30,6 +30,13 @@ electronLanguages: [pt-BR, en-US]
 # uiohook-napi is N-API with prebuilt binaries: nothing to rebuild against Electron's ABI.
 npmRebuild: false
 
+# algameet:// deep links (e-mail verification, password reset, invites; see ADR 0003).
+# electron-builder 26 applies `protocols` to mac/appx/linux only: the NSIS installer registers the scheme in
+# build/installer.nsh (customInstall) and removes it on uninstall.
+protocols:
+  - name: Alga Meet
+    schemes: [algameet]
+
 win:
   target:
     - target: nsis
