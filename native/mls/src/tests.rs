@@ -243,3 +243,197 @@ fn member_add_and_remove_by_key_package() {
     g.push(gone);
     agreed(&mut g);
 }
+
+fn hex_of(b: &[u8]) -> String {
+    super::hex(b)
+}
+
+/// The DS side (0004 §3.3) through `PublicCall`: it follows the real tree and relays only commits that cover exactly its
+/// own proposals, with a Welcome for exactly the added key packages.
+#[test]
+fn public_call_follows_the_group_and_refuses_bad_commits() {
+    let ds = Client::new(DS_ID).unwrap();
+    let mut creator = client(0);
+    creator
+        .create_group(GID, &ds.signature_public_key(), DS_ID)
+        .unwrap();
+    let mut call = PublicCall::from_group_info(&creator.group_info().unwrap()).unwrap();
+    assert_eq!(call.epoch(), 0);
+    assert_eq!(call.group_id(), GID);
+    assert!(call.has_external_sender(&ds.signature_public_key(), DS_ID));
+    assert!(!call.has_external_sender(&client(99).signature_public_key(), DS_ID));
+    assert!(call.members().contains(&hex_of(b"user0:device")));
+
+    // Key package as the server sees it on upload.
+    let mut joiner = client(1);
+    let kp = joiner.key_package().unwrap();
+    let info = inspect_key_package(&kp).unwrap();
+    assert_eq!(info.identity, b"user1:device");
+    assert_eq!(info.signature_key, joiner.signature_public_key());
+    assert_eq!(info.reference.len(), 32);
+    let mut bad_kp = kp.clone();
+    let last = bad_kp.len() - 1;
+    bad_kp[last] ^= 1;
+    assert!(inspect_key_package(&bad_kp).is_err());
+
+    // Add: the DS queues its own proposal; the committer's commit must come with a Welcome for that key package.
+    let add = ds.external_propose_add(GID, 0, &kp).unwrap();
+    call.add_proposal(&add).unwrap();
+    assert_eq!(creator.process(&add).unwrap(), "proposal");
+    let c = creator.commit_pending().unwrap();
+    let welcome = c.welcome.clone().unwrap();
+    assert_eq!(welcome_recipients(&welcome).unwrap(), info.reference);
+    assert!(
+        call.stage_commit(&c.commit, &[], 0).is_err(),
+        "Welcome missing"
+    );
+    assert!(
+        call.stage_commit(&c.commit, &welcome, 1).is_err(),
+        "relayed by another member"
+    );
+    // Content and signature are checked; the confirmation and membership tags (the last 66 bytes) are MACs under keys
+    // only members have, so a bad tag gets past the DS and is refused by the members (who then resync).
+    for i in (0..c.commit.len() - 66).step_by(7) {
+        let mut bad = c.commit.clone();
+        bad[i] ^= 1;
+        assert!(call.stage_commit(&bad, &welcome, 0).is_err(), "byte {i}");
+    }
+    assert_eq!(call.epoch(), 0, "refused commits leave no trace");
+    let done = call.stage_commit(&c.commit, &welcome, 0).unwrap();
+    assert_eq!(call.epoch(), 0, "staged, not merged yet");
+    call.merge().unwrap();
+    assert_eq!((done.epoch, done.sender_leaf), (1, 0));
+    assert_eq!(done.added, info.reference);
+    assert!(done.removed.is_empty());
+    assert_eq!(creator.process(&c.commit).unwrap(), "commit");
+    joiner.process_welcome(&welcome).unwrap();
+    assert_eq!(call.members(), creator.members().unwrap());
+    assert_eq!(call.members(), joiner.members().unwrap());
+    let code = creator.epoch_authenticator().unwrap();
+    assert_eq!(code, joiner.epoch_authenticator().unwrap());
+
+    // Proposals by value (a member adding someone on its own) and proposals from another "DS" are refused.
+    let rogue = joiner
+        .add_members(&client(2).key_package().unwrap())
+        .unwrap();
+    assert!(
+        call.stage_commit(&rogue.commit, &rogue.welcome.unwrap(), 1)
+            .is_err()
+    );
+    joiner.clear_pending_commit().unwrap();
+    let impostor = Client::new(DS_ID).unwrap();
+    assert!(
+        call.add_proposal(
+            &impostor
+                .external_propose_add(GID, 1, &client(3).key_package().unwrap())
+                .unwrap()
+        )
+        .is_err()
+    );
+
+    // Remove: the DS names the leaf from its own view of the tree.
+    let remove = ds.external_propose_remove(GID, 1, 1).unwrap();
+    call.add_proposal(&remove).unwrap();
+    let mut g = vec![creator, joiner];
+    for m in g.iter_mut() {
+        m.process(&remove).unwrap();
+    }
+    let c = g[0].commit_pending().unwrap();
+    let done = call.stage_commit(&c.commit, &[], 0).unwrap();
+    call.merge().unwrap();
+    assert_eq!((done.epoch, done.removed.clone()), (2, vec![1]));
+    assert_eq!(g[1].process(&c.commit).unwrap(), "removed");
+    assert_eq!(g[0].process(&c.commit).unwrap(), "commit");
+    assert_eq!(call.members(), g[0].members().unwrap());
+    assert_ne!(g[0].epoch_authenticator().unwrap(), code);
+    // An empty commit (no DS proposal) would only churn epochs: refused.
+    let empty = g[0].commit_pending().unwrap();
+    assert!(call.stage_commit(&empty.commit, &[], 0).is_err());
+    assert!(call.merge().is_err(), "a refused commit is not staged");
+}
+
+/// Two members commit the same epoch: the DS orders one; the loser drops its own and follows the winner.
+#[test]
+fn losing_committer_clears_and_follows_the_winner() {
+    let ds = Client::new(DS_ID).unwrap();
+    let mut g = group_of(&ds, 3);
+    let add = ds
+        .external_propose_add(
+            GID,
+            g[0].epoch().unwrap(),
+            &client(4).key_package().unwrap(),
+        )
+        .unwrap();
+    for m in g.iter_mut() {
+        m.process(&add).unwrap();
+    }
+    let winner = g[0].commit_pending().unwrap();
+    let _loser = g[1].commit_pending().unwrap();
+    g[1].clear_pending_commit().unwrap();
+    for m in g.iter_mut() {
+        assert_eq!(m.process(&winner.commit).unwrap(), "commit");
+    }
+    agreed(&mut g);
+    // Without the clear, processing the winner also discards the pending commit (merge clears it).
+    let add = ds
+        .external_propose_add(
+            GID,
+            g[0].epoch().unwrap(),
+            &client(5).key_package().unwrap(),
+        )
+        .unwrap();
+    for m in g.iter_mut() {
+        m.process(&add).unwrap();
+    }
+    let winner = g[0].commit_pending().unwrap();
+    let _ = g[2].commit_pending().unwrap();
+    for m in g.iter_mut() {
+        assert_eq!(m.process(&winner.commit).unwrap(), "commit");
+    }
+    agreed(&mut g);
+    g[2].leave().unwrap();
+    assert!(g[2].epoch().is_err());
+}
+
+/// Canary for the upstream report (docs/security/upstream-openmls-issue.md): after a self-removal, OpenMLS 0.9.2 keeps
+/// the removed member's last-epoch EncryptionKeyPairs even after `MlsGroup::delete`. `drop_group` wipes them; when this
+/// test fails, upstream fixed it and the `shortcut:` in `drop_group` can go.
+#[test]
+fn upstream_delete_keeps_the_last_epoch_keypairs_of_a_removed_member() {
+    let ds = Client::new(DS_ID).unwrap();
+    let mut g = group_of(&ds, 3);
+    let mut gone = g.pop().unwrap();
+    let remove = ds
+        .external_propose_remove(GID, g[0].epoch().unwrap(), gone.own_leaf_index().unwrap())
+        .unwrap();
+    let c = ds_epoch(&mut g, &remove);
+    assert_eq!(gone.process(&remove).unwrap(), "proposal");
+
+    // What the wrapper's `process` does, minus its wipe: process, merge the self-removal, delete the group.
+    let mut group = gone.group.take().unwrap();
+    let msg = MlsMessageIn::tls_deserialize_exact(&c.commit)
+        .unwrap()
+        .try_into_protocol_message()
+        .unwrap();
+    let ProcessedMessageContent::StagedCommitMessage(staged) = group
+        .process_message(&gone.provider, msg)
+        .unwrap()
+        .into_content()
+    else {
+        panic!("not a commit")
+    };
+    assert!(staged.self_removed());
+    group.merge_staged_commit(&gone.provider, *staged).unwrap();
+    group.delete(gone.provider.storage()).unwrap();
+    let left: Vec<_> = gone
+        .provider
+        .storage()
+        .values
+        .read()
+        .unwrap()
+        .keys()
+        .filter(|k| k.starts_with(b"EpochKeyPairs"))
+        .cloned()
+        .collect();
+    assert!(!left.is_empty(), "upstream now deletes them: drop the shortcut in drop_group");
+}

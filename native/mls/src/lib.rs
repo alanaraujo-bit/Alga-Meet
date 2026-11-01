@@ -52,6 +52,269 @@ fn magic(input: &mut &[u8], m: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
+fn hex(b: &[u8]) -> String {
+    b.iter().map(|x| format!("{x:02x}")).collect()
+}
+
+/// Leaves as JSON `[{"leaf":0,"identity":"<hex>","signatureKey":"<hex>"}]` (hex: the identity is client-chosen bytes).
+fn members_json(members: impl Iterator<Item = Member>) -> String {
+    let items: Vec<String> = members
+        .map(|m| {
+            let id = BasicCredential::try_from(m.credential)
+                .map(|c| c.identity().to_vec())
+                .unwrap_or_default();
+            format!(
+                r#"{{"leaf":{},"identity":"{}","signatureKey":"{}"}}"#,
+                m.index.u32(),
+                hex(&id),
+                hex(&m.signature_key)
+            )
+        })
+        .collect();
+    format!("[{}]", items.join(","))
+}
+
+fn basic_identity(c: &Credential) -> Result<Vec<u8>, String> {
+    Ok(BasicCredential::try_from(c.clone())
+        .map_err(err)?
+        .identity()
+        .to_vec())
+}
+
+#[wasm_bindgen(getter_with_clone)]
+pub struct KeyPackageInfo {
+    /// BasicCredential content (`userId:deviceId`).
+    pub identity: Vec<u8>,
+    /// Leaf Ed25519 public key (the device identity key).
+    pub signature_key: Vec<u8>,
+    /// KeyPackageRef (RFC 9420 §5.2): how a Welcome names its recipients.
+    pub reference: Vec<u8>,
+    /// End of the key package lifetime, seconds since the Unix epoch.
+    pub not_after: u64,
+}
+
+/// DS: validates an uploaded key package (exact parse, signatures, ciphersuite 1, lifetime, basic credential).
+#[wasm_bindgen]
+pub fn inspect_key_package(bytes: &[u8]) -> Result<KeyPackageInfo, String> {
+    let MlsMessageBodyIn::KeyPackage(kp) = de(bytes)? else {
+        return Err("not a key package".into());
+    };
+    let crypto = openmls_rust_crypto::RustCrypto::default();
+    let kp = kp.validate(&crypto, ProtocolVersion::Mls10).map_err(err)?;
+    if kp.ciphersuite() != CS {
+        return Err("unsupported ciphersuite".into());
+    }
+    let leaf = kp.leaf_node();
+    Ok(KeyPackageInfo {
+        identity: basic_identity(leaf.credential())?,
+        signature_key: leaf.signature_key().as_slice().to_vec(),
+        reference: kp.hash_ref(&crypto).map_err(err)?.as_slice().to_vec(),
+        not_after: kp.life_time().not_after(),
+    })
+}
+
+/// DS: KeyPackageRefs a Welcome is encrypted to (32 bytes each, concatenated).
+#[wasm_bindgen]
+pub fn welcome_recipients(welcome: &[u8]) -> Result<Vec<u8>, String> {
+    let MlsMessageBodyIn::Welcome(w) = de(welcome)? else {
+        return Err("not a welcome".into());
+    };
+    if w.ciphersuite() != CS {
+        return Err("unsupported ciphersuite".into());
+    }
+    Ok(w.secrets()
+        .iter()
+        .flat_map(|s| s.new_member().as_slice().to_vec())
+        .collect())
+}
+
+#[wasm_bindgen(getter_with_clone)]
+pub struct CommitInfo {
+    /// Epoch the group moved to.
+    pub epoch: u64,
+    pub sender_leaf: u32,
+    /// KeyPackageRefs of the members it added, in commit order (32 bytes each, concatenated).
+    pub added: Vec<u8>,
+    /// Leaf indices it removed.
+    pub removed: Vec<u32>,
+}
+
+/// DS view of one call (0004 §3.3): OpenMLS `PublicGroup`, the group's public state (tree, context) without any
+/// secret. Lets the server check every commit against the real tree before relaying it, and name leaves for Removes.
+#[wasm_bindgen]
+pub struct PublicCall {
+    provider: OpenMlsRustCrypto,
+    group: PublicGroup,
+    staged: Option<StagedCommit>,
+}
+
+#[wasm_bindgen]
+impl PublicCall {
+    /// From the creator's GroupInfo (MLSMessage, with the ratchet_tree extension): verifies tree and signature.
+    pub fn from_group_info(group_info: &[u8]) -> Result<PublicCall, String> {
+        let MlsMessageBodyIn::GroupInfo(info) = de(group_info)? else {
+            return Err("not a group info".into());
+        };
+        let tree = info
+            .extensions()
+            .ratchet_tree()
+            .ok_or("group info without ratchet tree")?
+            .ratchet_tree()
+            .clone();
+        let provider = OpenMlsRustCrypto::default();
+        let (group, _) = PublicGroup::from_external(
+            provider.crypto(),
+            provider.storage(),
+            tree,
+            info,
+            ProposalStore::new(),
+        )
+        .map_err(err)?;
+        if group.ciphersuite() != CS {
+            return Err("unsupported ciphersuite".into());
+        }
+        Ok(PublicCall {
+            provider,
+            group,
+            staged: None,
+        })
+    }
+
+    pub fn group_id(&self) -> Vec<u8> {
+        self.group.group_id().as_slice().to_vec()
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.group.group_context().epoch().as_u64()
+    }
+
+    pub fn members(&self) -> String {
+        members_json(self.group.members())
+    }
+
+    /// True when the group's only external sender is this DS key + identity (else its proposals would not apply).
+    pub fn has_external_sender(&self, ds_public_key: &[u8], ds_identity: &[u8]) -> bool {
+        let want = ExternalSender::new(
+            ds_public_key.into(),
+            BasicCredential::new(ds_identity.to_vec()).into(),
+        );
+        self.group
+            .group_context()
+            .extensions()
+            .external_senders()
+            .is_some_and(|s| s.len() == 1 && s[0] == want)
+    }
+
+    /// A proposal the DS just signed for this epoch: validated against the public state and queued.
+    pub fn add_proposal(&mut self, message: &[u8]) -> Result<(), String> {
+        let processed = self.process_public(message)?;
+        let from_ds = *processed.sender() == Sender::External(SenderExtensionIndex::new(0));
+        match processed.into_content() {
+            ProcessedMessageContent::ProposalMessage(p) if from_ds => self
+                .group
+                .add_proposal(self.provider.storage(), *p)
+                .map_err(err),
+            _ => Err("not a DS proposal".into()),
+        }
+    }
+
+    /// A member's commit for this epoch, from leaf `sender`: verified against the public state (signature, tree,
+    /// proposals) and held until `merge`/`discard`. It must cover only queued DS proposals (by reference), may not change
+    /// the committer's identity, and `welcome` must be encrypted to exactly the added key packages (empty when it adds
+    /// nobody). The confirmation and membership tags are MACs only members can check.
+    pub fn stage_commit(
+        &mut self,
+        commit: &[u8],
+        welcome: &[u8],
+        sender: u32,
+    ) -> Result<CommitInfo, String> {
+        self.staged = None;
+        let processed = self.process_public(commit)?;
+        if !matches!(*processed.sender(), Sender::Member(l) if l.u32() == sender) {
+            return Err("commit not from the sending member".into());
+        }
+        let ProcessedMessageContent::StagedCommitMessage(staged) = processed.into_content() else {
+            return Err("not a commit".into());
+        };
+        let ds = Sender::External(SenderExtensionIndex::new(0));
+        if staged
+            .queued_proposals()
+            .any(|p| *p.sender() != ds || p.proposal_or_ref_type() != ProposalOrRefType::Reference)
+        {
+            return Err("commit covers proposals that are not the DS's".into());
+        }
+        if staged.queued_proposals().next().is_none() {
+            return Err("empty commit".into());
+        }
+        if let Some(leaf) = staged.update_path_leaf_node() {
+            let old = self
+                .group
+                .leaf(LeafNodeIndex::new(sender))
+                .ok_or("unknown sender")?;
+            if leaf.signature_key() != old.signature_key()
+                || basic_identity(leaf.credential())? != basic_identity(old.credential())?
+            {
+                return Err("commit changes the committer's identity".into());
+            }
+        }
+        let crypto = self.provider.crypto();
+        let mut added = Vec::new();
+        for a in staged.add_proposals() {
+            let r = a
+                .add_proposal()
+                .key_package()
+                .hash_ref(crypto)
+                .map_err(err)?;
+            added.extend_from_slice(r.as_slice());
+        }
+        let removed: Vec<u32> = staged
+            .remove_proposals()
+            .map(|r| r.remove_proposal().removed().u32())
+            .collect();
+        let recipients = if welcome.is_empty() {
+            Vec::new()
+        } else {
+            welcome_recipients(welcome)?
+        };
+        let (mut want, mut got): (Vec<&[u8]>, Vec<&[u8]>) =
+            (added.chunks(32).collect(), recipients.chunks(32).collect());
+        want.sort();
+        got.sort();
+        if want != got {
+            return Err("welcome does not match the added members".into());
+        }
+        self.staged = Some(*staged);
+        Ok(CommitInfo {
+            epoch: self.epoch() + 1,
+            sender_leaf: sender,
+            added,
+            removed,
+        })
+    }
+
+    /// Apply the staged commit: the DS ordered it.
+    pub fn merge(&mut self) -> Result<(), String> {
+        let staged = self.staged.take().ok_or("nothing staged")?;
+        self.group
+            .merge_commit(self.provider.storage(), staged)
+            .map_err(err)
+    }
+
+    pub fn discard(&mut self) {
+        self.staged = None;
+    }
+
+    fn process_public(&self, message: &[u8]) -> Result<ProcessedMessage, String> {
+        let message = MlsMessageIn::tls_deserialize_exact(message)
+            .map_err(err)?
+            .try_into_protocol_message()
+            .map_err(err)?;
+        self.group
+            .process_message(self.provider.crypto(), message)
+            .map_err(err)
+    }
+}
+
 #[wasm_bindgen(getter_with_clone)]
 pub struct Commit {
     /// Commit as a PublicMessage (the DS reads it to check the proposals it covers).
@@ -340,6 +603,47 @@ impl Client {
 
     pub fn epoch(&self) -> Result<u64, String> {
         Ok(self.group.as_ref().ok_or("no group")?.epoch().as_u64())
+    }
+
+    /// Current members, from MLS (0004 §3.8: the "in this encrypted call" list never comes from the server).
+    pub fn members(&self) -> Result<String, String> {
+        Ok(members_json(
+            self.group.as_ref().ok_or("no group")?.members(),
+        ))
+    }
+
+    /// Epoch authenticator (32 bytes): the same for every member of this epoch, so it is the call verification code.
+    pub fn epoch_authenticator(&self) -> Result<Vec<u8>, String> {
+        Ok(self
+            .group
+            .as_ref()
+            .ok_or("no group")?
+            .epoch_authenticator()
+            .as_slice()
+            .to_vec())
+    }
+
+    /// Creator: GroupInfo with the ratchet tree, for the DS to start tracking the public state (`PublicCall`).
+    pub fn group_info(&self) -> Result<Vec<u8>, String> {
+        let group = self.group.as_ref().ok_or("no group")?;
+        ser(group
+            .export_group_info(self.provider.crypto(), &self.signer, true)
+            .map_err(err)?)
+    }
+
+    /// Our commit lost (the DS ordered another one, or refused it): forget it so the next commit can be built.
+    pub fn clear_pending_commit(&mut self) -> Result<(), String> {
+        let storage = self.provider.storage();
+        self.group
+            .as_mut()
+            .ok_or("no group")?
+            .clear_pending_commit(storage)
+            .map_err(err)
+    }
+
+    /// Leaving the call: drop the group and its keys (key packages of the device stay).
+    pub fn leave(&mut self) -> Result<(), String> {
+        self.drop_group()
     }
 
     pub fn own_leaf_index(&self) -> Result<u32, String> {
