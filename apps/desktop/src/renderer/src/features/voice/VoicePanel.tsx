@@ -3,15 +3,31 @@ import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
 import { useData } from '@/store/data'
 import { channelTitle } from '@/store/selectors'
-import { Fronds, IconButton } from '@/ui'
+import { Fronds, IconButton, Tooltip } from '@/ui'
 import { roomLevelNow } from './levels'
 import { t } from './strings'
 import { leaveVoice, openCall, useVoice } from './voice'
 import s from './chrome.module.css'
 
-/** "Voz conectada" above the user row: where you are, how the link is, and the two actions you need from anywhere. */
+/** 0–3 bars: the SFU's own rating when it has one, else the round trip. */
+function linkBars(quality: string, rtt: number | null): number {
+  if (quality === 'excellent') return 3
+  if (quality === 'good') return 2
+  if (quality === 'poor') return 1
+  if (quality === 'lost') return 0
+  return rtt === null || rtt < 150 ? 3 : rtt < 300 ? 2 : 1
+}
+
+/**
+ * "Voz conectada" above the user row: the ONE place for call status (the stage header only has actions). Where you
+ * are, link quality as 3 bars (numbers in the tooltip) and the two actions you need from anywhere.
+ */
 export function VoicePanel() {
-  const conn = useMedia(useShallow((st) => ({ state: st.connection.state, channelId: st.connection.channelId, reason: st.connection.reason, rtt: st.local?.rttMs ?? null })))
+  const conn = useMedia(useShallow((st) => ({ state: st.connection.state, channelId: st.connection.channelId, reason: st.connection.reason, rtt: st.local?.rttMs ?? null, quality: st.self.quality })))
+  const loss = useMedia((st) => {
+    const l = Object.values(st.participants).flatMap((p) => (p.audio ? [p.audio.packetLossPct] : []))
+    return l.length ? Math.max(...l) : null
+  })
   const sharing = useMedia((st) => st.screen.active)
   const channel = useData((st) => (conn.channelId ? st.channels[conn.channelId] : undefined))
   const spaceName = useData((st) => (channel?.spaceId ? st.spaces[channel.spaceId]?.name : undefined))
@@ -29,8 +45,8 @@ export function VoicePanel() {
         <button type="button" className={s.panelState} onClick={() => conn.channelId && openCall(conn.channelId)} aria-label={`${label}. ${t.panel.open}`}>
           <span className={`${s.panelTitle} ${warn ? s.warn : ''}`}>
             <Fronds size={14} breathing={warn && !down} getLevel={warn ? undefined : roomLevelNow} />
-            {label}
-            {!warn && conn.rtt !== null && <span className={`${s.ping} tnum`}>{t.panel.ping(conn.rtt)}</span>}
+            <span className={s.panelLabel}>{label}</span>
+            {!warn && <LinkBars bars={linkBars(conn.quality, conn.rtt)} detail={t.panel.link(conn.rtt, loss)} />}
           </span>
           <span className={`${s.panelSub} tnum`}>{sub}</span>
         </button>
@@ -42,15 +58,19 @@ export function VoicePanel() {
           ))}
         {down ? <IconButton icon={X} label={t.leave} onClick={leaveVoice} /> : <IconButton icon={PhoneOff} label={t.leave} danger onClick={leaveVoice} />}
       </div>
-      {sharing && (
-        <div className={s.liveRow}>
-          <span className={s.liveDot} aria-hidden />
-          <span className={s.liveText}>{t.panel.liveShort}</span>
-          <button type="button" className={s.liveStop} onClick={() => void media.stopScreenShare()}>
-            {t.dock.stopShare}
-          </button>
-        </div>
-      )}
     </div>
+  )
+}
+
+function LinkBars({ bars, detail }: { bars: number; detail: string }) {
+  const label = `${t.panel.quality[bars]}: ${detail}`
+  return (
+    <Tooltip content={detail}>
+      <span className={s.bars} role="img" aria-label={label} data-bars={bars}>
+        <i />
+        <i />
+        <i />
+      </span>
+    </Tooltip>
   )
 }

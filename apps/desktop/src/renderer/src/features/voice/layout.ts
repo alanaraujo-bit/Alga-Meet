@@ -3,8 +3,8 @@
 const GAP = 8
 const MIN_W = 200
 const MAX_W = 880
-/** A watched stream in the grid takes up to this share of the stage height (the rest stays a normal grid). */
-const FEATURED_SHARE = 0.64
+/** Stage box height (inside the stage padding and dock clearance) under which the people strip gets smaller. */
+const STRIP_SHORT = 620
 
 /** Largest 16:9 tile that fits `n` tiles in the box (tries every column count) and the column count it uses. */
 export function fitGrid(n: number, w: number, h: number, gap = GAP): { width: number; cols: number } {
@@ -42,31 +42,28 @@ export function balancedRows(n: number, cols: number): number[] {
 }
 
 export interface StageLayout {
-  /** Width of the featured (watched) stream tile; null = plain grid. */
-  featured: number | null
-  /** Width of every other tile. */
+  /** Width of every tile. */
   width: number
-  /** Tiles per row for the non-featured tiles. */
+  /** Tiles per row. */
   rows: number[]
 }
 
+/** The call grid: largest 16:9 tile for everyone, in balanced rows. */
+export function stageLayout(n: number, w: number, h: number, gap = GAP): StageLayout {
+  const g = fitGrid(n, w, h, gap)
+  return { width: g.width, rows: balancedRows(n, g.cols) }
+}
+
+/** People under a watched stream: 160×90, or 120×68 when the stage box is short (stage under 720 px). */
+export const stripTile = (h: number): { w: number; h: number } => (h < STRIP_SHORT ? { w: 120, h: 68 } : { w: 160, h: 90 })
+
 /**
- * The call grid. With a stream being watched (and someone else to show), the stream gets a big 16:9 tile on top
- * (up to 64 % of the height) and everyone else keeps a normal, balanced grid below: priority without hijacking.
+ * Watching a stream gives it the stage at any headcount: the largest 16:9 that fits above one strip of people.
+ * (The stage box already excludes the dock clearance and the side padding.)
  */
-export function stageLayout(n: number, w: number, h: number, featured: boolean, gap = GAP): StageLayout {
-  if (!featured || n < 2) {
-    const g = fitGrid(n, w, h, gap)
-    return { featured: null, width: g.width, rows: balancedRows(n, g.cols) }
-  }
-  const minRest = (MIN_W * 9) / 16
-  let bigH = Math.max(0, Math.min(h * FEATURED_SHARE, h - minRest - gap, (w * 9) / 16))
-  const g = fitGrid(n - 1, w, h - bigH - gap, gap)
-  const rows = balancedRows(n - 1, g.cols)
-  // The grid below never shrinks under MIN_W: if its rows don't fit, the stream gives up the height.
-  const restH = rows.length * ((g.width * 9) / 16) + (rows.length - 1) * gap
-  bigH = Math.max(0, Math.min(bigH, h - gap - restH))
-  return { featured: Math.floor((bigH * 16) / 9), width: g.width, rows }
+export function featuredWidth(w: number, h: number, gap = GAP): number {
+  const strip = stripTile(h)
+  return Math.max(0, Math.floor(Math.min(w, ((h - strip.h - gap) * 16) / 9)))
 }
 
 /**

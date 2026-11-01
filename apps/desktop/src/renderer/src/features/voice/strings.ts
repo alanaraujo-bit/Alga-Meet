@@ -1,5 +1,10 @@
 import type { VoiceDisconnectReason } from '@alga/shared'
 
+const num1 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const pct = (n: number) => `${num1.format(n)} %`
+/** Under 5 ms is a local network, not a broken measure. */
+const ping = (ms: number) => (ms < 5 ? '< 5 ms' : `${Math.round(ms)} ms`)
+
 export const t = {
   joinError: 'Não foi possível entrar no canal de voz.',
   join: (name: string) => `Entrar em ${name}`,
@@ -18,6 +23,7 @@ export const t = {
   },
   /** Stage overlay while the media connection is down: never pretend people are fine. */
   reconnectingBody: 'Você não está ouvindo ninguém agora. A conversa volta sozinha assim que a conexão voltar.',
+  reconnectingShort: 'Você não está ouvindo ninguém agora.',
   disconnectedBody: 'A conexão com a voz caiu e não voltou sozinha.',
 
   removed: {
@@ -42,8 +48,8 @@ export const t = {
     streamOf: (name: string) => `Transmissão de ${name}`,
     youAreLive: 'Você está transmitindo',
     yourStreamBody: 'Quem quiser assistir clica em Assistir. Nada é enviado para quem não está assistindo.',
-    focus: 'Ampliar',
-    unfocus: 'Voltar à grade',
+    people: 'Pessoas na chamada',
+    show: 'Mostrar no palco',
     fullscreen: 'Tela cheia',
     exitFullscreen: 'Sair da tela cheia',
     pip: 'Janela flutuante',
@@ -93,7 +99,10 @@ export const t = {
   },
 
   panel: {
-    ping: (ms: number) => `${Math.round(ms)} ms`,
+    ping,
+    link: (ms: number | null, lossPct: number | null) =>
+      [ms === null ? null : ping(ms), lossPct === null ? null : `perda ${pct(lossPct)}`].filter(Boolean).join(' · ') || 'Medindo a conexão…',
+    quality: { 3: 'Conexão ótima', 2: 'Conexão boa', 1: 'Conexão instável', 0: 'Sem sinal' } as Record<number, string>,
     live: 'Você está transmitindo',
     liveShort: 'Transmitindo',
     open: 'Abrir a chamada',
@@ -107,6 +116,11 @@ export const t = {
     join: (name: string) => `Entrar em ${name}`,
     more: (n: number) => `+${n}`,
     streaming: 'ao vivo',
+  },
+
+  here: {
+    count: (n: number, room: string) => `${n} em ${room}`,
+    open: 'Abrir',
   },
 
   ring: {
@@ -137,8 +151,9 @@ export const t = {
     loading: 'Procurando telas e janelas…',
     unavailable: 'A captura de tela não está disponível nesta versão.',
     preview: 'Prévia',
-    choose: 'Escolha uma tela ou janela',
     quality: 'Qualidade',
+    resolution: 'Resolução',
+    fps: 'Quadros por segundo',
     qualityHint: 'Só aparecem as opções que este computador sustenta.',
     qualityLiveHint: 'Muda na hora, sem interromper quem assiste.',
     plus: 'Alga Plus',
@@ -174,6 +189,7 @@ export const t = {
     codec: 'Codec',
     loss: 'Perda',
     freezes: 'Congelamentos',
-    kbps: (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)} Mb/s` : `${Math.round(n)} kb/s`),
+    kbps: (n: number) => (n >= 1000 ? `${num1.format(n / 1000)} Mb/s` : `${Math.round(n)} kb/s`),
+    pct,
   },
 } as const

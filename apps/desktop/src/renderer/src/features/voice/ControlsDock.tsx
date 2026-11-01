@@ -1,6 +1,6 @@
 import type { Channel } from '@alga/shared'
 import type { LucideIcon } from 'lucide-react'
-import { Headphones, HeadphoneOff, Mic, MicOff, MonitorOff, MonitorUp, PhoneOff, Settings2 } from 'lucide-react'
+import { ArrowLeftRight, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, Settings2, Square } from 'lucide-react'
 import { useCallback, useLayoutEffect, useRef, type ButtonHTMLAttributes, type ReactNode, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
@@ -12,24 +12,16 @@ import { t } from './strings'
 import { leaveVoice, useVoice } from './voice'
 import s from './stage.module.css'
 
-/** Toast stack's right edge (ui/overlay.module.css: right 16 px, up to 380 px wide). */
-const TOAST_ZONE = 16 + 380
-
 /**
- * Toasts live bottom-right. When this dock sits on the window's bottom edge under that corner (narrow windows),
- * the stack rises above it (--toast-bottom), so a toast never covers Desconectar.
+ * One rule, any window size: while the call dock is on screen, the toast stack rises above it (--toast-bottom,
+ * measured from the dock itself), so a toast never covers Desconectar.
  */
 function useToastClearance(ref: RefObject<HTMLElement | null>) {
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
     const root = document.documentElement.style
-    const update = () => {
-      const r = el.getBoundingClientRect()
-      const under = window.innerHeight - r.bottom < 48 && r.right > window.innerWidth - TOAST_ZONE
-      if (under) root.setProperty('--toast-bottom', `${Math.ceil(window.innerHeight - r.top + 12)}px`)
-      else root.removeProperty('--toast-bottom')
-    }
+    const update = () => root.setProperty('--toast-bottom', `${Math.ceil(window.innerHeight - el.getBoundingClientRect().top + 12)}px`)
     update()
     const ro = new ResizeObserver(update)
     ro.observe(el)
@@ -84,8 +76,9 @@ export function ControlsDock({ channel: _channel }: { channel: Channel }) {
           align="center"
           label={t.dock.stopShare}
           items={() => [
-            { label: t.dock.switchSource, icon: MonitorUp, onSelect: () => useVoice.setState({ picker: true }) },
-            { label: t.dock.stopShare, icon: MonitorOff, danger: true, onSelect: () => void media.stopScreenShare() },
+            { label: t.dock.switchSource, icon: ArrowLeftRight, onSelect: () => useVoice.setState({ picker: true }) },
+            // Stopping a stream destroys nothing: no red (red is Desconectar's).
+            { label: t.dock.stopShare, icon: Square, onSelect: () => void media.stopScreenShare() },
           ]}
         >
           <CallButton icon={MonitorUp} label={t.dock.stopShare} pressed on />

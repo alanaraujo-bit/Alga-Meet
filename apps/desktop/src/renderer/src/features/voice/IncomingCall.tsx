@@ -37,12 +37,14 @@ function RingCard({ channelId, fromUserId }: { channelId: string; fromUserId: st
         <span className={s.ringTitle}>{group ? title : name}</span>
         <span className={s.ringSub}>{group ? t.ring.groupBody : t.ring.body}</span>
       </span>
-      <Button variant="danger" icon={PhoneOff} onClick={declineRing}>
-        {t.ring.decline}
-      </Button>
-      <Button variant="primary" icon={Phone} onClick={() => void acceptRing()} autoFocus>
-        {t.ring.accept}
-      </Button>
+      <span className={s.ringActions}>
+        <Button variant="secondary-danger" icon={PhoneOff} onClick={declineRing}>
+          {t.ring.decline}
+        </Button>
+        <Button variant="primary" icon={Phone} onClick={() => void acceptRing()} autoFocus>
+          {t.ring.accept}
+        </Button>
+      </span>
     </motion.div>
   )
 }

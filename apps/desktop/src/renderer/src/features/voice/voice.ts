@@ -9,6 +9,7 @@ import { onDispatch, useSession } from '@/store/session'
 import { useUi } from '@/store/ui'
 import { toast } from '@/ui'
 import type { Corner } from './layout'
+import { streamNoticeOnTile } from './notice'
 import { t } from './strings'
 
 export interface Ring {
@@ -29,9 +30,19 @@ interface VoiceUi {
   stage: string | null
   /** Where the mini-player rests. */
   miniCorner: Corner
+  /** Engine notice about your own stream, shown on your tile for a few seconds (not a toast). */
+  streamNotice: { text: string; at: number } | null
 }
 
-export const useVoice = create<VoiceUi>()(() => ({ joining: null, ring: null, picker: false, focus: null, stats: false, stage: null, miniCorner: 'br' }))
+export const useVoice = create<VoiceUi>()(() => ({ joining: null, ring: null, picker: false, focus: null, stats: false, stage: null, miniCorner: 'br', streamNotice: null }))
+
+/** A notice about your stream goes on your tile when the call's stage is on screen; false = keep it a toast. */
+export function routeStreamNotice(text: string): boolean {
+  const m = useMedia.getState()
+  if (!streamNoticeOnTile(text, { sharing: m.screen.active, stage: useVoice.getState().stage, call: m.connection.channelId })) return false
+  useVoice.setState({ streamNotice: { text, at: Date.now() } })
+  return true
+}
 
 const RING_MS = 30_000
 let ringTimer: ReturnType<typeof setTimeout> | null = null

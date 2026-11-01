@@ -3,6 +3,9 @@ import { media, useMedia } from '@/media'
 import { useSession } from '@/store/session'
 import { Icon, Kbd } from '@/ui'
 import { useUi } from '@/store/ui'
+import { useSettings } from '../settings/store'
+import { useSpaceSettings } from '../spaceSettings/store'
+import { useVoice } from '../voice/voice'
 import { ConnectionChip } from './ConnectionBanner'
 import { LogoMark } from './Logo'
 import { t } from './strings'
@@ -12,7 +15,14 @@ import s from './app.module.css'
 export function TitleBar({ search }: { search?: boolean }) {
   const profile = window.alga?.config.profile
   const down = useSession((st) => st.gateway === 'reconnecting' || st.gateway === 'connecting')
-  const live = useMedia((st) => st.screen.active)
+  // On the call's stage your tile and the filled Tela button already say you're live; the chip is for everywhere else
+  // (other channels, Home, settings over the stage), so you never forget.
+  const callId = useMedia((st) => st.connection.channelId)
+  const onStage = useVoice((st) => st.stage !== null && st.stage === callId)
+  const settings = useSettings((st) => st.section !== null)
+  const spaceSettings = useSpaceSettings((st) => st.spaceId !== null)
+  const sharing = useMedia((st) => st.screen.active)
+  const live = sharing && (!onStage || settings || spaceSettings)
   return (
     <header className={s.titlebar}>
       <div className={s.brand}>
@@ -21,7 +31,6 @@ export function TitleBar({ search }: { search?: boolean }) {
         </span>
         {t.appName}
         {profile && profile !== 'default' && <span className={s.profile}>{profile}</span>}
-        {/* Always visible while you stream, even over settings: you never forget you are live. */}
         {live && (
           <span className={s.liveChip} role="status">
             <span className={s.liveDot} />

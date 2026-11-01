@@ -1,45 +1,40 @@
 import type { Channel } from '@alga/shared'
-import { Permission } from '@alga/shared'
-import { ArrowRightLeft, BarChart3, HeadphoneOff, Headphones, Maximize2, Mic, Minimize, Minimize2, MicOff, MonitorUp, MoreHorizontal, PhoneOff, PictureInPicture2, Scan, ShieldOff, Volume2, VolumeX, WifiOff, X, Signal } from 'lucide-react'
+import { ArrowLeftRight, BarChart3, HeadphoneOff, Minimize, MicOff, MonitorUp, MoreHorizontal, PictureInPicture2, Scan, ShieldOff, Square, Volume2, WifiOff, X, Signal } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia, type StreamQuality } from '@/media'
 import { useData } from '@/store/data'
-import { moderateVoice } from '@/store/actions'
-import { errorText } from '@/lib/errors'
-import { can, channelTitle, displayName, spaceChannels, spacePermissions, voiceMembers } from '@/store/selectors'
-import { Avatar, Button, contextMenuHandler, Fronds, Icon, IconButton, Popover, SegmentedControl, Spinner, Switch, toast, Tooltip, useEnvelope, type MenuEntry } from '@/ui'
+import { channelTitle, displayName, voiceMembers } from '@/store/selectors'
+import { Avatar, Button, contextMenuHandler, Fronds, Icon, IconButton, Popover, SegmentedControl, Spinner, Switch, Tooltip, useEnvelope } from '@/ui'
 import { EASE_OUT_QUART } from '@/ui/motion'
 import { DecoratedAvatar } from '../billing/Cosmetics'
 import { useLook } from '../billing/store'
+import { personEntries } from '../shell/people'
 import { ControlsDock } from './ControlsDock'
-import { stageLayout, type StageLayout } from './layout'
+import { featuredWidth, stageLayout, stripTile } from './layout'
 import { useLevelGetter, roomLevelNow } from './levels'
 import { t } from './strings'
 import { joinVoice, leaveVoice, useVoice } from './voice'
 import sh from '../shell/shell.module.css'
 import s from './stage.module.css'
 
-function useStageLayout(ref: RefObject<HTMLElement | null>, n: number, featured: boolean, mounted: boolean): StageLayout {
-  const [l, setL] = useState<StageLayout>({ featured: null, width: 320, rows: [n] })
+/** Content box of the stage (re-measured when `key` swaps the element, e.g. grid ⇄ watched stream). */
+function useBox(ref: RefObject<HTMLElement | null>, key: unknown): { w: number; h: number } {
+  const [box, setBox] = useState({ w: 0, h: 0 })
   useLayoutEffect(() => {
     const el = ref.current
-    if (!el || !mounted) return
-    const measure = () =>
-      setL((cur) => {
-        const next = stageLayout(n, el.clientWidth, el.clientHeight, featured)
-        return cur.featured === next.featured && cur.width === next.width && String(cur.rows) === String(next.rows) ? cur : next
-      })
+    if (!el) return
+    const measure = () => setBox((cur) => (cur.w === el.clientWidth && cur.h === el.clientHeight ? cur : { w: el.clientWidth, h: el.clientHeight }))
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [ref, n, featured, mounted])
-  return l
+  }, [ref, key])
+  return box
 }
 
-type Conn = { state: string; channelId: string | null; reason: string | null; rtt: number | null }
+type Conn = { state: string; channelId: string | null; reason: string | null }
 
 /**
  * The call. `channel` = a space voice channel (full main area) or a DM (variant "dm": top of the conversation).
@@ -50,7 +45,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
   const voiceStates = useData((st) => st.voiceStates)
   const people = useMemo(() => voiceMembers({ voiceStates }, channel.id), [voiceStates, channel.id])
   const meId = useData((st) => st.me?.id)
-  const conn = useMedia(useShallow((st): Conn => ({ state: st.connection.state, channelId: st.connection.channelId, reason: st.connection.reason, rtt: st.local?.rttMs ?? null })))
+  const conn = useMedia(useShallow((st): Conn => ({ state: st.connection.state, channelId: st.connection.channelId, reason: st.connection.reason })))
   const here = conn.channelId === channel.id && conn.state !== 'idle'
   const live = here && (conn.state === 'connecting' || conn.state === 'connected' || conn.state === 'reconnecting')
   const joining = useVoice((st) => st.joining === channel.id)
@@ -82,44 +77,47 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
             <span className={sh.headerTopic}>{channel.topic}</span>
           </>
         )}
-        <div className={sh.headerActions}>
-          {live && <StatusChip conn={conn} />}
-          {people.length > 0 && <span className={s.count}>{t.stage.preview(people.length)}</span>}
-        </div>
       </header>
     ) : null
 
   return (
     <section className={`${s.stage} ${variant === 'dm' ? s.dm : ''} ${live ? '' : s.idle}`} aria-label={channel.name}>
       {header}
-      <div className={`${s.area} ${conn.state !== 'connected' && here ? s.stale : ''}`}>
+      <Room stale={conn.state !== 'connected' && here} breathe={live && conn.state === 'connected'}>
         {live ? (
           <LiveRoom channel={channel} people={people.map((p) => p.userId)} meId={meId} />
         ) : (
           <PreJoin channel={channel} people={people.map((p) => p.userId)} streaming={people.filter((p) => p.streaming).map((p) => p.userId)} joining={joining} variant={variant} />
         )}
         {here && conn.state === 'reconnecting' && (
-          <Notice title={t.state.reconnecting}>{t.reconnectingBody}</Notice>
+          <div className={s.reconnect} role="status" aria-live="polite">
+            <Fronds size={14} breathing />
+            <strong>{t.state.reconnecting}</strong>
+            <span>{t.reconnectingShort}</span>
+          </div>
         )}
         {here && conn.state === 'disconnected' && (
           <Notice title={t.state.disconnected} action={<Button variant="primary" onClick={() => void joinVoice(channel.id)}>{t.rejoin}</Button>} dismiss={leaveVoice}>
             {conn.reason ?? t.disconnectedBody}
           </Notice>
         )}
-      </div>
+      </Room>
       {live && <ControlsDock channel={channel} />}
     </section>
   )
 }
 
-function StatusChip({ conn }: { conn: Conn }) {
-  const warn = conn.state !== 'connected'
+/**
+ * The room breathes with the conversation: a low teal light from below follows the loudest voice (one envelope on
+ * the area; the light is a composited layer whose opacity is --speak, never over video, no blur).
+ */
+function Room({ stale, breathe, children }: { stale: boolean; breathe: boolean; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEnvelope(ref, breathe ? roomLevelNow : null)
   return (
-    <span className={`${s.chip} ${warn ? s.chipWarn : ''}`} role="status">
-      {warn ? <Spinner size={12} /> : <Icon icon={Signal} size={12} />}
-      {conn.state === 'connecting' ? t.state.connecting : conn.state === 'reconnecting' ? t.state.reconnecting : t.state.connected}
-      {!warn && conn.rtt !== null && <span className="tnum">· {Math.round(conn.rtt)} ms</span>}
-    </span>
+    <div ref={ref} className={`${s.area} ${stale ? s.stale : ''}`}>
+      {children}
+    </div>
   )
 }
 
@@ -197,11 +195,7 @@ function PreviewPerson({ userId, spaceId, live }: { userId: string; spaceId: str
 
 function LiveRoom({ channel, people, meId }: { channel: Channel; people: string[]; meId: string | undefined }) {
   const remote = useMedia(useShallow((st) => Object.keys(st.participants)))
-  const streamers = useMedia(useShallow((st) => Object.values(st.participants).filter((p) => p.streaming).map((p) => p.identity)))
-  const selfLive = useMedia((st) => st.screen.active)
   const focus = useVoice((st) => st.focus)
-  const watchingFocus = useMedia((st) => (focus ? !!st.viewers[focus] : false))
-
   // Server order (join time) first; people the SFU already shows but the gateway hasn't told us about yet go last.
   const ids = useMemo(() => {
     const list = [...people]
@@ -209,26 +203,26 @@ function LiveRoom({ channel, people, meId }: { channel: Channel; people: string[
     for (const id of remote) if (!list.includes(id)) list.push(id)
     return list
   }, [people, remote, meId])
-  const streams = useMemo(() => [...(selfLive && meId ? [meId] : []), ...streamers.filter((id) => id !== meId)], [selfLive, streamers, meId])
-  // A stream you are watching gets the big tile on top; everyone else stays a normal grid below it.
-  const featured = useMedia((st) => streams.find((id) => id !== meId && !!st.viewers[id]) ?? null)
+  // Watching takes the stage: the stream you picked (focus), else the first you watch. Nothing is shown (or
+  // downloaded) for a stream until you click Assistir on the person's tile.
+  const watched = useMedia(useShallow((st) => Object.keys(st.viewers).filter((id) => id !== meId && st.participants[id]?.streaming)))
+  const featured = focus && watched.includes(focus) ? focus : (watched[0] ?? null)
 
-  const box = useRef<HTMLDivElement>(null)
-  const inFocus = !!focus && watchingFocus && streams.includes(focus)
-  // Re-measured when the grid comes back from focus mode (its box only exists outside it).
-  const layout = useStageLayout(box, ids.length + streams.length, !!featured, !inFocus)
+  const ref = useRef<HTMLDivElement>(null)
+  const box = useBox(ref, !!featured)
 
-  if (inFocus) {
+  if (featured) {
+    const strip = stripTile(box.h)
     return (
-      <div className={s.focus}>
-        <div className={s.focusMain}>
-          <StreamTile userId={focus} channel={channel} focused />
+      <div ref={ref} className={s.watching} style={{ ['--strip-w' as string]: `${strip.w}px`, ['--strip-h' as string]: `${strip.h}px` }}>
+        <div className={s.featured} style={{ width: featuredWidth(box.w, box.h) || undefined }}>
+          <StreamView key={featured} userId={featured} channel={channel} />
         </div>
-        <div className={s.strip} role="group" aria-label="Pessoas na chamada">
-          {streams
-            .filter((id) => id !== focus)
+        <div className={s.strip} role="group" aria-label={t.stage.people}>
+          {watched
+            .filter((id) => id !== featured)
             .map((id) => (
-              <StreamTile key={`s:${id}`} userId={id} channel={channel} small />
+              <StreamView key={`s:${id}`} userId={id} channel={channel} small />
             ))}
           {ids.map((id) => (
             <PersonTile key={id} userId={id} channel={channel} size={40} />
@@ -238,35 +232,27 @@ function LiveRoom({ channel, people, meId }: { channel: Channel; people: string[
     )
   }
 
+  const layout = stageLayout(ids.length, box.w, box.h)
   const width = layout.width
   const avatar = width >= 420 ? 96 : width >= 300 ? 80 : 56
   // One flex container (tiles never remount, layout animations keep working) with a line break after each
   // balanced row: 7 people read as 3+2+2, never 3+3+1 with a stray tile.
   const tiles: ReactNode[] = []
-  const rest = [...streams.filter((id) => id !== featured).map((id) => ({ key: 's:' + id, id, stream: true })), ...ids.map((id) => ({ key: id, id, stream: false }))]
-  if (featured && layout.featured) {
-    tiles.push(
-      <Appear key={'s:' + featured} width={layout.featured}>
-        <StreamTile userId={featured} channel={channel} />
-      </Appear>,
-      <span key="br:featured" className={s.rowBreak} aria-hidden />,
-    )
-  }
-  const tile = (it: (typeof rest)[number]) => (
-    <Appear key={it.key} width={width}>
-      {it.stream ? <StreamTile userId={it.id} channel={channel} /> : <PersonTile userId={it.id} channel={channel} size={avatar} />}
+  const tile = (id: string) => (
+    <Appear key={id} width={width}>
+      <PersonTile userId={id} channel={channel} size={avatar} />
     </Appear>
   )
   let next = 0
   layout.rows.forEach((count, r) => {
-    tiles.push(...rest.slice(next, next + count).map(tile))
+    tiles.push(...ids.slice(next, next + count).map(tile))
     next += count
     if (r < layout.rows.length - 1) tiles.push(<span key={'br:' + r} className={s.rowBreak} aria-hidden />)
   })
   // Someone who arrived since the last measure (re-measured before paint) is never left out meanwhile.
-  tiles.push(...rest.slice(next).map(tile))
+  tiles.push(...ids.slice(next).map(tile))
   return (
-    <div ref={box} className={s.grid}>
+    <div ref={ref} className={s.grid}>
       <AnimatePresence initial={false}>{tiles}</AnimatePresence>
     </div>
   )
@@ -297,9 +283,10 @@ function PersonTile({ userId, channel, size }: { userId: string; channel: Channe
   const isMe = useData((st) => st.me?.id === userId)
   const remote = useMedia(useShallow((st) => {
     const p = st.participants[userId]
-    return p ? { micMuted: p.micMuted, quality: p.quality, locallyMuted: p.locallyMuted } : null
+    return p ? { micMuted: p.micMuted, quality: p.quality, streaming: p.streaming } : null
   }))
-  const self = useMedia(useShallow((st) => ({ muted: st.self.muted, deafened: st.self.deafened, mic: st.self.micAvailable })))
+  const self = useMedia(useShallow((st) => ({ muted: st.self.muted, deafened: st.self.deafened, mic: st.self.micAvailable, live: st.screen.active })))
+  const watching = useMedia((st) => !!st.viewers[userId])
   const connecting = useMedia((st) => st.connection.state === 'connecting')
   const [menu, setMenu] = useState<HTMLElement | null>(null)
   const others = useMedia((st) => Object.keys(st.participants).length)
@@ -311,6 +298,8 @@ function PersonTile({ userId, channel, size }: { userId: string; channel: Channe
   const serverMute = !!vs?.serverMute
   const deaf = isMe ? self.deafened : !!vs?.selfDeaf
   const muted = isMe ? self.muted || self.deafened || !self.mic : remote ? remote.micMuted : !!vs?.selfMute
+  // Live is a property of the person, not a second tile: one tile per person, always.
+  const live = isMe ? self.live : !!remote?.streaming
   const quality = remote?.quality
   const small = size === 40
   const flag =
@@ -319,32 +308,52 @@ function PersonTile({ userId, channel, size }: { userId: string; channel: Channe
     : deaf ? { icon: HeadphoneOff, label: t.stage.deafened }
     : muted ? { icon: MicOff, label: isMe && !self.mic ? t.stage.noMic : t.stage.muted }
     : null
+  const watch = () => media.watch(userId, 'auto')
+  const selfLive = isMe && live && !small
   return (
     <div
       ref={ref}
       className={s.tile}
       style={small ? undefined : { width: '100%' }}
       data-user-id={userId}
-      onContextMenu={isMe ? undefined : contextMenuHandler(() => personMenu(userId, channel, !!remote?.locallyMuted, serverMute, serverDeaf), name)}
+      onContextMenu={isMe ? undefined : contextMenuHandler(() => personEntries(user, { spaceId: channel.spaceId }), name)}
     >
       <div className={s.tileBody}>
         {/* Cosmetics stay discreet on the stage: the avatar decoration only, never motion (the voice glow leads). */}
-        <DecoratedAvatar user={user} size={size} glow decorative decoration={small ? undefined : look.decoration} />
+        {!(selfLive && size === 56) && (
+          <DecoratedAvatar user={user} size={selfLive ? (size === 96 ? 56 : 40) : size} glow decorative decoration={small ? undefined : look.decoration} />
+        )}
+        {selfLive && <SelfLive compact={size === 56} />}
+        {!isMe && live && !watching && !small && (
+          <Button variant="primary" size="sm" icon={MonitorUp} onClick={watch}>
+            {t.stage.watch}
+          </Button>
+        )}
         {isMe && connecting && <span className={s.waiting}>{t.joining}</span>}
         {isMe && !connecting && others === 0 && channel.type === 'dm' && !small && <span className={s.waiting}>{t.call.waiting(title)}</span>}
       </div>
-      {!small && (
-        <span className={s.label}>
-          {flag && (
-            <Tooltip content={flag.label}>
-              <span className={s.flagDanger} role="img" aria-label={flag.label}>
-                <Icon icon={flag.icon} size={12} />
-              </span>
+      {live && !small && <span className={`${s.liveBadge} ${s.tileLive}`}>{t.stage.live}</span>}
+      {/* The strip keeps names too (smaller): a face alone is not enough to know who is who. Live rides in the label. */}
+      <span className={s.label}>
+        {live && small &&
+          (!isMe && !watching ? (
+            <Tooltip content={`${t.stage.watch}: ${t.stage.streamOf(name)}`}>
+              <button type="button" className={s.liveBadge} aria-label={`${t.stage.watch}: ${t.stage.streamOf(name)}`} onClick={watch}>
+                {t.stage.live}
+              </button>
             </Tooltip>
-          )}
-          <span>{isMe ? `${name} (${t.stage.you.toLowerCase()})` : name}</span>
-        </span>
-      )}
+          ) : (
+            <span className={s.liveBadge}>{t.stage.live}</span>
+          ))}
+        {flag && (
+          <Tooltip content={flag.label}>
+            <span className={s.flagDanger} role="img" aria-label={flag.label}>
+              <Icon icon={flag.icon} size={12} />
+            </span>
+          </Tooltip>
+        )}
+        <span>{isMe ? `${name} (${t.stage.you.toLowerCase()})` : name}</span>
+      </span>
       {!small && (
         <span className={s.corner}>
           {(quality === 'poor' || quality === 'lost') && (
@@ -366,30 +375,55 @@ function PersonTile({ userId, channel, size }: { userId: string; channel: Channe
   )
 }
 
-/** Right-click on someone's tile: "for you" (local mute) and, with the permission, moderation for everyone. */
-function personMenu(userId: string, channel: Channel, locallyMuted: boolean, serverMute: boolean, serverDeaf: boolean): MenuEntry[] {
-  const items: MenuEntry[] = [
-    { kind: 'group', label: t.mod.you },
-    { label: locallyMuted ? t.stage.unmuteFor : t.stage.muteFor, icon: VolumeX, checked: locallyMuted, onSelect: () => media.setLocalMute(userId, !locallyMuted) },
-  ]
-  const spaceId = channel.spaceId
-  if (!spaceId) return items
-  const st = useData.getState()
-  const perms = spacePermissions(st, spaceId)
-  const run = (body: Parameters<typeof moderateVoice>[2]) => () =>
-    void moderateVoice(spaceId, userId, body).catch((e: unknown) => toast.error(errorText(e, t.mod.failed)))
-  const mod: MenuEntry[] = []
-  if (can(perms, Permission.MUTE_MEMBERS)) mod.push({ label: serverMute ? t.mod.unmute : t.mod.mute, icon: serverMute ? Mic : MicOff, onSelect: run({ serverMute: !serverMute }) })
-  if (can(perms, Permission.DEAFEN_MEMBERS)) mod.push({ label: serverDeaf ? t.mod.undeafen : t.mod.deafen, icon: serverDeaf ? Headphones : HeadphoneOff, onSelect: run({ serverDeaf: !serverDeaf }) })
-  if (can(perms, Permission.MOVE_MEMBERS)) {
-    const others = spaceChannels(st, spaceId).voice.filter((c) => c.id !== channel.id)
-    if (others.length) {
-      mod.push({ kind: 'group', label: t.mod.moveTo })
-      for (const c of others) mod.push({ label: c.name, icon: ArrowRightLeft, onSelect: run({ channelId: c.id }) })
-    }
-    mod.push({ label: t.mod.disconnect, icon: PhoneOff, danger: true, onSelect: run({ channelId: null }) })
-  }
-  return mod.length ? [...items, { kind: 'group', label: t.mod.group }, ...mod] : items
+const STREAM_NOTICE_MS = 8000
+
+/**
+ * Your own stream lives on your tile (one tile per person): the best layer actually sent, the plan's re-cap line
+ * for a few seconds, and quiet controls. Red stays on Desconectar.
+ */
+function SelfLive({ compact }: { compact?: boolean }) {
+  // The best layer actually being sent (the SFU pauses top layers nobody watches big).
+  const sc = useMedia(
+    useShallow((st) => ({
+      preset: st.screen.preset,
+      hw: st.screen.hardwareEncoder,
+      layer: st.screen.stats?.layers.filter((l) => l.fps > 0).sort((a, b) => b.width - a.width)[0] ?? null,
+    })),
+  )
+  const notice = useVoice((st) => st.streamNotice)
+  const [, tick] = useState(0)
+  const left = notice ? STREAM_NOTICE_MS - (Date.now() - notice.at) : 0
+  useEffect(() => {
+    if (left <= 0) return
+    const id = setTimeout(() => tick((n) => n + 1), left)
+    return () => clearTimeout(id)
+  }, [left > 0, notice])
+  return (
+    <div className={s.selfLive}>
+      <span className={s.selfLiveTitle}>{t.stage.youAreLive}</span>
+      {!compact && (
+        <span className={`${s.selfLiveBody} tnum`}>
+          {sc.layer ? `${sc.layer.width}×${sc.layer.height} · ${Math.round(sc.layer.fps)} fps · ${t.stats.kbps(sc.layer.bitrateKbps)}` : sc.preset}
+          {sc.hw !== null && ` · ${sc.hw ? t.stage.hw : t.stage.sw}`}
+        </span>
+      )}
+      {left > 0 && notice && (
+        <span className={s.selfLiveNotice} role="status">
+          {notice.text}
+        </span>
+      )}
+      <div className={s.selfLiveActions}>
+        {!compact && (
+          <Button size="sm" icon={ArrowLeftRight} onClick={() => useVoice.setState({ picker: true })}>
+            {t.picker.switch}
+          </Button>
+        )}
+        <Button size="sm" icon={Square} onClick={() => void media.stopScreenShare()}>
+          {t.dock.stopShare}
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 function PersonVolume({ userId, name }: { userId: string; name: string }) {
@@ -413,43 +447,8 @@ function PersonVolume({ userId, name }: { userId: string; name: string }) {
 
 // ── Streams ───────────────────────────────────────────────────
 
-function StreamTile({ userId, channel, focused, small }: { userId: string; channel: Channel; focused?: boolean; small?: boolean }) {
-  const isMe = useData((st) => st.me?.id === userId)
-  const user = useData((st) => st.users[userId])
+function StreamView({ userId, channel, small }: { userId: string; channel: Channel; small?: boolean }) {
   const name = useData((st) => displayName(st, userId, channel.spaceId))
-  const watching = useMedia((st) => !!st.viewers[userId])
-  if (!user) return null
-  if (isMe) return <SelfStream small={small} />
-  if (!watching)
-    return (
-      <div className={s.stream} style={small ? undefined : { width: '100%' }}>
-        {!small ? (
-          <div className={s.streamCard}>
-            <Avatar user={user} size={40} decorative />
-            <span className={s.liveBadge}>{t.stage.live}</span>
-            <span className={s.streamTitle}>{t.stage.streamOf(name)}</span>
-            <Button variant="primary" size="sm" icon={MonitorUp} onClick={() => media.watch(userId, 'auto')}>
-              {t.stage.watch}
-            </Button>
-          </div>
-        ) : (
-          <Tooltip content={`${t.stage.watch}: ${t.stage.streamOf(name)}`}>
-            <button type="button" className={s.streamCard} aria-label={`${t.stage.watch}: ${t.stage.streamOf(name)}`} onClick={() => media.watch(userId, 'auto')}>
-              <span className={s.liveBadge}>{t.stage.live}</span>
-            </button>
-          </Tooltip>
-        )}
-        {!small && (
-          <span className={s.label}>
-            <span>{name}</span>
-          </span>
-        )}
-      </div>
-    )
-  return <StreamView userId={userId} name={name} focused={focused} small={small} />
-}
-
-function StreamView({ userId, name, focused, small }: { userId: string; name: string; focused?: boolean; small?: boolean }) {
   const box = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLVideoElement>(null)
   const [playing, setPlaying] = useState(false)
@@ -488,17 +487,22 @@ function StreamView({ userId, name, focused, small }: { userId: string; name: st
     if (document.pictureInPictureElement === el) void document.exitPictureInPicture()
     else void el.requestPictureInPicture().catch(() => undefined)
   }
-  const setFocus = (on: boolean) => useVoice.setState({ focus: on ? userId : null })
+  const stop = () => {
+    if (useVoice.getState().focus === userId) useVoice.setState({ focus: null })
+    media.unwatch(userId)
+  }
+  const show = () => useVoice.setState({ focus: userId })
 
   return (
     <div
       ref={box}
       className={s.stream}
-      style={small || focused ? undefined : { width: '100%' }}
       onDoubleClick={small ? undefined : toggleFull}
-      onClick={small ? () => setFocus(true) : undefined}
-      aria-label={t.stage.streamOf(name)}
-      role="group"
+      onClick={small ? show : undefined}
+      onKeyDown={small ? (e) => (e.key === 'Enter' || e.key === ' ') && show() : undefined}
+      aria-label={small ? `${t.stage.show}: ${t.stage.streamOf(name)}` : t.stage.streamOf(name)}
+      role={small ? 'button' : 'group'}
+      tabIndex={small ? 0 : undefined}
     >
       <video ref={video} autoPlay playsInline muted disablePictureInPicture={false} />
       {!playing && (
@@ -529,22 +533,9 @@ function StreamView({ userId, name, focused, small }: { userId: string; name: st
           />
           <span className={s.barSep} />
           <IconButton icon={BarChart3} label={t.stage.stats} shortcut={t.stage.statsShortcut} size="sm" aria-pressed={stats} onClick={() => useVoice.setState({ stats: !stats })} />
-          {focused ? (
-            <IconButton icon={Minimize2} label={t.stage.unfocus} size="sm" onClick={() => setFocus(false)} />
-          ) : (
-            <IconButton icon={Maximize2} label={t.stage.focus} size="sm" onClick={() => setFocus(true)} />
-          )}
           {'pictureInPictureEnabled' in document && document.pictureInPictureEnabled && <IconButton icon={PictureInPicture2} label={t.stage.pip} size="sm" onClick={pip} />}
           <IconButton icon={full ? Minimize : Scan} label={full ? t.stage.exitFullscreen : t.stage.fullscreen} size="sm" onClick={toggleFull} />
-          <IconButton
-            icon={X}
-            label={t.stage.stopWatching}
-            size="sm"
-            onClick={() => {
-              if (focused) setFocus(false)
-              media.unwatch(userId)
-            }}
-          />
+          <IconButton icon={X} label={t.stage.stopWatching} size="sm" onClick={stop} />
         </div>
       )}
       {!small && (
@@ -577,45 +568,9 @@ function StreamStats({ userId }: { userId: string }) {
         {st.decoderImplementation ?? '—'} {st.powerEfficientDecoder === null ? '' : st.powerEfficientDecoder ? `(${t.stage.hw})` : `(${t.stage.sw})`}
       </dd>
       <dt>{t.stats.loss}</dt>
-      <dd>{st.packetLossPct.toFixed(1)}%</dd>
+      <dd>{t.stats.pct(st.packetLossPct)}</dd>
       <dt>{t.stats.freezes}</dt>
       <dd>{st.freezeCount}</dd>
     </dl>
-  )
-}
-
-function SelfStream({ small }: { small?: boolean }) {
-  // The best layer actually being sent (the SFU pauses top layers nobody watches big).
-  const sc = useMedia(
-    useShallow((st) => ({
-      preset: st.screen.preset,
-      hw: st.screen.hardwareEncoder,
-      layer: st.screen.stats?.layers.filter((l) => l.fps > 0).sort((a, b) => b.width - a.width)[0] ?? null,
-    })),
-  )
-  return (
-    <div className={s.stream} style={small ? undefined : { width: '100%' }}>
-      <div className={s.streamCard}>
-        <span className={s.liveBadge}>{t.stage.live}</span>
-        {!small && (
-          <>
-            <span className={s.streamTitle}>{t.stage.youAreLive}</span>
-            <span className={s.streamBody}>
-              {sc.layer ? `${sc.layer.width}×${sc.layer.height} · ${Math.round(sc.layer.fps)} fps · ${t.stats.kbps(sc.layer.bitrateKbps)}` : sc.preset}
-              {sc.hw !== null && ` · ${sc.hw ? t.stage.hw : t.stage.sw}`}
-            </span>
-            <span className={s.streamBody}>{t.stage.yourStreamBody}</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button size="sm" aria-label={t.dock.switchSource} onClick={() => useVoice.setState({ picker: true })}>
-                {t.picker.switch}
-              </Button>
-              <Button size="sm" variant="danger" onClick={() => void media.stopScreenShare()}>
-                {t.dock.stopShare}
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
   )
 }

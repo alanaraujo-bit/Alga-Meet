@@ -8,6 +8,7 @@ import { can, channelTitle, dmPeers, presenceOf, spacePermissions } from '@/stor
 import { useUi } from '@/store/ui'
 import { Avatar, Fronds, Icon, IconButton, PRESENCE_LABEL } from '@/ui'
 import { CallStage } from '../voice/CallStage'
+import { VoiceHere } from '../voice/LiveNow'
 import { t as tv } from '../voice/strings'
 import { joinVoice } from '../voice/voice'
 import { Composer } from './Composer'
@@ -105,6 +106,7 @@ export function ChatView({ channelId, aside }: { channelId: string; aside?: Reac
             </>
           ) : null}
           <div className={sh.headerActions}>
+            {channel.spaceId && <VoiceHere spaceId={channel.spaceId} />}
             {isDm && inCall && (
               <span className={s.callChip}>
                 <Fronds size={12} breathing />

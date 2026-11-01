@@ -33,16 +33,18 @@
   );
 }
 
-/* Speaking: a glow that follows the voice envelope (--speak 0..1), not an on/off ring. */
+/* Speaking: light under water, not an on/off ring. A thin accent edge plus a soft halo whose spread and alpha follow
+   the envelope (--speak 0..1). --halo-k scales the spread down where avatars sit close together (rows, strip). */
 .glow {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  opacity: min(1, calc(var(--speak, 0) * 2.5));
+  opacity: min(1, calc(var(--speak, 0) * 3));
   box-shadow:
-    0 0 0 2px var(--accent),
-    0 0 calc(4px + 14px * var(--speak, 0)) var(--accent-glow);
+    0 0 0 calc(1.5px + 0.5px * var(--speak, 0)) rgba(77, 220, 220, 0.85),
+    0 0 0 calc((2px + 6px * var(--speak, 0)) * var(--halo-k, 1)) rgba(77, 220, 220, calc(0.35 * var(--speak, 0))),
+    0 0 calc((6px + 14px * var(--speak, 0)) * var(--halo-k, 1)) var(--accent-glow);
 }
 
 .presence {

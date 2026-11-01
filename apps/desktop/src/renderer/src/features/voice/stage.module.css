@@ -27,6 +27,28 @@
   /* bottom padding keeps tiles clear of the floating controls dock */
   padding: var(--s-4) var(--s-4) calc(var(--h-call) + 12px + var(--s-4) * 2);
   overflow: hidden;
+  isolation: isolate;
+}
+/* The room breathes with the conversation: a low teal light from below whose opacity is the loudest voice
+   (--speak on the area). Its own composited layer: an opacity change, never a repaint; never over video. */
+.area::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(1200px 600px at 50% 110%, rgba(33, 201, 202, 0.1), transparent 60%);
+  opacity: var(--speak, 0);
+  will-change: opacity;
+  pointer-events: none;
+}
+/* Reduced motion steps the envelope 0/1: a room that flashes is worse than a still one. */
+:global(html.reduce-motion) .area::before {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .area::before {
+    display: none;
+  }
 }
 .idle .area {
   padding-bottom: var(--s-4);
@@ -58,21 +80,67 @@
 .dm .tile {
   background: var(--bg-content);
 }
-/* Speaking: continuous 2px accent outline whose opacity is the envelope (not an on/off ring). */
+/* Speaking reads as light under water, not a ring switched on: a soft inner light that follows the envelope and a
+   2px edge that never goes past 70 %. Both are opacity on their own layers (no repaint per frame). */
+.tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(60% 80% at 50% 45%, rgba(77, 220, 220, 0.12), transparent 70%);
+  opacity: var(--speak);
+  pointer-events: none;
+}
 .tile::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
   box-shadow: inset 0 0 0 2px var(--accent);
-  opacity: min(1, calc(var(--speak) * 2.5));
+  opacity: min(0.7, calc(var(--speak) * 2));
   pointer-events: none;
   z-index: 3;
 }
 .tileBody {
+  position: relative;
   display: grid;
   place-items: center;
   gap: var(--s-2);
+}
+/* Live is a badge on the person's tile (top-left), never a second tile. */
+.tileLive {
+  position: absolute;
+  top: var(--s-2);
+  left: var(--s-2);
+  z-index: 2;
+}
+/* Your own stream, on your tile: what is really sent, then quiet controls. */
+.selfLive {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-1);
+  max-width: calc(100% - var(--s-6));
+  text-align: center;
+}
+.selfLiveTitle {
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-semibold);
+}
+.selfLiveBody {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.selfLiveNotice {
+  color: var(--warning);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+  text-wrap: balance;
+}
+.selfLiveActions {
+  display: flex;
+  gap: var(--s-1_5);
+  margin-top: var(--s-1);
 }
 .label {
   position: absolute;
@@ -277,40 +345,67 @@
   color: var(--text-primary);
 }
 
-/* ── Focus mode ───────────────────────────── */
-.focus {
+/* ── Watching: the stream takes the stage, people in a strip below ── */
+.watching {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: var(--s-2);
   width: 100%;
   height: 100%;
   min-height: 0;
 }
-.focusMain {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  place-items: center;
+.featured {
+  flex-shrink: 0;
+  max-width: 100%;
 }
-.focusMain .stream {
+.featured .stream {
   width: 100%;
-  height: 100%;
-  aspect-ratio: auto;
-  border-radius: var(--r-lg);
 }
 .strip {
   display: flex;
   justify-content: center;
   gap: var(--s-2);
   flex-shrink: 0;
-  height: 90px;
+  max-width: 100%;
+  height: var(--strip-h, 90px);
   overflow-x: auto;
+  scrollbar-width: none;
+  /* Small avatars: a smaller halo (Avatar .glow). */
+  --halo-k: 0.5;
 }
 .strip .tile,
 .strip .stream {
-  height: 90px;
-  width: 160px;
+  height: var(--strip-h, 90px);
+  width: var(--strip-w, 160px);
+}
+.strip .stream {
+  cursor: pointer;
+}
+.strip .label {
+  left: 4px;
+  bottom: 4px;
+  max-width: calc(100% - 8px);
+  height: 18px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+.strip .label .liveBadge {
+  height: 14px;
+  padding: 0 4px;
+  font-size: 10px;
+}
+.strip button.liveBadge:hover {
+  background: var(--accent-fill-hover);
+}
+/* Room for the name under the face on 68–90 px tiles. */
+.strip .tileBody {
+  margin-top: -18px;
+}
+/* DM call: a hairline where the stage ends and the conversation scrolls under it. */
+.dm {
+  box-shadow: inset 0 -1px 0 var(--border-subtle);
 }
 
 /* Fullscreen: the element itself goes fullscreen; keep the video black-framed. */
@@ -319,23 +414,34 @@
   background: #000;
 }
 
-/* ── Header status chip ───────────────────── */
-.chip {
+/* ── Reconnecting: a 32px chip at the top of the stage; the tiles below are already greyed ── */
+.reconnect {
+  position: absolute;
+  top: var(--s-4);
+  left: 50%;
+  z-index: 5;
   display: inline-flex;
   align-items: center;
-  gap: var(--s-1_5);
-  height: 24px;
-  padding: 0 var(--s-2);
+  gap: var(--s-2);
+  height: 32px;
+  max-width: calc(100% - var(--s-8));
+  padding: 0 var(--s-3);
   border-radius: var(--r-full);
-  background: var(--accent-tint);
-  color: var(--accent);
+  background: var(--bg-overlay);
+  box-shadow: var(--elev-overlay);
+  color: var(--text-tertiary);
   font: var(--type-meta);
-  font-weight: var(--w-medium);
   white-space: nowrap;
+  transform: translateX(-50%);
 }
-.chipWarn {
-  background: var(--warning-tint);
+.reconnect strong {
+  flex-shrink: 0;
   color: var(--warning);
+  font-weight: var(--w-semibold);
+}
+.reconnect span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .count {
   color: var(--text-tertiary);

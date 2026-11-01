@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { balancedRows, fitGrid, nearestCorner, stageLayout } from './layout'
+import { balancedRows, featuredWidth, fitGrid, nearestCorner, stageLayout, stripTile } from './layout'
 
 describe('call grid', () => {
   it('balances rows so no tile is left alone on the last one', () => {
@@ -19,35 +19,28 @@ describe('call grid', () => {
     expect(g.cols * 200 + (g.cols - 1) * 8).toBeLessThanOrEqual(600)
   })
 
-  it('a watched stream gets a big tile on top and the rest keeps a normal grid', () => {
-    const l = stageLayout(4, 1200, 700, true)
-    expect(l.featured).toBeGreaterThan(700) // ~64 % of the height, 16:9
-    expect((l.featured! * 9) / 16).toBeLessThanOrEqual(700 * 0.64 + 1)
-    expect(l.rows.reduce((a, b) => a + b, 0)).toBe(3)
-    expect(l.width).toBeGreaterThanOrEqual(200)
-    // The people below still fit under the stream.
-    const rows = l.rows.length
-    expect((l.featured! * 9) / 16 + 8 + rows * ((l.width * 9) / 16) + (rows - 1) * 8).toBeLessThanOrEqual(700 + 1)
-  })
-
-  it('stream + grid always fit the stage height (the grid keeps its minimum tile)', () => {
-    for (const n of [2, 3, 4, 5, 6, 7, 8]) {
-      for (const [w, h] of [[960, 652], [1200, 700], [700, 500], [1600, 900]] as const) {
-        const l = stageLayout(n, w, h, true)
-        const rows = l.rows.length
-        expect((l.featured! * 9) / 16 + 8 + rows * ((l.width * 9) / 16) + (rows - 1) * 8).toBeLessThanOrEqual(h + 1)
-      }
+  it('a watched stream takes the stage at any headcount, above one strip of people', () => {
+    // 2 people in the 976×652 box of a 1320×840 window: the stream is no longer a tile like the others.
+    const w = featuredWidth(976, 652)
+    expect(w).toBe(976)
+    expect((w * 9) / 16 + 8 + 90).toBeLessThanOrEqual(652)
+    // A short or narrow stage: still the largest 16:9 that leaves room for the strip.
+    for (const [bw, bh] of [[600, 412], [1600, 900], [700, 300]] as const) {
+      const f = featuredWidth(bw, bh)
+      expect(f).toBeLessThanOrEqual(bw)
+      expect((f * 9) / 16 + 8 + stripTile(bh).h).toBeLessThanOrEqual(bh + 1)
     }
   })
 
-  it('no featured tile when the stream is alone or nothing is watched', () => {
-    expect(stageLayout(1, 1200, 700, true).featured).toBeNull()
-    expect(stageLayout(4, 1200, 700, false).featured).toBeNull()
+  it('the strip shrinks on short stages', () => {
+    expect(stripTile(652)).toEqual({ w: 160, h: 90 })
+    expect(stripTile(412)).toEqual({ w: 120, h: 68 })
   })
 
-  it('a short stage keeps room for one row of people under the stream', () => {
-    const l = stageLayout(3, 1200, 300, true)
-    expect((l.featured! * 9) / 16).toBeLessThanOrEqual(300 - (200 * 9) / 16 - 8 + 1)
+  it('the grid fits everyone in balanced rows', () => {
+    const l = stageLayout(7, 1008, 652)
+    expect(l.rows).toEqual([3, 2, 2])
+    expect(l.width).toBeGreaterThanOrEqual(200)
   })
 })
 

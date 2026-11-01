@@ -1,9 +1,9 @@
 import { useMemo, useRef } from 'react'
 import { useMedia } from '@/media'
 import { useData } from '@/store/data'
-import { channelTitle, liveRooms, type LiveRoom } from '@/store/selectors'
-import { Avatar, Fronds, Tooltip, useSpeakingGlow } from '@/ui'
-import { useLevelGetter } from './levels'
+import { channelTitle, liveRooms, voiceMembers, type LiveRoom } from '@/store/selectors'
+import { Avatar, Button, Fronds, Tooltip, useSpeakingGlow } from '@/ui'
+import { roomLevelNow, useLevelGetter } from './levels'
 import { t } from './strings'
 import { joinVoice, openCall } from './voice'
 import s from './chrome.module.css'
@@ -46,6 +46,39 @@ function LiveRow({ room }: { room: LiveRoom }) {
         {room.streaming && <span className={s.liveTag}>{t.live.streaming}</span>}
       </button>
     </Tooltip>
+  )
+}
+
+/**
+ * Voice inside the chat: a text channel's header says where this space is talking right now ("3 em Sala de foco",
+ * faces, fronds) with one click to join. The room you are in wins, then the busiest one.
+ */
+export function VoiceHere({ spaceId }: { spaceId: string }) {
+  const voiceStates = useData((st) => st.voiceStates)
+  const myRoom = useMedia((st) => (st.connection.state === 'idle' ? null : st.connection.channelId))
+  const room = useMemo(() => {
+    const by = new Map<string, number>()
+    for (const v of Object.values(voiceStates)) if (v.spaceId === spaceId) by.set(v.channelId, (by.get(v.channelId) ?? 0) + 1)
+    if (myRoom && by.has(myRoom)) return myRoom
+    return [...by].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+  }, [voiceStates, spaceId, myRoom])
+  const channel = useData((st) => (room ? st.channels[room] : undefined))
+  const ids = useMemo(() => (room ? voiceMembers({ voiceStates }, room).map((v) => v.userId) : []), [voiceStates, room])
+  if (!channel || !ids.length) return null
+  const here = myRoom === channel.id
+  return (
+    <span className={s.here}>
+      <AvatarStack ids={ids} channelId={channel.id} />
+      <span className={s.hereText}>
+        <span className={s.accent}>
+          <Fronds size={12} breathing={!here} getLevel={here ? roomLevelNow : undefined} />
+        </span>
+        <span className="tnum">{t.here.count(ids.length, channel.name)}</span>
+      </span>
+      <Button size="sm" variant="ghost" onClick={() => (here ? openCall(channel.id) : void joinVoice(channel.id))}>
+        {here ? t.here.open : t.joinShort}
+      </Button>
+    </span>
   )
 }
 

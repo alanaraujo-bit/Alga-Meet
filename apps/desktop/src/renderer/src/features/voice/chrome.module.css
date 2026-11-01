@@ -30,11 +30,36 @@
 .warn {
   color: var(--warning);
 }
-.ping {
+/* A state never truncates: the label keeps its width, the sub line takes the ellipsis. */
+.panelLabel {
   flex-shrink: 0;
+  white-space: nowrap;
+}
+/* Link quality: 3 bars of 12 px, lit by quality; the numbers live in the tooltip. */
+.bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
   margin-left: auto;
-  color: var(--text-tertiary);
-  font: var(--type-meta);
+  padding-left: var(--s-2);
+  flex-shrink: 0;
+}
+.bars i {
+  width: 3px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.16);
+}
+.bars i:nth-child(1) { height: 5px; }
+.bars i:nth-child(2) { height: 8px; }
+.bars i:nth-child(3) { height: 12px; }
+.bars[data-bars='3'] i,
+.bars[data-bars='2'] i:nth-child(-n + 2),
+.bars[data-bars='1'] i:nth-child(1) {
+  background: var(--text-secondary);
+}
+.bars[data-bars='1'] i:nth-child(1) {
+  background: var(--warning);
 }
 .panelSub {
   overflow: hidden;
@@ -43,41 +68,6 @@
   color: var(--text-tertiary);
   font: var(--type-meta);
 }
-.liveRow {
-  display: flex;
-  align-items: center;
-  gap: var(--s-1_5);
-  height: 28px;
-  margin: var(--s-1) 0 0;
-  padding: 0 var(--s-1) 0 var(--s-2);
-  border-radius: var(--r-md);
-  background: var(--accent-tint);
-  color: var(--accent);
-  font: var(--type-meta);
-  font-weight: var(--w-medium);
-}
-.liveDot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--r-full);
-  background: currentColor;
-  animation: breathe 1.6s var(--ease-in-out-cubic) infinite;
-}
-.liveText {
-  flex: 1;
-}
-.liveStop {
-  height: 22px;
-  padding: 0 var(--s-2);
-  border-radius: var(--r-sm);
-  color: var(--text-secondary);
-  font: inherit;
-}
-.liveStop:hover {
-  background: var(--state-selected);
-  color: var(--text-primary);
-}
-
 /* ── Agora (live now) ───────────────────────── */
 .live {
   display: grid;
@@ -101,6 +91,7 @@
   text-wrap: pretty;
 }
 .liveRow2 {
+  --halo-k: 0.35;
   display: flex;
   align-items: center;
   gap: var(--s-2);
@@ -165,21 +156,56 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Voice inside the chat header ───────────── */
+.here {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  margin-right: var(--s-1);
+  --halo-k: 0.35;
+}
+.here .stackItem {
+  box-shadow: 0 0 0 2px var(--bg-content);
+}
+.hereText {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1_5);
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+  white-space: nowrap;
+}
+.accent {
+  display: grid;
+  color: var(--accent);
+}
+
 /* ── Incoming call ──────────────────────────── */
+/* Incoming call: its own layer in the top-right corner, under the view header, so it never covers a title. */
 .ring {
   position: fixed;
-  top: calc(var(--titlebar-h) + var(--s-3));
-  left: 50%;
-  z-index: var(--z-toast);
+  top: calc(var(--titlebar-h) + var(--header-h) + var(--s-3));
+  right: var(--s-4);
+  z-index: var(--z-call-overlay);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--s-3);
-  width: min(460px, calc(100vw - 32px));
-  margin-left: max(-230px, calc(-50vw + 16px));
-  padding: var(--s-3) var(--s-3) var(--s-3) var(--s-4);
+  width: min(360px, calc(100vw - 32px));
+  padding: var(--s-4);
   border-radius: var(--r-xl);
-  background: var(--bg-modal);
-  box-shadow: var(--elev-modal);
+  background: var(--bg-overlay);
+  box-shadow: var(--elev-overlay);
+}
+.ringActions {
+  display: flex;
+  gap: var(--s-2);
+  width: 100%;
+}
+.ringActions > * {
+  flex: 1;
 }
 .ringAvatar {
   position: relative;
