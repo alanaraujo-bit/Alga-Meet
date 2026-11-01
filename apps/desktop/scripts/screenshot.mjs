@@ -1,12 +1,17 @@
 // Visual validation loop: build → seed real data through the REST API → drive the REAL Electron app → PNGs.
-//   node scripts/screenshot.mjs [--skip-build] [--only=auth,home,chat,spaces,connection,sizes]
+//   node scripts/screenshot.mjs [--skip-build] [--only=auth,home,chat,spaces,connection,sizes,settings,voice]
+// Voice runs two real app instances (profiles shots + shots-b) through the local LiveKit with Chromium fake
+// devices: a generated speech WAV is B's microphone (so the speaking glow moves for real) and A's screen share
+// is Chromium's fake desktop source (real WebRTC encode → SFU → decode, synthetic picture). Needs LiveKit on
+// :7880; pass LIVEKIT_PID (a LiveKit *you* started) to also capture the reconnecting state.
 // Output: docs/screenshots/<YYYY-MM-DD>-<screen>-v<n>.png (earlier versions are kept).
 // Test users (generated credentials) live in scripts/.shots-users.json (git-ignored).
-import { execSync } from 'node:child_process'
+import { execSync, spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { createServer, connect } from 'node:net'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
@@ -140,7 +145,8 @@ async function seed(saved) {
   const geral = s1.channels.find((c) => c.type === 'text')
   const design = await api(T('ana'), 'POST', `/spaces/${s1.id}/channels`, { type: 'text', name: 'design', topic: 'Telas, tokens e motion' })
   await api(T('ana'), 'POST', `/spaces/${s1.id}/channels`, { type: 'text', name: 'off-topic' })
-  await api(T('ana'), 'POST', `/spaces/${s1.id}/channels`, { type: 'voice', name: 'Sala de foco' })
+  const focus = await api(T('ana'), 'POST', `/spaces/${s1.id}/channels`, { type: 'voice', name: 'Sala de foco', topic: 'Pareamento e revisão ao vivo' })
+  const jogo = await api(T('ana'), 'POST', `/spaces/${s1.id}/channels`, { type: 'voice', name: 'Sala de jogo' })
   await api(T('ana'), 'PATCH', `/channels/${geral.id}`, { topic: 'Conversa geral do estúdio. Sem pressa, sem ruído.' })
   const inv = await api(T('ana'), 'POST', `/spaces/${s1.id}/invites`, { maxAgeSeconds: 0, maxUses: 0 })
   for (const k of ['bruno', 'carla', 'diego']) await api(T(k), 'POST', `/invites/${inv.code}`)
@@ -190,7 +196,7 @@ async function seed(saved) {
   await dm('carla', dmC, 'Te mandei o arquivo dos ícones novos 💌')
 
   writeFileSync(usersFile, JSON.stringify(saved, null, 2))
-  return { s1, s2, geral, design, dmB, dmC }
+  return { s1, s2, geral, design, dmB, dmC, focus, jogo }
 }
 
 /** Keep other test users online over the gateway (presence), with heartbeats. */
@@ -215,15 +221,15 @@ function connectPresence(token, status) {
 const require = createRequire(join(appDir, 'package.json'))
 const electronPath = require('electron')
 
-async function launch({ width = 1320, height = 840, scale, keepProfile, apiUrl } = {}) {
+async function launch({ width = 1320, height = 840, scale, keepProfile, apiUrl, profile = PROFILE, extra = [] } = {}) {
   // Fresh profile by default: no stored token, no persisted window bounds.
-  const profileDir = join(process.env.APPDATA ?? '', 'Alga Meet', 'profiles', PROFILE)
+  const profileDir = join(process.env.APPDATA ?? '', 'Alga Meet', 'profiles', profile)
   if (!keepProfile) rmSync(profileDir, { recursive: true, force: true })
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'ELECTRON_RENDERER_URL'))
   if (apiUrl) env.ALGA_API_URL = apiUrl
   const app = await electron.launch({
     executablePath: electronPath,
-    args: [appDir, `--profile=${PROFILE}`, ...(scale ? [`--force-device-scale-factor=${scale}`] : [])],
+    args: [appDir, `--profile=${profile}`, ...(scale ? [`--force-device-scale-factor=${scale}`] : []), ...extra],
     cwd: appDir,
     env,
   })
@@ -290,7 +296,7 @@ async function authShots(serverUp) {
   await page.getByLabel('Nome de usuário').fill(username)
   await page.getByLabel('Senha', { exact: true }).fill(randomBytes(12).toString('base64url'))
   await page.getByRole('button', { name: 'Criar conta' }).click()
-  await page.getByText('Boas-vindas, Marina Souza').waitFor({ timeout: 20_000 })
+  await page.getByText('Boas-vindas, Marina').waitFor({ timeout: 20_000 })
   await shot(page, 'onboarding')
   await page.getByRole('button', { name: /Criar um espaço/ }).click()
   await page.getByRole('dialog').waitFor()
@@ -311,6 +317,8 @@ async function mainShots(saved) {
       if (want('spaces')) await spaceShots(page, saved)
       await close(app)
     }
+    if (want('settings')) await settingsShots(saved, ids)
+    if (want('voice')) await voiceShots(saved, ids)
     if (want('connection')) await connectionShots(saved, ids)
     if (want('sizes')) await sizeShots(saved)
   } finally {
@@ -335,7 +343,7 @@ async function homeShots(page) {
   await page.getByRole('menu').waitFor()
   await shot(page, 'friends-context-menu')
   await page.keyboard.press('Escape')
-  await page.getByRole('tab', { name: 'Adicionar amigo' }).click()
+  await page.getByRole('button', { name: 'Adicionar amigo' }).click()
   await page.getByPlaceholder('nome_de_usuario').fill('alguem.que.nao.existe')
   await page.getByRole('button', { name: 'Enviar pedido' }).click()
   await page.getByRole('alert').waitFor()
@@ -389,6 +397,21 @@ async function chatShots(page, saved, ids) {
   await page.getByText(/nova mensagem/).click()
   await sleep(500)
 
+  // @mention autocomplete and the emoji picker (both in the composer).
+  const box = page.getByRole('textbox', { name: /Mensagem para/ })
+  await box.click()
+  await page.keyboard.type('Valeu @ca')
+  await page.getByRole('listbox', { name: 'Mencionar' }).waitFor()
+  await shot(page, 'chat-mention-autocomplete')
+  await page.keyboard.press('Escape')
+  await box.fill('')
+  await page.getByRole('button', { name: 'Emoji', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Emojis' }).waitFor()
+  await page.keyboard.type('cora')
+  await sleep(150)
+  await shot(page, 'chat-emoji-picker')
+  await page.keyboard.press('Escape')
+
   // Quick switcher
   await page.keyboard.press('Control+K')
   await page.getByRole('combobox').waitFor()
@@ -429,8 +452,282 @@ async function spaceShots(page, saved) {
   await shot(page, 'space-join-preview')
   await page.keyboard.press('Escape')
   await page.getByRole('dialog').waitFor({ state: 'detached' })
-  await page.getByRole('button', { name: 'Sala de foco' }).click()
-  await shot(page, 'voice-stage')
+  // Voice screens come from voiceShots (two instances with fake devices): clicking a voice channel here would
+  // join it with this machine's real microphone.
+}
+
+async function settingsShots(saved) {
+  console.log('settings…')
+  const { app, page } = await launch()
+  await login(page, saved.users.ana)
+  await page.getByRole('button', { name: 'Configurações' }).click()
+  const dlg = page.getByRole('dialog', { name: 'Configurações' })
+  await dlg.waitFor()
+  await sleep(600)
+  await shot(page, 'settings-account')
+  for (const [name, key] of [
+    ['Atalhos', 'hotkeys'],
+    ['Notificações', 'notifications'],
+    ['Aparência', 'appearance'],
+    ['Inicialização', 'startup'],
+    ['Avançado', 'advanced'],
+  ]) {
+    await dlg.getByRole('navigation').getByRole('button', { name }).click()
+    await sleep(350)
+    await shot(page, `settings-${key}`)
+  }
+  // Compact density is real: show the shell with it on, then put it back.
+  await dlg.getByRole('navigation').getByRole('button', { name: 'Aparência' }).click()
+  await dlg.getByRole('radio', { name: 'Compacta' }).click()
+  await page.keyboard.press('Escape')
+  await dlg.waitFor({ state: 'detached' })
+  await rail(page, /^Estúdio Alga/).click()
+  await channels(page).getByRole('button', { name: /^geral/ }).click()
+  await page.getByText('Eu topo testar também').waitFor({ timeout: 15_000 }).catch(async (e) => {
+    await page.screenshot({ path: join(work, 'fail-density.png') })
+    throw e
+  })
+  await sleep(300)
+  await shot(page, 'density-compact')
+  await page.keyboard.press('Control+,')
+  await dlg.getByRole('navigation').getByRole('button', { name: 'Aparência' }).click()
+  await dlg.getByRole('radio', { name: 'Confortável' }).click()
+  await page.keyboard.press('Escape')
+  await close(app)
+}
+
+// ── voice: two real instances through LiveKit ─────────────────
+const work = join(tmpdir(), 'alga-shots')
+function ffmpeg(args) {
+  const r = spawnSync('ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', ...args], { encoding: 'utf8' })
+  if (r.status !== 0) throw new Error(`ffmpeg failed: ${r.stderr}`)
+}
+/** B's fake microphone: real pt-BR speech (Windows SAPI) so the glow follows a real voice envelope; tone bursts as fallback. */
+function speechWav() {
+  mkdirSync(work, { recursive: true })
+  const out = join(work, 'speech.wav')
+  const silence = join(work, 'silence.wav')
+  if (!existsSync(silence)) ffmpeg(['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=mono', '-t', '10', '-c:a', 'pcm_s16le', silence])
+  if (existsSync(out)) return { speech: out, silence }
+  const raw = join(work, 'speech-raw.wav')
+  const ps = `Add-Type -AssemblyName System.Speech
+$s = New-Object System.Speech.Synthesis.SpeechSynthesizer
+$v = $s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -eq 'pt-BR' } | Select-Object -First 1
+if ($v) { $s.SelectVoice($v.VoiceInfo.Name) }
+$s.SetOutputToWaveFile('${raw.replace(/'/g, "''")}')
+$p = New-Object System.Speech.Synthesis.PromptBuilder
+foreach ($t in @('Fala, pessoal, tudo certo?', 'Subi a build nova agora.', 'Consegue compartilhar a tela?', 'O brilho segue a voz.', 'Ficou muito bom.')) { $p.AppendText($t); $p.AppendBreak([TimeSpan]::FromMilliseconds(500)) }
+$s.Speak($p)
+$s.Dispose()`
+  const r = spawnSync('powershell', ['-NoProfile', '-Command', ps], { encoding: 'utf8' })
+  if (r.status === 0 && existsSync(raw)) ffmpeg(['-i', raw, '-ar', '48000', '-ac', '1', '-c:a', 'pcm_s16le', out])
+  else ffmpeg(['-f', 'lavfi', '-i', "aevalsrc='0.35*sin(2*PI*190*t)*(0.55+0.45*sin(2*PI*4*t))*gt(sin(2*PI*0.4*t),-0.3)':s=48000:d=20", '-ac', '1', '-c:a', 'pcm_s16le', out])
+  return { speech: out, silence }
+}
+
+const MEDIA_FLAGS = (wav) => [
+  '--use-fake-ui-for-media-stream',
+  '--use-fake-device-for-media-stream',
+  `--use-file-for-fake-audio-capture=${wav}`,
+  // Two windows on one desktop: keep the covered one rendering (harness only).
+  '--disable-features=CalculateNativeWinOcclusion',
+  '--disable-renderer-backgrounding',
+  '--disable-background-timer-throttling',
+]
+
+const dock = (page) => page.getByRole('toolbar', { name: 'Controles da chamada' })
+const channels = (page) => page.getByRole('complementary', { name: 'Canais' })
+
+async function waitConnected(page) {
+  await page.getByText('Voz conectada').first().waitFor({ timeout: 30_000 })
+}
+/** Wait until someone's tile glows at least `min` (the envelope is written to --speak on the tile). */
+async function waitSpeaking(page, userId, min = 0.4, timeout = 20_000) {
+  const t0 = Date.now()
+  while (Date.now() - t0 < timeout) {
+    const v = await page.evaluate((id) => Number(document.querySelector(`[data-user-id="${id}"]`)?.style.getPropertyValue('--speak') || 0), userId)
+    if (v >= min) return v
+    await sleep(40)
+  }
+  return 0
+}
+
+let pattern = null
+function startPattern() {
+  // Full-screen moving test pattern on top: screen thumbnails show this, never the real desktop.
+  pattern = spawn('ffplay', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=1920x1080:rate=30', '-fs', '-alwaysontop', '-an', '-window_title', 'AlgaPattern'], { stdio: 'ignore' })
+}
+function stopPattern() {
+  if (pattern?.pid) spawnSync('taskkill', ['/PID', String(pattern.pid), '/T', '/F'], { stdio: 'ignore' })
+  pattern = null
+}
+
+async function voiceShots(saved, ids) {
+  console.log('voice (two instances)…')
+  const lk = await fetch('http://127.0.0.1:7880/').then((r) => r.ok, () => false)
+  if (!lk) return console.warn('LiveKit is not running on :7880: voice screens skipped.')
+  const U = saved.users
+  const { speech, silence } = speechWav()
+  const A = await launch({ extra: MEDIA_FLAGS(silence) })
+  const B = await launch({ profile: 'shots-b', extra: MEDIA_FLAGS(speech) })
+  for (const [n, x] of [['A', A], ['B', B]]) {
+    x.page.on('console', (m) => m.type() === 'error' && console.log(`  ${n} console.error:`, m.text().slice(0, 240)))
+    x.page.on('pageerror', (e) => console.log(`  ${n} pageerror:`, e.message))
+  }
+  try {
+    await login(A.page, U.ana)
+    await login(B.page, U.bruno)
+
+    // B joins Sala de foco with one click (the Discord habit we keep).
+    await rail(B.page, /^Estúdio Alga/).click()
+    await channels(B.page).getByRole('button', { name: /Sala de foco/ }).click()
+    await waitConnected(B.page)
+
+    // A at home: "Agora" shows where Bruno is, the rail tile breathes.
+    await A.page.getByRole('button', { name: 'Conversas', exact: true }).click()
+    await A.page.getByRole('region', { name: 'Agora' }).getByText('Sala de foco').waitFor({ timeout: 15_000 })
+    await sleep(500)
+    await shot(A.page, 'home-agora')
+
+    // A opens the room without joining (Ctrl+K): the pre-join preview.
+    await A.page.keyboard.press('Control+K')
+    await A.page.keyboard.type('Sala de foco')
+    await sleep(200)
+    await A.page.keyboard.press('Enter')
+    await A.page.getByRole('button', { name: 'Entrar em Sala de foco', exact: true }).waitFor()
+    // Ctrl+K hands focus back to what opened it; park focus and pointer so no ring/tooltip sits in the shot.
+    await A.page.mouse.move(820, 300)
+    await A.page.evaluate(() => (document.activeElement)?.blur?.())
+    await sleep(500)
+    await shot(A.page, 'voice-preview')
+
+    // Join: tiles, live glow on Bruno (real envelope), voice panel, occupants in the sidebar.
+    await A.page.getByRole('button', { name: 'Entrar em Sala de foco', exact: true }).click()
+    await waitConnected(A.page)
+    await sleep(1500)
+    const v = await waitSpeaking(A.page, U.bruno.me.id, 0.45)
+    console.log(`  bruno --speak at capture: ${v.toFixed(2)}`)
+    await shot(A.page, 'voice-stage')
+    await waitSpeaking(B.page, U.bruno.me.id, 0.3)
+    await shot(B.page, 'voice-stage-self-speaking')
+
+    // Self muted + deafened: state by icon + color + tint, and the tile label follows.
+    await dock(A.page).getByRole('button', { name: 'Desativar microfone' }).click()
+    await dock(A.page).getByRole('button', { name: 'Desativar áudio' }).click()
+    await sleep(1200)
+    await shot(A.page, 'voice-self-muted-deafened')
+    await dock(A.page).getByRole('button', { name: 'Ativar áudio' }).click()
+    await sleep(300)
+    if (await dock(A.page).getByRole('button', { name: 'Ativar microfone' }).isVisible()) await dock(A.page).getByRole('button', { name: 'Ativar microfone' }).click()
+
+    // Moderation (Ana owns the space): context menu on Bruno's tile, then a real server mute seen by Bruno.
+    await A.page.locator(`[data-user-id="${U.bruno.me.id}"]`).click({ button: 'right' })
+    await A.page.getByRole('menu').waitFor()
+    await shot(A.page, 'voice-tile-moderation-menu')
+    await A.page.getByRole('menuitem', { name: 'Silenciar para todos' }).click()
+    await B.page.getByRole('button', { name: 'A moderação silenciou você neste canal' }).waitFor({ timeout: 10_000 })
+    await sleep(500)
+    await shot(B.page, 'voice-server-muted')
+    await api(U.ana.token, 'PATCH', `/spaces/${ids.s1.id}/members/${U.bruno.me.id}/voice`, { serverMute: false })
+    await sleep(800)
+
+    // Screen share: the picker (thumbnails show the test pattern, not the desktop), then live.
+    startPattern()
+    await sleep(1500)
+    await dock(A.page).getByRole('button', { name: 'Compartilhar tela' }).click()
+    const picker = A.page.getByRole('dialog', { name: 'Compartilhar tela' })
+    await picker.waitFor()
+    await picker.getByRole('radiogroup', { name: 'Telas' }).getByRole('radio').first().waitFor({ timeout: 20_000 })
+    await sleep(1800)
+    await shot(A.page, 'screen-picker')
+    await picker.getByRole('button', { name: 'Transmitir' }).click()
+    await picker.waitFor({ state: 'detached', timeout: 15_000 })
+    stopPattern()
+    await A.page.getByText('Você está transmitindo').first().waitFor()
+    await sleep(2500)
+    await shot(A.page, 'screen-sharing-self')
+
+    // Bruno: nothing downloads until he clicks Assistir.
+    await B.page.getByRole('button', { name: 'Assistir' }).first().waitFor({ timeout: 15_000 })
+    await sleep(400)
+    await shot(B.page, 'stream-tile-unwatched')
+    await B.page.getByRole('button', { name: 'Assistir' }).first().click()
+    await B.page.waitForFunction(() => [...document.querySelectorAll('video')].some((v) => v.readyState >= 2 && v.videoWidth > 0), null, { timeout: 20_000 })
+    await sleep(2500)
+    await shot(B.page, 'stream-watching')
+    await B.page.keyboard.press('Control+Shift+E')
+    await sleep(1500)
+    await B.page.locator('video').first().hover()
+    await sleep(300)
+    await shot(B.page, 'stream-stats')
+    await B.page.getByRole('button', { name: 'Ampliar' }).click()
+    await sleep(1500)
+    await shot(B.page, 'stream-focus')
+    await B.page.keyboard.press('Control+Shift+E')
+    await dock(A.page).getByRole('button', { name: 'Parar transmissão' }).click()
+    await A.page.getByRole('menuitem', { name: 'Parar transmissão' }).click()
+    await sleep(800)
+
+    // Moderator moves Bruno to another room (VOICE_MOVE), then disconnects him (VOICE_DISCONNECT).
+    await api(U.ana.token, 'PATCH', `/spaces/${ids.s1.id}/members/${U.bruno.me.id}/voice`, { channelId: ids.jogo.id })
+    await B.page.getByText('Você foi movido para Sala de jogo.').waitFor({ timeout: 15_000 })
+    await waitConnected(B.page)
+    await sleep(600)
+    await shot(B.page, 'voice-moved')
+    await api(U.ana.token, 'PATCH', `/spaces/${ids.s1.id}/members/${U.bruno.me.id}/voice`, { channelId: null })
+    await B.page.getByText('Um moderador desconectou você do canal de voz.').waitFor({ timeout: 15_000 })
+    await sleep(400)
+    await shot(B.page, 'voice-disconnected-moderator')
+
+    // Reconnecting never lies: with the SFU gone, tiles go grey and the stage says so.
+    const lkPid = Number(process.env.LIVEKIT_PID || 0)
+    if (lkPid) {
+      spawnSync('taskkill', ['/PID', String(lkPid), '/T', '/F'], { stdio: 'ignore' })
+      await A.page.getByText('Reconectando à voz…').first().waitFor({ timeout: 30_000 })
+      await sleep(800)
+      await shot(A.page, 'voice-reconnecting')
+      const lkProc = spawn('node', [join(repo, 'scripts', 'livekit.mjs')], { cwd: repo, detached: true, stdio: 'ignore' })
+      lkProc.unref()
+      console.log(`  LiveKit restarted (pid ${lkProc.pid}); stop it when done.`)
+      await A.page.getByText('Voz conectada').first().waitFor({ timeout: 60_000 }).catch(() => undefined)
+    }
+    await A.page.getByRole('button', { name: 'Desconectar' }).first().click().catch(() => undefined)
+    await sleep(600)
+
+    // DM call: Ana calls Bruno from the DM header; Bruno gets the ring card, answers, both on the DM stage.
+    await A.page.getByRole('button', { name: 'Conversas', exact: true }).click()
+    await A.page.getByRole('button', { name: /Bruno Costa/ }).first().click()
+    await A.page.getByRole('button', { name: 'Iniciar chamada de voz' }).click()
+    await B.page.getByRole('alertdialog').waitFor({ timeout: 20_000 })
+    await sleep(500)
+    await shot(B.page, 'call-incoming')
+    await B.page.getByRole('button', { name: 'Atender' }).click()
+    await waitConnected(B.page)
+    await sleep(1500)
+    await waitSpeaking(A.page, U.bruno.me.id, 0.4)
+    await shot(A.page, 'dm-call')
+    await A.page.getByRole('button', { name: 'Desconectar' }).first().click()
+    await B.page.getByRole('button', { name: 'Desconectar' }).first().click()
+
+    // Voice settings on Bruno (speech mic): live meter against the gate threshold.
+    await B.page.keyboard.press('Control+,')
+    const dlg = B.page.getByRole('dialog', { name: 'Configurações' })
+    await dlg.getByRole('navigation').getByRole('button', { name: 'Voz e vídeo' }).click()
+    await dlg.getByRole('button', { name: 'Testar' }).click()
+    await sleep(2500)
+    await shot(B.page, 'settings-voice')
+    await dlg.getByRole('button', { name: 'Parar o teste' }).click()
+  } catch (e) {
+    // Leave evidence for debugging the harness (not versioned).
+    await A.page.screenshot({ path: join(work, 'fail-a.png') }).catch(() => undefined)
+    await B.page.screenshot({ path: join(work, 'fail-b.png') }).catch(() => undefined)
+    for (const [n, x] of [['A', A], ['B', B]]) console.log(`  ${n} media:`, await x.page.evaluate(() => JSON.stringify(window.__algaMediaState?.() ?? null)).catch(() => '?'))
+    throw e
+  } finally {
+    stopPattern()
+    await close(A.app)
+    await close(B.app)
+  }
 }
 
 /** TCP proxy in front of the API so the script can cut or slow the "network" for real. */
@@ -478,14 +775,14 @@ async function connectionShots(saved, ids) {
   await page.getByText('Eu topo testar também').waitFor()
   // Server unreachable: banner with countdown + a send that fails in place.
   await proxy.stop()
-  await page.getByText(/Reconectando|Conexão perdida/).waitFor({ timeout: 15_000 })
+  await page.getByText(/Sem conexão/).first().waitFor({ timeout: 15_000 })
   await page.getByRole('textbox', { name: /Mensagem para/ }).fill('Alguém mais caiu agora?')
   await page.keyboard.press('Enter')
   await page.getByText('Não enviada.').waitFor({ timeout: 15_000 })
   await shot(page, 'banner-reconnecting-send-failed')
   proxy = startProxy(PORT)
   await page.getByRole('button', { name: 'Tentar agora' }).click()
-  await page.getByText(/Reconectando|Conexão perdida/).waitFor({ state: 'detached', timeout: 20_000 })
+  await page.getByText(/Sem conexão\. Tentando/).waitFor({ state: 'detached', timeout: 20_000 })
   await page.getByRole('button', { name: 'Tentar de novo' }).click()
   await page.getByText('Não enviada.').waitFor({ state: 'detached', timeout: 10_000 })
   await shot(page, 'chat-send-retried')
@@ -493,7 +790,7 @@ async function connectionShots(saved, ids) {
   // Boot with a stored session while the server is down: the splash explains and offers a way out.
   await proxy.stop()
   ;({ app, page } = await launch({ apiUrl: via, keepProfile: true }))
-  await page.getByText('Sem conexão com o servidor').waitFor({ timeout: 20_000 })
+  await page.getByText(/Sem conexão\. Tentando/).waitFor({ timeout: 20_000 })
   await shot(page, 'splash-offline')
   proxy = startProxy(PORT)
   await page.getByRole('button', { name: 'Tentar agora' }).click()
@@ -530,7 +827,7 @@ try {
   serverUp = false
 }
 if (want('auth')) await authShots(serverUp)
-if (serverUp && ['home', 'chat', 'spaces', 'connection', 'sizes'].some(want)) {
+if (serverUp && ['home', 'chat', 'spaces', 'connection', 'sizes', 'settings', 'voice'].some(want)) {
   const saved = await ensureUsers()
   await mainShots(saved)
 } else console.warn(`API at ${API} is not reachable: only auth screens were captured.`)
