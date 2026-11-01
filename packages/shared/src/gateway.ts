@@ -2,6 +2,7 @@ import type {
   Channel, Me, Member, Message, Presence, PublicUser, ReadState, Relationship,
   Role, Space, SpaceSnapshot, StatusPreference, VoiceDisconnectReason, VoiceState,
 } from './models.js'
+import type { Entitlements } from './billing.js'
 
 /**
  * Realtime gateway: WebSocket at /gateway, JSON frames.
@@ -91,6 +92,11 @@ export type Dispatch =
    * voice_state op with the current self flags.
    */
   | { t: 'VOICE_MOVE'; d: { channelId: string } }
+  /**
+   * Sent only to the user: their plan or owned/included cosmetics changed (purchase confirmed by the provider, renewal,
+   * a cancellation reaching its end, expiry, refund). ME_UPDATE with the new Me.plan follows when the plan changed.
+   */
+  | { t: 'ENTITLEMENTS_UPDATE'; d: Entitlements }
 
 export type DispatchType = Dispatch['t']
 export type DispatchOf<T extends DispatchType> = Extract<Dispatch, { t: T }>['d']

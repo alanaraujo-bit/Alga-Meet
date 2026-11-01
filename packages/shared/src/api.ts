@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { StreamPreset } from './billing.js'
 import type { Me } from './models.js'
 import { ALL_PERMISSIONS } from './permissions.js'
 
@@ -96,9 +97,28 @@ import { ALL_PERMISSIONS } from './permissions.js'
  *   create/edit/delete/assign/reorder roles below your highest role, grant permissions you have, and kick, ban or
  *   rename members whose highest role is below yours. Channel permission overwrites are not implemented yet.
  * POST   /spaces/:id/invites       CreateInviteBody      -> Invite
+ * GET    /spaces/:id/invites                             -> Invite[] (usable ones, newest first: every invite with
+ *                                                          MANAGE_SPACE, otherwise only the ones you created)
+ * DELETE /invites/:code                                  -> 204 (revoke: MANAGE_SPACE in its space or its creator;
+ *                                                          404 if it does not exist or you are not in the space)
  * GET    /invites/:code                                  -> Invite (public preview, no auth)
  * POST   /invites/:code                                  -> SpaceSnapshot (join)
  * POST   /voice/join               VoiceJoinBody         -> VoiceJoinResponse
+ *   The token carries the participant attribute STREAM_PRESETS_ATTRIBUTE (the user's plan presets); the server also
+ *   checks every screen-share publication against them (see VoiceJoinResponse.streamPresets).
+ * GET    /billing/catalog                                -> BillingCatalog (public, no auth)
+ * GET    /billing/me                                     -> BillingMe (plan, subscriptions, entitlements, orders)
+ * POST   /billing/checkout         CheckoutBody          -> CheckoutResponse (201; verified e-mail required; 10/min)
+ *   Creates a pending subscription (plan products) or order (cosmetics) and returns the provider's page. Nothing is
+ *   granted here: the provider's verified webhook (or an API re-fetch) confirms the payment, then ENTITLEMENTS_UPDATE
+ *   (+ ME_UPDATE with the new Me.plan). 404 unknown/unsold product, 409 already subscribed / already owned, 503
+ *   payments disabled on this server. `sandbox: true` = test provider (dev/test only), nothing is charged.
+ * POST   /billing/subscription/cancel                    -> Subscription (renewals stop now, the plan lasts until
+ *                                                          currentPeriodEnd; idempotent; 404 without an active one)
+ * POST   /billing/webhooks/:provider (provider-signed)   -> 200 (server-to-server; 401 bad signature, 404 unknown
+ *                                                          provider; repeated events are acknowledged and ignored)
+ * GET    /billing/sandbox/checkout/:reference?sig=&outcome=approve|decline -> HTML (sandbox provider only: the fake
+ *                                                          "provider page" a sandbox checkout URL opens)
  * POST   /livekit/webhook          (LiveKit-signed)      -> 200 (server-to-server only)
  * GET    /health                                         -> { ok: true, version }
  */
@@ -299,4 +319,11 @@ export interface VoiceJoinResponse {
   room: string
   /** Opus target bitrate for this channel. */
   bitrateKbps: number
+  /**
+   * Screen-share presets this user may publish (their plan; same value as the token attribute
+   * STREAM_PRESETS_ATTRIBUTE). The media engine must cap the top simulcast layer to one of them: short side ≤
+   * STREAM_PRESETS[p].height, frame rate ≤ fps, maxBitrate ≤ maxBitrateKbps. The server mutes screen-share tracks
+   * published above the plan's largest preset. Always sent; optional for older fixtures.
+   */
+  streamPresets?: StreamPreset[]
 }

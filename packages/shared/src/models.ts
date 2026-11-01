@@ -1,4 +1,6 @@
 /** Wire models shared by server and desktop. Timestamps are ISO-8601 strings. */
+import type { PlanSummary } from './billing.js'
+
 
 export type PresenceStatus = 'online' | 'idle' | 'dnd' | 'offline'
 /** What the user chose; 'invisible' is broadcast to others as 'offline'. */
@@ -23,6 +25,8 @@ export interface Me extends PublicUser {
   emailVerified?: boolean
   statusPreference: StatusPreference
   createdAt: string
+  /** Current plan and its limits (stream presets, attachment cap). Always sent by the server; optional like emailVerified. */
+  plan?: PlanSummary
 }
 
 export interface Presence {
