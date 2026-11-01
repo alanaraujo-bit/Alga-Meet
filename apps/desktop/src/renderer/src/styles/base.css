@@ -60,9 +60,14 @@ button {
 a {
   color: var(--accent);
   text-decoration: none;
+  transition: color var(--dur-hover-out) var(--ease-out-quad);
 }
 a:hover {
+  transition-duration: 0ms;
+  color: var(--accent-hover);
   text-decoration: underline;
+  text-decoration-color: rgba(162, 168, 252, 0.4);
+  text-underline-offset: 3px;
 }
 
 /* Text the user may want to copy. */
@@ -84,7 +89,7 @@ textarea,
   color: var(--text-primary);
 }
 
-/* Focus: 2px accent ring, keyboard only (study §10, WCAG 2.2 focus appearance). */
+/* Focus: 2px indigo ring, keyboard only (Linear draws 1 px; 2 px for WCAG 2.2 focus appearance). */
 :focus {
   outline: none;
 }
@@ -158,10 +163,10 @@ textarea,
 ::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.12) padding-box;
+  background: rgba(255, 255, 255, 0.1) padding-box;
 }
 :hover::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.16);
 }
 
 .tnum {

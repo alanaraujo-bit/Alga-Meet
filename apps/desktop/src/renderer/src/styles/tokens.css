@@ -1,73 +1,94 @@
 /*
- * Alga Meet design tokens (dark-first). Source: docs/research/linear-design-study.md §17.
- * Surfaces are OKLCH lightness steps on a "deep water" neutral (H 230, C ~0.006).
- * Accent "Bioluminescência" (H 195) is a SIGNAL: voice presence, focus, mentions, primary action.
+ * Alga Meet design tokens — Direção B "Índigo suave" (Linear's visual language, our product).
+ * Neutrals are OKLCH lightness steps at H ≈ 282 with almost no chroma (C ≤ 0.004): hierarchy comes from luminance,
+ * not color. One soft indigo (H ≈ 279) is the only accent: focus, the current place, primary action, the voice.
+ * Semantic colors are desaturated (C ≤ 0.17) and rare. Contrast is asserted in tokens.test.ts.
  * Living reference: docs/design/design-system.md
  */
 :root {
   color-scheme: dark;
 
-  /* ── Surfaces (level 0 → 5) ───────────────────────────── */
-  --bg-app: #080b0c; /* 0  window, title bar, space rail */
-  --bg-sidebar: #0e1113; /* 1  channel / DM list, member list */
-  --bg-content: #121517; /* 2  conversation, call stage */
-  --bg-raised: #191c1e; /* 3  cards, inputs, composer */
-  --bg-overlay: #1f2426; /* 4  popover, menu, tooltip */
-  --bg-modal: #23272a; /* 5  modal */
-  --scrim: rgba(0, 0, 0, 0.6);
+  /* ── Surfaces (OKLCH L, C ≈ 0.003, H 282) ─────────────── */
+  --bg-app: #0b0b0c; /* L .150  chrome: title bar, rail (the inverted L) */
+  --bg-sidebar: #0b0b0c; /* L .150  channel / DM list: same plane as the chrome */
+  --bg-content: #0f1011; /* L .172  the sheet: conversation, call stage, member list */
+  --bg-raised: #161718; /* L .203  cards, composer, tiles without camera */
+  --bg-overlay: #1b1b1d; /* L .222  tooltip, toast (solid) */
+  --bg-glass: rgba(27, 27, 30, 0.9); /* menus, popovers: translucent over --glass-blur */
+  --glass-blur: blur(20px) saturate(1.6);
+  --bg-modal: #171719; /* L .205  modal */
+  --scrim: rgba(0, 0, 0, 0.56);
 
-  /* State overlays: stack on any surface. Selection is neutral, never accent. */
+  /* State overlays: stack on any surface. Hover/press are neutral; --state-current marks "you are here". */
   --state-hover: rgba(255, 255, 255, 0.04);
-  --state-selected: rgba(255, 255, 255, 0.07);
-  --state-pressed: rgba(255, 255, 255, 0.1);
+  --state-selected: rgba(255, 255, 255, 0.06);
+  --state-pressed: rgba(255, 255, 255, 0.08);
+  --state-current: rgba(150, 152, 255, 0.13); /* #1d1d2c on the chrome: the indigo-tinted current row */
+  --state-current-hover: rgba(150, 152, 255, 0.17);
 
-  /* ── Text (≥4.5:1 on every surface except disabled) ───── */
-  --text-primary: #f1f4f6;
-  --text-secondary: #c9cfd2;
-  --text-tertiary: #98a0a3;
-  --text-disabled: #636a6e;
+  /* ── Text (4 steps; ≥4.5:1 on every surface except disabled) ── */
+  --text-primary: #f7f8f8; /* titles, names, the current item */
+  --text-secondary: #d0d6e0; /* reading text (messages), hover */
+  --text-tertiary: #8a8f98; /* inactive rows, metadata, placeholders */
+  --text-disabled: #62666d; /* disabled / decorative only, never information */
 
   /* ── Borders (translucent white: adapt to any surface) ── */
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.09);
-  --border-strong: rgba(255, 255, 255, 0.14);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-default: rgba(255, 255, 255, 0.08); /* ≈ #1f2023 on the chrome */
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --hairline: 0.5px; /* one device pixel at 100–150 % scale, a true hairline at 200 % */
 
-  /* ── Accent: Bioluminescência ─────────────────────────── */
-  --accent: #4ddcdc; /* text & icons */
-  --accent-fill: #21c9ca; /* filled controls, always with --on-accent text */
-  --accent-fill-hover: #3ad3d3;
-  --accent-pressed: #38b3b3;
-  --on-accent: #061415;
-  --accent-tint: rgba(77, 220, 220, 0.1);
-  --accent-tint-strong: rgba(77, 220, 220, 0.18);
-  --accent-glow: rgba(33, 201, 202, 0.55);
-  --selection-bg: rgba(77, 220, 220, 0.28);
+  /* ── Accent: soft indigo (OKLCH H 279) ─────────────────── */
+  --accent: #8b8ef7; /* L .69 C .15  text, icons, focus, speaking ring */
+  --accent-hover: #a2a8fc; /* L .76  link hover */
+  --accent-fill: #6163d0; /* L .555 C .165  primary fill, white text 5.0:1 */
+  --accent-fill-hover: #6466d4; /* L .565  4.8:1 */
+  --accent-pressed: #5a5bc1; /* L .525 */
+  --on-accent: #ffffff;
+  --accent-tint: rgba(139, 142, 247, 0.1);
+  --accent-tint-strong: rgba(139, 142, 247, 0.18);
+  --accent-glow: rgba(139, 142, 247, 0.24); /* soft halo, never neon */
+  --accent-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 55%);
+  --selection-bg: rgba(110, 114, 232, 0.38);
 
-  /* ── Semantic ─────────────────────────────────────────── */
-  --online: #4fce74;
-  --idle: #fdbe45;
-  --dnd: #f75d59;
-  --offline: #7b8387;
-  --warning: #fdbe45;
-  --warning-tint: rgba(253, 190, 69, 0.1);
-  --danger: #f75d59;
-  --danger-hover: #ff7370;
-  --danger-tint: rgba(247, 93, 89, 0.12);
-  --on-danger: #1c0605;
-  --success: #4fce74;
-  --success-tint: rgba(79, 206, 116, 0.1);
+  /* ── Semantic (desaturated, rare) ─────────────────────── */
+  --online: #61c28e; /* L .74 C .12 H 158 */
+  --idle: #e6b463; /* L .80 C .115 H 78 */
+  --dnd: #e66e68;
+  --offline: #777a80;
+  --warning: #e6b463;
+  --warning-tint: rgba(230, 180, 99, 0.1);
+  --danger: #e66e68; /* L .68 C .15 H 25  text, icons */
+  --danger-hover: #f0857f;
+  --danger-fill: #c04444; /* L .56  white text 5.1:1 */
+  --danger-fill-hover: #c74a49;
+  --danger-tint: rgba(230, 110, 104, 0.12);
+  --on-danger: #ffffff;
+  --success: #61c28e;
+  --success-tint: rgba(97, 194, 142, 0.1);
+  --live: #e86885; /* L .68 C .16 H 8  "ao vivo": a rose, apart from the danger red */
+  --live-fill: #be395e; /* white text 5.3:1 */
+  --live-tint: rgba(232, 104, 133, 0.12);
+  --on-live: #ffffff;
+
+  /* ── People ───────────────────────────────────────────── */
+  --avatar-fill: #26272b; /* initials avatar: neutral, a whisper of hue per person (Avatar.tsx) */
+  --avatar-ink: #d0d6e0;
 
   /* ── Type ─────────────────────────────────────────────── */
   --font-ui: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', 'Cascadia Mono', Consolas, monospace;
-  --font-features: 'cv11', 'ss01', 'calt';
+  /* Linear-like Inter: double-storey a, straight 1 (cv01), round quotes (ss03). */
+  --font-features: 'calt', 'cv01', 'ss03';
+  /* Inter Display: headings pin the optical-size axis to its display end (the font ships opsz 14–32). */
+  --opsz-display: 'opsz' 32;
 
   --w-regular: 400;
   --w-medium: 510;
   --w-semibold: 590;
   --w-bold: 680;
 
-  /* size / line-height / tracking (study §17.2) */
+  /* size / line-height / tracking (Linear measured: 13 px UI, −0.01em at 13–15 px, −0.022em at display) */
   --type-badge: 590 11px/14px var(--font-ui);
   --type-meta: 400 12px/16px var(--font-ui);
   --type-ui: 400 13px/20px var(--font-ui);
@@ -80,10 +101,10 @@
   --type-title: 590 20px/28px var(--font-ui);
   --type-title-lg: 590 24px/32px var(--font-ui);
   --type-display: 590 32px/40px var(--font-ui);
-  --track-ui: -0.005em;
-  --track-ui-lg: -0.01em;
+  --track-ui: -0.008em;
+  --track-ui-lg: -0.011em;
   --track-message: -0.011em;
-  --track-title: -0.012em;
+  --track-title: -0.016em;
   --track-display: -0.022em;
 
   /* ── Space (4px base; 2 and 6 for dense controls) ─────── */
@@ -125,12 +146,13 @@
   --members-w: 240px;
   --header-h: 48px;
 
-  /* ── Elevation (dark: luminance + border + dark ring) ─── */
-  --elev-overlay: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  --elev-modal: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 16px 48px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  /* ── Elevation (dark: luminance + hairline + dark outer ring + one soft, wide shadow) ─── */
+  --elev-low: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --elev-overlay: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.22), 0 16px 40px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --elev-modal: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 8px 20px rgba(0, 0, 0, 0.25), 0 32px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --focus-ring: 0 0 0 2px var(--bg-content), 0 0 0 4px var(--accent);
 
-  /* ── Motion (study §17.4) ─────────────────────────────── */
+  /* ── Motion (Linear measured: states 100 ms out-quad, objects 180 ms, nothing past 300 ms) ── */
   --ease-out-quad: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
   --ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
