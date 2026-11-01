@@ -26,6 +26,11 @@ export function rmsDb(samples: Float32Array): number {
   return rms > 1e-6 ? 20 * Math.log10(rms) : -120
 }
 
+/** Speaking level for meters/glow: −50 dBFS → 0 … −20 dBFS → 1 (normal speech after AGC sits around −35…−20). */
+export function perceptualLevel(db: number): number {
+  return Math.max(0, Math.min(1, (db + 50) / 30))
+}
+
 export class VadGate {
   config: GateConfig
   open = false

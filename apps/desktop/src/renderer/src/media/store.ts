@@ -17,7 +17,11 @@ export interface ParticipantView {
   identity: string
   name: string
   speaking: boolean
-  /** 0..1, server-reported audio level (smoothed). */
+  /**
+   * Perceptual speaking level 0..1, ready for meters/glow (no conversion needed): RMS of the received voice
+   * over the last ~43 ms in dBFS, mapped linearly −50 dBFS → 0 … −20 dBFS → 1 (`perceptualLevel`), instant
+   * attack and ~150 ms release, refreshed every 50 ms. Measured on this machine's decoded audio, not the SFU's.
+   */
   level: number
   micMuted: boolean
   /** Playback volume 0..2 (persisted per userId). */
@@ -49,6 +53,10 @@ export interface MediaState {
     /** ms of the last reconnection (Reconnecting -> Reconnected). */
     lastReconnectMs: number | null
     reconnects: number
+    /** true while an automatic recovery is pending (LiveKit reconnecting or a scheduled rejoin); false once it gave up or the end is terminal. */
+    willRetry: boolean
+    /** Human channel name for the tray/titles (media.setContext); null = unknown. */
+    channelName: string | null
   }
   self: {
     identity: string | null
@@ -67,6 +75,14 @@ export interface MediaState {
     processingActive: ProcessingMode
     sensitivityDb: number | null
     micAvailable: boolean
+    /** The server (moderator) took away microphone publishing. Independent of `muted` (the user's own choice). */
+    serverMuted: boolean
+    /** Own connection quality as rated by the SFU. */
+    quality: Quality
+    /** UI cues on/off (pref). */
+    sounds: boolean
+    /** PTT release delay in ms (pref). */
+    pttReleaseMs: number
   }
   participants: Record<string, ParticipantView>
   devices: { inputs: DeviceInfo[]; outputs: DeviceInfo[]; inputId: string | null; outputId: string | null }
@@ -91,7 +107,7 @@ export interface MediaState {
 }
 
 export const initialState = (): MediaState => ({
-  connection: { state: 'idle', reason: null, channelId: null, room: null, joinMs: null, lastReconnectMs: null, reconnects: 0 },
+  connection: { state: 'idle', reason: null, channelId: null, room: null, joinMs: null, lastReconnectMs: null, reconnects: 0, willRetry: false, channelName: null },
   self: {
     identity: null,
     muted: false,
@@ -107,6 +123,10 @@ export const initialState = (): MediaState => ({
     processingActive: DEFAULT_PREFS.processing,
     sensitivityDb: null,
     micAvailable: true,
+    serverMuted: false,
+    quality: 'unknown',
+    sounds: DEFAULT_PREFS.sounds,
+    pttReleaseMs: DEFAULT_PREFS.pttReleaseMs,
   },
   participants: {},
   devices: { inputs: [], outputs: [], inputId: null, outputId: null },

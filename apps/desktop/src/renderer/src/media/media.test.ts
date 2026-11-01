@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_HANGOVER_MS, PttLatch, VadGate, rmsDb } from './vad'
+import { DEFAULT_HANGOVER_MS, PttLatch, VadGate, perceptualLevel, rmsDb } from './vad'
 import { SCREEN_PRESETS, availablePresets, contentSettings, defaultPreset, getPreset, pickCodec, recordSustain, simulcastFor } from './presets'
 import { PrefsStore } from './prefs'
 
@@ -41,6 +41,10 @@ describe('VadGate', () => {
     const g = new VadGate()
     run(g, -70, 1000) // quiet
     expect(run(g, -48, 6000)).toBe(false) // fan turns on: after a few seconds it is noise, not voice
+  })
+
+  it('perceptualLevel maps -50..-20 dBFS onto 0..1, clamped', () => {
+    expect([perceptualLevel(-120), perceptualLevel(-50), perceptualLevel(-35), perceptualLevel(-20), perceptualLevel(0)]).toEqual([0, 0, 0.5, 1, 1])
   })
 
   it('rmsDb of a full-scale square wave is 0 dB, silence is -120', () => {

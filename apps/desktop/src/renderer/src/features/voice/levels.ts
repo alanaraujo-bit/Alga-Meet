@@ -1,7 +1,6 @@
 import { useCallback } from 'react'
 import { useMedia } from '@/media'
 import { useData } from '@/store/data'
-import { loudness } from './layout'
 
 /**
  * Live voice level of one person in MY call (0 when muted, not connected, or not in my room).
@@ -14,7 +13,7 @@ export function levelNow(userId: string): number {
     return m.self.speaking && !m.self.muted && !m.self.deafened ? m.self.level : 0
   }
   const p = m.participants[userId]
-  return p && !p.micMuted ? loudness(p.level) : 0
+  return p && !p.micMuted ? p.level : 0
 }
 
 /** The loudest voice in my call: drives the fronds on the rail and in the voice panel. */
@@ -22,7 +21,7 @@ export function roomLevelNow(): number {
   const m = useMedia.getState()
   if (m.connection.state !== 'connected') return 0
   let max = levelNow(m.self.identity ?? useData.getState().me?.id ?? '')
-  for (const p of Object.values(m.participants)) if (!p.micMuted && loudness(p.level) > max) max = loudness(p.level)
+  for (const p of Object.values(m.participants)) if (!p.micMuted && p.level > max) max = p.level
   return max
 }
 

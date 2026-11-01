@@ -44,6 +44,7 @@ export async function joinVoice(channelId: string): Promise<void> {
   if (useVoice.getState().ring?.channelId === channelId) clearRing()
   try {
     const res = await voiceJoin(channelId)
+    media.setContext({ channelName: useData.getState().channels[channelId]?.name ?? null })
     await media.join({ ...res, channelId, refresh: () => voiceJoin(channelId) })
   } catch (e) {
     toast.error(errorText(e, useMedia.getState().connection.reason ?? t.joinError))

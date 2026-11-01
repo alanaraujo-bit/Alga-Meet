@@ -18,7 +18,7 @@ import {
   type RemoteTrack,
   type RemoteTrackPublication,
 } from 'livekit-client'
-import { PttLatch } from './vad'
+import { PttLatch, perceptualLevel, rmsDb } from './vad'
 import { PrefsStore, type InputMode, type ProcessingMode } from './prefs'
 import { availablePresets, contentSettings, defaultPreset, getPreset, pickCodec, recordSustain, simulcastFor, type ContentType, type ScreenPreset, type ScreenPresetId, type VideoCodecId } from './presets'
 import { VoiceGraph, VoiceProcessor, captureConstraints } from './processing'
@@ -75,6 +75,10 @@ const DISCONNECT_TEXT: Partial<Record<DisconnectReason, string>> = {
 /** Reasons where rejoining automatically would fight the user or the server. */
 const TERMINAL = new Set([DisconnectReason.CLIENT_INITIATED, DisconnectReason.DUPLICATE_IDENTITY, DisconnectReason.PARTICIPANT_REMOVED, DisconnectReason.ROOM_DELETED])
 
+/** protobuf TrackSource.MICROPHONE in ParticipantPermission.canPublishSources (livekit-client doesn't re-export the enum). */
+const PROTO_MICROPHONE = 2
+const LEVEL_TICK_MS = 50
+
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 const bridge = (): Partial<Window['alga']> | undefined => (typeof window !== 'undefined' ? window.alga : undefined)
 const safeStorage = (): Storage | null => {
@@ -128,7 +132,7 @@ class MediaEngine {
     const p = this.prefs.get()
     this.activeInput = p.inputDeviceId
     this.activeOutput = p.outputDeviceId
-    patch('self', { inputMode: p.inputMode, processing: p.processing, processingActive: p.processing, sensitivityDb: p.sensitivityDb })
+    patch('self', { inputMode: p.inputMode, processing: p.processing, processingActive: p.processing, sensitivityDb: p.sensitivityDb, sounds: p.sounds, pttReleaseMs: p.pttReleaseMs })
     patch('screen', { preset: p.screenPreset, contentType: p.contentType, ...(p.codec && { codec: p.codec }), codecAuto: !p.codec })
     patch('devices', { inputId: p.inputDeviceId, outputId: p.outputDeviceId })
     setCueOutput(p.outputDeviceId)
@@ -149,6 +153,19 @@ class MediaEngine {
   // ───────────────────────────── voice ─────────────────────────────
 
   async join(params: JoinParams): Promise<void> {
+    this.rejoinAttempt = 0
+    return this.connect(params)
+  }
+
+  /** Human channel name for the tray (and `connection.channelName`); kept across automatic rejoins, cleared by leave(). */
+  setContext(ctx: { channelName?: string | null }): void {
+    this.start()
+    if (ctx.channelName !== undefined) this.channelName = ctx.channelName
+    patch('connection', { channelName: this.channelName })
+    this.syncTray()
+  }
+
+  private async connect(params: JoinParams): Promise<void> {
     this.start()
     if (this.room) await this.leave(true)
     this.clearRejoin()
@@ -176,7 +193,8 @@ class MediaEngine {
       if (this.room === room) {
         this.room = null
         room.removeAllListeners()
-        this.setConn('disconnected', `Não foi possível conectar ao servidor de voz: ${errText(e)}`)
+        // An automatic rejoin attempt failing is not the end: scheduleRejoin() follows unless the backoff ran out.
+        this.setConn('disconnected', `Não foi possível conectar ao servidor de voz: ${errText(e)}`, { willRetry: this.rejoinAttempt > 0 && REJOIN_BACKOFF_MS[this.rejoinAttempt] !== undefined })
       }
       throw e
     }
@@ -184,10 +202,11 @@ class MediaEngine {
     void room.startAudio().catch(() => undefined)
     patch('self', { identity: room.localParticipant.identity })
     for (const rp of room.remoteParticipants.values()) this.addRemote(rp)
-    if (params.publishMic !== false) await this.publishMic(room, kbps)
+    await this.syncMic(room)
     if (this.room !== room) return
     this.rejoinAttempt = 0
     this.setConn('connected', null, { room: room.name, joinMs: Math.round(performance.now() - t0) })
+    void this.syncMic(room) // a permission change during the handshake was deferred to here
     this.startTimers()
     this.cue('join')
     this.syncTray()
@@ -198,7 +217,8 @@ class MediaEngine {
     this.clearRejoin()
     const room = this.room
     if (!room) {
-      this.setConn('idle', null)
+      if (!silent) this.channelName = null
+      this.setConn('idle', null, { channelName: this.channelName })
       return
     }
     await this.stopScreenShare(true).catch(() => undefined)
@@ -206,9 +226,50 @@ class MediaEngine {
     await this.teardown()
     await room.disconnect(true).catch(() => undefined)
     room.removeAllListeners()
-    if (!silent) this.cue('leave')
-    this.setConn('idle', null, { room: null, channelId: null })
+    if (!silent) {
+      this.cue('leave')
+      this.channelName = null
+    }
+    this.setConn('idle', null, { room: null, channelId: null, channelName: this.channelName })
     this.syncTray()
+  }
+
+  /** Server mute = the SFU dropped `microphone` from canPublishSources. Empty list = every source allowed. */
+  private micAllowed(room: Room): boolean {
+    const p = room.localParticipant.permissions
+    return !p || (p.canPublish && (p.canPublishSources.length === 0 || p.canPublishSources.includes(PROTO_MICROPHONE)))
+  }
+
+  /**
+   * Make the mic match what we want and what the server allows: publish when allowed (muted if the user is
+   * self-muted, like at join), drop capture when revoked. Runs at join and on every permission change.
+   */
+  private syncMic(room: Room): Promise<void> {
+    const run = async () => {
+      if (this.room !== room) return
+      const allowed = this.micAllowed(room)
+      patch('self', { serverMuted: !allowed })
+      if (this.last?.publishMic === false) return
+      if (allowed && !this.mic) await this.publishMic(room, this.last?.bitrateKbps ?? DEFAULT_KBPS)
+      else if (!allowed && this.mic) await this.dropMic(room)
+      this.syncTray()
+    }
+    this.micOp = this.micOp.then(run, run)
+    return this.micOp
+  }
+
+  /** Unpublish + stop capture + close the graph (server mute, or the SFU unpublished it). */
+  private async dropMic(room: Room | null): Promise<void> {
+    const mic = this.mic
+    const graph = this.graph
+    this.mic = null
+    this.graph = null
+    if (mic) {
+      await room?.localParticipant.unpublishTrack(mic, true).catch(() => undefined)
+      mic.stop()
+    }
+    await graph?.close()
+    patch('self', { speaking: false, level: 0, gateOpen: false })
   }
 
   private async publishMic(room: Room, kbps: number): Promise<void> {
@@ -246,6 +307,7 @@ class MediaEngine {
       })
       .on(RoomEvent.ParticipantDisconnected, (rp) => {
         this.viewerEls.delete(rp.identity)
+        this.dropMeter(rp.identity)
         useMedia.setState((s) => {
           const viewers = { ...s.viewers }
           delete viewers[rp.identity]
@@ -255,8 +317,19 @@ class MediaEngine {
       })
       .on(RoomEvent.TrackPublished, (pub, rp) => this.onRemotePublished(pub, rp))
       .on(RoomEvent.TrackSubscribed, (track, pub, rp) => this.onSubscribed(track, pub, rp))
-      .on(RoomEvent.TrackUnsubscribed, (track) => {
+      .on(RoomEvent.TrackUnsubscribed, (track, pub, rp) => {
         for (const el of track.detach()) if (this.audioEls.delete(el)) el.remove()
+        if (pub.source === Track.Source.Microphone) this.dropMeter(rp.identity)
+      })
+      // Only while connected: connect() and Reconnected reconcile themselves (publishing mid-handshake isn't safe).
+      .on(RoomEvent.ParticipantPermissionsChanged, (_prev, p) => {
+        if (p === room.localParticipant && useMedia.getState().connection.state === 'connected') void this.syncMic(room)
+      })
+      // The SFU can unpublish our mic itself (permission revoked): LiveKit stops the track; release our side too.
+      .on(RoomEvent.LocalTrackUnpublished, (pub) => {
+        if (pub.source === Track.Source.Microphone && this.mic && pub.track === this.mic) {
+          this.micOp = this.micOp.then(() => this.dropMic(null))
+        }
       })
       .on(RoomEvent.TrackUnpublished, (pub, rp) => {
         if (pub.source === Track.Source.ScreenShare) this.unwatch(rp.identity)
@@ -267,6 +340,7 @@ class MediaEngine {
         const ms = this.reconnectT0 ? Math.round(performance.now() - this.reconnectT0) : null
         this.reconnectT0 = 0
         this.setConn('connected', null, { lastReconnectMs: ms, reconnects: useMedia.getState().connection.reconnects + 1 })
+        void this.syncMic(room)
       })
       .on(RoomEvent.Disconnected, (reason) => void this.onDisconnected(room, reason))
       .on(RoomEvent.MediaDevicesError, (e) => this.notify(`Erro de dispositivo: ${errText(e)}`))
@@ -291,11 +365,10 @@ class MediaEngine {
       this.setConn('disconnected', text)
       return
     }
-    this.setConn('disconnected', `${text} Tentando entrar de novo…`)
-    this.scheduleRejoin()
+    this.scheduleRejoin(`${text} Tentando entrar de novo…`)
   }
 
-  private scheduleRejoin(): void {
+  private scheduleRejoin(text = useMedia.getState().connection.reason): void {
     this.clearRejoin()
     const delay = REJOIN_BACKOFF_MS[this.rejoinAttempt]
     if (delay === undefined) {
@@ -303,6 +376,7 @@ class MediaEngine {
       return
     }
     this.rejoinTimer = setTimeout(() => void this.rejoin(), navigator.onLine === false ? Math.max(delay, 5000) : delay)
+    this.setConn('disconnected', text)
   }
 
   private async rejoin(): Promise<void> {
@@ -311,7 +385,7 @@ class MediaEngine {
     this.rejoinAttempt++
     try {
       const fresh = last.refresh ? await last.refresh() : null
-      await this.join({ ...last, ...(fresh ?? {}) })
+      await this.connect({ ...last, ...(fresh ?? {}) })
     } catch {
       if (!this.userLeft) this.scheduleRejoin()
     }
@@ -331,6 +405,7 @@ class MediaEngine {
     if (!this.last || this.userLeft) return
     const state = useMedia.getState().connection.state
     if (state === 'disconnected') {
+      this.clearRejoin()
       this.rejoinAttempt = 0
       return this.rejoin()
     }
@@ -363,6 +438,10 @@ class MediaEngine {
 
   private async teardown(): Promise<void> {
     this.stopTimers()
+    for (const el of this.ownEls) this.screenPub?.video.track?.detach(el)
+    for (const id of [...this.meters.keys()]) this.dropMeter(id)
+    void this.meterCtx?.close().catch(() => undefined)
+    this.meterCtx = null
     this.screenPub?.video.track?.stop()
     this.screenPub?.audio?.track?.stop()
     this.screenPub = null
@@ -377,11 +456,13 @@ class MediaEngine {
     const init = initialState()
     useMedia.setState({ participants: {}, viewers: {}, local: null })
     patch('screen', { active: false, stats: null, sourceId: null })
-    patch('self', { speaking: false, level: 0, levelDb: init.self.levelDb, gateOpen: false })
+    patch('self', { speaking: false, level: 0, levelDb: init.self.levelDb, gateOpen: false, quality: 'unknown', serverMuted: false })
   }
 
   private setConn(state: ConnectionState, reason: string | null, extra: Partial<MediaState['connection']> = {}): void {
-    patch('connection', { state, reason, ...extra })
+    // A retry is pending while LiveKit reconnects, while a scheduled rejoin waits and while it connects.
+    const willRetry = state === 'reconnecting' || (state === 'connecting' && this.rejoinAttempt > 0) || (state === 'disconnected' && this.rejoinTimer !== null)
+    patch('connection', { state, reason, willRetry, ...extra })
   }
 
   // ───────────────────────────── participants ─────────────────────────────
@@ -406,6 +487,7 @@ class MediaEngine {
       document.body.appendChild(el)
       this.audioEls.add(el)
       this.applyVolume(rp.identity)
+      if (pub.source === Track.Source.Microphone) this.addMeter(rp.identity, track.mediaStreamTrack)
     } else if (pub.source === Track.Source.ScreenShare) {
       if (this.room) this.room.options.adaptiveStream = ADAPTIVE
       for (const el of this.viewerEls.get(rp.identity) ?? []) track.attach(el)
@@ -492,6 +574,7 @@ class MediaEngine {
   setPttReleaseDelay(ms: number): void {
     this.ptt.delayMs = Math.max(0, Math.min(1000, ms))
     this.prefs.set({ pttReleaseMs: this.ptt.delayMs })
+    patch('self', { pttReleaseMs: this.ptt.delayMs })
   }
 
   pttDown(): void {
@@ -759,6 +842,7 @@ class MediaEngine {
     try {
       const pub = await this.publishScreen(room, stream, preset, contentType, codec)
       this.screenPub = { ...pub, preset, fps: [] }
+      for (const el of this.ownEls) pub.video.track?.attach(el)
       patch('screen', { active: true, sourceId: opts.sourceId ?? null })
       this.cue('streamStart')
     } catch (e) {
@@ -945,17 +1029,67 @@ class MediaEngine {
     }
   }
 
+  /** Self-preview: render my own outgoing screen into a <video> (call before or during a share). Returns detach. */
+  attachOwnScreen(el: HTMLVideoElement): () => void {
+    this.ownEls.add(el)
+    el.muted = true
+    this.screenPub?.video.track?.attach(el)
+    return () => {
+      this.ownEls.delete(el)
+      this.screenPub?.video.track?.detach(el)
+    }
+  }
+
   // ───────────────────────────── stats / ui tick ─────────────────────────────
 
   private startTimers(): void {
     this.stopTimers()
     this.uiTimer = setInterval(() => this.tickUi(), 200)
     this.statsTimer = setInterval(() => void this.tickStats(), 1000)
+    this.levelTimer = setInterval(() => this.tickLevels(), LEVEL_TICK_MS)
   }
   private stopTimers(): void {
     if (this.uiTimer) clearInterval(this.uiTimer)
     if (this.statsTimer) clearInterval(this.statsTimer)
-    this.uiTimer = this.statsTimer = null
+    if (this.levelTimer) clearInterval(this.levelTimer)
+    this.uiTimer = this.statsTimer = this.levelTimer = null
+  }
+
+  private addMeter(identity: string, track: MediaStreamTrack): void {
+    this.dropMeter(identity)
+    // No output device: this context only analyses; playback stays in LiveKit's own graph.
+    this.meterCtx ??= new AudioContext({ latencyHint: 'playback', sinkId: { type: 'none' } } as AudioContextOptions)
+    void this.meterCtx.resume().catch(() => undefined)
+    const an = this.meterCtx.createAnalyser()
+    an.fftSize = 2048
+    const src = this.meterCtx.createMediaStreamSource(new MediaStream([track]))
+    src.connect(an)
+    this.meters.set(identity, { src, an, buf: new Float32Array(an.fftSize), level: 0 })
+  }
+
+  private dropMeter(identity: string): void {
+    const m = this.meters.get(identity)
+    if (!m) return
+    m.src.disconnect()
+    this.meters.delete(identity)
+    this.updateParticipant(identity, { level: 0 })
+  }
+
+  /** participants[id].level: written only when it moves by >= 0.01, so silence costs no store updates. */
+  private tickLevels(): void {
+    if (!this.meters.size) return
+    const cur = useMedia.getState().participants
+    let next: Record<string, ParticipantView> | null = null
+    for (const [id, m] of this.meters) {
+      m.an.getFloatTimeDomainData(m.buf)
+      const inst = perceptualLevel(rmsDb(m.buf))
+      // Instant attack, x0.8 per 50 ms tick release (-50 % in ~150 ms): steady glow, no flicker between syllables.
+      m.level = inst >= m.level ? inst : Math.max(inst, m.level * 0.8)
+      const level = m.level < 0.01 ? 0 : Math.round(m.level * 100) / 100
+      const p = cur[id]
+      if (p && p.level !== level) (next ??= { ...cur })[id] = { ...p, level }
+    }
+    if (next) useMedia.setState({ participants: next })
   }
 
   private tickUi(): void {
@@ -970,7 +1104,7 @@ class MediaEngine {
         identity: rp.identity,
         name: rp.name || rp.identity,
         speaking: rp.isSpeaking,
-        level: Math.max(rp.audioLevel, (old?.level ?? 0) * 0.7),
+        level: old?.level ?? 0,
         micMuted: !mic || mic.isMuted,
         volume: this.prefs.volumeOf(rp.identity),
         locallyMuted: old?.locallyMuted ?? false,
@@ -981,6 +1115,8 @@ class MediaEngine {
       }
     }
     useMedia.setState({ participants })
+    const quality = room.localParticipant.connectionQuality as Quality
+    if (useMedia.getState().self.quality !== quality) patch('self', { quality })
   }
 
   private delta(key: string): StatsDelta {
@@ -1022,6 +1158,7 @@ class MediaEngine {
 
   setSoundsEnabled(on: boolean): void {
     this.prefs.set({ sounds: on })
+    patch('self', { sounds: on })
   }
 
   private cue(c: Cue): void {
@@ -1034,7 +1171,7 @@ class MediaEngine {
 
   private syncTray(): void {
     const s = useMedia.getState()
-    bridge()?.tray?.setVoiceState?.({ connected: s.connection.state === 'connected', muted: s.self.muted, deafened: s.self.deafened, channelName: s.connection.room ?? undefined })
+    bridge()?.tray?.setVoiceState?.({ connected: s.connection.state === 'connected', muted: s.self.muted, deafened: s.self.deafened, channelName: this.channelName ?? s.connection.room ?? undefined })
   }
 
   /** Dev/benchmark access (MediaLab only). Not part of the UI contract. */
