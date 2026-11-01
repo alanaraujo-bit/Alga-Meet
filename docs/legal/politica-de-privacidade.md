@@ -15,7 +15,7 @@
   - sua conta;
   - o que você envia (mensagens e arquivos);
   - dados técnicos de acesso.
-- **Não vendemos dados, não mostramos anúncios e não temos rastreadores nem telemetria no app.**
+- **Não vendemos dados, não mostramos anúncios e não temos rastreadores no app.** O único diagnóstico enviado é o relatório opcional de qualidade de chamada, desligado por padrão (ver abaixo).
 - Mensagens e chamadas são cifradas no caminho, mas **não têm criptografia de ponta a ponta**. Nossos servidores
   conseguem acessar o conteúdo, e a equipe só o acessa nos casos da seção 5.
 - Parte dos dados fica em servidores nos **Estados Unidos**. Os servidores de voz e de transmissão de tela ficam em
@@ -66,8 +66,14 @@ Os incisos citados são do art. 7º da LGPD. As bases legais usadas são:
 
 - **Não vendemos nem alugamos dados**, para ninguém.
 - **Não temos anúncios** e não montamos perfil de você para publicidade.
-- **Não há telemetria nem analytics no app.** Nenhum SDK de rastreamento, nenhum pixel e nenhum relatório de uso é
+- **Não há analytics nem rastreamento no app.** Nenhum SDK de rastreamento, nenhum pixel e nenhum relatório de uso é
   enviado. Também não coletamos conteúdo de mensagens para métricas.
+- **Relatório de qualidade de chamada — opcional, desligado por padrão.** Só se você ativar em Configurações, ao fim de
+  cada chamada o app envia números agregados para melhorarmos a voz e a transmissão: duração, tempo para entrar,
+  reconexões, latência, jitter, perda de pacotes, codecs usados, se a codificação foi por hardware, faixas de fps e
+  resolução, versão do app e do Windows e a classe do processador/placa de vídeo. **Nunca** inclui áudio, vídeo, mensagens,
+  nomes de salas, quem estava na chamada nem seu IP. Seu identificador é guardado como hash com sal rotativo e os dados
+  são apagados em 30 dias. Base legal: consentimento (LGPD art. 7º, I), revogável a qualquer momento desligando a opção.
 - **Não enviamos relatórios de travamento.** O app guarda esses relatórios só no seu computador.
 - **Não gravamos chamadas nem transmissões.**
 - **Não analisamos sua voz** para identificar você. Não tratamos biometria.
