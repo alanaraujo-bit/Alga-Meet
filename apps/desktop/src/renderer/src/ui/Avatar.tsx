@@ -2,9 +2,9 @@ import type { PresenceStatus } from '@alga/shared'
 import { useEffect, useId, useState, type RefObject } from 'react'
 import s from './Avatar.module.css'
 
-export type AvatarSize = 16 | 20 | 24 | 32 | 36 | 40 | 48 | 56 | 64 | 80 | 96
+export type AvatarSize = 16 | 20 | 24 | 32 | 36 | 40 | 48 | 56 | 64 | 80 | 88 | 96 | 112 | 128
 
-const DOT: Record<AvatarSize, number> = { 16: 0, 20: 8, 24: 8, 32: 10, 36: 11, 40: 12, 48: 13, 56: 14, 64: 16, 80: 18, 96: 20 }
+const DOT: Record<AvatarSize, number> = { 16: 0, 20: 8, 24: 8, 32: 10, 36: 11, 40: 12, 48: 13, 56: 14, 64: 16, 80: 18, 88: 19, 96: 20, 112: 22, 128: 24 }
 
 export const PRESENCE_LABEL: Record<PresenceStatus, string> = {
   online: 'Online',
@@ -17,8 +17,16 @@ export const PRESENCE_LABEL: Record<PresenceStatus, string> = {
  *  (H 160–220 is gone with the old accent) and no 40–110 band, which reads as mud. */
 const HUES = [140, 235, 255, 275, 295, 315, 340, 15] as const
 
-/** Stable hue per id so initials avatars are recognizable without being loud. */
+/**
+ * Hues measured from people's own avatars (personHue.ts), by user id. Once known, the person's color wins over the
+ * hash everywhere hueFor is used (profile banner, stage spot, name chip): the app is tinted by who is in it.
+ */
+export const measuredHue = new Map<string, number>()
+
+/** Stable hue per id so initials avatars are recognizable without being loud (or the avatar's own hue, once measured). */
 export function hueFor(id: string): number {
+  const m = measuredHue.get(id)
+  if (m !== undefined) return m
   let h = 0
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
   return HUES[h % HUES.length]!
