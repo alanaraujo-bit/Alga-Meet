@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { presenceAudience } from '../access.js'
 import type { Ctx } from '../app.js'
 import { resolveToken } from '../auth.js'
+import { safeErr } from '../errors.js'
 import { readStates, spaceMembers, users, type UserRow } from '../db/schema.js'
 import { afterMeUpdate } from '../routes/users.js'
 import { meView, privateChannelsOf, publicUser, relationshipsOf, spaceSnapshots } from '../views.js'
@@ -71,7 +72,7 @@ export async function buildReady(ctx: Ctx, user: UserRow): Promise<ReadyPayload>
 
 export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
   const { db, hub, voice, config } = ctx
-  const stateOps = new Throttle(STATE_OP_INTERVAL_MS, (err) => ctx.log.error({ err }, 'gateway state op failed'))
+  const stateOps = new Throttle(STATE_OP_INTERVAL_MS, (err) => ctx.log.error({ err: safeErr(err) }, 'gateway state op failed'))
   const prune = setInterval(() => stateOps.prune(), 60_000)
   prune.unref()
   app.addHook('onClose', async () => {
@@ -172,7 +173,7 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
       if (++frames > FRAME_LIMIT) return close(GatewayClose.RATE_LIMITED, 'rate limited')
       const raw = isBinary ? '' : data.toString()
       chain = chain.then(() => handle(raw)).catch((err: unknown) => {
-        log.error({ err }, 'gateway frame handling failed')
+        log.error({ err: safeErr(err) }, 'gateway frame handling failed')
         close(1011, 'internal error')
       })
     })
@@ -182,7 +183,7 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
       const c = conn
       conn = null
       if (c && hub.remove(c) && !hub.closing) {
-        broadcastPresence(db, hub, c.userId, 'offline').catch((err: unknown) => log.error({ err }, 'presence broadcast failed'))
+        broadcastPresence(db, hub, c.userId, 'offline').catch((err: unknown) => log.error({ err: safeErr(err) }, 'presence broadcast failed'))
       }
     })
 

@@ -2,13 +2,16 @@
  * Regression tests for docs/security/server-review-2026-11-01.md (one describe per finding).
  * Each test reproduces the reviewer's PoC and asserts the fixed behaviour.
  */
-import { DEFAULT_EVERYONE_PERMISSIONS, GatewayClose, Permission, type Invite, type SpaceSnapshot, type VoiceJoinResponse } from '@alga/shared'
+import { DEFAULT_EVERYONE_PERMISSIONS, GatewayClose, Permission, type Channel, type Invite, type SpaceSnapshot, type VoiceJoinResponse } from '@alga/shared'
 import { TokenVerifier } from 'livekit-server-sdk'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { loadConfig } from '../src/config.js'
 import { roles, sessions } from '../src/db/schema.js'
-import { api, connect, freshIp, openGateway, postWebhook, register, startServer, type TestServer } from './helpers.js'
+import { safeErr, safeUrl } from '../src/errors.js'
+import { setRel } from '../src/routes/users.js'
+import { relationships } from '../src/db/schema.js'
+import { api, befriend, connect, freshIp, openGateway, postWebhook, register, startServer, type TestServer } from './helpers.js'
 
 let s: TestServer
 beforeAll(async () => { s = await startServer() })
@@ -313,5 +316,136 @@ describe('M4/B1/B7/B8/B9 voice', () => {
     await postWebhook(s.app, s.config, lkEvent('participant_joined', voice.id, a.user.id))
     expect((await postWebhook(s.app, s.config, left)).status).toBe(200)
     expect(s.app.ctx.voice.inChannel(voice.id).map((v) => v.userId)).toEqual([a.user.id])
+  })
+})
+
+describe('M5 DMs need consent; group DMs can be left', () => {
+  const openDm = (token: string, recipientIds: string[]) => api<Channel>(s.app, 'POST', '/users/@me/channels', { token, body: { recipientIds } })
+
+  it('a 1:1 DM needs friendship or a shared space; a group DM needs every recipient to be a friend', async () => {
+    const [a, b, c, d] = [await register(s.app), await register(s.app), await register(s.app), await register(s.app)]
+    expect((await openDm(a.token, [b.user.id])).status).toBe(403)
+    expect((await openDm(a.token, [b.user.id, c.user.id])).status).toBe(403)
+    await spaceWith(a.token, d.token)
+    expect((await openDm(a.token, [d.user.id])).status).toBe(201) // shared space
+    expect((await openDm(a.token, [b.user.id, d.user.id])).status).toBe(403) // d is not a friend
+    await befriend(s.app, a, b)
+    await befriend(s.app, a, c)
+    expect((await openDm(a.token, [b.user.id])).status).toBe(201)
+    expect((await openDm(a.token, [b.user.id, c.user.id])).status).toBe(201)
+  })
+
+  it('DELETE /channels/:id/recipients/@me leaves a group DM (and its call)', async () => {
+    const [a, b, c] = [await register(s.app), await register(s.app), await register(s.app)]
+    await befriend(s.app, a, b)
+    await befriend(s.app, a, c)
+    const g = (await openDm(a.token, [b.user.id, c.user.id])).body
+    const ga = await connect(s.port, a.token)
+    const gb = await connect(s.port, b.token)
+    await postWebhook(s.app, s.config, lkEvent('participant_joined', g.id, b.user.id))
+    await ga.waitFor('VOICE_STATE_UPDATE', (v) => v.userId === b.user.id)
+    expect((await api(s.app, 'DELETE', `/channels/${g.id}/recipients/@me`, { token: b.token })).status).toBe(204)
+    expect(await gb.waitFor('CHANNEL_DELETE')).toEqual({ id: g.id, spaceId: null })
+    const upd = await ga.waitFor('CHANNEL_UPDATE', (ch) => ch.id === g.id)
+    expect(upd.recipientIds!.sort()).toEqual([a.user.id, c.user.id].sort())
+    await ga.waitFor('VOICE_STATE_REMOVE', (v) => v.userId === b.user.id)
+    expect((await api(s.app, 'GET', `/channels/${g.id}/messages`, { token: b.token })).status).toBe(403)
+    // 1:1 DMs have no "leave".
+    const dm = (await openDm(a.token, [b.user.id])).body
+    expect((await api(s.app, 'DELETE', `/channels/${dm.id}/recipients/@me`, { token: b.token })).status).toBe(400)
+    ga.close()
+    gb.close()
+  })
+})
+
+describe('M6 blocks and SEND_MESSAGES also cover edits', () => {
+  it('a blocked user cannot keep editing old DM messages', async () => {
+    const [a, b] = [await register(s.app), await register(s.app)]
+    await befriend(s.app, a, b)
+    const dm = (await api<Channel>(s.app, 'POST', '/users/@me/channels', { token: b.token, body: { recipientIds: [a.user.id] } })).body
+    const m = (await api(s.app, 'POST', `/channels/${dm.id}/messages`, { token: b.token, body: { content: 'oi' } })).body
+    expect((await api(s.app, 'PUT', `/relationships/${b.user.id}`, { token: a.token, body: { type: 'blocked' } })).status).toBe(200)
+    const ga = await connect(s.port, a.token)
+    expect((await api(s.app, 'PATCH', `/channels/${dm.id}/messages/${m.id}`, { token: b.token, body: { content: 'assédio' } })).status).toBe(403)
+    await ga.expectNone('MESSAGE_UPDATE')
+    ga.close()
+  })
+
+  it('losing SEND_MESSAGES in a space also stops edits', async () => {
+    const [a, b] = [await register(s.app), await register(s.app)]
+    const { space, text } = await spaceWith(a.token, b.token)
+    const m = (await api(s.app, 'POST', `/channels/${text.id}/messages`, { token: b.token, body: { content: 'oi' } })).body
+    await s.app.ctx.db.update(roles).set({ permissions: DEFAULT_EVERYONE_PERMISSIONS & ~Permission.SEND_MESSAGES }).where(eq(roles.id, space.id))
+    expect((await api(s.app, 'PATCH', `/channels/${text.id}/messages/${m.id}`, { token: b.token, body: { content: 'x' } })).status).toBe(403)
+  })
+})
+
+describe('M7 reactions are real emoji, at most 20 distinct per message', () => {
+  it('rejects arbitrary text and the 21st distinct emoji', async () => {
+    const [a, b, c] = [await register(s.app), await register(s.app), await register(s.app)]
+    const { text } = await spaceWith(a.token, b.token, c.token)
+    const m = (await api(s.app, 'POST', `/channels/${text.id}/messages`, { token: a.token, body: { content: 'hi' } })).body
+    const react = (token: string, emoji: string) =>
+      api(s.app, 'PUT', `/channels/${text.id}/messages/${m.id}/reactions/${encodeURIComponent(emoji)}`, { token })
+    expect((await react(b.token, '<img src=x>1')).status).toBe(400)
+    expect((await react(b.token, 'ab')).status).toBe(400)
+    for (const e of ['👍🏽', '❤️', '🇧🇷', '1️⃣', '👨‍👩‍👧']) expect((await react(b.token, e)).status).toBe(204)
+    const more = Array.from('😀😃😄😁😆😅😂🤣😊😇🙂🙃😉😌😍🥰')
+    const codes: number[] = []
+    for (const [i, e] of more.entries()) codes.push((await react(i < 8 ? a.token : c.token, e)).status)
+    expect(codes.slice(0, 15).every((x) => x === 204)).toBe(true)
+    expect(codes[15]).toBe(400) // 21st distinct emoji
+    expect((await react(c.token, '👍🏽')).status).toBe(204) // existing emoji still accepts more users
+  })
+})
+
+describe('M9/B4 input bounds', () => {
+  it('avatarUrl / iconUrl must be https', async () => {
+    const a = await register(s.app)
+    const { space } = await spaceWith(a.token)
+    for (const u of ['javascript:alert(1)', 'file:///C:/Windows/win.ini', 'http://attacker.example/p.gif', 'data:image/png;base64,AA']) {
+      expect((await api(s.app, 'PATCH', '/users/@me', { token: a.token, body: { avatarUrl: u } })).status).toBe(400)
+      expect((await api(s.app, 'PATCH', `/spaces/${space.id}`, { token: a.token, body: { iconUrl: u } })).status).toBe(400)
+    }
+    expect((await api(s.app, 'PATCH', '/users/@me', { token: a.token, body: { avatarUrl: 'https://cdn.example/a.png' } })).status).toBe(200)
+  })
+
+  it('channel position is bounded (no 500 on integer overflow)', async () => {
+    const a = await register(s.app)
+    const { text } = await spaceWith(a.token)
+    expect((await api(s.app, 'PATCH', `/channels/${text.id}`, { token: a.token, body: { position: 2 ** 40 } })).status).toBe(400)
+  })
+})
+
+describe('B2/B3/B6', () => {
+  it('B2: a relationship write never overwrites a block', async () => {
+    const [a, b] = [await register(s.app), await register(s.app)]
+    await setRel(s.app.ctx.db, b.user.id, a.user.id, 'blocked')
+    await setRel(s.app.ctx.db, b.user.id, a.user.id, 'incoming') // the losing side of the PoC race
+    const [row] = await s.app.ctx.db.select().from(relationships)
+      .where(and(eq(relationships.userId, b.user.id), eq(relationships.targetId, a.user.id)))
+    expect(row!.type).toBe('blocked')
+  })
+
+  it('B3: logged errors drop query params / pg detail, and invite codes are redacted from URLs', () => {
+    const cause = Object.assign(new Error('duplicate key value violates unique constraint "users_email_key"'), {
+      code: '23505', detail: 'Key (email)=(victim@example.com) already exists.',
+    })
+    const err = Object.assign(new Error('Failed query: insert into "users" values ($1, $2)\nparams: victim@example.com,$argon2id$secret'), {
+      query: 'insert into "users" values ($1, $2)', params: ['victim@example.com', '$argon2id$secret'], cause,
+    })
+    const logged = JSON.stringify(safeErr(err))
+    expect(logged).not.toMatch(/victim@example\.com|argon2id/)
+    expect(logged).toMatch(/23505/)
+    expect(safeUrl('/api/v1/invites/Ab3dEf9h?x=1')).toBe('/api/v1/invites/<redacted>?x=1')
+  })
+
+  it('B6: invites die with their creator\'s membership', async () => {
+    const [a, b] = [await register(s.app), await register(s.app)]
+    const { space } = await spaceWith(a.token, b.token)
+    const mine = (await api<Invite>(s.app, 'POST', `/spaces/${space.id}/invites`, { token: b.token, body: {} })).body
+    expect((await api(s.app, 'GET', `/invites/${mine.code}`, { ip: freshIp() })).status).toBe(200)
+    expect((await api(s.app, 'DELETE', `/spaces/${space.id}/members/@me`, { token: b.token })).status).toBe(204)
+    expect((await api(s.app, 'GET', `/invites/${mine.code}`, { ip: freshIp() })).status).toBe(404)
   })
 })

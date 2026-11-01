@@ -50,6 +50,24 @@ export function idParam(value: string | undefined): string {
   return value
 }
 
+/**
+ * Error for logs without data: drizzle puts SQL params in `message`/`params`, pg puts row values in `detail`.
+ * Keeps type, the query text (placeholders only), pg `code` and the stack frames.
+ */
+export function safeErr(err: unknown): Record<string, unknown> {
+  const e = (err ?? {}) as { name?: string; message?: unknown; code?: unknown; stack?: string; cause?: unknown }
+  return {
+    type: e.name,
+    message: String(e.message ?? '').split('\nparams:')[0],
+    code: e.code,
+    stack: e.stack?.split('\n').filter((l) => l.trimStart().startsWith('at ')).join('\n'),
+    ...(e.cause ? { cause: safeErr(e.cause) } : {}),
+  }
+}
+
+/** Invite codes in URLs are bearer secrets for joining; keep them out of request logs. */
+export const safeUrl = (url: string) => url.replace(/(\/invites\/)[^/?#]+/, '$1<redacted>')
+
 const body = (code: ApiErrorCode, message: string, fields?: Record<string, string>): ApiError =>
   ({ error: fields ? { code, message, fields } : { code, message } })
 
@@ -71,7 +89,7 @@ export function installErrorHandling(app: FastifyInstance): void {
       // Fastify-level client errors: malformed JSON, unsupported media type, body too large…
       return reply.code(status).send(body(status === 404 ? 'not_found' : 'bad_request', err.message))
     }
-    req.log.error({ err }, 'unhandled error')
+    req.log.error({ err: safeErr(err) }, 'unhandled error')
     return reply.code(500).send(body('internal', 'Erro interno.'))
   })
 }

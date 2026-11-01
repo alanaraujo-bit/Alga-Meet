@@ -1,6 +1,6 @@
 import type { Channel, Relationship } from '@alga/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { api, connect, register, startServer, type TestServer } from './helpers.js'
+import { api, befriend, connect, register, startServer, type TestServer } from './helpers.js'
 
 let s: TestServer
 beforeAll(async () => { s = await startServer() })
@@ -104,6 +104,7 @@ describe('blocking', () => {
   it('blocks messages in an existing DM', async () => {
     const a = await register(s.app)
     const b = await register(s.app)
+    await befriend(s.app, a, b)
     const dm = await api<Channel>(s.app, 'POST', '/users/@me/channels', { token: a.token, body: { recipientIds: [b.user.id] } })
     expect((await api(s.app, 'POST', `/channels/${dm.body.id}/messages`, { token: b.token, body: { content: 'oi' } })).status).toBe(200)
     await api(s.app, 'PUT', `/relationships/${b.user.id}`, { token: a.token, body: { type: 'blocked' } })
@@ -116,6 +117,7 @@ describe('direct messages', () => {
   it('opening a 1:1 DM is idempotent from either side and visible in READY', async () => {
     const a = await register(s.app)
     const b = await register(s.app)
+    await befriend(s.app, a, b)
     const gwB = await connect(s.port, b.token)
     const first = await api<Channel>(s.app, 'POST', '/users/@me/channels', { token: a.token, body: { recipientIds: [b.user.id] } })
     expect(first.status).toBe(201)
@@ -140,6 +142,8 @@ describe('direct messages', () => {
 
   it('creates group DMs and rejects bad recipient lists', async () => {
     const [a, b, c] = [await register(s.app), await register(s.app), await register(s.app)]
+    await befriend(s.app, a, b)
+    await befriend(s.app, a, c)
     const g = await api<Channel>(s.app, 'POST', '/users/@me/channels', { token: a.token, body: { recipientIds: [b.user.id, c.user.id] } })
     expect(g.status).toBe(201)
     expect(g.body.type).toBe('group_dm')

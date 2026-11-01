@@ -92,6 +92,19 @@ export async function isBlockedBetween(db: Db, a: string, b: string): Promise<bo
   return rows.length > 0
 }
 
+export async function isFriend(db: Db, a: string, b: string): Promise<boolean> {
+  const rows = await db.select({ t: relationships.type }).from(relationships)
+    .where(and(eq(relationships.userId, a), eq(relationships.targetId, b), eq(relationships.type, 'friend'))).limit(1)
+  return rows.length > 0
+}
+
+export async function sharesSpace(db: Db, a: string, b: string): Promise<boolean> {
+  const theirs = db.select({ id: spaceMembers.spaceId }).from(spaceMembers).where(eq(spaceMembers.userId, b))
+  const rows = await db.select({ id: spaceMembers.spaceId }).from(spaceMembers)
+    .where(and(eq(spaceMembers.userId, a), inArray(spaceMembers.spaceId, theirs))).limit(1)
+  return rows.length > 0
+}
+
 /** For 1:1 DMs: refuses when a block exists between the participants. */
 export async function assertDmNotBlocked(db: Db, access: ChannelAccess, userId: string): Promise<void> {
   if (access.channel.type !== 'dm') return

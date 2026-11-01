@@ -59,6 +59,8 @@ async function removeMember(ctx: Ctx, spaceId: string, userId: string): Promise<
   const chans = await db.select({ id: channels.id }).from(channels).where(eq(channels.spaceId, spaceId))
   await voice.disconnect(userId, chans.map((c) => c.id))
   await db.delete(spaceMembers).where(and(eq(spaceMembers.spaceId, spaceId), eq(spaceMembers.userId, userId)))
+  // Their invites must not keep letting people in after they leave or are removed.
+  await db.delete(invites).where(and(eq(invites.spaceId, spaceId), eq(invites.inviterId, userId)))
   hub.dispatch(await spaceMemberIds(db, spaceId), 'MEMBER_REMOVE', { spaceId, userId })
   hub.dispatch([userId], 'SPACE_DELETE', { id: spaceId })
 }

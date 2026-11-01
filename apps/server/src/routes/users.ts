@@ -2,9 +2,9 @@ import {
   FriendRequestBody, OpenDmBody, PatchMeBody, PutRelationshipBody, uuidv7,
   type Channel, type Me, type PublicUser, type Relationship,
 } from '@alga/shared'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, ne } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
-import { isBlockedBetween, profileAudience } from '../access.js'
+import { isBlockedBetween, isFriend, profileAudience, requireChannel, sharesSpace } from '../access.js'
 import type { Ctx } from '../app.js'
 import { isUniqueViolation, type Db } from '../db/index.js'
 import { channelRecipients, channels, relationships, users, type UserRow } from '../db/schema.js'
@@ -36,9 +36,13 @@ async function relOf(db: Db, userId: string, targetId: string): Promise<RelType 
   return r?.type
 }
 
-async function setRel(db: Db, userId: string, targetId: string, type: RelType): Promise<void> {
-  await db.insert(relationships).values({ userId, targetId, type, since: new Date() })
-    .onConflictDoUpdate({ target: [relationships.userId, relationships.targetId], set: { type, since: new Date() } })
+/** Upsert; only a block may replace a block (unblocking is a DELETE), so a racing request cannot undo one. */
+export async function setRel(db: Db, userId: string, targetId: string, type: RelType): Promise<void> {
+  await db.insert(relationships).values({ userId, targetId, type, since: new Date() }).onConflictDoUpdate({
+    target: [relationships.userId, relationships.targetId],
+    set: { type, since: new Date() },
+    ...(type === 'blocked' ? {} : { setWhere: ne(relationships.type, 'blocked') }),
+  })
 }
 
 async function delRel(db: Db, userId: string, targetId: string): Promise<void> {
@@ -177,6 +181,12 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
       const dm = await existing()
       if (dm) return dm
     }
+    // New conversations need consent: friends, or (1:1 only) a shared space.
+    for (const id of ids) {
+      if (await isFriend(db, me, id)) continue
+      if (ids.length > 1) throw forbidden('Só é possível adicionar amigos a um grupo.')
+      if (!(await sharesSpace(db, me, id))) throw forbidden('Você só pode iniciar conversa com amigos ou membros de um espaço em comum.')
+    }
     const id = uuidv7()
     const members = [me, ...ids]
     try {
@@ -197,5 +207,18 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
     hub.dispatch(members, 'CHANNEL_CREATE', channel)
     reply.code(201)
     return channel
+  })
+
+  app.delete<{ Params: { id: string } }>('/channels/:id/recipients/@me', async (req, reply) => {
+    const me = req.auth.user.id
+    const { channel, recipientIds } = await requireChannel(db, idParam(req.params.id), me)
+    if (channel.type !== 'group_dm') throw badRequest('Só é possível sair de grupos.')
+    await ctx.voice.disconnect(me, [channel.id])
+    await db.delete(channelRecipients).where(and(eq(channelRecipients.channelId, channel.id), eq(channelRecipients.userId, me)))
+    const rest = recipientIds.filter((id) => id !== me)
+    hub.dispatch([me], 'CHANNEL_DELETE', { id: channel.id, spaceId: null })
+    if (rest.length) hub.dispatch(rest, 'CHANNEL_UPDATE', channelView(channel, rest))
+    else await db.delete(channels).where(eq(channels.id, channel.id))
+    return reply.code(204).send()
   })
 }

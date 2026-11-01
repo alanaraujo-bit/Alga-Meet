@@ -1,7 +1,7 @@
 import type { Invite, Message, SpaceSnapshot } from '@alga/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { mentionedIds } from '../src/routes/messages.js'
-import { api, connect, register, startServer, type TestServer } from './helpers.js'
+import { api, befriend, connect, register, startServer, type TestServer } from './helpers.js'
 
 let s: TestServer
 beforeAll(async () => { s = await startServer() })
@@ -148,6 +148,7 @@ describe('messages', () => {
     const a = await register(s.app)
     const b = await register(s.app)
     const c = await register(s.app)
+    await befriend(s.app, a, b)
     const dm = (await api(s.app, 'POST', '/users/@me/channels', { token: a.token, body: { recipientIds: [b.user.id] } })).body
     const gwB = await connect(s.port, b.token)
     const gwC = await connect(s.port, c.token)

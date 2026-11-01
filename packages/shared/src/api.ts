@@ -22,6 +22,8 @@ import type { Me } from './models.js'
  * PUT    /relationships/:userId    PutRelationshipBody   -> Relationship   (accept / block)
  * DELETE /relationships/:userId                          -> 204            (remove/decline/cancel/unblock)
  * POST   /users/@me/channels       OpenDmBody            -> Channel        (open or create DM / group DM)
+ *   A new 1:1 DM needs friendship or a shared space; a group DM needs every recipient to be the creator's friend.
+ * DELETE /channels/:id/recipients/@me                     -> 204 (leave a group DM; CHANNEL_DELETE to you, CHANNEL_UPDATE to the rest)
  * POST   /spaces                   CreateSpaceBody       -> SpaceSnapshot
  * PATCH  /spaces/:id               PatchSpaceBody        -> Space
  * DELETE /spaces/:id                                     -> 204 (owner only)
@@ -59,6 +61,9 @@ export type ApiErrorCode =
 export interface ApiError {
   error: { code: ApiErrorCode; message: string; fields?: Record<string, string> }
 }
+
+/** Profile/space images: https only (no javascript:/file:/data:/http: — tracking and unsafe schemes). */
+const httpsUrl = z.url({ protocol: /^https$/ }).max(2048)
 
 const username = z
   .string()
@@ -99,7 +104,7 @@ export const PatchMeBody = z.object({
   username: username.optional(),
   bio: z.string().max(190).optional(),
   accentColor: z.string().regex(/^#[0-9a-f]{6}$/i).nullable().optional(),
-  avatarUrl: z.string().url().max(2048).nullable().optional(),
+  avatarUrl: httpsUrl.nullable().optional(),
   statusPreference: z.enum(['online', 'idle', 'dnd', 'invisible']).optional(),
 })
 export type PatchMeBody = z.infer<typeof PatchMeBody>
@@ -118,7 +123,7 @@ export type CreateSpaceBody = z.infer<typeof CreateSpaceBody>
 
 export const PatchSpaceBody = z.object({
   name: z.string().trim().min(1).max(100).optional(),
-  iconUrl: z.string().url().max(2048).nullable().optional(),
+  iconUrl: httpsUrl.nullable().optional(),
 })
 export type PatchSpaceBody = z.infer<typeof PatchSpaceBody>
 
@@ -132,7 +137,7 @@ export type CreateChannelBody = z.infer<typeof CreateChannelBody>
 export const PatchChannelBody = z.object({
   name: z.string().trim().min(1).max(100).optional(),
   topic: z.string().max(1024).optional(),
-  position: z.number().int().min(0).optional(),
+  position: z.number().int().min(0).max(10_000).optional(),
   bitrateKbps: z.number().int().min(16).max(256).optional(),
   userLimit: z.number().int().min(0).max(99).optional(),
 })

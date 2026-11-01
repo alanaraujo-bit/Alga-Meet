@@ -5,7 +5,7 @@ import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify'
 import { authenticate, type AuthContext } from './auth.js'
 import type { Config } from './config.js'
 import { openDatabase, type Db } from './db/index.js'
-import { HttpError, installErrorHandling } from './errors.js'
+import { HttpError, installErrorHandling, safeUrl } from './errors.js'
 import { Hub } from './gateway/hub.js'
 import { gatewayRoute } from './gateway/socket.js'
 import { authPublicRoutes, authRoutes } from './routes/auth.js'
@@ -41,6 +41,9 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       level: config.logLevel,
       // Bodies are never logged; headers only through these redactions.
       redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["sec-websocket-protocol"]'],
+      serializers: {
+        req: (req: { method: string; url: string; ip: string }) => ({ method: req.method, url: safeUrl(req.url), remoteAddress: req.ip }),
+      },
     },
   })
 

@@ -67,6 +67,14 @@ export async function register(app: FastifyInstance, name?: string): Promise<Aut
   return { ...res.body, password }
 }
 
+/** Makes `a` and `b` friends (request + accept). */
+export async function befriend(app: FastifyInstance, a: AuthResponse, b: AuthResponse): Promise<void> {
+  const req = await api(app, 'POST', '/relationships', { token: a.token, body: { username: b.user.username } })
+  if (req.status !== 200) throw new Error(`friend request failed: ${req.status}`)
+  const acc = await api(app, 'PUT', `/relationships/${a.user.id}`, { token: b.token, body: { type: 'friend' } })
+  if (acc.status !== 200) throw new Error(`accept failed: ${acc.status}`)
+}
+
 /** Minimal gateway client recording every dispatch. */
 export class Gateway {
   readonly events: Dispatch[] = []

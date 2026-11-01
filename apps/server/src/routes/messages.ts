@@ -2,7 +2,7 @@ import {
   AckBody, EditMessageBody, Permission, SendMessageBody, hasPermission, uuidv7,
   type Message, type ReadState,
 } from '@alga/shared'
-import { and, asc, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm'
+import { and, asc, countDistinct, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { assertDmNotBlocked, channelAudience, requireChannel, type ChannelAccess } from '../access.js'
@@ -33,8 +33,14 @@ async function messageIn(db: Db, channelId: string, messageId: string): Promise<
   return m
 }
 
-function checkEmoji(emoji: string): string {
-  if (!emoji.trim() || emoji.length > 32) throw invalid({ emoji: 'Emoji inválido (máx. 32 caracteres).' })
+// One emoji: an RGI sequence (skin tones, ZWJ families, flags, keycaps) or a pictograph with optional VS16.
+// Built with RegExp because the `v` flag is newer than the ES2023 compile target (Node 24 supports it).
+const EMOJI_RE = new RegExp('^(?:\\p{RGI_Emoji}|\\p{Extended_Pictographic}\\uFE0F?)$', 'v')
+const MAX_DISTINCT_REACTIONS = 20
+
+/** `strict` for adding; removal only bounds the length, so reactions stored before validation can still go. */
+function checkEmoji(emoji: string, strict = true): string {
+  if (!emoji.trim() || emoji.length > 32 || (strict && !EMOJI_RE.test(emoji))) throw invalid({ emoji: 'Emoji inválido.' })
   return emoji
 }
 
@@ -118,7 +124,9 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
 
   app.patch<PM>('/channels/:id/messages/:mid', async (req): Promise<Message> => {
     const me = req.auth.user.id
-    const access = await requireChannel(db, idParam(req.params.id), me, Permission.VIEW_CHANNELS)
+    // Same gate as sending: an edit is pushed live to the channel, so a block or a lost SEND_MESSAGES must stop it.
+    const access = await requireChannel(db, idParam(req.params.id), me, Permission.SEND_MESSAGES)
+    await assertDmNotBlocked(db, access, me)
     const msg = await messageIn(db, access.channel.id, idParam(req.params.mid))
     if (msg.authorId !== me) throw forbidden('Você só pode editar suas próprias mensagens.')
     const { content } = parse(EditMessageBody, req.body)
@@ -146,6 +154,13 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
     await assertDmNotBlocked(db, access, me)
     const msg = await messageIn(db, access.channel.id, idParam(req.params.mid))
     const emoji = checkEmoji(req.params.emoji)
+    const [known] = await db.select({ e: reactions.emoji }).from(reactions)
+      .where(and(eq(reactions.messageId, msg.id), eq(reactions.emoji, emoji))).limit(1)
+    if (!known) {
+      // shortcut: check-then-insert, concurrent requests may overshoot by a few; make it conditional SQL if that matters.
+      const [c] = await db.select({ n: countDistinct(reactions.emoji) }).from(reactions).where(eq(reactions.messageId, msg.id))
+      if ((c?.n ?? 0) >= MAX_DISTINCT_REACTIONS) throw invalid({ emoji: `Limite de ${MAX_DISTINCT_REACTIONS} reações diferentes por mensagem.` })
+    }
     const added = await db.insert(reactions).values({ messageId: msg.id, userId: me, emoji }).onConflictDoNothing().returning()
     if (added.length) {
       hub.dispatch(await channelAudience(db, access.channel, access.recipientIds), 'REACTION_ADD',
@@ -158,7 +173,7 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
     const me = req.auth.user.id
     const access = await requireChannel(db, idParam(req.params.id), me, Permission.VIEW_CHANNELS)
     const msg = await messageIn(db, access.channel.id, idParam(req.params.mid))
-    const emoji = checkEmoji(req.params.emoji)
+    const emoji = checkEmoji(req.params.emoji, false)
     const removed = await db.delete(reactions)
       .where(and(eq(reactions.messageId, msg.id), eq(reactions.userId, me), eq(reactions.emoji, emoji))).returning()
     if (removed.length) {

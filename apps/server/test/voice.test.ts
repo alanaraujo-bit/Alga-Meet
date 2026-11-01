@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { TokenVerifier } from 'livekit-server-sdk'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { roles } from '../src/db/schema.js'
-import { api, connect, postWebhook, register, signedWebhook, startServer, type TestServer } from './helpers.js'
+import { api, befriend, connect, postWebhook, register, signedWebhook, startServer, type TestServer } from './helpers.js'
 
 let s: TestServer
 beforeAll(async () => { s = await startServer() })
@@ -78,6 +78,7 @@ describe('voice join', () => {
   it('DM participants can join the DM call room', async () => {
     const a = await register(s.app)
     const b = await register(s.app)
+    await befriend(s.app, a, b)
     const dm = (await api<Channel>(s.app, 'POST', '/users/@me/channels', { token: a.token, body: { recipientIds: [b.user.id] } })).body
     const res = await join(b.token, dm.id)
     expect(res.status).toBe(200)
@@ -170,6 +171,7 @@ describe('livekit webhook', () => {
   it('first participant in a DM room rings the other recipients; kicking from a space drops voice', async () => {
     const a = await register(s.app)
     const b = await register(s.app)
+    await befriend(s.app, a, b)
     const dm = (await api<Channel>(s.app, 'POST', '/users/@me/channels', { token: a.token, body: { recipientIds: [b.user.id] } })).body
     const gwA = await connect(s.port, a.token)
     const gwB = await connect(s.port, b.token)
