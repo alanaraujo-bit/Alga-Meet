@@ -114,6 +114,9 @@ Medições [MEDIDO] em `docs/benchmarks/media-baseline.md` — **localhost, duas
 
 Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não decodifica HEVC (backup **ainda não exercitado**); H.264 por hardware não engata no Electron 45 (sempre OpenH264). Decisão em `docs/decisions/0001-media-engine.md`.
 
+## Acessibilidade (a9330d4, `docs/accessibility/2026-11-01-audit.md`)
+Percursos só por teclado 3/10 → **10/10**; achados da auditoria 31 → 1; regiões ao vivo 2/5 → 5/5 (toasts e entrada/saída na chamada anunciadas); alto contraste (emulação clara do Playwright) 12 estados invisíveis → 0; movimento reduzido já funcionava. Pendentes: teste manual com NVDA/Narrador; rótulo + `aria-pressed` duplicados nos botões de mudo/surdo (precisa mudar junto com os scripts que procuram por texto); temas escuros de alto contraste do Windows não verificados.
+
 ## Problemas conhecidos
 - **Lição do QA:** a flag `--use-fake-device-for-media-stream` troca silenciosamente a captura de tela por uma tela sintética — testes antigos de transmissão nunca capturaram janela real. Testes de tela agora devem rodar o transmissor sem fake devices.
 - `livekit-client` (~500 kB) carrega na inicialização (motor de mídia importado no boot) e zod (~55 kB) ainda vai no renderer — exigem carregamento preguiçoso do `media/` e separar constantes/schemas no `@alga/shared`.
