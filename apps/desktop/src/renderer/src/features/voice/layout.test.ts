@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { balancedRows, featuredWidth, fitGrid, nearestCorner, stageLayout, stripTile } from './layout'
+import { balancedRows, cardWidth, featuredWidth, fitGrid, nearestCorner, seatWidth, stageLayout, stripTile, voiceLayout } from './layout'
 
 describe('call grid', () => {
   it('balances rows so no tile is left alone on the last one', () => {
@@ -41,6 +41,42 @@ describe('call grid', () => {
     const l = stageLayout(7, 1008, 652)
     expect(l.rows).toEqual([3, 2, 2])
     expect(l.width).toBeGreaterThanOrEqual(200)
+  })
+})
+
+describe('voice-only stage', () => {
+  it('seats 1–12 people in calm, balanced rows', () => {
+    // The 976×652 box of a 1320×840 window.
+    const rows = (n: number) => voiceLayout(n, 976, 652).rows
+    expect(rows(1)).toEqual([1])
+    expect(rows(2)).toEqual([2])
+    expect(rows(4)).toEqual([4])
+    expect(rows(5)).toEqual([3, 2])
+    expect(rows(6)).toEqual([3, 3])
+    expect(rows(7)).toEqual([4, 3])
+    expect(rows(9)).toEqual([3, 3, 3])
+    expect(rows(12)).toEqual([4, 4, 4])
+  })
+
+  it('faces are large, step down on short stages and in big rooms, and always fit', () => {
+    expect(voiceLayout(2, 976, 652).avatar).toBe(112)
+    expect(voiceLayout(2, 1600, 860).avatar).toBe(128)
+    expect(voiceLayout(3, 976, 480).avatar).toBe(88)
+    expect(voiceLayout(9, 976, 652).avatar).toBe(64)
+    for (const n of [1, 3, 5, 8, 12]) {
+      for (const [w, h] of [[976, 652], [700, 420], [1500, 860]] as const) {
+        const l = voiceLayout(n, w, h)
+        expect(l.rows.reduce((a, b) => a + b, 0)).toBe(n)
+        expect(Math.max(...l.rows) * seatWidth(l.avatar) + (Math.max(...l.rows) - 1) * l.gap).toBeLessThanOrEqual(w)
+        if (l.avatar > 64) expect(l.height).toBeLessThanOrEqual(h)
+      }
+    }
+  })
+
+  it('live cards take about half the stage, never more than 520 wide', () => {
+    expect(cardWidth(1, 976, 652)).toBe(520)
+    expect(cardWidth(2, 976, 652)).toBeLessThanOrEqual((976 - 24) / 2)
+    expect(cardWidth(0, 976, 652)).toBe(0)
   })
 })
 

@@ -54,6 +54,47 @@ export function stageLayout(n: number, w: number, h: number, gap = GAP): StageLa
   return { width: g.width, rows: balancedRows(n, g.cols) }
 }
 
+/** Avatar sizes of the voice-only stage (critique r3 #1): 112 normally, 128 on a big stage with few people, 88 on a
+ *  short stage, 64 above 8 people or wherever the larger ones do not fit. */
+export type SeatSize = 64 | 88 | 112 | 128
+/** Name line under the face: 8 px gap + 22 px chip. */
+const SEAT_LABEL = 30
+/** A seat is the face plus room for the name on both sides. */
+export const seatWidth = (avatar: SeatSize) => avatar + 56
+
+export interface VoiceLayout {
+  avatar: SeatSize
+  gap: number
+  rows: number[]
+  /** Height of the seat block (rows × seat + gaps). */
+  height: number
+}
+
+/**
+ * Voice-only stage: bare faces on the stage, no 16:9 boxes. Up to 4 people sit side by side; more go into balanced
+ * rows of about √(1.5 n) (5 → 3+2, 7 → 4+3, 9 → 3·3·3, 12 → 4·4·4). The largest size whose rows fit wins.
+ */
+export function voiceLayout(n: number, w: number, h: number): VoiceLayout {
+  const sizes: SeatSize[] = n > 8 ? [64] : h < 560 ? [88, 64] : n <= 3 && h >= 760 && w >= 1100 ? [128, 112, 88, 64] : [112, 88, 64]
+  const want = n <= 4 ? n : Math.ceil(Math.sqrt(1.5 * n))
+  let out: VoiceLayout | null = null
+  for (const avatar of sizes) {
+    const gap = avatar >= 112 ? 48 : 40
+    const fit = Math.max(1, Math.floor((w + gap) / (seatWidth(avatar) + gap)))
+    const rows = balancedRows(n, Math.min(want, fit))
+    const height = rows.length * (avatar + SEAT_LABEL) + Math.max(0, rows.length - 1) * gap
+    out = { avatar, gap, rows, height }
+    if (height <= h) break
+  }
+  return out ?? { avatar: 64, gap: 40, rows: [], height: 0 }
+}
+
+/** Live cards (someone streaming, nobody watching it big) sit above the faces: 16:9, at most 520 wide, ~half the stage. */
+export function cardWidth(k: number, w: number, h: number, gap = 24): number {
+  if (k <= 0) return 0
+  return Math.max(200, Math.floor(Math.min(520, (w - gap * (k - 1)) / k, ((h * 0.5) * 16) / 9)))
+}
+
 /** People under a watched stream: 160×90, or 120×68 when the stage box is short (stage under 720 px). */
 export const stripTile = (h: number): { w: number; h: number } => (h < STRIP_SHORT ? { w: 120, h: 68 } : { w: 160, h: 90 })
 

@@ -1,26 +1,28 @@
 import type { Channel } from '@alga/shared'
-import { ArrowLeftRight, BarChart3, HeadphoneOff, Minimize, MicOff, MonitorUp, MoreHorizontal, PictureInPicture2, Scan, ShieldOff, Square, Volume2, WifiOff, X, Signal } from '@/ui/icons'
+import { ArrowLeftRight, BarChart3, Headphones, Mic, Minimize, MonitorUp, MoreHorizontal, PictureInPicture2, Scan, ShieldOff, Square, Volume2, WifiOff, X, Signal, type Glyph } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia, type StreamQuality } from '@/media'
 import { useData } from '@/store/data'
 import { channelTitle, displayName, voiceMembers } from '@/store/selectors'
-import { Avatar, Button, contextMenuHandler, Fronds, Icon, IconButton, Popover, SegmentedControl, Spinner, Switch, Tooltip, useEnvelope } from '@/ui'
-import { EASE_OUT_QUART } from '@/ui/motion'
+import { Avatar, Button, contextMenuHandler, Icon, IconButton, Popover, SegmentedControl, Spinner, Switch, Tooltip, useEnvelope, usePersonHue, type AvatarSize } from '@/ui'
+import type { IconSize } from '@/ui/Icon'
+import { EASE_IN_OUT_CUBIC, EASE_OUT_QUART } from '@/ui/motion'
 import { AuraGlyph, DecoratedAvatar, ReactionLayer, StreamFrame } from '../billing/Cosmetics'
 import { useEncodingGate, useTileCount } from '../billing/engine'
 import { useLook } from '../billing/store'
 import { personEntries } from '../shell/people'
 import { ControlsDock } from './ControlsDock'
-import { featuredWidth, stageLayout, stripTile } from './layout'
-import { useLevelGetter, roomLevelNow } from './levels'
+import { E2eeChip, MismatchBanner } from './E2ee'
+import { cardWidth, featuredWidth, seatWidth, stripTile, voiceLayout, type SeatSize } from './layout'
+import { useLevelGetter } from './levels'
 import { t } from './strings'
 import { joinVoice, leaveVoice, useVoice } from './voice'
 import sh from '../shell/shell.module.css'
 import s from './stage.module.css'
 
-/** Content box of the stage (re-measured when `key` swaps the element, e.g. grid ⇄ watched stream). */
+/** Content box of the stage (re-measured when `key` swaps the element, e.g. voice stage ⇄ watched stream). */
 function useBox(ref: RefObject<HTMLElement | null>, key: unknown): { w: number; h: number } {
   const [box, setBox] = useState({ w: 0, h: 0 })
   useLayoutEffect(() => {
@@ -35,18 +37,18 @@ function useBox(ref: RefObject<HTMLElement | null>, key: unknown): { w: number; 
   return box
 }
 
-type Conn = { state: string; channelId: string | null; reason: string | null }
+type Conn = { state: string; channelId: string | null; reason: string | null; failed: boolean }
 
 /**
  * The call. `channel` = a space voice channel (full main area) or a DM (variant "dm": top of the conversation).
  * Who is in the room comes from the server (voiceStates); levels, mute and streams come from the media engine
- * once we are connected, so tiles react within one frame of the audio.
+ * once we are connected, so faces react within one frame of the audio.
  */
 export function CallStage({ channel, variant = 'channel' }: { channel: Channel; variant?: 'channel' | 'dm' }) {
   const voiceStates = useData((st) => st.voiceStates)
   const people = useMemo(() => voiceMembers({ voiceStates }, channel.id), [voiceStates, channel.id])
   const meId = useData((st) => st.me?.id)
-  const conn = useMedia(useShallow((st): Conn => ({ state: st.connection.state, channelId: st.connection.channelId, reason: st.connection.reason })))
+  const conn = useMedia(useShallow((st): Conn => ({ state: st.connection.state, channelId: st.connection.channelId, reason: st.connection.reason, failed: st.e2ee.state === 'failed' })))
   const here = conn.channelId === channel.id && conn.state !== 'idle'
   const live = here && (conn.state === 'connecting' || conn.state === 'connected' || conn.state === 'reconnecting')
   const joining = useVoice((st) => st.joining === channel.id)
@@ -69,7 +71,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
     variant === 'channel' ? (
       <header className={sh.header}>
         <h1 className={sh.headerTitle}>
-          {people.length > 0 ? <Fronds size={16} breathing={!live} getLevel={live ? roomLevelNow : undefined} className={s.accentIcon} /> : <Icon icon={Volume2} size={18} />}
+          <Icon icon={Volume2} size={18} />
           {channel.name}
         </h1>
         {channel.topic && (
@@ -78,13 +80,22 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
             <span className={sh.headerTopic}>{channel.topic}</span>
           </>
         )}
+        <div className={`${sh.headerActions} ${s.headerEnd}`}>
+          <E2eeChip channelId={channel.id} showOff />
+        </div>
       </header>
     ) : null
 
   return (
     <section className={`${s.stage} ${variant === 'dm' ? s.dm : ''} ${live ? '' : s.idle}`} aria-label={channel.name}>
       {header}
-      <Room stale={conn.state !== 'connected' && here}>
+      <MismatchBanner channel={channel} />
+      <Room stale={conn.state !== 'connected' && here} live={live}>
+        {variant === 'dm' && (
+          <div className={s.dmLock}>
+            <E2eeChip channelId={channel.id} />
+          </div>
+        )}
         {live ? (
           <LiveRoom channel={channel} people={people.map((p) => p.userId)} meId={meId} />
         ) : (
@@ -92,14 +103,14 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
         )}
         {here && conn.state === 'reconnecting' && (
           <div className={s.reconnect} role="status" aria-live="polite">
-            <Fronds size={14} breathing />
+            <Spinner size={12} />
             <strong>{t.state.reconnecting}</strong>
             <span>{t.reconnectingShort}</span>
           </div>
         )}
         {here && conn.state === 'disconnected' && (
-          <Notice title={t.state.disconnected} action={<Button variant="primary" onClick={() => void joinVoice(channel.id)}>{t.rejoin}</Button>} dismiss={leaveVoice}>
-            {conn.reason ?? t.disconnectedBody}
+          <Notice title={conn.failed ? t.e2ee.failedTitle : t.state.disconnected} action={<Button variant="primary" onClick={() => void joinVoice(channel.id)}>{t.rejoin}</Button>} dismiss={leaveVoice}>
+            {conn.reason ?? (conn.failed ? t.e2ee.failedBody : t.disconnectedBody)}
           </Notice>
         )}
       </Room>
@@ -108,19 +119,89 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
   )
 }
 
-/** The stage area. Direção B dropped the room light: speaking lives on the faces only (calm, never ambient). */
-function Room({ stale, children }: { stale: boolean; children: ReactNode }) {
-  return <div className={`${s.area} ${stale ? s.stale : ''}`}>{children}</div>
+/**
+ * The stage area. The room's light (RoomLight) is the one ambient thing: a wide, very soft pool in the speaker's own
+ * hue that drifts to whoever is talking. Speaking itself lives on the faces (the 2 px ring).
+ */
+function Room({ stale, live, children }: { stale: boolean; live: boolean; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  return (
+    <div ref={ref} className={`${s.area} ${stale ? s.stale : ''}`}>
+      {live && <RoomLight host={ref} />}
+      {children}
+    </div>
+  )
+}
+
+/** Moves only when a new voice has held for 300 ms (no flicker between two people), fades out after 900 ms of quiet. */
+const LIGHT_HOLD_MS = 300
+const LIGHT_QUIET_MS = 900
+const LIGHT_MIN = 0.18
+
+/**
+ * Reads the faces' own envelopes (--speak, written by useEnvelope on each seat) 10× a second: no React work, no
+ * per-frame writes. The light is a transformed, blurred-by-gradient layer: compositor only.
+ */
+function RoomLight({ host }: { host: RefObject<HTMLElement | null> }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    const root = host.current
+    if (!el || !root) return
+    let current: string | null = null
+    let cand: string | null = null
+    let since = performance.now()
+    let placed = false
+    let last = ''
+    const id = setInterval(() => {
+      let best: HTMLElement | null = null
+      let bestV = LIGHT_MIN
+      for (const seat of root.querySelectorAll<HTMLElement>('[data-seat]')) {
+        const v = Number(seat.style.getPropertyValue('--speak') || 0)
+        if (v > bestV) {
+          bestV = v
+          best = seat
+        }
+      }
+      const key = best?.dataset.userId ?? null
+      const now = performance.now()
+      if (key !== cand) {
+        cand = key
+        since = now
+      }
+      if (key !== current && now - since >= (key ? LIGHT_HOLD_MS : LIGHT_QUIET_MS)) current = key
+      const seat = current ? root.querySelector<HTMLElement>(`[data-seat][data-user-id="${current}"]`) : null
+      const face = seat?.querySelector<HTMLElement>('[data-face]')
+      if (!seat || !face) {
+        if (el.style.opacity !== '0') el.style.opacity = '0'
+        return
+      }
+      const a = root.getBoundingClientRect()
+      const b = face.getBoundingClientRect()
+      const transform = `translate(${Math.round(b.left + b.width / 2 - a.left)}px, ${Math.round(b.top + b.height * 0.7 - a.top)}px) translate(-50%, -50%)`
+      if (transform !== last) {
+        // The first time, the light appears in place instead of sweeping in from the corner.
+        if (!placed) el.style.transition = 'none'
+        el.style.transform = last = transform
+        if (!placed) {
+          void el.offsetWidth
+          el.style.transition = ''
+          placed = true
+        }
+      }
+      el.style.setProperty('--lh', seat.dataset.hue ?? '279')
+      if (el.style.opacity !== '1') el.style.opacity = '1'
+    }, 100)
+    return () => clearInterval(id)
+  }, [host])
+  return <div ref={ref} className={s.light} aria-hidden />
 }
 
 function Notice({ title, children, action, dismiss }: { title: string; children: ReactNode; action?: ReactNode; dismiss?: () => void }) {
   return (
     <div className={s.notice} role="status" aria-live="polite">
       <div className={s.noticeCard}>
-        <span className={s.noticeTitle}>
-          <Fronds size={16} breathing />
-          {title}
-        </span>
+        <span className={s.noticeTitle}>{title}</span>
         <p className={s.noticeBody}>{children}</p>
         {(action || dismiss) && (
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -153,9 +234,7 @@ function PreJoin({ channel, people, streaming, joining, variant }: { channel: Ch
   if (people.length === 0)
     return (
       <div className={s.empty}>
-        <span className={s.emptyGlyph}>
-          <Fronds size={20} />
-        </span>
+        <span className={s.emptySeat} aria-hidden />
         <h2 className={s.emptyTitle}>{t.stage.emptyTitle}</h2>
         <p className={s.emptyBody}>{t.stage.emptyBody}</p>
         <div className={s.emptyActions}>{join}</div>
@@ -176,19 +255,25 @@ function PreJoin({ channel, people, streaming, joining, variant }: { channel: Ch
 
 function PreviewPerson({ userId, spaceId, live }: { userId: string; spaceId: string | null; live: boolean }) {
   const u = useData((st) => st.users[userId])
-  // The space nickname, as in chat and on the tiles.
+  // The space nickname, as in chat and on the stage.
   const name = useData((st) => displayName(st, userId, spaceId))
+  const hue = usePersonHue(u)
   if (!u) return null
   return (
-    <li className={s.previewPerson}>
-      <Avatar user={u} size={56} decorative />
-      <span>{name}</span>
+    <li className={s.previewPerson} style={{ ['--h' as string]: hue }}>
+      <span className={s.previewFace}>
+        <Avatar user={u} size={64} decorative />
+      </span>
+      <span className={s.previewName}>{name}</span>
       {live && <span className={s.liveBadge}>{t.stage.live}</span>}
     </li>
   )
 }
 
 // ── In the room ───────────────────────────────────────────────
+
+/** Entrance choreography window: seats rendered this soon after joining come in one after the other. */
+const ENTRANCE_MS = 450
 
 function LiveRoom({ channel, people, meId }: { channel: Channel; people: string[]; meId: string | undefined }) {
   const remote = useMedia(useShallow((st) => Object.keys(st.participants)))
@@ -201,12 +286,22 @@ function LiveRoom({ channel, people, meId }: { channel: Channel; people: string[
     return list
   }, [people, remote, meId])
   // Watching takes the stage: the stream you picked (focus), else the first you watch. Nothing is shown (or
-  // downloaded) for a stream until you click Assistir on the person's tile.
+  // downloaded) for a stream until you click Assistir on the person's card.
   const watched = useMedia(useShallow((st) => Object.keys(st.viewers).filter((id) => id !== meId && st.participants[id]?.streaming)))
   const featured = focus && watched.includes(focus) ? focus : (watched[0] ?? null)
+  // Who is live: they get a 16:9 card (the only boxes on a voice stage); everyone else is a bare face.
+  const live = useMedia(useShallow((st) => ids.filter((id) => (id === meId ? st.screen.active : !!st.participants[id]?.streaming))))
+  const connecting = useMedia((st) => st.connection.state === 'connecting')
+  const others = useMedia((st) => Object.keys(st.participants).length)
+  const title = useData((st) => channelTitle(st, channel))
+  const born = useRef(performance.now())
 
   const ref = useRef<HTMLDivElement>(null)
   const box = useBox(ref, !!featured)
+
+  // Nothing is placed before the stage is measured: a first layout at width 0 would make every face slide in from
+  // a stacked column (layout animation) instead of arriving where it sits.
+  if (!featured && box.w === 0) return <div ref={ref} className={s.voice} />
 
   if (featured) {
     const strip = stripTile(box.h)
@@ -222,169 +317,252 @@ function LiveRoom({ channel, people, meId }: { channel: Channel; people: string[
               <StreamView key={`s:${id}`} userId={id} channel={channel} small />
             ))}
           {ids.map((id) => (
-            <PersonTile key={id} userId={id} channel={channel} size={40} />
+            <Seat key={id} userId={id} channel={channel} size={40} />
           ))}
         </div>
       </div>
     )
   }
 
-  const layout = stageLayout(ids.length, box.w, box.h)
-  const width = layout.width
-  const avatar = width >= 420 ? 96 : width >= 300 ? 80 : 56
-  // One flex container (tiles never remount, layout animations keep working) with a line break after each
-  // balanced row: 7 people read as 3+2+2, never 3+3+1 with a stray tile.
-  const tiles: ReactNode[] = []
-  const tile = (id: string) => (
-    <Appear key={id} width={width}>
-      <PersonTile userId={id} channel={channel} size={avatar} />
-    </Appear>
-  )
-  let next = 0
-  layout.rows.forEach((count, r) => {
-    tiles.push(...ids.slice(next, next + count).map(tile))
-    next += count
-    if (r < layout.rows.length - 1) tiles.push(<span key={'br:' + r} className={s.rowBreak} aria-hidden />)
+  const caption = connecting ? t.joining : others === 0 && channel.type === 'dm' ? t.call.waiting(title) : null
+  const cards = ids.filter((id) => live.includes(id))
+  const seats = ids.filter((id) => !live.includes(id))
+  const CARD_GAP = 40
+  const cw = cardWidth(cards.length, box.w, box.h * (seats.length ? 1 : 1.6))
+  const ch = cards.length ? Math.round((cw * 9) / 16) : 0
+  const lay = voiceLayout(seats.length, box.w, Math.max(0, box.h - (ch ? ch + CARD_GAP : 0) - (caption ? 36 : 0)))
+  const total = ch + (ch && seats.length ? CARD_GAP : 0) + (seats.length ? lay.height : 0) + (caption ? 36 : 0)
+  // Optical center at 45 % of the stage: a hair above the middle, where a face wants to sit.
+  const top = Math.max(0, Math.round(box.h * 0.45 - total / 2))
+
+  // One flex container per group (seats never remount, layout animations keep working) with a line break after each
+  // balanced row: 7 people read as 4 + 3, never 5 + 2.
+  const nodes: ReactNode[] = []
+  let at = 0
+  let order = cards.length
+  lay.rows.forEach((count, r) => {
+    for (const id of seats.slice(at, at + count))
+      nodes.push(
+        <Appear key={id} order={order++} born={born}>
+          <Seat userId={id} channel={channel} size={lay.avatar} />
+        </Appear>,
+      )
+    at += count
+    if (r < lay.rows.length - 1) nodes.push(<span key={'br:' + r} className={s.rowBreak} aria-hidden />)
   })
   // Someone who arrived since the last measure (re-measured before paint) is never left out meanwhile.
-  tiles.push(...ids.slice(next).map(tile))
+  for (const id of seats.slice(at))
+    nodes.push(
+      <Appear key={id} order={order++} born={born}>
+        <Seat userId={id} channel={channel} size={lay.avatar} />
+      </Appear>,
+    )
+
   return (
-    <div ref={ref} className={s.grid}>
-      <AnimatePresence initial={false}>{tiles}</AnimatePresence>
+    <div ref={ref} className={s.voice}>
+      <div className={s.voiceBlock} style={{ paddingTop: top }}>
+        {cards.length > 0 && (
+          <div className={s.cards} style={{ marginBottom: seats.length ? CARD_GAP : 0 }}>
+            <AnimatePresence>
+              {cards.map((id, i) => (
+                <Appear key={id} order={i} born={born}>
+                  <LiveCard userId={id} channel={channel} width={cw} isMe={id === meId} />
+                </Appear>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+        {seats.length > 0 && (
+          <div className={s.seats} style={{ ['--seat-gap' as string]: `${lay.gap}px` }}>
+            <AnimatePresence>{nodes}</AnimatePresence>
+          </div>
+        )}
+        {caption && <p className={s.caption}>{caption}</p>}
+      </div>
     </div>
   )
 }
 
-/** Join/leave with purpose: tiles grow in from 96% and the grid reflows (morph), leave is shorter than enter. */
-function Appear({ width, children }: { width: number; children: ReactNode }) {
+/**
+ * Join with purpose (critique r3, sexy move 2): right after you join, the faces come in one after the other
+ * (scale .94 → 1 + fade, 220 ms out-quart, 30 ms apart) while the engine's join cue plays and the dock rises; later
+ * arrivals come in alone, and leaving is shorter than arriving. Reduced motion: MotionConfig makes it instant.
+ */
+function Appear({ order, born, children }: { order: number; born: RefObject<number>; children: ReactNode }) {
+  const [delay] = useState(() => (performance.now() - born.current < ENTRANCE_MS ? 0.04 + order * 0.03 : 0))
   return (
     <motion.div
       layout
-      style={{ width }}
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1, transition: { duration: 0.18, ease: EASE_OUT_QUART } }}
-      exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.13 } }}
-      transition={{ layout: { duration: 0.22, ease: [0.645, 0.045, 0.355, 1] } }}
+      className={s.appear}
+      initial={{ opacity: 0, scale: 0.94 }}
+      animate={{ opacity: 1, scale: 1, transition: { duration: 0.22, ease: EASE_OUT_QUART, delay } }}
+      exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.13 } }}
+      transition={{ layout: { duration: 0.22, ease: EASE_IN_OUT_CUBIC } }}
     >
       {children}
     </motion.div>
   )
 }
 
-function PersonTile({ userId, channel, size }: { userId: string; channel: Channel; size: 40 | 56 | 80 | 96 }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEnvelope(ref, useLevelGetter(userId, channel.id))
+/** Everything a face needs to say about one person in this call. */
+function usePerson(userId: string, channel: Channel) {
   const user = useData((st) => st.users[userId])
   const name = useData((st) => displayName(st, userId, channel.spaceId))
   const vs = useData((st) => st.voiceStates[userId])
   const isMe = useData((st) => st.me?.id === userId)
-  const remote = useMedia(useShallow((st) => {
-    const p = st.participants[userId]
-    return p ? { micMuted: p.micMuted, quality: p.quality, streaming: p.streaming } : null
-  }))
+  const remote = useMedia(
+    useShallow((st) => {
+      const p = st.participants[userId]
+      return p ? { micMuted: p.micMuted, quality: p.quality, streaming: p.streaming } : null
+    }),
+  )
   const self = useMedia(useShallow((st) => ({ muted: st.self.muted, deafened: st.self.deafened, mic: st.self.micAvailable, live: st.screen.active })))
-  const watching = useMedia((st) => !!st.viewers[userId])
-  const connecting = useMedia((st) => st.connection.state === 'connecting')
-  const [menu, setMenu] = useState<HTMLElement | null>(null)
-  const others = useMedia((st) => Object.keys(st.participants).length)
-  const title = useData((st) => channelTitle(st, channel))
-  const look = useLook(userId)
-  // Auras fall back to the default ring with more than 9 tiles, or while your own encode needs the CPU/GPU.
-  useTileCount(true)
-  useEncodingGate(isMe && self.live)
-  if (!user) return null
-
   const serverDeaf = !!vs?.serverDeaf
   const serverMute = !!vs?.serverMute
   const deaf = isMe ? self.deafened : !!vs?.selfDeaf
   const muted = isMe ? self.muted || self.deafened || !self.mic : remote ? remote.micMuted : !!vs?.selfMute
-  // Live is a property of the person, not a second tile: one tile per person, always.
-  const live = isMe ? self.live : !!remote?.streaming
-  const quality = remote?.quality
-  const small = size === 40
-  const flag =
-    serverDeaf ? { icon: ShieldOff, label: t.stage.serverDeafened }
-    : serverMute ? { icon: ShieldOff, label: t.stage.serverMuted }
-    : deaf ? { icon: HeadphoneOff, label: t.stage.deafened }
-    : muted ? { icon: MicOff, label: isMe && !self.mic ? t.stage.noMic : t.stage.muted }
+  const flag: { icon: Glyph; slash: boolean; label: string } | null =
+    serverDeaf ? { icon: ShieldOff, slash: false, label: t.stage.serverDeafened }
+    : serverMute ? { icon: ShieldOff, slash: false, label: t.stage.serverMuted }
+    : deaf ? { icon: Headphones, slash: true, label: t.stage.deafened }
+    : muted ? { icon: Mic, slash: true, label: isMe && !self.mic ? t.stage.noMic : t.stage.muted }
     : null
-  const watch = () => media.watch(userId, 'auto')
-  const selfLive = isMe && live && !small
+  return { user, name, isMe, remote, flag, quality: remote?.quality, selfLive: isMe && self.live }
+}
+
+/**
+ * One person on a voice stage: the face straight on the stage (no box), the person's own hue as a 6 % floor under
+ * it and in the name chip, the 2 px speaking ring on the face only, mute/deafen as a 22 px disc at 45° on the face.
+ * `size` 40 = the strip under a watched stream.
+ */
+function Seat({ userId, channel, size }: { userId: string; channel: Channel; size: SeatSize | 40 }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEnvelope(ref, useLevelGetter(userId, channel.id))
+  const p = usePerson(userId, channel)
+  const hue = usePersonHue(p.user)
+  const [menu, setMenu] = useState<HTMLElement | null>(null)
+  const look = useLook(userId)
+  // Auras fall back to the default ring with more than 9 faces, or while your own encode needs the CPU/GPU.
+  useTileCount(true)
+  useEncodingGate(p.selfLive)
+  if (!p.user) return null
+  const small = size === 40
+  const label = p.isMe ? `${p.name} (${t.stage.you.toLowerCase()})` : p.name
   return (
     <div
       ref={ref}
-      className={s.tile}
-      style={small ? undefined : { width: '100%' }}
+      className={`${s.seat} ${small ? s.seatSmall : ''}`}
+      style={{ width: small ? 72 : seatWidth(size), ['--h' as string]: hue }}
       data-user-id={userId}
+      data-seat={small ? undefined : ''}
+      data-hue={hue}
       data-speak-host
-      onContextMenu={isMe ? undefined : contextMenuHandler(() => personEntries(user, { spaceId: channel.spaceId }), name)}
+      onContextMenu={p.isMe ? undefined : contextMenuHandler(() => personEntries(p.user!, { spaceId: channel.spaceId }), p.name)}
     >
-      <div className={s.tileBody}>
+      <div className={s.face} data-face style={{ width: size, height: size }}>
         {/* Cosmetics stay discreet on the stage: a still decoration, and the voice aura in place of the default ring. */}
-        {!(selfLive && size === 56) && (
-          <DecoratedAvatar user={user} size={selfLive ? (size === 96 ? 56 : 40) : size} glow decorative decoration={small ? undefined : look.decoration} aura={look.aura} />
-        )}
-        {selfLive && <SelfLive compact={size === 56} />}
-        {!isMe && live && !watching && !small && (
-          <Button variant="primary" size="sm" icon={MonitorUp} onClick={watch}>
-            {t.stage.watch}
-          </Button>
-        )}
-        {isMe && connecting && <span className={s.waiting}>{t.joining}</span>}
-        {isMe && !connecting && others === 0 && channel.type === 'dm' && !small && <span className={s.waiting}>{t.call.waiting(title)}</span>}
-      </div>
-      {live && !small && <span className={`${s.liveBadge} ${s.tileLive}`}>{t.stage.live}</span>}
-      {/* The strip keeps names too (smaller): a face alone is not enough to know who is who. Live rides in the label. */}
-      <span className={s.label}>
-        {live && small &&
-          (!isMe && !watching ? (
-            <Tooltip content={`${t.stage.watch}: ${t.stage.streamOf(name)}`}>
-              <button type="button" className={s.liveBadge} aria-label={`${t.stage.watch}: ${t.stage.streamOf(name)}`} onClick={watch}>
-                {t.stage.live}
-              </button>
-            </Tooltip>
-          ) : (
-            <span className={s.liveBadge}>{t.stage.live}</span>
-          ))}
-        {flag && (
-          <Tooltip content={flag.label}>
-            <span className={s.flagDanger} role="img" aria-label={flag.label}>
-              <Icon icon={flag.icon} size={12} />
+        <DecoratedAvatar user={p.user} size={size as AvatarSize} glow decorative decoration={small ? undefined : look.decoration} aura={look.aura} />
+        {p.flag && (
+          <Tooltip content={p.flag.label}>
+            <span className={`${s.flag} ${small ? s.flagSmall : ''}`} role="img" aria-label={p.flag.label}>
+              <FlagGlyph icon={p.flag.icon} slash={p.flag.slash} size={small ? 12 : 14} />
             </span>
           </Tooltip>
         )}
-        <AuraGlyph id={look.aura} />
-        <span>{isMe ? `${name} (${t.stage.you.toLowerCase()})` : name}</span>
+        {!small && !p.isMe && p.remote && (
+          <IconButton icon={MoreHorizontal} label={t.stage.personVolume(p.name)} size="sm" className={s.more} aria-expanded={!!menu} onClick={(e) => setMenu(menu ? null : e.currentTarget)} />
+        )}
+        <ReactionLayer userId={userId} />
+      </div>
+      <span className={s.name}>
+        {!small && (p.quality === 'poor' || p.quality === 'lost') && (
+          <Tooltip content={t.stage.quality[p.quality]}>
+            <span className={p.quality === 'lost' ? s.qualityLost : s.qualityPoor} role="img" aria-label={t.stage.quality[p.quality]}>
+              <Icon icon={p.quality === 'lost' ? WifiOff : Signal} size={12} />
+            </span>
+          </Tooltip>
+        )}
+        {!small && <AuraGlyph id={look.aura} />}
+        <span className={s.nameText}>{small ? p.name : label}</span>
       </span>
-      <ReactionLayer userId={userId} />
-      {!small && (
-        <span className={s.corner}>
-          {(quality === 'poor' || quality === 'lost') && (
-            <Tooltip content={t.stage.quality[quality]}>
-              <span className={quality === 'lost' ? s.qualityLost : s.qualityPoor} role="img" aria-label={t.stage.quality[quality]}>
-                <Icon icon={quality === 'lost' ? WifiOff : Signal} size={12} />
-              </span>
-            </Tooltip>
-          )}
-          {!isMe && remote && (
-            <IconButton icon={MoreHorizontal} label={t.stage.personVolume(name)} size="sm" className={s.tileMenu} aria-expanded={!!menu} onClick={(e) => setMenu(menu ? null : e.currentTarget)} />
-          )}
-        </span>
-      )}
-      <Popover anchor={menu} onClose={() => setMenu(null)} side="bottom" align="end" label={t.stage.personVolume(name)} width={240}>
-        <PersonVolume userId={userId} name={name} />
+      <Popover anchor={menu} onClose={() => setMenu(null)} side="bottom" align="end" label={t.stage.personVolume(p.name)} width={240}>
+        <PersonVolume userId={userId} name={p.name} />
       </Popover>
     </div>
+  )
+}
+
+/** Mute / deafen glyph whose slash draws itself in 120 ms (stroke-dashoffset), in step with the engine's mute cue. */
+function FlagGlyph({ icon, slash, size }: { icon: Glyph; slash: boolean; size: IconSize }) {
+  if (!slash) return <Icon icon={icon} size={size} />
+  return (
+    <span className={s.glyph} style={{ width: size, height: size }}>
+      <Icon icon={icon} size={size} />
+      <svg viewBox="0 0 256 256" width={size} height={size} aria-hidden>
+        <line className={s.cut} x1="48" y1="48" x2="208" y2="224" pathLength={1} />
+        <line className={s.slash} x1="48" y1="48" x2="208" y2="224" pathLength={1} />
+      </svg>
+    </span>
   )
 }
 
 const STREAM_NOTICE_MS = 8000
 
 /**
- * Your own stream lives on your tile (one tile per person): the best layer actually sent, the plan's re-cap line
- * for a few seconds, and quiet controls. Red stays on Desconectar.
+ * Someone live (and nobody watching it big yet): the only box on a voice stage, 16:9. Theirs: their face on a wash
+ * of their hue, AO VIVO and Assistir (nothing is downloaded before that). Yours: a muted preview of what actually
+ * leaves your computer, with quiet controls. Red stays on Desconectar.
  */
-function SelfLive({ compact }: { compact?: boolean }) {
+function LiveCard({ userId, channel, width, isMe }: { userId: string; channel: Channel; width: number; isMe: boolean }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEnvelope(ref, useLevelGetter(userId, channel.id))
+  const p = usePerson(userId, channel)
+  const hue = usePersonHue(p.user)
+  const look = useLook(userId)
+  useTileCount(true)
+  useEncodingGate(isMe)
+  if (!p.user) return null
+  return (
+    <div
+      ref={ref}
+      className={s.card}
+      style={{ width, ['--h' as string]: hue }}
+      data-user-id={userId}
+      data-seat=""
+      data-hue={hue}
+      data-speak-host
+      onContextMenu={isMe ? undefined : contextMenuHandler(() => personEntries(p.user!, { spaceId: channel.spaceId }), p.name)}
+    >
+      {isMe ? (
+        <SelfLive />
+      ) : (
+        <div className={s.cardBody}>
+          <span className={s.face} data-face style={{ width: 64, height: 64 }}>
+            <DecoratedAvatar user={p.user} size={64} glow decorative aura={look.aura} />
+          </span>
+          <Button variant="primary" size="sm" icon={MonitorUp} onClick={() => media.watch(userId, 'auto')}>
+            {t.stage.watch}
+          </Button>
+        </div>
+      )}
+      <span className={`${s.liveBadge} ${s.cardLive}`}>{t.stage.live}</span>
+      <span className={s.cardLabel}>
+        {p.flag && (
+          <span className={s.cardFlag} role="img" aria-label={p.flag.label}>
+            <FlagGlyph icon={p.flag.icon} slash={p.flag.slash} size={12} />
+          </span>
+        )}
+        <span>{isMe ? `${p.name} (${t.stage.you.toLowerCase()})` : p.name}</span>
+      </span>
+      <ReactionLayer userId={userId} />
+    </div>
+  )
+}
+
+/** Your own stream on your card: the outgoing picture, the best layer actually sent, and the plan's re-cap line. */
+function SelfLive() {
+  const video = useRef<HTMLVideoElement>(null)
+  useEffect(() => (video.current ? media.attachOwnScreen(video.current) : undefined), [])
   // The best layer actually being sent (the SFU pauses top layers nobody watches big).
   const sc = useMedia(
     useShallow((st) => ({
@@ -402,30 +580,31 @@ function SelfLive({ compact }: { compact?: boolean }) {
     return () => clearTimeout(id)
   }, [left > 0, notice])
   return (
-    <div className={s.selfLive}>
-      <span className={s.selfLiveTitle}>{t.stage.youAreLive}</span>
-      {!compact && (
-        <span className={`${s.selfLiveBody} tnum`}>
-          {sc.layer ? `${sc.layer.width}×${sc.layer.height} · ${Math.round(sc.layer.fps)} fps · ${t.stats.kbps(sc.layer.bitrateKbps)}` : sc.preset}
-          {sc.hw !== null && ` · ${sc.hw ? t.stage.hw : t.stage.sw}`}
+    <>
+      <video ref={video} className={s.cardVideo} autoPlay playsInline muted />
+      <div className={s.selfLive}>
+        <span className={s.selfLiveText}>
+          <span className={s.selfLiveTitle}>{t.stage.youAreLive}</span>
+          <span className={`${s.selfLiveBody} tnum`}>
+            {sc.layer ? `${sc.layer.width}×${sc.layer.height} · ${Math.round(sc.layer.fps)} fps · ${t.stats.kbps(sc.layer.bitrateKbps)}` : sc.preset}
+            {sc.hw !== null && ` · ${sc.hw ? t.stage.hw : t.stage.sw}`}
+          </span>
+          {left > 0 && notice && (
+            <span className={s.selfLiveNotice} role="status">
+              {notice.text}
+            </span>
+          )}
         </span>
-      )}
-      {left > 0 && notice && (
-        <span className={s.selfLiveNotice} role="status">
-          {notice.text}
-        </span>
-      )}
-      <div className={s.selfLiveActions}>
-        {!compact && (
+        <span className={s.selfLiveActions}>
           <Button size="sm" icon={ArrowLeftRight} onClick={() => useVoice.setState({ picker: true })}>
             {t.picker.switch}
           </Button>
-        )}
-        <Button size="sm" icon={Square} onClick={() => void media.stopScreenShare()}>
-          {t.dock.stopShare}
-        </Button>
+          <Button size="sm" icon={Square} onClick={() => void media.stopScreenShare()}>
+            {t.dock.stopShare}
+          </Button>
+        </span>
       </div>
-    </div>
+    </>
   )
 }
 

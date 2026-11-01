@@ -1,7 +1,8 @@
 /* ── Call stage ─────────────────────────────────────────────
- * The product's core screen. Tiles are quiet raised cards with a hairline edge; the only color that ever appears
- * is the speaking indigo, and it follows the voice envelope (--speak): a 2 px ring on the face, a soft edge on the
- * tile. No glow, no room light: calm is the point.
+ * The product's core screen (critique r3 #1, wave 9). Voice-only, the stage is bare: faces straight on the sheet, no
+ * 16:9 boxes, each person's own hue as a 6 % floor and in their name chip. Speaking is the 2 px indigo ring on the
+ * face only. The room has one light: a wide, very soft pool in the speaker's hue that drifts to whoever talks (≤ 9 %
+ * alpha, 900 ms moves). Boxes come back only for what is a picture: someone live, a watched stream.
  */
 .stage {
   position: relative;
@@ -17,6 +18,9 @@
   height: clamp(240px, 42vh, 460px);
   background: var(--bg-sidebar);
 }
+.headerEnd {
+  gap: var(--s-2);
+}
 
 .area {
   position: relative;
@@ -25,7 +29,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* bottom padding keeps tiles clear of the floating controls dock */
+  /* bottom padding keeps faces clear of the floating controls dock */
   padding: var(--s-4) var(--s-4) calc(var(--h-call) + 12px + var(--s-4) * 2);
   overflow: hidden;
   isolation: isolate;
@@ -33,18 +37,259 @@
 .idle .area {
   padding-bottom: var(--s-4);
 }
-
-.grid {
-  display: flex;
-  flex-wrap: wrap;
-  align-content: center;
-  justify-content: center;
-  gap: var(--s-2);
-  width: 100%;
-  height: 100%;
+.dmLock {
+  position: absolute;
+  top: var(--s-2);
+  left: var(--s-3);
+  z-index: 5;
 }
 
-/* ── Tile ─────────────────────────────────── */
+/* ── The room's light ───────────────────── */
+@property --lh {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 279;
+}
+.light {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  width: 1040px;
+  height: 680px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, oklch(0.62 0.08 var(--lh) / 0.12), oklch(0.62 0.08 var(--lh) / 0.05) 45%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transition:
+    transform 900ms var(--ease-in-out-cubic),
+    opacity 700ms var(--ease-out-quad),
+    --lh 900ms linear;
+}
+.dm .light {
+  width: 760px;
+  height: 420px;
+}
+.stale .light {
+  opacity: 0 !important;
+}
+@media (forced-colors: active) {
+  .light {
+    display: none;
+  }
+}
+
+/* ── Voice-only stage ───────────────────── */
+.voice {
+  align-self: stretch;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.voiceBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.cards {
+  display: flex;
+  justify-content: center;
+  gap: var(--s-6);
+  width: 100%;
+}
+.seats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  row-gap: var(--seat-gap, 48px);
+  /* Half a gap of padding on each seat, half a gap of negative margin here: n seats need n·seat + (n−1)·gap, as
+     voiceLayout counts. */
+  width: calc(100% + var(--seat-gap, 48px));
+  margin: 0 calc(var(--seat-gap, 48px) / -2);
+}
+/* Seat spacing is horizontal padding inside each slot: rows stay centered and balanced with any gap. */
+.seats > .appear {
+  padding: 0 calc(var(--seat-gap, 48px) / 2);
+}
+.appear {
+  flex: 0 0 auto;
+}
+/* Line break between balanced rows (zero height; cancels the row gap it would add). */
+.rowBreak {
+  flex-basis: 100%;
+  height: 0;
+  margin-top: calc(var(--seat-gap, 48px) * -1);
+}
+.caption {
+  align-self: center;
+  margin-top: var(--s-4);
+  height: 20px;
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+}
+
+/* ── Seat: one person, bare on the stage ── */
+.seat {
+  --speak: 0;
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--s-2);
+}
+.face {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+/* Their hue as the floor under the face: 6 % at rest, a touch more while they talk. */
+.face::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  z-index: -1;
+  width: 190%;
+  height: 90%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, oklch(0.62 0.09 var(--h, 279) / calc(0.06 + 0.05 * var(--speak))), transparent);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.seatSmall .face::before {
+  display: none;
+}
+/* Name chip: 14/510, secondary at rest, primary while speaking (mixed by the envelope, no re-render). */
+.name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--r-full);
+  background: oklch(0.29 0.028 var(--h, 279) / 0.55);
+  box-shadow: inset 0 0 0 1px oklch(0.6 0.05 var(--h, 279) / 0.1);
+  color: color-mix(in oklab, var(--text-primary) calc(min(1, var(--speak) * 2) * 100%), var(--text-secondary));
+  font: var(--w-medium) 14px/20px var(--font-ui);
+  letter-spacing: var(--track-ui-lg);
+  white-space: nowrap;
+}
+.nameText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.seatSmall {
+  gap: 4px;
+}
+.seatSmall .name {
+  height: 16px;
+  padding: 0 4px;
+  background: none;
+  box-shadow: none;
+  font-size: 11px;
+  line-height: 16px;
+}
+/* Mute / deafen: a 22 px disc at 45° on the face (where presence goes elsewhere), the glyph 14 px in --danger. */
+.flag {
+  position: absolute;
+  left: calc(85.355% - 11px);
+  top: calc(85.355% - 11px);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-full);
+  background: var(--bg-overlay);
+  box-shadow: 0 0 0 2px var(--bg-content);
+  color: var(--danger);
+}
+.dm .flag {
+  box-shadow: 0 0 0 2px var(--bg-sidebar);
+}
+.flagSmall {
+  left: calc(85.355% - 8px);
+  top: calc(85.355% - 8px);
+  width: 16px;
+  height: 16px;
+}
+/* The slash draws itself in 120 ms (stroke-dashoffset), with the engine's mute cue. */
+.glyph {
+  position: relative;
+  display: grid;
+}
+.glyph > svg {
+  display: block;
+}
+.glyph > svg:last-child {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.cut,
+.slash {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 120ms var(--ease-out-quad) forwards;
+}
+/* The cut paints the disc color across the base glyph, so the slash reads as crossing it. */
+.cut {
+  stroke: var(--bg-overlay);
+  stroke-width: 64;
+}
+.slash {
+  stroke: currentColor;
+  stroke-width: 22;
+}
+.cardFlag .cut {
+  stroke: rgba(11, 11, 12, 1);
+}
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.more {
+  position: absolute;
+  left: calc(85.355% - 12px);
+  top: calc(14.645% - 12px);
+  z-index: 2;
+  border-radius: var(--r-full) !important;
+  background: var(--bg-overlay) !important;
+  box-shadow: 0 0 0 2px var(--bg-content);
+  opacity: 0;
+}
+.seat:hover .more,
+.more:focus-visible,
+.more[aria-expanded='true'] {
+  opacity: 1;
+}
+.qualityPoor {
+  display: grid;
+  color: var(--warning);
+}
+.qualityLost {
+  composes: qualityPoor;
+  color: var(--danger);
+}
+
+/* Stale: the media link is down. People are not shown as fine: dimmed, no glow, no levels. */
+.stale .seat,
+.stale .card {
+  --speak: 0 !important;
+}
+.stale .face,
+.stale .stream video,
+.stale .cardVideo {
+  filter: grayscale(1);
+  opacity: 0.4;
+}
+
+/* ── Boxes: only for pictures (a live card, a stream) ── */
 .tile {
   --speak: 0;
   position: relative;
@@ -58,52 +303,78 @@
   overflow: hidden;
   isolation: isolate;
 }
-.dm .tile {
-  background: var(--bg-content);
-}
-/* Speaking on the tile: a soft 1.5 px indigo edge that fades in with the envelope (the face carries the 2 px ring).
-   Opacity on its own layer: no repaint per frame. */
-.tile::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 0 0 1.5px rgba(139, 142, 247, 0.6);
-  opacity: min(1, calc(var(--speak) * 2));
-  pointer-events: none;
-  z-index: 3;
-}
-/* High contrast: the tile needs an edge, and speaking keeps its outline (box-shadow is dropped in forced colors). */
 @media (forced-colors: active) {
   .tile {
     border: 1px solid CanvasText;
   }
-  .tile::after {
-    forced-color-adjust: none;
-    box-shadow: none;
-    border: 3px solid Highlight;
-  }
 }
-.tileBody {
-  position: relative;
+/* Someone live, nobody watching it big: their face on a wash of their own hue. */
+.card {
+  composes: tile;
+  background: radial-gradient(90% 80% at 50% 38%, oklch(0.36 0.05 var(--h, 279) / 0.42), transparent 70%), var(--bg-raised);
+}
+.cardBody {
   display: grid;
-  place-items: center;
-  gap: var(--s-2);
+  justify-items: center;
+  gap: var(--s-3);
 }
-/* Live is a badge on the person's tile (top-left), never a second tile. */
-.tileLive {
+.cardVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+.cardLive {
   position: absolute;
   top: var(--s-2);
   left: var(--s-2);
   z-index: 2;
 }
-/* Your own stream, on your tile: what is really sent, then quiet controls. */
-.selfLive {
-  display: grid;
-  justify-items: center;
+.cardLabel {
+  position: absolute;
+  left: var(--s-2);
+  bottom: var(--s-2);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
   gap: var(--s-1);
-  max-width: calc(100% - var(--s-6));
-  text-align: center;
+  max-width: calc(100% - var(--s-4));
+  height: 24px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-sm);
+  background: rgba(11, 11, 12, 0.62);
+  color: var(--text-primary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+  white-space: nowrap;
+}
+.cardFlag {
+  display: grid;
+  color: var(--danger);
+}
+/* Your own stream: the outgoing picture with a calm bottom band. */
+.selfLive {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-8) var(--s-3) var(--s-3);
+  background: linear-gradient(180deg, transparent, rgba(8, 8, 9, 0.82));
+}
+.card:has(.selfLive) .cardLabel {
+  display: none;
+}
+.selfLiveText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 .selfLiveTitle {
   color: var(--text-primary);
@@ -111,7 +382,7 @@
   font-weight: var(--w-semibold);
 }
 .selfLiveBody {
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font: var(--type-meta);
 }
 .selfLiveNotice {
@@ -122,8 +393,8 @@
 }
 .selfLiveActions {
   display: flex;
+  flex-shrink: 0;
   gap: var(--s-1_5);
-  margin-top: var(--s-1);
 }
 .label {
   position: absolute;
@@ -146,55 +417,6 @@
 .label > span {
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.flagDanger {
-  display: grid;
-  color: var(--danger);
-}
-.corner {
-  position: absolute;
-  top: var(--s-2);
-  right: var(--s-2);
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: var(--s-1);
-}
-.qualityPoor {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--r-full);
-  background: rgba(0, 0, 0, 0.5);
-  color: var(--warning);
-}
-.qualityLost {
-  composes: qualityPoor;
-  color: var(--danger);
-}
-.tileMenu {
-  opacity: 0;
-  background: rgba(0, 0, 0, 0.5) !important;
-}
-.tile:hover .tileMenu,
-.tileMenu:focus-visible,
-.tileMenu[aria-expanded='true'] {
-  opacity: 1;
-}
-.waiting {
-  color: var(--text-tertiary);
-  font: var(--type-meta);
-}
-
-/* Stale: the media link is down. People are not shown as fine: dimmed, no glow, no levels. */
-.stale .tile {
-  --speak: 0 !important;
-}
-.stale .tile .tileBody,
-.stale .stream video {
-  filter: grayscale(1);
-  opacity: 0.4;
 }
 
 /* ── Stream tile ──────────────────────────── */
@@ -358,13 +580,13 @@
   /* Small avatars: a smaller halo (Avatar .glow). */
   --halo-k: 0.5;
 }
-.strip .tile,
 .strip .stream {
   height: var(--strip-h, 90px);
   width: var(--strip-w, 160px);
-}
-.strip .stream {
   cursor: pointer;
+}
+.strip .seat {
+  align-self: center;
 }
 .strip .label {
   left: 4px;
@@ -378,13 +600,6 @@
   height: 14px;
   padding: 0 4px;
   font-size: 10px;
-}
-.strip button.liveBadge:hover {
-  filter: brightness(1.1);
-}
-/* Room for the name under the face on 68–90 px tiles. */
-.strip .tileBody {
-  margin-top: -18px;
 }
 /* DM call: a hairline where the stage ends and the conversation scrolls under it. */
 .dm {
@@ -478,16 +693,14 @@
   padding: var(--s-8) var(--s-6);
   text-align: center;
 }
-.emptyGlyph {
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  margin-bottom: var(--s-2);
-  border-radius: var(--r-xl);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  color: var(--accent);
+/* An empty seat: the shape of a face that is not there yet. */
+.emptySeat {
+  width: 88px;
+  height: 88px;
+  margin-bottom: var(--s-3);
+  border-radius: var(--r-full);
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.025), transparent);
+  box-shadow: inset 0 0 0 1px var(--border-default);
 }
 .emptyTitle {
   color: var(--text-primary);
@@ -518,17 +731,32 @@
 .previewPerson {
   display: grid;
   justify-items: center;
-  gap: var(--s-1_5);
-  width: 72px;
-  color: var(--text-secondary);
-  font: var(--type-meta);
-  font-weight: var(--w-medium);
+  gap: var(--s-2);
+  width: 96px;
 }
-.previewPerson > span:last-child {
+.previewFace {
+  position: relative;
+}
+.previewFace::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  z-index: -1;
+  width: 190%;
+  height: 90%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, oklch(0.62 0.09 var(--h, 279) / 0.06), transparent);
+  transform: translateX(-50%);
+}
+.previewName {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text-secondary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
 }
 
 /* ── Controls dock (floating, centered, 16px off the bottom) ── */
@@ -545,6 +773,18 @@
   background: rgba(27, 27, 29, 0.96);
   box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-default);
   transform: translateX(-50%);
+  /* Joining: the dock rises 12 px as the faces come in (reduced motion: instant, base.css). */
+  animation: dockIn 260ms var(--ease-out-quart) 90ms both;
+}
+@keyframes dockIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 .dockSep {
   width: 1px;
@@ -628,14 +868,4 @@
   gap: var(--s-3);
   color: var(--text-secondary);
   font: var(--type-ui);
-}
-.accentIcon {
-  color: var(--accent);
-}
-
-/* Line break between balanced rows of the call grid (zero height; cancels the row gap it would add). */
-.rowBreak {
-  flex-basis: 100%;
-  height: 0;
-  margin-top: calc(var(--s-2) * -1);
 }
