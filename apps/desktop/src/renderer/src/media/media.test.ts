@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_HANGOVER_MS, PttLatch, VadGate, rmsDb } from './vad'
-import { SCREEN_PRESETS, availablePresets, contentSettings, defaultPreset, pickCodec, recordSustain } from './presets'
+import { SCREEN_PRESETS, availablePresets, contentSettings, defaultPreset, getPreset, pickCodec, recordSustain, simulcastFor } from './presets'
 import { PrefsStore } from './prefs'
 
 const run = (g: VadGate, db: number, ms: number) => {
@@ -88,6 +88,20 @@ describe('presets', () => {
   })
   it('simulcast layers are strictly below the top layer', () => {
     for (const p of SCREEN_PRESETS) for (const l of p.simulcast) expect(l.width * l.height).toBeLessThan(p.width * p.height)
+  })
+  it('simulcast ladder follows a smaller source: 3 distinct layers at /4 and /2 when the preset ladder does not fit', () => {
+    const p = getPreset('1080p60')
+    const dims = (l: { width: number; height: number }[]) => l.map((x) => `${x.width}x${x.height}`)
+    expect(dims(simulcastFor(p, 1920, 1080))).toEqual(['640x360', '1280x720']) // the preset's own ladder
+    expect(dims(simulcastFor(p, 1600, 900))).toEqual(['640x360', '1280x720'])
+    expect(dims(simulcastFor(p, 1280, 720))).toEqual(['320x180', '640x360'])
+    expect(dims(simulcastFor(p, 1360, 768))).toEqual(['340x192', '680x384'])
+    expect(dims(simulcastFor(p, 608, 1080))).toEqual(['152x270', '304x540']) // portrait window (capped to 1080 tall)
+    expect(dims(simulcastFor(p, 320, 240))).toEqual(['160x120']) // a quarter would be below 90 px
+    expect(dims(simulcastFor(p))).toEqual(['640x360', '1280x720']) // unknown size: the preset's own
+    const [low, mid] = simulcastFor(p, 1280, 720)
+    expect(low!.maxBitrate).toBeLessThan(400_000)
+    expect(mid!.maxBitrate).toBeLessThan(1_700_000)
   })
   it('automatic codec prefers a hardware HEVC encoder, else H.264', () => {
     expect(pickCodec({ h265: true, h264: false })).toBe('h265')

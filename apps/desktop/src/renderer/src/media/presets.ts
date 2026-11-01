@@ -34,6 +34,27 @@ export function getPreset(id: ScreenPresetId): ScreenPreset {
   return SCREEN_PRESETS.find((p) => p.id === id) ?? SCREEN_PRESETS[2]!
 }
 
+/**
+ * Lower layers for what will really be sent. A window is often below the preset (1280x720 window, 1080p
+ * preset): the preset's 720p layer would duplicate the top one, and with only two layers LiveKit's backup-codec
+ * regression (H.264 for viewers that can't decode HEVC) delivered nothing (measured, media-baseline.md §4).
+ * When the preset's ladder doesn't fit (a layer above 80 % of the source's short side), use quarter and half of
+ * the source instead: always 3 distinct layers, exact /4 and /2 scales (even sizes for the HW encoder).
+ */
+export function simulcastFor(preset: ScreenPreset, sourceWidth?: number, sourceHeight?: number): Layer[] {
+  // The capture is already capped to the preset (getDisplayMedia max), so these are the sizes really sent.
+  const w = sourceWidth || preset.width
+  const h = sourceHeight || preset.height
+  const short = Math.min(w, h)
+  if (preset.simulcast.every((l) => Math.min(l.width, l.height) <= 0.8 * short)) return preset.simulcast
+  const [low, mid] = [L360, L720]
+  const scaled = (base: Layer, div: number, ref: number): Layer => {
+    const k = short / div / ref
+    return { width: Math.round(w / div), height: Math.round(h / div), fps: base.fps, maxBitrate: Math.max(100_000, Math.round(base.maxBitrate * k * k)) }
+  }
+  return [scaled(low, 4, 360), scaled(mid, 2, 720)].filter((l) => Math.min(l.width, l.height) >= 90)
+}
+
 export const pixelRate = (l: Pick<Layer, 'width' | 'height' | 'fps'>): number => l.width * l.height * l.fps
 
 export interface EncoderCapability {

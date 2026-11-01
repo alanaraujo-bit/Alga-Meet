@@ -5,6 +5,115 @@ import { media } from './engine'
 /** Wall-clock ms with sub-ms resolution, comparable across processes on the same machine. */
 export const epochNow = (): number => performance.timeOrigin + performance.now()
 
+// Leak accounting: weak registries of every capture track, AudioContext and PeerConnection the page creates.
+// Installed when MediaLab loads (before any join), so engine and LiveKit objects are all seen.
+const reg = { tracks: new Set<WeakRef<MediaStreamTrack>>(), ctxs: new Set<WeakRef<BaseAudioContext>>(), pcs: new Set<WeakRef<RTCPeerConnection>>() }
+const keep = <T extends object>(set: Set<WeakRef<T>>, o: T): T => (set.add(new WeakRef(o)), o)
+const keepStream = (s: MediaStream): MediaStream => (s.getTracks().forEach((t) => keep(reg.tracks, t)), s)
+export function instrument(): void {
+  const w = window as unknown as { __labInstrumented?: boolean }
+  if (w.__labInstrumented) return
+  w.__labInstrumented = true
+  const md = MediaDevices.prototype
+  const gum = md.getUserMedia
+  md.getUserMedia = async function (c) {
+    return keepStream(await gum.call(this, c))
+  }
+  const gdm = md.getDisplayMedia
+  md.getDisplayMedia = async function (c) {
+    return keepStream(await gdm.call(this, c))
+  }
+  const dest = AudioContext.prototype.createMediaStreamDestination
+  AudioContext.prototype.createMediaStreamDestination = function () {
+    const d = dest.call(this)
+    keepStream(d.stream)
+    return d
+  }
+  const clone = MediaStreamTrack.prototype.clone
+  MediaStreamTrack.prototype.clone = function () {
+    return keep(reg.tracks, clone.call(this))
+  }
+  const cap = HTMLCanvasElement.prototype.captureStream
+  HTMLCanvasElement.prototype.captureStream = function (fps) {
+    return keepStream(cap.call(this, fps))
+  }
+  const AC = window.AudioContext
+  window.AudioContext = class extends AC {
+    constructor(o?: AudioContextOptions) {
+      super(o)
+      keep(reg.ctxs, this)
+    }
+  }
+  const PC = window.RTCPeerConnection
+  window.RTCPeerConnection = class extends PC {
+    constructor(c?: RTCConfiguration) {
+      super(c)
+      keep(reg.pcs, this)
+    }
+  } as typeof RTCPeerConnection
+  // A/B of voice protection (scripts/media-net.mjs): rewrite the SFU's answer to our publisher offer.
+  const srd = PC.prototype.setRemoteDescription as (this: RTCPeerConnection, d?: RTCSessionDescriptionInit) => Promise<void>
+  PC.prototype.setRemoteDescription = function (this: RTCPeerConnection, d?: RTCSessionDescriptionInit) {
+    const f = labSdp
+    return srd.call(this, f && d?.type === 'answer' && d.sdp ? { type: d.type, sdp: mungeAudio(d.sdp, f) } : d)
+  } as typeof PC.prototype.setRemoteDescription
+}
+
+/** Lab-only voice protection override, applied at the next publisher negotiation (rejoin to apply). */
+let labSdp: { red?: boolean; fec?: boolean } | null = null
+export const setLabSdp = (f: { red?: boolean; fec?: boolean } | null): void => void (labSdp = f)
+
+/** red:false drops RED from every audio m-line (Opus only); fec:false answers useinbandfec=0 (encoder FEC off). */
+export function mungeAudio(sdp: string, f: { red?: boolean; fec?: boolean }): string {
+  let s = sdp
+  if (f.fec === false) s = s.replace(/useinbandfec=1/g, 'useinbandfec=0')
+  if (f.red === false) {
+    for (const pt of new Set([...s.matchAll(/^a=rtpmap:(\d+) red\/48000\/2/gim)].map((m) => m[1]!))) {
+      s = s.replace(new RegExp(`^a=(rtpmap|fmtp|rtcp-fb):${pt} .*\\r?\\n`, 'gm'), '')
+      s = s.replace(/^(m=audio \d+ \S+)((?: \d+)+)/gm, (_m, head: string, pts: string) => head + pts.split(' ').filter((p) => p !== pt).join(' '))
+    }
+  }
+  return s
+}
+
+/** Open RTCPeerConnections of this page (publisher + subscriber), for transceiver/stats inspection. */
+export const peerConnections = (): RTCPeerConnection[] => [...reg.pcs].map((r) => r.deref()).filter((p): p is RTCPeerConnection => !!p && p.connectionState !== 'closed')
+
+/** Every video outbound-rtp the page's PCs still report (a live send stream = an encoder that still exists). */
+export async function videoSendStreams() {
+  const out: Array<{ ssrc: unknown; rid: unknown; mid: unknown; encoder: unknown; frames: unknown; active: unknown }> = []
+  for (const pc of peerConnections()) {
+    ;(await pc.getStats()).forEach((s: Record<string, unknown>) => {
+      if (s.type === 'outbound-rtp' && s.kind === 'video') out.push({ ssrc: s.ssrc, rid: s.rid, mid: s.mid, encoder: s.encoderImplementation, frames: s.framesEncoded, active: s.active })
+    })
+  }
+  return out
+}
+
+/** Live (not stopped / closed / collected) media objects right now. Call after gc() for a fair count. */
+export function counters() {
+  const live = <T extends object>(set: Set<WeakRef<T>>, alive: (o: T) => boolean) => {
+    let n = 0
+    for (const r of set) {
+      const o = r.deref()
+      if (!o) set.delete(r)
+      else if (alive(o)) n++
+    }
+    return n
+  }
+  const pcs = peerConnections()
+  return {
+    liveTracks: live(reg.tracks, (t) => t.readyState === 'live'),
+    liveTracksByKind: [...reg.tracks].map((r) => r.deref()).filter((t) => t?.readyState === 'live').map((t) => `${t!.kind}:${t!.label.slice(0, 24)}`),
+    audioContexts: live(reg.ctxs, (c) => c.state !== 'closed'),
+    peerConnections: pcs.length,
+    transceivers: pcs.reduce((n, p) => n + p.getTransceivers().length, 0),
+    sendersWithTrack: pcs.reduce((n, p) => n + p.getSenders().filter((s) => s.track).length, 0),
+    mediaElements: document.querySelectorAll('video, audio').length,
+    attachedVideoTracks: [...document.querySelectorAll('video')].filter((v) => v.srcObject).length,
+  }
+}
+
 /**
  * Detects sound onsets on a track: first sample above `thresholdDb` after >= `quietMs` of quiet.
  * The analyser window lets us locate the onset sample inside it, so precision is ~1 render quantum, not the poll period.
@@ -192,8 +301,10 @@ export function syntheticScreen(width: number, height: number, fps: number): Med
       g.font = `${height / 10}px monospace`
       g.fillText(String(f), width / 20, height / 6)
     }
-    requestAnimationFrame(draw)
+    if (track.readyState === 'live') requestAnimationFrame(draw)
   }
-  requestAnimationFrame(draw)
-  return c.captureStream(fps)
+  const stream = c.captureStream(fps)
+  const track = stream.getVideoTracks()[0]!
+  requestAnimationFrame(draw) // stops redrawing once the track is stopped (no orphan rAF loop per run)
+  return stream
 }

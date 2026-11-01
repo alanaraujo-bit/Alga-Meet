@@ -33,6 +33,7 @@ const phases = (argv.find((a) => a.startsWith('--phase='))?.split('=')[1] ?? 'vo
 const SCREEN_CODEC = argv.find((a) => a.startsWith('--codec='))?.split('=')[1] ?? 'h264'
 /** Extra Chromium switches for the screen phase, e.g. --flags=--enable-features=PlatformH264CbpEncoding */
 const flagArgs = () => argv.filter((a) => a.startsWith('--flags=')).map((a) => a.slice('--flags='.length))
+const arg = (name, def) => argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? def
 const SCREEN_SECONDS = Number(argv.find((a) => a.startsWith('--screen-seconds='))?.split('=')[1] ?? 60)
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -47,6 +48,10 @@ const r1 = (v) => (typeof v === 'number' ? Math.round(v * 10) / 10 : v)
 const summary = (a) => ({ n: a.length, median: r1(median(a)), p95: r1(q(a, 0.95)), min: r1(q(a, 0)), max: r1(q(a, 1)), mean: r1(mean(a)) })
 
 const results = existsSync(outJson) ? JSON.parse(readFileSync(outJson, 'utf8')) : {}
+// Memory cycles (leak) and server mute/unmute runs go to their own file, so the baseline JSON stays as measured.
+const memJson = join(repo, 'docs/benchmarks/media-memory.json')
+const mem = existsSync(memJson) ? JSON.parse(readFileSync(memJson, 'utf8')) : {}
+const saveMem = () => writeFileSync(memJson, JSON.stringify(mem, null, 2) + String.fromCharCode(10))
 const save = () => {
   mkdirSync(dirname(outJson), { recursive: true })
   writeFileSync(outJson, JSON.stringify(results, null, 2) + '\n')
@@ -84,6 +89,8 @@ async function waitPort(port, ms) {
 
 // ─────────────── LiveKit ───────────────
 let livekit = null
+/** media-net.mjs rewrites the lab config (node_ip behind the impairment proxy, UDP only). */
+const liveKitOverride = { edit: null }
 function liveKitConfig() {
   const exe = join(repo, 'infra/livekit/bin', process.platform === 'win32' ? 'livekit-server.exe' : 'livekit-server')
   if (!existsSync(exe)) throw new Error('LiveKit binary missing: run `node scripts/livekit.mjs` once (downloads + verifies it)')
@@ -93,8 +100,9 @@ function liveKitConfig() {
     .replace(/port_range_start: \d+/, 'port_range_start: 50300')
     .replace(/port_range_end: \d+/, 'port_range_end: 50400')
     .replace(/^webhook:[\s\S]*?(?=^room:)/m, '') // no API server in the lab
+  const yaml2 = liveKitOverride.edit ? liveKitOverride.edit(yaml) : yaml
   const cfg = join(work, 'livekit.lab.yaml')
-  writeFileSync(cfg, yaml)
+  writeFileSync(cfg, yaml2)
   return { exe, cfg }
 }
 async function startLiveKit() {
@@ -670,8 +678,247 @@ async function phaseReconnect(sig) {
   await close(b)
 }
 
+// ─────────────── leak cycles ───────────────
+const MEM_FLAGS = ['--js-flags=--expose-gc', '--enable-precise-memory-info']
+
+let windowPattern = null
+/** Moving pattern in a normal 1280x720 window (not full screen, not on top), captured as a *window* source. */
+function startWindowPattern() {
+  windowPattern = spawn('ffplay', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=60', '-x', '1280', '-y', '720', '-left', '40', '-top', '40', '-noborder', '-an', '-window_title', 'AlgaPatternWin'], { stdio: 'ignore' })
+  children.add(windowPattern)
+}
+function stopWindowPattern() {
+  if (!windowPattern) return
+  killTree(windowPattern.pid)
+  children.delete(windowPattern)
+  windowPattern = null
+}
+
+/** Private MB per process type after a forced GC, plus JS heap and live media object counts in the renderer. */
+async function memSample(inst) {
+  await ev(inst, async () => {
+    for (let i = 0; i < 3; i++) window.gc?.(), await new Promise((r) => setTimeout(r, 100))
+  })
+  await sleep(700)
+  const m = await metrics(inst)
+  const byType = {}
+  for (const p of m) byType[p.type] = r1((byType[p.type] ?? 0) + p.priv / 1024)
+  const page = await ev(inst, () => ({ heapMB: performance.memory.usedJSHeapSize / 1048576, ...window.__mediaLab.counters() }))
+  return { totalMB: r1(m.reduce((t, p) => t + p.priv, 0) / 1024), byType, ...page, heapMB: r1(page.heapMB) }
+}
+
+/** Least-squares slope (MB per cycle) of a series, and first/last thirds medians. */
+function trend(xs) {
+  const n = xs.length
+  if (n < 3) return null
+  const mx = (n - 1) / 2
+  const my = mean(xs)
+  let num = 0
+  let den = 0
+  xs.forEach((y, i) => ((num += (i - mx) * (y - my)), (den += (i - mx) ** 2)))
+  const k = Math.max(1, Math.floor(n / 3))
+  return { slopeMBPerCycle: r1(num / den), firstThirdMedian: r1(median(xs.slice(0, k))), lastThirdMedian: r1(median(xs.slice(-k))), min: r1(Math.min(...xs)), max: r1(Math.max(...xs)) }
+}
+const series = (samples, pick) => samples.map(pick).filter((v) => typeof v === 'number')
+function digest(samples) {
+  const types = [...new Set(samples.flatMap((s) => Object.keys(s.byType)))]
+  return {
+    total: trend(series(samples, (s) => s.totalMB)),
+    ...Object.fromEntries(types.map((t) => [t, trend(series(samples, (s) => s.byType[t]))])),
+    heap: trend(series(samples, (s) => s.heapMB)),
+    lastCounters: (({ totalMB, byType, heapMB, ...c }) => c)(samples[samples.length - 1] ?? {}),
+  }
+}
+
+async function phaseLeak(sig) {
+  const N = Number(arg('cycles', 20))
+  const NJ = Number(arg('join-cycles', 10))
+  const codecs = arg('leak-codecs', 'auto,h264').split(',').filter(Boolean)
+  const tag = arg('leak-tag', 'run')
+  startWindowPattern()
+  await sleep(1500)
+  // A: real window capture (no fake devices: they replace getDisplayMedia) and listen-only.
+  // B: fake mic (beeps), publishes voice, is the viewer and does the join/leave cycles.
+  const a = await launch('lab-a', sig.silence, MEM_FLAGS, false)
+  const b = await launch('lab-b', sig.beeps, MEM_FLAGS, true)
+  a.token = await token('lab-a')
+  b.token = await token('lab-b')
+  const out = { when: new Date().toISOString(), cycles: N, joinCycles: NJ, source: 'janela ffplay testsrc2 1280x720@60 (captura de janela, não tela cheia)', runs: {} }
+  mem.leak = { ...mem.leak, [tag]: out }
+  try {
+    await Promise.all([gotoLab(a), gotoLab(b)])
+    await join_(b, true)
+    await join_(a, false)
+    await sleep(3000)
+    const sourceId = await ev(a, async () => (await window.__mediaLab.media.getScreenSources()).find((s) => s.kind === 'window' && s.name.includes('AlgaPatternWin'))?.id ?? null)
+    if (!sourceId) throw new Error('pattern window not found among capture sources')
+    out.baseline = { a: await memSample(a), b: await memSample(b) }
+    const waitVideo = () => b.page.waitForFunction(() => {
+      const v = document.querySelector('[data-testid="video-lab-a"]')
+      return v && v.videoWidth > 0
+    }, null, { timeout: 20_000 })
+
+    for (const codec of codecs) {
+      await ev(a, (c) => window.__mediaLab.media.setScreenDefaults({ codec: c === 'auto' ? null : c }), codec)
+      await sleep(500)
+      const eff = (await state(a)).screen.codec
+      const run = { codec, effective: eff, a: [], b: [], sent: [] }
+      out.runs[`share:${codec}`] = run
+      for (let i = 0; i < N; i++) {
+        await ev(a, (o) => window.__mediaLab.media.startScreenShare(o), { sourceId, audio: false, quality: '1080p60' })
+        await sleep(800)
+        await ev(b, () => window.__mediaLab.media.watch('lab-a', 'source'))
+        await waitVideo()
+        await sleep(5000)
+        const st = (await state(a)).screen.stats?.layers[0]
+        run.sent.push(st ? `${st.width}x${st.height}@${Math.round(st.fps)} ${st.encoderImplementation}` : null)
+        await ev(b, () => window.__mediaLab.media.unwatch('lab-a'))
+        await ev(a, () => window.__mediaLab.media.stopScreenShare())
+        await sleep(1500)
+        run.a.push(await memSample(a))
+        run.b.push(await memSample(b))
+        const sa = run.a.at(-1)
+        log(`leak ${codec} #${i + 1}: A ${sa.totalMB} MB (Tab ${sa.byType.Tab}, GPU ${sa.byType.GPU}) heap ${sa.heapMB} tracks ${sa.liveTracks} tx ${sa.transceivers} ctx ${sa.audioContexts} | B ${run.b.at(-1).totalMB} MB · ${run.sent.at(-1)}`)
+      }
+      run.digestA = digest(run.a)
+      run.digestB = digest(run.b)
+      saveMem()
+    }
+
+    // watch/unwatch while A shares with the default (automatic) codec.
+    await ev(a, () => window.__mediaLab.media.setScreenDefaults({ codec: null }))
+    await ev(a, (o) => window.__mediaLab.media.startScreenShare(o), { sourceId, audio: false, quality: '1080p60' })
+    await sleep(1500)
+    const wrun = { a: [], b: [] }
+    out.runs.watch = wrun
+    for (let i = 0; i < N; i++) {
+      await ev(b, (q) => window.__mediaLab.media.watch('lab-a', q), i % 2 ? 'auto' : 'source')
+      await waitVideo()
+      await sleep(3000)
+      await ev(b, () => window.__mediaLab.media.unwatch('lab-a'))
+      await sleep(800)
+      wrun.b.push(await memSample(b))
+      wrun.a.push(await memSample(a))
+      const sb = wrun.b.at(-1)
+      log(`leak watch #${i + 1}: B ${sb.totalMB} MB (Tab ${sb.byType.Tab}, GPU ${sb.byType.GPU}) heap ${sb.heapMB} els ${sb.mediaElements} tx ${sb.transceivers}`)
+    }
+    wrun.digestA = digest(wrun.a)
+    wrun.digestB = digest(wrun.b)
+    await ev(a, () => window.__mediaLab.media.stopScreenShare())
+    saveMem()
+
+    // join/leave with mic published (B) while A stays in the room.
+    const jrun = { b: [], a: [] }
+    out.runs.join = jrun
+    for (let i = 0; i < NJ; i++) {
+      await leave(b)
+      await sleep(800)
+      await join_(b, true)
+      await sleep(3000)
+      jrun.b.push(await memSample(b))
+      jrun.a.push(await memSample(a))
+      const sb = jrun.b.at(-1)
+      log(`leak join #${i + 1}: B ${sb.totalMB} MB (Tab ${sb.byType.Tab}) heap ${sb.heapMB} ctx ${sb.audioContexts} tracks ${sb.liveTracks} pcs ${sb.peerConnections} els ${sb.mediaElements}`)
+    }
+    jrun.digestA = digest(jrun.a)
+    jrun.digestB = digest(jrun.b)
+    out.final = { a: await memSample(a), b: await memSample(b) }
+    saveMem()
+  } finally {
+    stopWindowPattern()
+    await close(a)
+    await close(b)
+  }
+}
+
+// ─────────────── server mute / unmute (moderator) ───────────────
+/**
+ * The real moderation path (apps/server voice.ts enforce()): RoomServiceClient.updateParticipant drops
+ * `microphone` from canPublishSources (server mute) and puts it back (server unmute). Timings are from the
+ * API call until each side's store shows the result; audio flow = B's inbound-rtp bytes for A's mic.
+ */
+async function phaseUnmute(sig) {
+  const { RoomServiceClient, TrackSource } = await import('livekit-server-sdk')
+  const svc = new RoomServiceClient(`http://127.0.0.1:${LK_PORT}`, 'devkey', secret)
+  const ALL = [TrackSource.CAMERA, TrackSource.MICROPHONE, TrackSource.SCREEN_SHARE, TrackSource.SCREEN_SHARE_AUDIO]
+  const perm = (mic) => ({ canSubscribe: true, canPublish: true, canPublishData: false, canPublishSources: mic ? ALL : ALL.filter((s) => s !== TrackSource.MICROPHONE) })
+  const setMic = (mic) => svc.updateParticipant(ROOM, 'lab-a', { permission: perm(mic) })
+  const a = await launch('lab-a', sig.beeps)
+  const b = await launch('lab-b', sig.silence)
+  a.token = await token('lab-a')
+  b.token = await token('lab-b')
+  const out = { when: new Date().toISOString(), steps: [] }
+  mem[arg('unmute-tag', 'unmute')] = out
+  const rx = () => ev(b, async () => (await window.__mediaLab.rawStats({ remote: 'lab-a', source: 'mic' })).find((s) => s.type === 'inbound-rtp')?.bytesReceived ?? 0)
+  const look = async () => {
+    const [sa, sb] = await Promise.all([state(a), state(b)])
+    const p = sb.participants['lab-a']
+    return {
+      aServerMuted: sa.self.serverMuted,
+      aMuted: sa.self.muted,
+      aMicTrack: await ev(a, () => window.__mediaLab.media.debug.mic?.mediaStreamTrack.readyState ?? 'none'),
+      aNotice: sa.notice?.text ?? null,
+      bSeesAMuted: p ? p.micMuted : null,
+      bLevelA: p ? p.level : null,
+    }
+  }
+  /** Poll until `done(view, rxRate)` or timeout; rxRate = bytes/s of A's voice arriving at B over the last 500 ms. */
+  const until = async (name, done, ms = 15_000) => {
+    const t0 = Date.now()
+    let prev = await rx()
+    let v
+    let rate = 0
+    while (Date.now() - t0 < ms) {
+      await sleep(250)
+      const cur = await rx()
+      rate = (cur - prev) * 4
+      prev = cur
+      v = await look()
+      if (done(v, rate)) break
+    }
+    const step = { step: name, ok: done(v, rate), ms: Date.now() - t0, rxBytesPerSec: Math.round(rate), ...v }
+    out.steps.push(step)
+    log('unmute', JSON.stringify(step))
+    return step
+  }
+  try {
+    await Promise.all([gotoLab(a), gotoLab(b)])
+    await join_(b)
+    await join_(a)
+    await until('em chamada', (v, r) => v.bSeesAMuted === false && r > 1000)
+    await setMic(false)
+    await until('server mute', (v, r) => v.aServerMuted && v.bSeesAMuted === true && v.aMicTrack === 'none' && r === 0)
+    await setMic(true)
+    await until('server unmute', (v, r) => !v.aServerMuted && v.bSeesAMuted === false && r > 1000 && v.bLevelA > 0)
+    // Self-muted while the moderator mutes/unmutes: comes back published but still muted (the user's choice).
+    await ev(a, () => window.__mediaLab.media.setMuted(true))
+    await setMic(false)
+    await until('auto-mutado + server mute', (v) => v.aServerMuted && v.aMicTrack === 'none')
+    await setMic(true)
+    await until('auto-mutado + server unmute', (v) => !v.aServerMuted && v.aMuted && v.aMicTrack === 'live' && v.bSeesAMuted === true)
+    await ev(a, () => window.__mediaLab.media.setMuted(false))
+    await until('desmuta a si mesmo', (v, r) => v.bSeesAMuted === false && r > 1000)
+    // Joining while already server-muted (token without microphone): no "mic unavailable" error, then unmute.
+    await leave(a)
+    const at = new AccessToken('devkey', secret, { identity: 'lab-a', name: 'LAB A', ttl: '1h' })
+    at.addGrant({ roomJoin: true, room: ROOM, ...perm(false) })
+    a.token = await at.toJwt()
+    await join_(a)
+    await until('entra já server-mutado', (v) => v.aServerMuted && v.aMicTrack === 'none' && v.bSeesAMuted === true)
+    await setMic(true)
+    await until('server unmute após entrar mutado', (v, r) => !v.aServerMuted && v.bSeesAMuted === false && r > 1000)
+    saveMem()
+  } finally {
+    await close(a)
+    await close(b)
+  }
+}
+
 // ─────────────── main ───────────────
-try {
+// Importable: scripts/media-net.mjs (and ad-hoc probes) reuse launch/token/metrics without running the phases.
+export { ROOM, LK_PORT, secret, arg, startWindowPattern, stopWindowPattern, children, close, ev, gotoLab, join_, killTree, launch, leave, liveKitOverride, log, makeSignals, memSample, metrics, median, q, r1, results, sampler, save, sleep, startLiveKit, state, stopLiveKit, summary, token, cleanup, LK_URL, MEM_FLAGS, desktop, repo, work }
+const isMain = process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url
+if (isMain) try {
   mkdirSync(work, { recursive: true })
   if (!argv.includes('--no-build')) {
     log('building…')
@@ -680,17 +927,20 @@ try {
   }
   const sig = makeSignals()
   await startLiveKit()
-  results.when = new Date().toISOString()
+  const baselinePhases = phases.filter((p) => !['leak', 'unmute'].includes(p))
+  if (baselinePhases.length) results.when = new Date().toISOString()
   if (argv.includes('--proposed-csp')) patchCsp()
   const csp = argv.includes('--proposed-csp') ? "script-src 'self' 'wasm-unsafe-eval' (proposta, só no build do lab)" : "script-src 'self' (como enviado)"
-  results.cspByPhase = { ...results.cspByPhase, ...Object.fromEntries(phases.map((p) => [p, csp])) }
+  if (baselinePhases.length) results.cspByPhase = { ...results.cspByPhase, ...Object.fromEntries(baselinePhases.map((p) => [p, csp])) }
   if (phases.includes('voice')) await phaseVoice(sig)
   if (phases.includes('speech')) await phaseSpeech(sig)
   if (phases.includes('codecs')) await phaseCodecs(sig)
   if (phases.includes('screen') || phases.includes('synthetic')) await phaseScreen(sig)
   if (phases.includes('reconnect')) await phaseReconnect(sig)
-  save()
-  log('done →', outJson)
+  if (phases.includes('leak')) await phaseLeak(sig)
+  if (phases.includes('unmute')) await phaseUnmute(sig)
+  if (baselinePhases.length) save()
+  log('done →', baselinePhases.length ? outJson : memJson)
 } catch (e) {
   console.error(e)
   process.exitCode = 1

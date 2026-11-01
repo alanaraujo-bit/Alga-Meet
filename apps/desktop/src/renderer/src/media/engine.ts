@@ -20,7 +20,7 @@ import {
 } from 'livekit-client'
 import { PttLatch } from './vad'
 import { PrefsStore, type InputMode, type ProcessingMode } from './prefs'
-import { availablePresets, contentSettings, defaultPreset, getPreset, pickCodec, recordSustain, type ContentType, type ScreenPreset, type ScreenPresetId, type VideoCodecId } from './presets'
+import { availablePresets, contentSettings, defaultPreset, getPreset, pickCodec, recordSustain, simulcastFor, type ContentType, type ScreenPreset, type ScreenPresetId, type VideoCodecId } from './presets'
 import { VoiceGraph, VoiceProcessor, captureConstraints } from './processing'
 import { playCue, setCueOutput, type Cue } from './sounds'
 import { StatsDelta, audioIn, audioOut, videoIn, videoOut } from './stats'
@@ -111,6 +111,15 @@ class MediaEngine {
   private noticeId = 0
   private levelSmooth = 0
   private started = false
+  /** Mic publish/unpublish run one at a time (join, permission changes and server unpublish can race). */
+  private micOp: Promise<void> = Promise.resolve()
+  /** <video>s showing my own outgoing screen (attachOwnScreen). */
+  private ownEls = new Set<HTMLVideoElement>()
+  /** Per remote mic: analyser on the decoded track for `participants[id].level`. One context for all. */
+  private meterCtx: AudioContext | null = null
+  private meters = new Map<string, { src: MediaStreamAudioSourceNode; an: AnalyserNode; buf: Float32Array<ArrayBuffer>; level: number }>()
+  private levelTimer: ReturnType<typeof setInterval> | null = null
+  private channelName: string | null = null
 
   /** Wire OS/bridge integrations once (idempotent). Called lazily by every public entry point. */
   private start(): void {
@@ -703,15 +712,29 @@ class MediaEngine {
 
   private async capture(sourceId: string | null | undefined, audio: boolean, preset: ScreenPreset): Promise<MediaStream> {
     const screen = bridge()?.screen
-    // Without the native picker (bridge not ready) getDisplayMedia uses whatever handler main installed.
-    if (screen?.select && sourceId) await screen.select(sourceId, { audio })
-    return navigator.mediaDevices.getDisplayMedia({
-      video: { width: { max: preset.width }, height: { max: preset.height }, frameRate: { ideal: preset.fps, max: preset.fps } },
-      // restrictOwnAudio: loopback without our own process tree, so viewers don't hear the call echoed (decision 0002).
-      audio: audio ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, restrictOwnAudio: true } : false,
-      systemAudio: audio ? 'include' : 'exclude',
-      selfBrowserSurface: 'exclude',
-    } as DisplayMediaStreamOptions)
+    const open = async (width: number, height: number) => {
+      // Without the native picker (bridge not ready) getDisplayMedia uses whatever handler main installed.
+      if (screen?.select && sourceId) await screen.select(sourceId, { audio })
+      return navigator.mediaDevices.getDisplayMedia({
+        video: { width: { max: width }, height: { max: height }, frameRate: { ideal: preset.fps, max: preset.fps } },
+        // restrictOwnAudio: loopback without our own process tree, so viewers don't hear the call echoed (decision 0002).
+        audio: audio ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, restrictOwnAudio: true } : false,
+        systemAudio: audio ? 'include' : 'exclude',
+        selfBrowserSurface: 'exclude',
+      } as DisplayMediaStreamOptions)
+    }
+    const stream = await open(preset.width, preset.height)
+    // A source smaller than the preset (most windows) arrives inside capture buffers of the preset's size
+    // (getSettings() reports that size, not the frame's). The HEVC hardware encoder can't start on those and
+    // WebRTC silently switches the sender to VP8, which the SFU drops (docs/benchmarks/media-baseline.md §4).
+    // Capture again at the real size.
+    const track = stream.getVideoTracks()[0]
+    const set = track?.getSettings()
+    const real = track && set?.width && set.height ? await frameSize(track) : null
+    if (!real || (real.width >= set!.width! && real.height >= set!.height!)) return stream
+    stream.getTracks().forEach((t) => t.stop())
+    // Multiple of 8: the /4 and /2 simulcast layers (presets.simulcastFor) stay even, as the HW encoder needs.
+    return open(real.width & ~1, real.height & ~1)
   }
 
   async startScreenShare(opts: ScreenShareOptions = {}): Promise<void> {
@@ -750,6 +773,7 @@ class MediaEngine {
     const { hint, degradation } = contentSettings(contentType)
     video.contentHint = hint
     video.addEventListener('ended', () => void this.stopScreenShare())
+    const size = video.getSettings()
     const svc = codec === 'vp9' || codec === 'av1'
     const advanced = svc || codec === 'h265'
     const vpub = await room.localParticipant.publishTrack(video, {
@@ -759,7 +783,7 @@ class MediaEngine {
       // Codecs not every viewer can decode get an H.264 backup the SFU switches to per subscriber.
       backupCodec: advanced ? { codec: 'h264', encoding: { maxBitrate: preset.maxBitrate, maxFramerate: preset.fps } } : false,
       screenShareEncoding: { maxBitrate: preset.maxBitrate, maxFramerate: preset.fps, priority: 'high' },
-      screenShareSimulcastLayers: preset.simulcast.map((l) => new VideoPreset(l.width, l.height, l.maxBitrate, l.fps)),
+      screenShareSimulcastLayers: simulcastFor(preset, size.width, size.height).map((l) => new VideoPreset(l.width, l.height, l.maxBitrate, l.fps)),
       simulcast: true,
       scalabilityMode: svc ? 'L3T3_KEY' : undefined,
       degradationPreference: degradation,
@@ -801,11 +825,19 @@ class MediaEngine {
     if (!cur) return
     this.screenPub = null
     const room = this.room
-    for (const pub of [cur.video, cur.audio]) {
-      if (!pub?.track) continue
-      pub.track.stop()
-      await room?.localParticipant.unpublishTrack(pub.track, true).catch(() => undefined)
+    // LiveKit's unpublish only makes the transceivers inactive. Chromium keeps their send streams, and with
+    // them every encoder instance (3 simulcast layers + backup codec), for the life of the connection:
+    // +39 MB per share with OpenH264, +165 MB with VP9 (docs/benchmarks/media-baseline.md §4). Stopping
+    // the transceivers releases them.
+    const tracks = [cur.video.track, cur.audio?.track].filter((t) => !!t)
+    const senders = new Set(tracks.flatMap((t) => [t.sender, ...('simulcastCodecs' in t ? [...(t as LocalVideoTrack).simulcastCodecs.values()].map((c) => c.sender) : [])]))
+    const transceivers = room?.engine.pcManager?.publisher.getTransceivers().filter((t) => senders.has(t.sender)) ?? []
+    for (const el of this.ownEls) cur.video.track?.detach(el)
+    for (const track of tracks) {
+      track.stop()
+      await room?.localParticipant.unpublishTrack(track, true).catch(() => undefined)
     }
+    if (room && transceivers.length) await releaseTransceivers(room, transceivers)
     if (cur.fps.length >= 10) {
       const sorted = [...cur.fps].sort((a, b) => a - b)
       const sustain = recordSustain(this.prefs.get().sustain, cur.preset.id, cur.preset.fps, sorted[Math.floor(sorted.length / 2)]!)
@@ -1008,6 +1040,44 @@ class MediaEngine {
   /** Dev/benchmark access (MediaLab only). Not part of the UI contract. */
   get debug() {
     return { room: this.room, graph: this.graph, mic: this.mic, screen: this.screenPub, prefs: this.prefs }
+  }
+}
+
+/**
+ * Free a finished share's encoders: stop its transceivers (an inactive one keeps its send stream and every
+ * encoder instance alive). Chromium then recycles the freed m-lines for the next share, and on a recycled
+ * m-line LiveKit's SFU (1.13.11) answers its default codec order when it is regressing a viewer to the
+ * backup codec: the next share went out as VP8 and nobody received it (measured). So each freed slot is
+ * taken right away by an inert placeholder (no track, no encoder), and later shares get fresh m-lines.
+ */
+async function releaseTransceivers(room: Room, transceivers: RTCRtpTransceiver[]): Promise<void> {
+  const pc = room.engine.pcManager?.publisher
+  if (!pc) return
+  const kinds = transceivers.map((t) => t.receiver.track.kind as 'audio' | 'video')
+  for (const t of transceivers) t.stop()
+  await room.engine.negotiate().catch(() => undefined)
+  // shortcut: placeholders add one m-line per stopped transceiver (as many as before the fix, minus encoders); revisit if SDP size starts to show in negotiation time.
+  for (const kind of kinds) pc.addTransceiverOfKind(kind, { direction: 'inactive' })
+  await room.engine.negotiate().catch(() => undefined)
+}
+
+/** Size of the first real frame (getSettings() can report the capture buffer instead). null = unknown. */
+async function frameSize(track: MediaStreamTrack, timeoutMs = 1500): Promise<{ width: number; height: number } | null> {
+  type Reader = ReadableStreamDefaultReader<{ displayWidth: number; displayHeight: number; close(): void }>
+  const Processor = (window as unknown as { MediaStreamTrackProcessor?: new (o: { track: MediaStreamTrack }) => { readable: { getReader(): Reader } } }).MediaStreamTrackProcessor
+  if (!Processor) return null
+  const clone = track.clone()
+  const reader = new Processor({ track: clone }).readable.getReader()
+  try {
+    const r = await Promise.race([reader.read(), new Promise<null>((res) => setTimeout(() => res(null), timeoutMs))])
+    const f = r?.value
+    if (!f) return null
+    const size = { width: f.displayWidth, height: f.displayHeight }
+    f.close()
+    return size
+  } finally {
+    void reader.cancel().catch(() => undefined)
+    clone.stop()
   }
 }
 

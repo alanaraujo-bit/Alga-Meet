@@ -5,6 +5,7 @@ import { media, useMedia, type ContentType, type ProcessingMode, type ScreenPres
 import * as lab from './lab'
 
 const q = new URLSearchParams(location.search)
+lab.instrument()
 Object.assign(window, { __mediaLab: { media, useMedia, ...lab } })
 
 const S: Record<string, CSSProperties> = {
