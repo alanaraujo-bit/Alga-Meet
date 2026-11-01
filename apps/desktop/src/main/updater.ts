@@ -66,6 +66,7 @@ export function initUpdater(): void {
   updater.autoDownload = true
   updater.autoInstallOnAppQuit = true
   updater.allowDowngrade = false
+  updater.disableWebInstaller = true // we ship the full NSIS installer, never the web installer
   updater.on('checking-for-update', () => set({ state: 'checking' }))
   updater.on('update-available', (i) => set({ state: 'available', version: i.version }))
   updater.on('update-not-available', () => set({ state: 'none' }))
