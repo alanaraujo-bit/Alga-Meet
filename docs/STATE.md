@@ -36,7 +36,8 @@
 | Servidor: complementos de T&S (1c059e2, 165 testes) | `apps/server` | **feito** |
 | Servidor: endurecimento de T&S (0b08eec, 167 testes em PGlite e PG 18) | `apps/server` | **feito** |
 | Desenho de E2EE (f753ac3) | `docs/decisions/0004-e2ee.md` | **feito** — opção A: MLS (RFC 9420) por chamada, OpenMLS (MIT, auditado) em WASM num `utilityProcess`, chaves por remetente via MLS-Exporter no frame cryptor do LiveKit |
-| E2EE fase 0: spike OpenMLS→WASM, medições n=2/10/25/99, go/no-go | `native/mls`, `src/main/mls` | em andamento |
+| E2EE fase 0 (08d73e3) | `native/mls`, `src/main/mls` | **GO: OpenMLS 0.9.2** (MIT) em `utilityProcess`: `.wasm` 2,23 MiB (662 KiB gzip); entrar numa chamada de 99 pessoas custa p95 9,7 ms de CPU (19,7 ms worker frio); worker 30–34 MB; 157 crates sem GPL (4 MPL-2.0 → aviso de terceiros) |
+| E2EE fase 1a (contrato + Delivery Service no servidor + identidade de dispositivo nativa) | `packages/shared`, `apps/server`, `src/main` | em andamento |
 | Servidor: downgrade de plano no meio da live (8f1854d, 2e3a0aa; 168 testes) | `apps/server`, `infra/livekit` | **feito** — atributo atualizado na hora; reverificação em 10 s muta transmissão acima do plano. Timeout de camada do LiveKit **mantido em 2 s** (1–1,5 s causou oscilação de camadas; detalhes em `infra/livekit/README.md`) |
 | Mídia: republicar a transmissão no downgrade (LiveKit mantém as camadas declaradas; sem isso o servidor muta cliente obediente) | `media/` | em andamento |
 | Crítica de design rodada 2 (`docs/design/critique-2026-11-01-r2.md`) | docs | **feito**: **6,5/10** (antes 5) — shell 6,5 · chat 7 · chamada 7 · transmissão 6 · configurações 7 · billing 8 / loja 5 · T&S 8 · consistência 5,5; identidade ainda é sobretudo a cor |
