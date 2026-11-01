@@ -1,0 +1,49 @@
+# Alga Meet — Estado do projeto
+
+> Fonte de verdade. Só entra como "Validado" o que tem evidência (teste, medição, screenshot). Atualizado: 2026-11-01.
+
+## Versão executável
+- Dev: `npm install && npm run dev` (ver `README.md`). Multiusuário local: `npm run dev -- --profiles=bob`.
+- Instalador: `npm run dist:win` → `apps/desktop/release/`.
+
+## Implementado
+- Monorepo (npm workspaces), contrato compartilhado `@alga/shared` (modelos, REST com zod, protocolo do gateway, permissões, UUIDv7).
+- Esqueleto Electron (janela com caption buttons nativos, perfis isolados para multi-instância, bridge tipado `window.alga`).
+- SFU LiveKit 1.13.11 local (binário fixado com SHA-256 conferido) + config dev com webhooks para a API.
+
+## Em desenvolvimento (agentes paralelos)
+| Frente | Escopo | Status |
+|---|---|---|
+| Backend | `apps/server`: auth, amigos, DMs, espaços, canais, mensagens, convites, gateway, voz (tokens + webhooks) | em andamento |
+| Desktop nativo | `apps/desktop/src/main`, `preload`, instalador NSIS, tray, hotkeys globais, captura, updater | em andamento |
+| Motor de mídia | `apps/desktop/src/renderer/src/media`: voz (Opus/DTX/RED, RNNoise, PTT, dispositivos) + transmissão (codecs, presets, áudio do sistema) + benchmarks | em andamento |
+| Design system + telas | `apps/desktop/src/renderer` | aguardando estudo do Linear |
+
+## Validado
+- `@alga/shared`: 2 testes unitários (UUIDv7, permissões) passando.
+- Esqueleto desktop: `electron-vite build` e `typecheck` passando.
+
+## Pesquisa concluída
+- `docs/research/discord-benchmark.md` — barra a superar (fatos/medições/relatos separados). Medido: Discord ocioso na bandeja = 6 processos, ~808 MB de memória privada.
+- Em andamento: `docs/research/linear-design-study.md`, `docs/infra/cost-model.md`.
+
+## Qualidade (voz / transmissão / interface / desempenho)
+Sem medições ainda. Metas iniciais (de `discord-benchmark.md`): stream 1080p60 grátis com encode por hardware; RAM ociosa ≤ 300 MB; voz ≥ paridade Opus 64–128 kbps com DTX+RED.
+
+## Problemas conhecidos
+- **Sem E2EE de mídia.** Mídia é cifrada só até o SFU (DTLS-SRTP). Discord tem E2EE (DAVE) obrigatório desde 2026-03 → paridade necessária antes de lançamento público.
+- Strings da UI direto em pt-BR, sem framework de i18n ainda.
+- Anexos/upload de arquivos fora do escopo da primeira fatia.
+
+## Bloqueios humanos
+| O quê | Por quê | O que fazer | Sem isso |
+|---|---|---|---|
+| Certificado de assinatura de código (OV/EV ou Azure Trusted Signing) | Windows SmartScreen e confiança do updater | Contratar certificado; fornecer `CSC_LINK`/`CSC_KEY_PASSWORD` ou credenciais Azure | Instalador mostra aviso "editor desconhecido" |
+| Repositório GitHub `alanaraujo-bit/alga-meet` (privado ou público) | Canal de releases do auto-update | Autorizar criação (ou criar) | Auto-update não tem de onde baixar |
+| Servidor com UDP para o SFU (VPS) | Railway não expõe UDP | Escolher provedor (ver `docs/infra/cost-model.md`) e autorizar custo | Voz/tela só funcionam em rede local/dev |
+| Segunda máquina independente | Validar voz/tela entre dispositivos reais e NATs diferentes | Instalar o build em outro PC e entrar num canal | Só temos medições em localhost |
+
+## Próximos passos
+1. Integrar backend + nativo + mídia; rodar o fluxo ponta a ponta com dois perfis.
+2. Design system e telas (após estudo do Linear), com ciclo de screenshots e crítica.
+3. Primeiro build instalável para o usuário testar.
