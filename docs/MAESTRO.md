@@ -12,7 +12,8 @@ Política permanente de execução do Alga Meet. Objetivo: **qualidade entregue 
 2. Contrato antes de paralelismo: `packages/shared` (rede) e `apps/desktop/src/shared/bridge.ts` (main↔renderer) são escritos antes de agentes paralelos começarem.
 3. Processos: todo agente para o que iniciou; nunca dois servidores no mesmo `PGLITE_DIR`; o stack de dev do dono (API :4000, LiveKit :7880, perfis `default`/`bob`) é intocável — agentes usam portas, perfis e diretórios próprios.
 4. Uma instalação de dependências por vez (npm na raiz). Agentes não rodam `npm install`; pedem a dependência no relatório.
-5. Renovar sessão quando o contexto do Maestro ficar denso: atualizar `docs/STATE.md` + este handoff, commitar, abrir sessão nova com o prompt de retomada abaixo.
+5. Repositório público: nunca commitar dados reais da rede de casa (o hook bloqueia); push para `origin/main` após cada lote verificado.
+6. Renovar sessão quando o contexto do Maestro ficar denso: atualizar `docs/STATE.md` + este handoff, commitar, abrir sessão nova com o prompt de retomada abaixo.
 
 ## Handoff (preencher antes de trocar de sessão)
 Mantido em `docs/STATE.md` → seções *Próximos passos* e *Em desenvolvimento*. O Maestro seguinte lê, nesta ordem:
