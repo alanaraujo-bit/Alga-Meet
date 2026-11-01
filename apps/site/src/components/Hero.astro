@@ -4,6 +4,8 @@
 import { getImage } from 'astro:assets';
 import Download from './Download.astro';
 import { downloadNote } from '../data/links';
+import { Picture } from 'astro:assets';
+import heroStill from '../assets/media/hero.png';
 import chat from '../assets/shots/chat.png';
 
 const img = await getImage({ src: chat, format: 'avif', widths: [960, 1440, 1920], sizes: '(min-width: 1240px) 1120px, 92vw' });
@@ -39,6 +41,9 @@ const lines = title.map((line) => line.split(' ').map((word) => [...word].map((c
 <section class="hero" id="topo" data-hero aria-labelledby="hero-t">
   <div class="stage" data-stage>
     <div class="backdrop" aria-hidden="true"></div>
+    <div class="media hero-media" data-video="/media/hero.mp4" aria-hidden="true">
+      <Picture src={heroStill} formats={['avif', 'webp']} widths={[480]} sizes="480px" alt="" loading="lazy" fetchpriority="low" />
+    </div>
 
     <div class="copy wrap" data-copy>
       <p class="pill rise" style="--d:0ms"><span class="live-dot" aria-hidden="true"></span>Beta fechado · Windows 10 e 11</p>
@@ -136,6 +141,11 @@ const lines = title.map((line) => line.split(' ').map((word) => [...word].map((c
   @keyframes rise { from { opacity: 0.001; transform: translateY(18px); } }
 
   .cue { display: none; }
+  /* B e C: as frondes gravadas do WebGL (vídeo em B, foto em C), à direita do texto; no A, nada disso carrega. */
+  .hero-media { position: absolute; right: max(0px, calc(50vw - 720px)); top: 0; width: min(46vw, 600px); height: min(100vh, 900px); z-index: 0; pointer-events: none;
+    -webkit-mask-image: radial-gradient(70% 60% at 50% 55%, #000 55%, transparent 100%); mask-image: radial-gradient(70% 60% at 50% 55%, #000 55%, transparent 100%); }
+  .hero-media :global(picture), .hero-media :global(img), .hero-media :global(video) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  :global(html.tier-a) .hero-media { display: none; }
 
   /* Janela (B, C e sem JS): em fluxo, montada, logo abaixo do texto. */
   .scene { position: relative; z-index: 1; width: min(1120px, calc(100vw - 2 * var(--gutter))); margin: clamp(56px, 9vh, 96px) auto 0; padding-bottom: clamp(72px, 12vh, 140px); perspective: 2000px; }
@@ -194,6 +204,7 @@ const lines = title.map((line) => line.split(' ').map((word) => [...word].map((c
     .title { font-size: clamp(52px, 15vw, 72px); }
     .word { margin-right: 0.18em; }
     .ctas { justify-content: center; }
+    .hero-media { right: 0; left: 0; top: auto; bottom: -40px; width: 100%; height: 52vh; position: absolute; }
     :global(html.tier-a) .scene { width: 92vw; top: 50%; }
     :global(html.tier-a) .tag, :global(html.tier-a) .cue { display: none; }
     :global(html.tier-a) .copy { padding-top: 104px; }

@@ -1,6 +1,8 @@
 ---
 import { facts } from '../data/facts';
 import { people, lines } from '../data/conversation';
+import { Picture } from 'astro:assets';
+import roomStill from '../assets/media/room.png';
 const dots = (w: number) => `background:linear-gradient(135deg,${people[w].grad[0]},${people[w].grad[1]})`;
 const lost = facts.packetsSent.toLocaleString('pt-BR');
 
@@ -44,6 +46,9 @@ const speech = () => line(false);
         <span class="l-off">Ouvir a sala</span><span class="l-on">Silenciar</span>
       </button>
       <p class="latency" data-latency><span class="tnum">{facts.voiceLatencyMs} ms</span> da boca de um ao ouvido do outro.</p>
+      <div class="media room-media wrap" data-video="/media/room.mp4" aria-hidden="true">
+        <Picture src={roomStill} formats={['avif', 'webp']} widths={[960, 1280]} sizes="(min-width: 1240px) 1160px, 100vw" alt="" loading="lazy" />
+      </div>
       <ol class="transcript" aria-label="A conversa da sala">
         {lines.map((l) => (
           <li class:list={[l.laugh && 'laugh']}>
@@ -112,6 +117,12 @@ const speech = () => line(false);
   .room-stage { position: relative; padding-block: clamp(96px, 14vh, 160px) 24px; }
   .room-gl, .names, .caption, .latency, .listen { display: none; }
   .room-head { position: relative; z-index: 2; }
+  .room-media { margin-top: clamp(28px, 4vh, 48px); }
+  .room-media :global(img), .room-media :global(video) { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 16px; background: #010102; }
+  .room-media :global(video) { position: absolute; inset: 0; }
+  .room-media { position: relative; }
+  .room-media :global(video) { left: var(--gutter); right: var(--gutter); width: calc(100% - 2 * var(--gutter)); }
+  :global(html.tier-a) .room-media { display: none; }
   .chapter-t em { font-style: normal; color: #a9acff; }
   .room-lede { margin-top: 12px; color: var(--text-3); font-size: clamp(16px, 1.4vw, 19px); }
   .transcript { list-style: none; margin: clamp(32px, 5vh, 56px) auto 0; padding: 0 var(--gutter); max-width: var(--maxw); display: grid; gap: 10px; }
@@ -123,6 +134,9 @@ const speech = () => line(false);
 
   /* ---- Nível A: palco preso de tela cheia com o WebGL ---- */
   :global(html.tier-a) .room-ch { height: 460vh; }
+  /* a água escurece até o preto da sala: sem borda seca entre os capítulos */
+  :global(html.tier-a) .room-ch::before { content: ''; position: absolute; left: 0; right: 0; top: -50vh; height: 50vh; pointer-events: none; background: linear-gradient(rgba(1, 1, 2, 0), #010102); }
+  :global(html.tier-a) .room-ch::after { content: ''; position: absolute; left: 0; right: 0; bottom: -40vh; height: 40vh; pointer-events: none; background: linear-gradient(#010102, rgba(1, 1, 2, 0)); }
   :global(html.tier-a) .anchor { top: calc(0.16 * 360vh); }
   :global(html.tier-a) .room-stage { position: sticky; top: 0; height: 100vh; height: 100lvh; overflow: hidden; padding: 0; background: #010102; }
   :global(html.tier-a) .room-gl { display: block; position: absolute; inset: 0; }

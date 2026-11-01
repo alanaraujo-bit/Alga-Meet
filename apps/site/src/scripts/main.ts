@@ -143,6 +143,30 @@ if (tier !== 'c') {
   }
 }
 
+// Nível B: os momentos em vídeo gravado do próprio WebGL (public/media), só perto da tela e sem som.
+// A foto (nível C) fica por baixo como pôster. data-once = toca uma vez e para no último quadro.
+if (tier === 'b') {
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const host = e.target as HTMLElement;
+      let v = host.querySelector('video');
+      if (e.isIntersecting && !v) {
+        v = document.createElement('video');
+        Object.assign(v, { muted: true, playsInline: true, autoplay: true, loop: !('once' in host.dataset), preload: 'auto' });
+        v.setAttribute('aria-hidden', 'true');
+        v.style.opacity = '0';
+        v.style.transition = 'opacity 600ms';
+        v.addEventListener('playing', () => { v!.style.opacity = '1'; }, { once: true });
+        v.src = host.dataset.video!;
+        host.append(v);
+      } else if (v) {
+        if (e.isIntersecting) v.play().catch(() => {}); else v.pause();
+      }
+    }
+  }, { rootMargin: '200px' });
+  document.querySelectorAll('[data-video]').forEach((el) => io.observe(el));
+}
+
 // A lente da transmissão vale para todos os níveis (A: WebGL; B/C: fotos + CSS).
 const { initLens } = await import('./lens/chapter');
 initLens(tier);

@@ -4,11 +4,16 @@ import Logo from './Logo.astro';
 import mark from '../assets/brand/mark.svg?url';
 import { facts } from '../data/facts';
 import { downloadNote, releasesUrl } from '../data/links';
+import { Picture } from 'astro:assets';
+import finalStill from '../assets/media/final.png';
 const year = new Date().getFullYear();
 ---
 <section class="final" aria-labelledby="final-t" data-final>
   <div class="final-stage" data-final-stage>
     <div class="horizon" data-horizon aria-hidden="true"></div>
+    <div class="media final-media" data-video="/media/final.mp4" data-once aria-hidden="true">
+      <Picture src={finalStill} formats={['avif', 'webp']} widths={[960, 1440]} sizes="100vw" alt="" loading="lazy" />
+    </div>
     <div class="wrap inner">
       <img class="mark" src={mark} width="72" height="72" alt="" data-reveal />
       <span class="mark-space" aria-hidden="true"></span>
@@ -32,6 +37,14 @@ const year = new Date().getFullYear();
   .final-stage { position: relative; padding-block: clamp(120px, 20vh, 220px) clamp(120px, 18vh, 200px); }
   h2 em { font-style: normal; color: #a9acff; }
   .mark-space { display: none; }
+  .final-media { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+  .final-media :global(picture), .final-media :global(img), .final-media :global(video) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+  .final-media::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(11, 11, 12, 0.2), rgba(11, 11, 12, 0.1) 40%, rgba(11, 11, 12, 0.75) 75%, var(--bg-1)); }
+  :global(html:not(.tier-a)) .final .horizon, :global(html:not(.tier-a)) .final::before { display: none; }
+  :global(html.tier-a) .final-media { display: none; }
+  /* B/C: as frondes do vídeo/foto fazem o papel da marca; o texto desce até a água */
+  :global(html:not(.tier-a)) .final .mark { display: none; }
+  :global(html:not(.tier-a)) .final-stage { padding-top: clamp(280px, 46vh, 460px); }
   /* Nível A: a superfície. A água sobe, o horizonte da hora azul nasce (WebGL) e as frondes se encontram. */
   :global(html.gl-on) .final { height: 260vh; overflow: visible; }
   :global(html.gl-on) .final-stage { position: sticky; top: 0; height: 100vh; height: 100lvh; padding: 0; display: grid; place-items: center; }
