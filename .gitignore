@@ -7,9 +7,8 @@ release/
 .env.*
 !.env.example
 infra/livekit/bin/
-# Rust build output and the generated WASM + glue (native/mls/build.sh).
+# Rust build output. native/mls/pkg (WASM + glue) is committed; npm run verify:mls checks it matches the sources.
 native/mls/target/
-native/mls/pkg/
 apps/server/data/
 .vite/
 coverage/

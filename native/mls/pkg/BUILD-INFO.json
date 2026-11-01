@@ -1,0 +1,18 @@
+{
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "wasmBindgen": "wasm-bindgen 0.2.130",
+  "target": "wasm32-unknown-unknown",
+  "sources": [
+    "Cargo.lock",
+    "Cargo.toml",
+    "build.sh",
+    "notices.cjs",
+    "src/lib.rs"
+  ],
+  "sourceHash": "36721b96d5976aafe9e9d07590f7c9381e86dc8ff59636f694c47838c07a0f95",
+  "outputs": {
+    "alga_mls.js": "fa060961982834912c50fd36faf6d83d2be22bf894286b21c7e18d29e61e6f07",
+    "alga_mls_bg.wasm": "f73ba81bf184ee2de5d3c5ad40a1f97f3604b77956cfe625d19a752ec8436599",
+    "THIRD-PARTY-NOTICES.txt": "7123eb505cb117b5395dff169cfa09387442ff50ca107c8a066d93682ed3e812"
+  }
+}
