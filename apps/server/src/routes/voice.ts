@@ -1,0 +1,50 @@
+import { Permission, VoiceJoinBody, hasPermission, type VoiceJoinResponse } from '@alga/shared'
+import type { FastifyInstance } from 'fastify'
+import { assertDmNotBlocked, requireChannel } from '../access.js'
+import type { Ctx } from '../app.js'
+import { HttpError, badRequest, forbidden, parse } from '../errors.js'
+import { roomName } from '../voice.js'
+
+export function voiceRoutes(app: FastifyInstance, { db, voice, config }: Ctx): void {
+  app.post('/voice/join', async (req): Promise<VoiceJoinResponse> => {
+    const { channelId } = parse(VoiceJoinBody, req.body)
+    const me = req.auth.user
+    const access = await requireChannel(db, channelId, me.id, Permission.CONNECT)
+    const { channel, permissions } = access
+    if (channel.type === 'text') throw badRequest('Canais de texto não têm voz.')
+    await assertDmNotBlocked(db, access, me.id)
+    const limit = channel.userLimit ?? 0
+    if (limit > 0 && !hasPermission(permissions, Permission.MOVE_MEMBERS)) {
+      const others = voice.inChannel(channel.id).filter((s) => s.userId !== me.id).length
+      if (others >= limit) throw forbidden('Este canal de voz está cheio.')
+    }
+    return {
+      url: config.livekit.publicUrl,
+      token: await voice.mintToken(me, channel.id, permissions),
+      room: roomName(channel.id),
+      bitrateKbps: channel.bitrateKbps ?? 64,
+    }
+  })
+}
+
+/** LiveKit → server. Encapsulated so its raw-body content-type parser does not leak to other routes. */
+export async function livekitWebhookRoute(app: FastifyInstance, { voice }: Ctx): Promise<void> {
+  await app.register(async (hook) => {
+    hook.addContentTypeParser('application/webhook+json', { parseAs: 'string', bodyLimit: 1024 * 1024 }, (_req, body, done) => {
+      done(null, body)
+    })
+    hook.post('/livekit/webhook', async (req) => {
+      if (typeof req.body !== 'string') throw badRequest('Content-Type esperado: application/webhook+json.')
+      let event
+      try {
+        event = await voice.receive(req.body, req.headers.authorization)
+      } catch (err) {
+        req.log.warn({ reason: (err as Error).message }, 'livekit webhook rejected')
+        throw new HttpError('unauthorized', 'Assinatura do webhook inválida.')
+      }
+      req.log.info({ event: event.event, room: event.room?.name, participant: event.participant?.identity }, 'livekit webhook')
+      await voice.handleEvent(event)
+      return { ok: true }
+    })
+  })
+}
