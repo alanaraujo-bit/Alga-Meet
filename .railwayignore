@@ -1,0 +1,12 @@
+# `railway up` upload filter (in addition to .gitignore). The server image only needs what
+# infra/server/Dockerfile copies; skip the desktop app, docs and screenshots.
+docs/
+apps/desktop/src/
+apps/desktop/build/
+apps/desktop/scripts/
+apps/desktop/release/
+apps/desktop/out/
+native/mls/src/
+native/mls/target/
+scripts/
+*.png
