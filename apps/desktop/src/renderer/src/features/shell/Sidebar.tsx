@@ -6,7 +6,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { isUnread, useData } from '@/store/data'
 import { can, channelTitle, dmChannels, dmPeers, mentionCount, presenceOf, spaceChannels, spacePermissions, voiceMembers } from '@/store/selectors'
 import { useUi } from '@/store/ui'
-import { Avatar, Badge, contextMenuHandler, Fronds, Icon, IconButton, MenuButton, ScrollArea, toast, Tooltip, useSpeakingGlow } from '@/ui'
+import { Avatar, Badge, contextMenuHandler, Icon, IconButton, MenuButton, ScrollArea, toast, Tooltip, useSpeakingGlow, VoiceDot } from '@/ui'
 import { leaveGroupDm, markSpaceRead } from '@/store/actions'
 import { errorText } from '@/lib/errors'
 import { arrowFocus } from '@/ui/floating'
@@ -128,9 +128,9 @@ function DmRow({ channel, active }: { channel: Channel; active: boolean }) {
       {/* One line: the presence dot already says "online"; a subtitle only when it adds something. */}
       <span className={s.rowName}>
         {title}
-        {inCall ? <span className={`${s.rowSub} ${s.rowSubLive}`}>{t.space.inVoice}</span> : channel.type === 'group_dm' ? <span className={s.rowSub}>{channel.recipientIds?.length ?? 0} membros</span> : null}
+        {inCall ? <span className={s.rowSub}>{t.space.inVoice}</span> : channel.type === 'group_dm' ? <span className={s.rowSub}>{channel.recipientIds?.length ?? 0} membros</span> : null}
       </span>
-      {inCall && <Fronds size={14} breathing className={s.accent} />}
+      {inCall && <VoiceDot label={t.space.inVoice} />}
       <Badge count={mentions} mention />
     </button>
   )
@@ -190,7 +190,7 @@ function TextChannelRow({ channel, active }: { channel: Channel; active: boolean
       onContextMenu={contextMenuHandler(() => [{ label: t.space.markRead, onSelect: () => markSpaceRead(channel.spaceId!) }], channel.name)}
     >
       <span className={s.rowIcon}>
-        <Icon icon={Hash} size={16} filled={active} />
+        <Icon icon={Hash} size={16} />
       </span>
       <span className={s.rowName}>{channel.name}</span>
       <Badge count={mentions} mention />
@@ -217,10 +217,18 @@ function VoiceChannelRow({ channel, active }: { channel: Channel; active: boolea
         aria-label={here ? channel.name : `${t.space.joinVoice(channel.name)}${people.length ? `, ${people.length}` : ''}`}
       >
         <span className={s.rowIcon}>
-          {people.length ? <Fronds size={16} breathing={!here} getLevel={here ? roomLevelNow : undefined} /> : <Icon icon={Volume2} size={16} filled={active} />}
+          <Icon icon={Volume2} size={16} filled={active || people.length > 0} />
         </span>
         <span className={s.rowName}>{channel.name}</span>
-        {!!channel.userLimit && <span className={s.rowMeta}>{t.space.users(people.length, channel.userLimit)}</span>}
+        {/* "● 2": who is talking there, one indigo mark; its ring rides the room when it is yours. */}
+        {people.length > 0 ? (
+          <span className={s.voiceCount}>
+            <VoiceDot getLevel={here ? roomLevelNow : undefined} />
+            {channel.userLimit ? t.space.users(people.length, channel.userLimit) : people.length}
+          </span>
+        ) : (
+          !!channel.userLimit && <span className={s.rowMeta}>{t.space.users(people.length, channel.userLimit)}</span>
+        )}
       </button>
       {people.length > 0 && (
         <ul className={s.voiceUsers} aria-label={`Pessoas em ${channel.name}`}>

@@ -18,17 +18,26 @@
 .panelState:hover {
   background: var(--state-hover);
 }
+/* "Voz conectada" in primary 13/510 with the 6 px indigo dot on its left (critique r3 #7): one indigo mark, not a
+   whole indigo label. */
 .panelTitle {
   display: flex;
   align-items: center;
-  gap: var(--s-1_5);
+  gap: var(--s-2);
   white-space: nowrap;
-  color: var(--accent);
+  color: var(--text-primary);
   font: var(--type-ui);
-  font-weight: var(--w-semibold);
+  font-weight: var(--w-medium);
 }
 .warn {
   color: var(--warning);
+}
+.warnDot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  background: var(--warning);
 }
 /* A state never truncates: the label keeps its width, the sub line takes the ellipsis. */
 .panelLabel {
@@ -77,10 +86,10 @@
 .liveHead {
   display: flex;
   align-items: center;
-  gap: var(--s-1_5);
+  gap: var(--s-2);
   height: 28px;
   padding: 0 var(--s-2);
-  color: var(--accent);
+  color: var(--text-secondary);
   font: var(--type-meta);
   font-weight: var(--w-semibold);
 }
@@ -171,7 +180,7 @@
 .hereText {
   display: inline-flex;
   align-items: center;
-  gap: var(--s-1_5);
+  gap: var(--s-2);
   color: var(--text-secondary);
   font: var(--type-meta);
   font-weight: var(--w-medium);

@@ -2,8 +2,8 @@ import { useMemo, useRef } from 'react'
 import { useMedia } from '@/media'
 import { useData } from '@/store/data'
 import { channelTitle, liveRooms, voiceMembers, type LiveRoom } from '@/store/selectors'
-import { Avatar, Button, Fronds, Tooltip, useSpeakingGlow } from '@/ui'
-import { roomLevelNow, useLevelGetter } from './levels'
+import { Avatar, Button, Tooltip, useSpeakingGlow, VoiceDot } from '@/ui'
+import { useLevelGetter } from './levels'
 import { t } from './strings'
 import { joinVoice, openCall } from './voice'
 import s from './chrome.module.css'
@@ -19,7 +19,7 @@ export function LiveNow() {
   return (
     <section className={s.live} aria-label={t.live.title}>
       <div className={s.liveHead}>
-        <Fronds size={12} breathing={rooms.length > 0} />
+        {rooms.length > 0 && <VoiceDot />}
         {t.live.title}
       </div>
       {rooms.length === 0 ? <p className={s.liveEmpty}>{t.live.empty}</p> : rooms.map((r) => <LiveRow key={r.channel.id} room={r} />)}
@@ -51,7 +51,7 @@ function LiveRow({ room }: { room: LiveRoom }) {
 
 /**
  * Voice inside the chat: a text channel's header says where this space is talking right now ("3 em Sala de foco",
- * faces, fronds) with one click to join. The room you are in wins, then the busiest one.
+ * faces) with one click to join. The voice dot stays on the rail and the channel list (≤ 2 per screen). The room you are in wins, then the busiest one.
  */
 export function VoiceHere({ spaceId }: { spaceId: string }) {
   const voiceStates = useData((st) => st.voiceStates)
@@ -70,9 +70,6 @@ export function VoiceHere({ spaceId }: { spaceId: string }) {
     <span className={s.here}>
       <AvatarStack ids={ids} channelId={channel.id} />
       <span className={s.hereText}>
-        <span className={s.accent}>
-          <Fronds size={12} breathing={!here} getLevel={here ? roomLevelNow : undefined} />
-        </span>
         <span className="tnum">{t.here.count(ids.length, channel.name)}</span>
       </span>
       <Button size="sm" variant="ghost" onClick={() => (here ? openCall(channel.id) : void joinVoice(channel.id))}>

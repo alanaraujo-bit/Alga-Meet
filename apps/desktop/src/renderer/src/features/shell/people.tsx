@@ -7,7 +7,7 @@ import { openDm, removeRelationship, sendFriendRequest, setRelationship } from '
 import { useData } from '@/store/data'
 import { channelTitle } from '@/store/selectors'
 import { useUi } from '@/store/ui'
-import { Button, Fronds, IconButton, MenuButton, toast, type MenuEntry } from '@/ui'
+import { Button, IconButton, MenuButton, toast, VoiceDot, type MenuEntry } from '@/ui'
 import { openSettings } from '../settings/store'
 import { openSpaceSettings } from '../spaceSettings/store'
 import { actorFor, visibleSections } from '../spaceSettings/permissions'
@@ -130,9 +130,7 @@ export function ProfileFooter({ user, spaceId, onDone }: { user: PublicUser; spa
     <>
       {room && (
         <div className={s.profileVoice}>
-          <span className={s.accent}>
-            <Fronds size={12} breathing={!here} />
-          </span>
+          <VoiceDot />
           <span className={s.profileVoiceText}>{room.spaceId ? t.people.inRoom(roomName) : t.people.inCall}</span>
           {room.spaceId && !here && (
             <Button size="sm" variant="ghost" onClick={done(() => (openCall(room.id), joinVoice(room.id)))}>

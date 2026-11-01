@@ -28,6 +28,7 @@ export const t = {
     joinSpace: 'Entrar com convite',
     mentions: (n: number) => `${n} menç${n === 1 ? 'ão' : 'ões'}`,
     inVoice: 'pessoas em voz agora',
+    unread: 'mensagens novas',
   },
   userPanel: {
     mute: 'Desativar microfone',

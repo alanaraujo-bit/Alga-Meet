@@ -237,12 +237,3 @@ textarea,
     transform: rotate(360deg);
   }
 }
-@keyframes frond {
-  0%,
-  100% {
-    transform: scaleY(0.55);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-}

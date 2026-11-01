@@ -16,7 +16,7 @@ export function levelNow(userId: string): number {
   return p && !p.micMuted ? p.level : 0
 }
 
-/** The loudest voice in my call: drives the fronds on the rail and in the voice panel. */
+/** The loudest voice in my call: drives the voice dot's ring on the rail, the channel list and the voice panel. */
 export function roomLevelNow(): number {
   const m = useMedia.getState()
   if (m.connection.state !== 'connected') return 0

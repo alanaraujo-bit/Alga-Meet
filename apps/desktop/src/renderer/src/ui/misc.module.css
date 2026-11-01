@@ -257,42 +257,31 @@
   color: var(--on-danger);
 }
 
-/* ── Fronds (live / speaking glyph) ──────── */
-.fronds {
+/* ── Voice dot ("people are in voice here") ─ */
+/* 6 px indigo dot. In your own room a 1.5 px ring, 3 px outside the dot, rides the loudest voice (--speak from
+   useEnvelope); elsewhere the dot is still. The logo is never a status glyph (build/README.md). */
+.voiceDot {
   --speak: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--u);
+  position: relative;
+  display: inline-block;
   flex-shrink: 0;
-  color: inherit;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--accent);
 }
-/* Marca v1 rest pose: u wide, u apart, 3u / 5u / 3u tall (--u is set per size in Fronds.tsx). */
-.fronds i {
-  display: block;
-  width: var(--u);
-  height: calc(var(--u) * 3);
-  border-radius: 9999px;
-  background: currentColor;
-  transform-origin: 50% 50%;
+.voiceDot::after {
+  content: '';
+  position: absolute;
+  inset: -4.5px;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  opacity: min(0.9, calc(var(--speak) * 2));
+  pointer-events: none;
 }
-.fronds i:nth-child(2) {
-  height: calc(var(--u) * 5);
-}
-/* Live: each frond's height rides the envelope, the tallest one the most. */
-.frondsLive i {
-  transform: scaleY(calc(0.42 + 0.58 * var(--speak)));
-}
-/* Marca v2: every bar shows its slice of one 5u gradient centered on the group (outer bars are 3u, centered). */
-.frondsBrand i {
-  background: linear-gradient(180deg, #ffffff, #9a9df9) center / 100% calc(var(--u) * 5);
-}
-.frondsBreathing i {
-  animation: frond 1.6s var(--ease-in-out-cubic) infinite;
-}
-.frondsBreathing i:nth-child(2) {
-  animation-delay: 0.2s;
-}
-.frondsBreathing i:nth-child(3) {
-  animation-delay: 0.4s;
+@media (forced-colors: active) {
+  .voiceDot {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
 }

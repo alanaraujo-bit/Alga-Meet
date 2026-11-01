@@ -85,7 +85,7 @@
   justify-content: flex-end;
   height: 0;
   margin: var(--s-3) var(--s-4) var(--s-1);
-  border-top: 1px solid rgba(139, 142, 247, 0.42);
+  border-top: 1px solid rgba(139, 142, 247, 0.32);
 }
 /* The label "punches through" the line instead of sitting on a filled pill. */
 .unreadLine span {
@@ -93,7 +93,8 @@
   top: -1px;
   padding: 0 6px;
   background: var(--bg-content);
-  color: var(--accent);
+  /* The line keeps a hint of indigo; the word is neutral (fewer indigo marks per screen, critique r3 #7). */
+  color: var(--text-secondary);
   font: var(--type-badge);
   line-height: 14px;
 }
@@ -171,8 +172,8 @@
   background: rgba(255, 255, 255, 0.02);
 }
 .mentioned {
+  /* The row tint alone (no side bar): the chip in the text already says who was called (critique r3 #5). */
   background: rgba(139, 142, 247, 0.06);
-  box-shadow: inset 2px 0 0 rgba(139, 142, 247, 0.7);
 }
 .mentioned:hover {
   background: rgba(139, 142, 247, 0.085);
@@ -361,14 +362,15 @@ button.author:hover {
   background: rgba(255, 255, 255, 0.07);
   box-shadow: inset 0 0 0 1px var(--border-strong);
 }
+/* Your own reaction: the edge says it is yours, the count stays neutral (critique r3 #7: fewer indigo marks). */
 .reactionMe {
-  background: var(--accent-tint);
-  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.32);
-  color: var(--accent-hover);
+  background: rgba(139, 142, 247, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.4);
+  color: var(--text-primary);
 }
 .reactionMe:hover {
-  background: var(--accent-tint-strong);
-  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.45);
+  background: rgba(139, 142, 247, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.5);
 }
 .reactionAdd {
   width: 28px;
@@ -693,13 +695,13 @@ button.replyBody:hover {
 .callChip {
   display: inline-flex;
   align-items: center;
-  gap: var(--s-1_5);
+  gap: var(--s-2);
   height: 24px;
   margin-right: var(--s-1);
   padding: 0 var(--s-2);
   border-radius: var(--r-full);
-  background: var(--accent-tint);
-  color: var(--accent);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
   font: var(--type-meta);
   font-weight: var(--w-medium);
 }

@@ -96,6 +96,7 @@ export {
   Link,
   LinkSimple as Link2,
   LockSimple as Lock,
+  LockSimpleOpen as LockOpen,
   MagnifyingGlass as Search,
   MagnifyingGlassMinus as ZoomOut,
   MagnifyingGlassPlus as ZoomIn,

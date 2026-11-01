@@ -6,7 +6,7 @@ import { ackLatest, loadMessages } from '@/store/actions'
 import { useData } from '@/store/data'
 import { displayName } from '@/store/selectors'
 import { useUi } from '@/store/ui'
-import { Avatar, Button, Divider, Fronds, Icon, Skeleton } from '@/ui'
+import { Avatar, Button, Divider, Icon, Skeleton, VoiceDot } from '@/ui'
 import { focusables } from '@/ui/floating'
 import { errorText } from '@/lib/errors'
 import { t as tv } from '../voice/strings'
@@ -452,7 +452,7 @@ function Intro({ title, isDm, channelId }: { title: string; isDm: boolean; chann
           {/* The call is already on screen above: the intro says so instead of offering to start another. */}
           {callOn ? (
             <span className={s.callChip}>
-              <Fronds size={12} breathing />
+              <VoiceDot />
               {tv.call.inCall}
             </span>
           ) : (

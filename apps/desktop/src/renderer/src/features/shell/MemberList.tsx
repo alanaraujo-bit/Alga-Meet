@@ -1,14 +1,11 @@
-import { Crown } from '@/ui/icons'
 import type { Member, PresenceStatus, PublicUser } from '@alga/shared'
 import { useMemo, useRef, useState } from 'react'
-import { useMedia } from '@/media'
 import { useData } from '@/store/data'
 import { presenceOf, roleColor } from '@/store/selectors'
 import { useSession } from '@/store/session'
-import { contextMenuHandler, Fronds, Icon, Popover, ScrollArea, Tooltip } from '@/ui'
+import { contextMenuHandler, Popover, ScrollArea } from '@/ui'
 import { DecoratedAvatar, Nameplate, ProfileCard } from '../billing/Cosmetics'
 import { useLook } from '../billing/store'
-import { roomLevelNow } from '../voice/levels'
 import { personEntries, ProfileFooter } from './people'
 import { t } from './strings'
 import s from './shell.module.css'
@@ -21,7 +18,6 @@ export function MemberList({ spaceId }: { spaceId: string }) {
   const me = useData((st) => st.me)
   const roles = useData((st) => st.roles)
   const channels = useData((st) => st.channels)
-  const ownerId = useData((st) => st.spaces[spaceId]?.ownerId)
   const voiceStates = useData((st) => st.voiceStates)
   // Presence is stale while the realtime link is down: show it as uncertain, not as fact.
   const stale = useSession((st) => st.gateway !== 'ready')
@@ -54,15 +50,10 @@ export function MemberList({ spaceId }: { spaceId: string }) {
         groups[k].length === 0 ? null : (
           <section key={k} aria-label={label[k](groups[k].length)}>
             <div className={s.section}>
-              {k === 'voice' && (
-                <span className={`${s.accent} ${s.sectionGlyph}`}>
-                  <Fronds size={12} breathing />
-                </span>
-              )}
               <span className={s.sectionLabel}>{label[k](groups[k].length)}</span>
             </div>
             {groups[k].map((r) => (
-              <MemberRow key={r.m.user.id} row={r} spaceId={spaceId} owner={r.m.user.id === ownerId} />
+              <MemberRow key={r.m.user.id} row={r} spaceId={spaceId} />
             ))}
           </section>
         ),
@@ -71,14 +62,12 @@ export function MemberList({ spaceId }: { spaceId: string }) {
   )
 }
 
-function MemberRow({ row, spaceId, owner }: { row: Row; spaceId: string; owner: boolean }) {
+function MemberRow({ row, spaceId }: { row: Row; spaceId: string }) {
   const { m, name, presence, color, room } = row
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const btn = useRef<HTMLButtonElement>(null)
   // USER_UPDATE refreshes `users`, not the member copy: the profile (and its cosmetics) stays live.
   const user = useData((st) => st.users[m.user.id]) ?? m.user
-  // My room: the fronds ride its real envelope; elsewhere they just breathe.
-  const mine = useMedia((st) => st.connection.state === 'connected' && !!room && useData.getState().voiceStates[m.user.id]?.channelId === st.connection.channelId)
   // Cosmetics: subtle in a list (no motion unless hovered), the full card in the popover.
   const look = useLook(m.user.id)
   return (
@@ -102,20 +91,6 @@ function MemberRow({ row, spaceId, owner }: { row: Row; spaceId: string; owner: 
           </span>
           {room && <span className={s.memberSub}>{room}</span>}
         </span>
-        {room && (
-          <Tooltip content={t.members.inVoice}>
-            <span className={s.accent} role="img" aria-label={t.members.inVoice}>
-              <Fronds size={14} breathing={!mine} getLevel={mine ? roomLevelNow : undefined} />
-            </span>
-          </Tooltip>
-        )}
-        {owner && (
-          <Tooltip content={t.members.owner}>
-            <span className={s.crown} role="img" aria-label={t.members.owner}>
-              <Icon icon={Crown} size={14} />
-            </span>
-          </Tooltip>
-        )}
       </button>
       <PersonPopover user={user} spaceId={spaceId} name={name} presence={presence} anchor={anchor} onClose={() => setAnchor(null)} />
     </>
@@ -152,15 +127,18 @@ export function PersonPopover({
 }
 
 function RoleChips({ userId, spaceId }: { userId: string; spaceId: string }) {
+  // "Dono" lives here as a chip (critique r3 #5), not as a crown in the member list.
+  const owner = useData((st) => st.spaces[spaceId]?.ownerId === userId)
   const ids = useData((st) => st.members[spaceId]?.[userId]?.roleIds)
   const roles = useData((st) => st.roles[spaceId])
   const list = useMemo(
     () => (ids ?? []).map((id) => roles?.[id]).filter((r) => !!r && r.id !== spaceId).sort((a, b) => b!.position - a!.position),
     [ids, roles, spaceId],
   )
-  if (!list.length) return null
+  if (!list.length && !owner) return null
   return (
     <ul className={s.roleChips} aria-label="Cargos">
+      {owner && <li className={`${s.roleChip} ${s.ownerChip}`}>{t.members.owner}</li>}
       {list.map((r) => (
         <li key={r!.id} className={s.roleChip}>
           <span className={s.roleDot} style={{ background: r!.color ?? 'var(--text-tertiary)' }} />

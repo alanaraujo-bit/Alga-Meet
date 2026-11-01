@@ -4,8 +4,8 @@ import { useMedia } from '@/media'
 import { useData } from '@/store/data'
 import { homeBadge, spaceUnread } from '@/store/selectors'
 import { useUi } from '@/store/ui'
-import { Badge, contextMenuHandler, Fronds, Icon, MenuButton, Tooltip, tintFor } from '@/ui'
-import { initials } from '@/ui/Avatar'
+import { Badge, contextMenuHandler, Icon, MenuButton, Tooltip, VoiceDot } from '@/ui'
+import { hueFor, initials } from '@/ui/Avatar'
 import { arrowFocus } from '@/ui/floating'
 import { roomLevelNow } from '../voice/levels'
 import { spaceMenu } from '../spaces/spaceMenu'
@@ -28,7 +28,6 @@ export function SpaceRail() {
     <nav className={s.rail} aria-label="Espaços">
       <div className={s.railScroll} data-arrow-nav onKeyDown={arrowFocus}>
         <div className={s.railItem}>
-          <span className={`${s.pill} ${view.kind !== 'space' ? s.pillActive : ''}`} />
           <Tooltip content={t.rail.home} side="right">
             <button
               type="button"
@@ -45,7 +44,7 @@ export function SpaceRail() {
               )}
               {dmCall && (
                 <span className={s.railVoice}>
-                  <Fronds size={12} breathing />
+                  <VoiceDot />
                 </span>
               )}
             </button>
@@ -90,29 +89,29 @@ function SpaceIcon({ spaceId, active }: { spaceId: string; active: boolean }) {
   const readStates = useData((st) => st.readStates)
   const { unread, mentions } = useMemo(() => spaceUnread({ channels, readStates }, spaceId), [channels, readStates, spaceId])
   const voice = useData((st) => Object.values(st.voiceStates).some((v) => v.spaceId === spaceId))
-  // When I'm in this space's voice, the fronds ride the room's real envelope; elsewhere they just breathe.
+  // When I'm in this space's voice, the dot's ring rides the room's real envelope; elsewhere the dot is still.
   const mine = useMedia((st) => st.connection.state === 'connected' && !!st.connection.channelId && useData.getState().channels[st.connection.channelId]?.spaceId === spaceId)
   if (!space) return null
   const open = () => {
     const ui = useUi.getState()
     ui.go({ kind: 'space', spaceId, channelId: ui.lastChannelBySpace[spaceId] ?? null })
   }
-  const label = mentions > 0 ? `${space.name}, ${t.rail.mentions(mentions)}` : space.name
+  const label = mentions > 0 ? `${space.name}, ${t.rail.mentions(mentions)}` : unread && !active ? `${space.name}, ${t.rail.unread}` : space.name
   return (
     <div className={s.railItem}>
-      <span className={`${s.pill} ${active ? s.pillActive : unread ? s.pillUnread : ''}`} />
       <Tooltip content={space.name} side="right">
         <button
           type="button"
-          className={s.spaceBtn}
-          style={space.iconUrl ? undefined : { ['--tile' as string]: tintFor(spaceId) }}
+          className={`${s.spaceBtn} ${space.iconUrl ? '' : s.monogram}`}
+          style={space.iconUrl ? undefined : { ['--tile-h' as string]: hueFor(spaceId) }}
           aria-current={active ? 'page' : undefined}
           aria-label={voice ? `${label}, ${t.rail.inVoice}` : label}
           onClick={open}
           onContextMenu={contextMenuHandler(() => spaceMenu(spaceId), space.name)}
         >
           {space.iconUrl ? <img src={space.iconUrl} alt="" draggable={false} /> : initials(space.name)}
-          {/* Separate corners: a mention never hides "people are talking there" (fronds bottom, count top). */}
+          {unread && !active && mentions === 0 && <span className={s.railUnread} aria-hidden />}
+          {/* Separate corners: a mention never hides "people are talking there" (dot bottom, count top). */}
           {mentions > 0 && (
             <span className={s.railBadge}>
               <Badge count={mentions} mention />
@@ -120,7 +119,7 @@ function SpaceIcon({ spaceId, active }: { spaceId: string; active: boolean }) {
           )}
           {voice && (
             <span className={s.railVoice}>
-              <Fronds size={12} breathing={!mine} getLevel={mine ? roomLevelNow : undefined} />
+              <VoiceDot getLevel={mine ? roomLevelNow : undefined} />
             </span>
           )}
         </button>

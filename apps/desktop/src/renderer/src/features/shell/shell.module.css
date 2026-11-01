@@ -47,28 +47,9 @@
   width: 100%;
   flex-shrink: 0;
 }
-.pill {
-  position: absolute;
-  left: 0;
-  width: 3px;
-  height: 0;
-  border-radius: 0 3px 3px 0;
-  background: var(--text-tertiary);
-  transition:
-    height var(--dur-morph) var(--ease-out-quart),
-    background-color var(--dur-morph) var(--ease-out-quart);
-}
-.pillUnread {
-  height: 8px;
-}
-.railItem:hover .pill {
-  height: 20px;
-}
-.pillActive,
-.railItem:hover .pillActive {
-  height: 24px;
-  background: var(--accent);
-}
+/* Space tiles (critique r3 #5): no border, 40 px, radius 12; a space without an icon is its monogram (13/590) on a
+   quiet gradient of its own hue, so spaces are told apart without a rainbow. Current = the indigo-tinted state plus a
+   1 px inner ring (no bar on the left); unread = a 6 px dot inside the tile, top left. */
 .spaceBtn {
   position: relative;
   display: grid;
@@ -76,27 +57,47 @@
   width: 40px;
   height: 40px;
   border-radius: var(--r-lg);
-  background: var(--tile, var(--bg-raised));
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  background: var(--bg-raised);
   color: var(--text-tertiary);
-  font: var(--type-ui);
-  font-weight: var(--w-semibold);
-  letter-spacing: 0;
+  font: var(--w-semibold) 13px/1 var(--font-ui);
+  letter-spacing: 0.01em;
   transition:
     background-color var(--dur-hover-out) var(--ease-out-quad),
-    color var(--dur-hover-out) var(--ease-out-quad),
-    border-radius var(--dur-morph) var(--ease-out-quart);
+    color var(--dur-hover-out) var(--ease-out-quad);
+}
+.spaceBtn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: background-color var(--dur-hover-out) var(--ease-out-quad);
 }
 .spaceBtn:hover {
-  transition-duration: 0ms, 0ms, var(--dur-morph);
-  background: color-mix(in srgb, var(--tile, var(--bg-raised)), white 6%);
+  transition-duration: 0ms;
   color: var(--text-primary);
 }
-/* The current space steps up in luminance and its edge takes a quiet indigo; the pill on the left is indigo too. */
+.spaceBtn:hover::after {
+  transition-duration: 0ms;
+  background: rgba(255, 255, 255, 0.06);
+}
+.monogram {
+  background: linear-gradient(160deg, oklch(0.33 0.05 var(--tile-h)), oklch(0.24 0.035 var(--tile-h)));
+  color: oklch(0.88 0.035 var(--tile-h));
+}
+.monogram:hover {
+  color: oklch(0.96 0.02 var(--tile-h));
+}
 .spaceBtn[aria-current='page'] {
-  background: color-mix(in srgb, var(--tile, var(--bg-raised)), white 7%);
-  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.35);
   color: var(--text-primary);
+}
+.spaceBtn[aria-current='page']::after,
+.spaceBtn[aria-current='page']:hover::after {
+  background: var(--state-current);
+  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.35);
+}
+.spaceBtn:has(img)[aria-current='page']::after {
+  background: none;
 }
 .spaceBtn img {
   width: 100%;
@@ -108,28 +109,35 @@
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-tertiary);
 }
-.addBtn:hover {
-  background: var(--state-selected);
-  color: var(--text-primary);
+.railUnread {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 1;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--text-primary);
+  box-shadow: 0 0 0 1.5px rgba(11, 11, 12, 0.5);
 }
-/* Voice in the chrome: live fronds on a space where people are talking right now. */
+/* Voice in the chrome: the 6 px dot on the tile's bottom-right corner, ringed in the rail's color. */
 .railVoice {
   position: absolute;
-  right: -3px;
-  bottom: -3px;
+  right: -1px;
+  bottom: -1px;
+  z-index: 1;
   display: grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
+  width: 10px;
+  height: 10px;
   border-radius: var(--r-full);
   background: var(--bg-app);
-  color: var(--accent);
 }
 .railBadge {
   position: absolute;
   right: -4px;
   top: -4px;
-  z-index: 1;
+  z-index: 2;
   box-shadow: 0 0 0 3px var(--bg-app);
   border-radius: var(--r-full);
 }
@@ -290,9 +298,10 @@
 .rowUnread .rowIcon {
   color: var(--text-secondary);
 }
-/* You are here: the glyph turns solid and takes the indigo (Linear's sidebar). */
+/* You are here: the row's indigo-tinted fill says it; the glyph steps up to primary, never a solid indigo stamp
+   (critique r3 #7). */
 .row[aria-current='page'] .rowIcon {
-  color: var(--accent);
+  color: var(--text-primary);
 }
 .rowMeta {
   color: var(--text-tertiary);
@@ -308,9 +317,17 @@
   font: var(--type-meta);
   font-weight: var(--w-regular);
 }
-.voiceActive .rowIcon,
-.row[aria-current='page'].voiceActive .rowIcon {
-  color: var(--accent);
+.voiceActive .rowIcon {
+  color: var(--text-secondary);
+}
+/* "● 2" on a voice channel with people: the dot is the one indigo mark, the count is quiet. */
+.voiceCount {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1_5);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  font-variant-numeric: tabular-nums;
 }
 
 .voiceUsers {
@@ -355,9 +372,7 @@
 .accent {
   color: var(--accent);
 }
-.rowSubLive {
-  color: var(--accent);
-}
+
 
 /* ── User panel card ──────────────────────── */
 .dock {
@@ -582,9 +597,11 @@
 .memberOffline > :first-child {
   opacity: 0.45;
 }
-.crown {
-  color: var(--text-tertiary);
-  display: grid;
+/* The owner is a chip on the profile card, never a crown in the list (critique r3 #5). */
+.ownerChip {
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  color: var(--text-primary);
 }
 .membersStale :global([class*='_presence_']) {
   opacity: 0.4;
@@ -637,10 +654,10 @@
   gap: var(--s-2);
   height: 32px;
   margin-top: var(--s-3);
-  padding: 0 var(--s-1) 0 var(--s-2);
+  padding: 0 var(--s-1) 0 var(--s-2_5, 10px);
   border-radius: var(--r-md);
-  background: var(--accent-tint);
-  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
 }
 .profileVoiceText {
   flex: 1;

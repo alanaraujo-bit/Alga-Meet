@@ -6,7 +6,7 @@ import { useMedia } from '@/media'
 import { useData } from '@/store/data'
 import { can, channelTitle, dmPeers, presenceOf, spacePermissions } from '@/store/selectors'
 import { useUi } from '@/store/ui'
-import { Avatar, Fronds, Icon, IconButton, PRESENCE_LABEL } from '@/ui'
+import { Avatar, Icon, IconButton, PRESENCE_LABEL, VoiceDot } from '@/ui'
 import { CallStage } from '../voice/CallStage'
 import { VoiceHere } from '../voice/LiveNow'
 import { t as tv } from '../voice/strings'
@@ -109,7 +109,7 @@ export function ChatView({ channelId, aside }: { channelId: string; aside?: Reac
             {channel.spaceId && <VoiceHere spaceId={channel.spaceId} />}
             {isDm && inCall && (
               <span className={s.callChip}>
-                <Fronds size={12} breathing />
+                <VoiceDot />
                 {tv.call.inCall}
               </span>
             )}
