@@ -21,6 +21,7 @@ import { QuickSwitcher } from '../switcher/QuickSwitcher'
 import { useDeletionCanceledNotice } from '../trust/Gate'
 import { ReportHost } from '../trust/Report'
 import { CallStage } from '../voice/CallStage'
+import { UnsafeCallDialog, VerifySheet } from '../voice/E2ee'
 import { IncomingCall } from '../voice/IncomingCall'
 import { MiniPlayer } from '../voice/MiniPlayer'
 import { VoiceAnnouncer } from '../voice/VoiceAnnouncer'
@@ -97,6 +98,8 @@ export function Shell() {
       <QuickSwitcher />
       <ScreenPicker />
       <IncomingCall />
+      <VerifySheet />
+      <UnsafeCallDialog />
       <VoiceAnnouncer />
       <MiniPlayer />
       <Suspense fallback={null}>

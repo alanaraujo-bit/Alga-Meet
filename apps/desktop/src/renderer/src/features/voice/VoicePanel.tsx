@@ -3,7 +3,8 @@ import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
 import { useData } from '@/store/data'
 import { channelTitle } from '@/store/selectors'
-import { Fronds, IconButton, Tooltip } from '@/ui'
+import { IconButton, Tooltip, VoiceDot } from '@/ui'
+import { E2eePanelMark } from './E2ee'
 import { roomLevelNow } from './levels'
 import { t } from './strings'
 import { leaveVoice, openCall, useVoice } from './voice'
@@ -19,8 +20,9 @@ function linkBars(quality: string, rtt: number | null): number {
 }
 
 /**
- * "Voz conectada" above the user row: the ONE place for call status (the stage header only has actions). Where you
- * are, link quality as 3 bars (numbers in the tooltip) and the two actions you need from anywhere.
+ * "Voz conectada" above the user row: the ONE place for call status (the stage header only has actions). The 6 px
+ * voice dot (its ring rides the room), the E2EE lock, where you are, link quality as 3 bars (numbers in the tooltip)
+ * and the two actions you need from anywhere.
  */
 export function VoicePanel() {
   const conn = useMedia(useShallow((st) => ({ state: st.connection.state, channelId: st.connection.channelId, reason: st.connection.reason, rtt: st.local?.rttMs ?? null, quality: st.self.quality })))
@@ -44,8 +46,9 @@ export function VoicePanel() {
       <div className={s.panelTop}>
         <button type="button" className={s.panelState} onClick={() => conn.channelId && openCall(conn.channelId)} aria-label={`${label}. ${t.panel.open}`}>
           <span className={`${s.panelTitle} ${warn ? s.warn : ''}`}>
-            <Fronds size={14} breathing={warn && !down} getLevel={warn ? undefined : roomLevelNow} />
+            {warn ? <span className={s.warnDot} aria-hidden /> : <VoiceDot getLevel={roomLevelNow} />}
             <span className={s.panelLabel}>{label}</span>
+            {!warn && <E2eePanelMark />}
             {!warn && <LinkBars bars={linkBars(conn.quality, conn.rtt)} detail={t.panel.link(conn.rtt, loss)} />}
           </span>
           <span className={`${s.panelSub} tnum`}>{sub}</span>

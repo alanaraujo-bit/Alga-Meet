@@ -9,6 +9,7 @@ import { onDispatch, useSession } from '@/store/session'
 import { useUi } from '@/store/ui'
 import { toast } from '@/ui'
 import type { Corner } from './layout'
+import { mustLeave, refuseOffer } from './directCall'
 import { streamNoticeOnTile } from './notice'
 import { t } from './strings'
 
@@ -32,9 +33,22 @@ interface VoiceUi {
   miniCorner: Corner
   /** Engine notice about your own stream, shown on your tile for a few seconds (not a toast). */
   streamNotice: { text: string; at: number } | null
+  /** The E2EE verification sheet (E2ee.tsx) is open. */
+  verify: boolean
+  /** A direct call refused because the server offered it without E2EE (channel id): the blocking dialog. */
+  unsafe: string | null
 }
 
-export const useVoice = create<VoiceUi>()(() => ({ joining: null, ring: null, picker: false, focus: null, stats: false, stage: null, miniCorner: 'br', streamNotice: null }))
+export const useVoice = create<VoiceUi>()(() => ({ joining: null, ring: null, picker: false, focus: null, stats: false, stage: null, miniCorner: 'br', streamNotice: null, verify: false, unsafe: null }))
+
+/** DMs and group DMs: always end-to-end encrypted on this client, whatever the server says (0004 §3.8.3). */
+const isDirect = (channelId: string | null): boolean => !!channelId && !!useData.getState().channels[channelId] && !useData.getState().channels[channelId]!.spaceId
+
+/** The server offered a direct call without E2EE: refuse it (never connect), say why. */
+class UnsafeCall extends Error {}
+function refuseUnsafe(channelId: string): void {
+  useVoice.setState({ unsafe: channelId })
+}
 
 /** A notice about your stream goes on your tile when the call's stage is on screen; false = keep it a toast. */
 export function routeStreamNotice(text: string): boolean {
@@ -64,16 +78,28 @@ export async function joinVoice(channelId: string): Promise<void> {
   const st = useData.getState()
   // Starting a DM call (nobody there yet): the server rings the others (CALL_RING), we hear the ringback.
   const calling = !st.channels[channelId]?.spaceId && !Object.values(st.voiceStates).some((v) => v.channelId === channelId && v.userId !== st.me?.id)
+  const direct = isDirect(channelId)
+  // Direct calls are E2EE on this client regardless of the server's flag: a plain offer is refused before connecting,
+  // also on the engine's automatic re-entries (refresh). shortcut: the engine decides the mode from `e2ee`; asking it to
+  // require E2EE itself (media.join({ requireE2ee })) would put this rule in the engine too (requested, see docs).
+  const offer = async () => {
+    const r = await voiceJoin(channelId)
+    if (refuseOffer(direct, r.e2ee)) {
+      refuseUnsafe(channelId)
+      throw new UnsafeCall(t.e2ee.unsafeTitle)
+    }
+    return r
+  }
   try {
-    const res = await voiceJoin(channelId)
+    const res = await offer()
     media.setContext({ channelName: useData.getState().channels[channelId]?.name ?? null })
-    await media.join({ ...res, channelId, refresh: () => voiceJoin(channelId) })
+    await media.join({ ...res, channelId, refresh: offer })
     if (calling && inVoice(channelId) && !Object.keys(useMedia.getState().participants).length) {
       media.ring('outgoing')
       ringbackTimer = setTimeout(stopRingback, RING_MS)
     }
   } catch (e) {
-    toast.error(errorText(e, useMedia.getState().connection.reason ?? t.joinError))
+    if (!(e instanceof UnsafeCall)) toast.error(errorText(e, useMedia.getState().connection.reason ?? t.joinError))
   } finally {
     if (useVoice.getState().joining === channelId) useVoice.setState({ joining: null })
   }
@@ -188,6 +214,12 @@ export function startVoiceSync(): () => void {
       const f = useVoice.getState().focus
       if (f && prev.participants[f]?.streaming && !s.participants[f]?.streaming) useVoice.setState({ focus: null })
       if (s.connection.state === 'idle' && prev.connection.state !== 'idle') useVoice.setState({ focus: null, picker: false })
+      // A direct call that ended up connected without E2EE (an engine re-entry, an old server): never stay in it.
+      if (mustLeave(isDirect(s.connection.channelId), prev.connection.state, s.connection.state, s.e2ee.state)) {
+        const id = s.connection.channelId!
+        leaveVoice()
+        refuseUnsafe(id)
+      }
       // Ringback ends when someone answers or the call drops.
       if (ringbackTimer && (Object.keys(s.participants).length > 0 || s.connection.state === 'idle' || s.connection.state === 'disconnected')) stopRingback()
     }),
