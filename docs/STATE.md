@@ -14,7 +14,8 @@
 ## Em desenvolvimento (agentes paralelos)
 | Frente | Escopo | Status |
 |---|---|---|
-| Backend | `apps/server`: auth, amigos, DMs, espaços, canais, mensagens, convites, gateway, voz (tokens + webhooks) | em andamento |
+| Backend onda 1 | `apps/server` | **feito** — ver Validado |
+| Revisão de segurança independente do backend | `docs/security/` | em andamento |
 | Desktop nativo | `apps/desktop/src/main`, `preload`, instalador NSIS, tray, hotkeys globais, captura, updater | em andamento |
 | Motor de mídia | `apps/desktop/src/renderer/src/media`: voz (Opus/DTX/RED, RNNoise, PTT, dispositivos) + transmissão (codecs, presets, áudio do sistema) + benchmarks | em andamento |
 | Design system + telas (onda 1: shell, auth, amigos, DMs, espaços, chat) | `apps/desktop/src/renderer` (exceto `media/`) | em andamento |
@@ -23,6 +24,7 @@
 ## Validado
 - `@alga/shared`: 2 testes unitários (UUIDv7, permissões) passando.
 - Esqueleto desktop: `electron-vite build` e `typecheck` passando.
+- Backend: 47 testes vitest (PGlite em memória, REST via inject + gateway via WebSocket real) passando, conferido pelo Maestro. Smoke test com LiveKit real: webhooks `room_started/finished` e `participant_joined/left` reais recebidos e assinatura verificada; `VOICE_STATE_UPDATE/REMOVE` entregues no gateway.
 
 ## Pesquisa concluída
 - `docs/research/discord-benchmark.md` — barra a superar (fatos/medições/relatos separados). Medido: Discord ocioso na bandeja = 6 processos, ~808 MB de memória privada.
@@ -36,6 +38,9 @@ Sem medições ainda. Metas iniciais (de `discord-benchmark.md`): stream 1080p60
 - **Sem E2EE de mídia.** Mídia é cifrada só até o SFU (DTLS-SRTP). Discord tem E2EE (DAVE) obrigatório desde 2026-03 → paridade necessária antes de lançamento público.
 - Strings da UI direto em pt-BR, sem framework de i18n ainda.
 - Anexos/upload de arquivos fora do escopo da primeira fatia.
+- Backend sem rotas de cargos, apelidos, banimento e moderação de voz (`serverMute/serverDeaf` sempre false) — próxima onda do backend.
+- Estado de voz, conexões do gateway e throttle de digitação em memória → instância única até introduzir Redis pub/sub.
+- Testado só em PGlite (Postgres 18 WASM); migração ainda não rodada em Postgres real.
 
 ## Bloqueios humanos
 | O quê | Por quê | O que fazer | Sem isso |
