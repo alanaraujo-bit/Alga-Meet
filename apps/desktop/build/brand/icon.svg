@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- App icon, 40 px and up: the near-black tile of Direção B with mark.svg inlined at MARK (78 % of the tile) by
+       scripts/brand.mjs. 16/20/24/32 px use the hand-fitted mark-<n>.svg instead. -->
+  <defs>
+    <linearGradient id="i-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#202128"/>
+      <stop offset="1" stop-color="#0b0b0d"/>
+    </linearGradient>
+    <radialGradient id="i-glow" cx="0.5" cy="0.32" r="0.6">
+      <stop offset="0" stop-color="#8b8ef7" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#8b8ef7" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#i-bg)"/>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#i-glow)"/>
+  <rect x="9" y="9" width="238" height="238" rx="55" fill="none" stroke="#ffffff" stroke-opacity="0.09" stroke-width="2"/>
+  <!--MARK x=28 y=28 size=200-->
+</svg>

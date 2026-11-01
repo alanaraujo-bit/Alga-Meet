@@ -5,7 +5,7 @@
 //   build/icon.ico                     app/installer icon, 16..256 px
 //   build/runtime/icon.png             256 px (notifications, dev window icon)
 //   build/runtime/tray-<state>[@Nx].png idle/connected/muted at 16/20/24/32/40 px
-//   build/runtime/tray-breathe-<n>[@Nx].png connected with shorter bars: the tray "breathing" frames while in voice
+//   build/runtime/tray-breathe-<n>[@Nx].png connected with a smaller state dot: the tray "breathing" frames in voice
 //   build/installer-sidebar.bmp        164x314 NSIS welcome/finish sidebar
 //   build/installer-header.bmp         150x57 NSIS page header
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -15,8 +15,8 @@ import { app, BrowserWindow } from 'electron'
 
 const build = join(dirname(fileURLToPath(import.meta.url)), '..', 'build')
 const svg = (name) => readFileSync(join(build, 'brand', name), 'utf8')
-// Small sizes are hand-hinted: one master per pixel grid, only ever scaled by whole factors (32 = 16 x2, 40 = 20 x2).
-const small = (size) => svg(`mark-${[24, 20, 16].find((g) => size % g === 0)}.svg`)
+// Small sizes are drawn pixel by pixel: one master per grid (16/20/24/32), only ever scaled by whole factors (40 = 20 x2).
+const small = (size) => svg(`mark-${[32, 24, 20, 16].find((g) => size % g === 0)}.svg`)
 const previewIdx = process.argv.indexOf('--preview')
 const previewPath = previewIdx > 0 ? process.argv[previewIdx + 1] : null
 
@@ -125,14 +125,9 @@ const TRAY = {
   connected: '#61c28e',
   muted: '#e66e68',
 }
-// Bar height scale per breathing frame (src/main/tray.ts plays connected, 1, 2, 1 at 250 ms): subtle, unlike the
-// in-app Fronds (0.55).
+// State-dot radius scale per breathing frame (src/main/tray.ts plays connected, 1, 2, 1 at 250 ms). The mark itself
+// stays still: it is the logo, not a voice meter.
 const BREATHE = { 'breathe-1': 0.85, 'breathe-2': 0.7 }
-/** The small master with each bar shortened to `s` of its height around its own center (caps stay round). */
-const breathe = (master, s) =>
-  master.replace(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g, (_, x, y, w, h) =>
-    `<rect x="${x}" y="${+y + (h * (1 - s)) / 2}" width="${w}" height="${h * s}"`,
-  )
 const TRAY_SIZES = [
   [16, ''],
   [20, '@1.25x'],
@@ -145,11 +140,12 @@ app.whenReady().then(async () => {
   win = new BrowserWindow({ show: false, width: 400, height: 400 })
   await win.loadURL('about:blank')
   const mark = svg('mark.svg')
+  const icon = withMark(svg('icon.svg'), mark)
   mkdirSync(join(build, 'runtime'), { recursive: true })
 
   const iconImages = []
   for (const s of [16, 20, 24, 32]) iconImages.push(await raster(small(s), s))
-  for (const s of [40, 48, 64, 128, 256]) iconImages.push(await raster(mark, s))
+  for (const s of [40, 48, 64, 128, 256]) iconImages.push(await raster(icon, s))
   writeFileSync(join(build, 'icon.ico'), ico(iconImages))
   writeFileSync(join(build, 'runtime', 'icon.png'), iconImages.at(-1).png)
 
@@ -157,13 +153,13 @@ app.whenReady().then(async () => {
   for (const [state, color] of Object.entries(TRAY))
     for (const [size, suffix] of TRAY_SIZES)
       writeFileSync(join(build, 'runtime', `tray-${state}${suffix}.png`), (await raster(tray(color, size), size)).png)
-  const breathing = (s, size) => withMark(svg('tray.svg'), breathe(small(size), s)).replace('{{COLOR}}', TRAY.connected)
+  const breathing = (s, size) => tray(TRAY.connected, size).replace('r="32" fill', `r="${32 * s}" fill`)
   for (const [frame, s] of Object.entries(BREATHE))
     for (const [size, suffix] of TRAY_SIZES)
       writeFileSync(join(build, 'runtime', `tray-${frame}${suffix}.png`), (await raster(breathing(s, size), size)).png)
 
   const sidebar = await raster(withMark(svg('installer-sidebar.svg'), mark), 164, 314)
-  const header = await raster(withMark(svg('installer-header.svg'), mark), 150, 57)
+  const header = await raster(withMark(svg('installer-header.svg'), icon), 150, 57)
   writeFileSync(join(build, 'installer-sidebar.bmp'), bmp24(sidebar))
   writeFileSync(join(build, 'installer-header.bmp'), bmp24(header))
 

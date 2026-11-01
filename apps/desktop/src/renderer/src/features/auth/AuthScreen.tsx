@@ -55,7 +55,7 @@ export function AuthScreen() {
           exit={{ opacity: 0, transition: { duration: 0.1 } }}
         >
           <div className={s.mark}>
-            <LogoMark size={28} />
+            <LogoMark size={36} />
           </div>
           {mode === 'login' && <LoginForm resetDone={!!note.resetDone} invite={invite} onSwitch={() => go('register')} onForgot={() => go('forgot')} />}
           {mode === 'register' && <RegisterForm invite={invite} onSwitch={() => go('login')} />}

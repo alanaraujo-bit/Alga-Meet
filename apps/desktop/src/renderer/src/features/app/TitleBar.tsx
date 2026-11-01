@@ -27,7 +27,7 @@ export function TitleBar({ search }: { search?: boolean }) {
     <header className={s.titlebar}>
       <div className={s.brand}>
         <span className={s.brandMark}>
-          <LogoMark size={14} />
+          <LogoMark size={16} />
         </span>
         {t.appName}
         {profile && profile !== 'default' && <span className={s.profile}>{profile}</span>}

@@ -1,6 +1,6 @@
 # Marca: três conceitos para escolha
 
-> Proposta de 01/11/2026 para o dono escolher. Nada no produto mudou: `apps/desktop/build/**`, o app e os ativos continuam com a marca v2 (as três barras).
+> Proposta de 01/11/2026 para o dono escolher. **Decisão: A · Encosto**, refinado e já no produto como marca v2 (substitui as três barras): ver `apps/desktop/build/README.md` e [`../brand-v2.png`](../brand-v2.png). Os arquivos desta pasta ficam como registro da proposta.
 > Ponto de partida: problema 3 da crítica r3 (`docs/design/critique-2026-11-01-r3.md`). As três barras leem como o ícone universal de áudio, e o mesmo glifo aparece 5 vezes por tela como sinal de "tem gente em voz".
 
 Cada folha (2400 × 1500) mostra:

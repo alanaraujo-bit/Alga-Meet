@@ -6,7 +6,7 @@ import { LogoMark } from './Logo'
 import { t } from './strings'
 import s from './app.module.css'
 
-/** Until the first READY: the mark "breathes" like a voice; failures are explained in place. */
+/** Until the first READY: the mark, still, and the status line; failures are explained in place. */
 export function BootSplash() {
   const phase = useSession((st) => st.phase)
   const gateway = useSession((st) => st.gateway)
@@ -15,7 +15,7 @@ export function BootSplash() {
   return (
     <motion.main className={s.splash} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.3, delay: 0.15 } }} aria-busy="true">
       <span className={s.splashMark}>
-        <LogoMark size={44} breathing />
+        <LogoMark size={44} />
       </span>
       <p className={`${s.splashText} tnum`} role="status" aria-live="polite">
         {failing ? t.splash.retrying(secs ?? 0) : phase === 'booting' ? t.splash.connecting : t.splash.loading}
