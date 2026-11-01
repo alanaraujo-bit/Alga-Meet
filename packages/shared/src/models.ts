@@ -16,6 +16,11 @@ export interface PublicUser {
 
 export interface Me extends PublicUser {
   email: string
+  /**
+   * The user proved they read `email` (verification link or password reset); see api.ts for what needs it. Always sent
+   * by the server; optional in the type only so existing `Me` literals (fixtures) keep compiling.
+   */
+  emailVerified?: boolean
   statusPreference: StatusPreference
   createdAt: string
 }

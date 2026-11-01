@@ -25,14 +25,15 @@ describe('auth', () => {
     expect(me.body.passwordHash).toBeUndefined()
   })
 
-  it('rejects duplicates with field errors and bad bodies with validation fields', async () => {
+  it('rejects a taken username (only) with a field error and bad bodies with validation fields', async () => {
     await register(s.app, 'bob')
     const dup = await api(s.app, 'POST', '/auth/register', {
-      ip: freshIp(), body: { email: 'BOB@example.com', username: 'bob', password: 'whatever123' },
+      ip: freshIp(), body: { email: 'BOB@example.com', username: 'bob', password: 'a fine long passphrase' },
     })
     expect(dup.status).toBe(409)
     expect(dup.body.error.code).toBe('conflict')
-    expect(dup.body.error.fields).toMatchObject({ email: expect.any(String), username: expect.any(String) })
+    // B5: the e-mail is never reported (email.test.ts covers what happens instead).
+    expect(dup.body.error.fields).toEqual({ username: expect.any(String) })
 
     const bad = await api(s.app, 'POST', '/auth/register', {
       ip: freshIp(), body: { email: 'nope', username: 'x y', password: 'short' },

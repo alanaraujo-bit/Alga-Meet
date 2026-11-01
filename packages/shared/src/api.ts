@@ -8,7 +8,20 @@ import { ALL_PERMISSIONS } from './permissions.js'
  * Errors: { error: { code: ApiErrorCode, message: string, fields?: Record<string,string> } }
  *
  * POST   /auth/register            RegisterBody          -> AuthResponse
+ *   409 only for a taken username (usernames are public). A taken e-mail is never revealed: the account is created
+ *   unverified and the address gets a "you already have an account" mail instead of a verification link.
+ *   Passwords: MIN_PASSWORD_LENGTH..256 characters and not a common/leaked password (400 `fields.password`).
  * POST   /auth/login               LoginBody             -> AuthResponse
+ *   By username, or by e-mail once that e-mail is verified (Me.emailVerified); same 401 either way.
+ * POST   /auth/verify-email        VerifyEmailBody       -> 204 (no auth; token from the e-mail, 24 h, single use;
+ *                                                          ME_UPDATE; 400 `fields.token` if invalid/expired/used)
+ * POST   /auth/verify-email/resend                       -> 204 (auth; 3 per 15 min; no-op when already verified)
+ *   While Me.emailVerified is false: no invites (POST /spaces/:id/invites), at most one owned space (POST /spaces), and
+ *   no new DM with someone who is not a friend (POST /users/@me/channels). These answer 403 `forbidden`.
+ * POST   /auth/password-reset/request PasswordResetRequestBody -> 204 (no auth; always 204, whether or not the e-mail
+ *                                                          exists; 5 per 15 min per IP, 3 mails per hour per address)
+ * POST   /auth/password-reset/confirm PasswordResetConfirmBody -> 204 (no auth; token 1 h, single use; revokes every
+ *                                                          session (gateway 4004) and verifies the e-mail)
  * POST   /auth/logout                                    -> 204
  * POST   /auth/password            ChangePasswordBody    -> 204 (revokes every other session)
  * GET    /auth/sessions                                  -> Session[]
@@ -42,6 +55,10 @@ import { ALL_PERMISSIONS } from './permissions.js'
  *   Content-Type and the extension are ignored) and the filename is sanitized. Attachment.contentType is what the
  *   file is served as: an image/*, video/* or audio/* type means "render inline"; anything else (unknown types,
  *   SVG, HTML, huge images) is application/octet-stream, a download. width/height come with images.
+ *   Inline images (png/jpeg/webp/gif/avif) are re-encoded before storage: no EXIF/GPS/XMP/ICC survives, the EXIF
+ *   orientation is applied (width/height are as displayed), colors become sRGB, GIF/WebP animation is kept, sides above
+ *   8192 px are scaled down and AVIF becomes WebP (size/filename extension follow the stored file). 400
+ *   `fields.files` for more than 100 megapixels (all frames together), more than 500 frames or undecodable images.
  *   Uploads are limited to 30 files per 10 minutes per user (429). Deleting the message deletes its files.
  * GET    /files/:id?uid=&exp=&sig=                        -> file bytes (no auth header: Attachment.url is signed)
  *   Attachment.url is per viewer and expires (~1 h; every message fetch or event carries fresh ones), so it works
@@ -50,7 +67,7 @@ import { ALL_PERMISSIONS } from './permissions.js'
  * PUT    /users/@me/avatar         multipart `file`      -> Me    (ME_UPDATE + USER_UPDATE)
  * PUT    /spaces/:id/icon          multipart `file`      -> Space (MANAGE_SPACE; SPACE_UPDATE)
  *   One image of AVATAR_CONTENT_TYPES (sniffed; SVG refused), ≤ MAX_AVATAR_BYTES and ≤ MAX_AVATAR_SIDE px per side,
- *   5 per minute. Sets avatarUrl/iconUrl to our own URL, served publicly and immutably at
+ *   5 per minute. Stored as WebP (animated when the input was) fitting 1024 px, metadata stripped; crop on the client. Sets avatarUrl/iconUrl to our own URL, served publicly and immutably at
  * GET    /avatars/:userId/:file  ·  GET /icons/:spaceId/:file   -> image (public, no auth)
  *   PATCH /users/@me and PATCH /spaces/:id accept avatarUrl/iconUrl only as null (remove) or a URL these uploads
  *   returned for that same user/space; any other URL is a 400.
@@ -114,11 +131,16 @@ const username = z
   .max(32)
   .regex(/^[a-z0-9_.]+$/, 'Use apenas letras, números, "_" e "."')
 
+/** Server-side the password must also not be a common/leaked one or contain the username/e-mail (fields.password). */
+export const MIN_PASSWORD_LENGTH = 10
+const password = z.string().min(MIN_PASSWORD_LENGTH).max(256)
+const email = z.string().trim().toLowerCase().email().max(254)
+
 export const RegisterBody = z.object({
-  email: z.string().trim().toLowerCase().email().max(254),
+  email,
   username,
   displayName: z.string().trim().min(1).max(32).optional(),
-  password: z.string().min(8).max(256),
+  password,
 })
 export type RegisterBody = z.infer<typeof RegisterBody>
 
@@ -134,6 +156,18 @@ export const ChangePasswordBody = z.object({
   newPassword: RegisterBody.shape.password,
 })
 export type ChangePasswordBody = z.infer<typeof ChangePasswordBody>
+
+/** Opaque token from a verification or password-reset e-mail (link `?token=` or pasted code). */
+const emailToken = z.string().trim().min(1).max(256)
+
+export const VerifyEmailBody = z.object({ token: emailToken })
+export type VerifyEmailBody = z.infer<typeof VerifyEmailBody>
+
+export const PasswordResetRequestBody = z.object({ email })
+export type PasswordResetRequestBody = z.infer<typeof PasswordResetRequestBody>
+
+export const PasswordResetConfirmBody = z.object({ token: emailToken, password })
+export type PasswordResetConfirmBody = z.infer<typeof PasswordResetConfirmBody>
 
 export interface AuthResponse {
   token: string

@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import {
   boolean, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid,
 } from 'drizzle-orm/pg-core'
@@ -17,10 +18,23 @@ export const users = pgTable('users', {
   bio: text('bio').notNull().default(''),
   statusPreference: text('status_preference', { enum: ['online', 'idle', 'dnd', 'invisible'] }).notNull().default('online'),
   createdAt: ts('created_at').notNull().defaultNow(),
+  /** Set by the verification link or a password reset. Until then `email` is only claimed (B5: never refused). */
+  emailVerifiedAt: ts('email_verified_at'),
 }, (t) => [
-  uniqueIndex('users_email_key').on(t.email),
+  // An address belongs to at most one verified account; unverified accounts may claim a taken one.
+  uniqueIndex('users_verified_email_key').on(t.email).where(sql`${t.emailVerifiedAt} is not null`),
+  index('users_email_idx').on(t.email),
   uniqueIndex('users_username_key').on(t.username),
 ])
+
+/** Single-use tokens sent by e-mail. Only the SHA-256 is stored; the row is deleted when used. */
+export const emailTokens = pgTable('email_tokens', {
+  tokenHash: text('token_hash').primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kind: text('kind', { enum: ['verify_email', 'password_reset'] }).notNull(),
+  expiresAt: ts('expires_at').notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [index('email_tokens_user_id_idx').on(t.userId)])
 
 export const sessions = pgTable('sessions', {
   id: uuid('id').primaryKey(),

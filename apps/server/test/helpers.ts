@@ -1,13 +1,18 @@
 import { createHash } from 'node:crypto'
+import { mkdtempSync, rmSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { AuthResponse, Dispatch, DispatchOf, DispatchType, ServerFrame } from '@alga/shared'
 import type { FastifyInstance } from 'fastify'
 import { AccessToken } from 'livekit-server-sdk'
+import { eq } from 'drizzle-orm'
 import pg from 'pg'
 import { inject } from 'vitest'
 import WebSocket from 'ws'
 import { buildApp } from '../src/app.js'
 import { loadConfig, type Config } from '../src/config.js'
+import { users } from '../src/db/schema.js'
 
 export interface TestServer {
   app: FastifyInstance
@@ -39,6 +44,8 @@ export const onRealPostgres = () => Boolean(inject('pgAdminUrl'))
 
 export async function startServer(env: Record<string, string> = {}): Promise<TestServer> {
   const databaseUrl = await freshDatabaseUrl()
+  // Console e-mail driver: .eml files go to a throwaway outbox, removed on close.
+  const outbox = mkdtempSync(join(tmpdir(), 'alga-outbox-'))
   const config = loadConfig({
     NODE_ENV: 'test',
     LOG_LEVEL: 'silent',
@@ -46,12 +53,13 @@ export async function startServer(env: Record<string, string> = {}): Promise<Tes
     ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
     // Nothing listens here: SFU calls (kick/delete room) fail fast and are logged, as in production with LiveKit down.
     LIVEKIT_URL: 'http://127.0.0.1:9',
+    EMAIL_OUTBOX_DIR: outbox,
     ...env,
   })
   const app = await buildApp(config)
   await app.listen({ port: 0, host: '127.0.0.1' })
   const port = (app.server.address() as AddressInfo).port
-  return { app, config, port, close: () => app.close() }
+  return { app, config, port, close: async () => { await app.close(); rmSync(outbox, { recursive: true, force: true }) } }
 }
 
 let ipCounter = 0
@@ -81,7 +89,8 @@ export async function api<T = any>(
 }
 
 let userCounter = 0
-export async function register(app: FastifyInstance, name?: string): Promise<AuthResponse & { password: string }> {
+/** Registers a user; unless `verified: false`, marks the e-mail verified directly in the DB (the flow is in email.test.ts). */
+export async function register(app: FastifyInstance, name?: string, { verified = true } = {}): Promise<AuthResponse & { password: string }> {
   const username = name ?? `user${++userCounter}_${Math.random().toString(36).slice(2, 6)}`
   const password = 'correct horse battery'
   const res = await api<AuthResponse>(app, 'POST', '/auth/register', {
@@ -89,6 +98,10 @@ export async function register(app: FastifyInstance, name?: string): Promise<Aut
     body: { email: `${username}@example.com`, username, displayName: username.toUpperCase(), password },
   })
   if (res.status !== 201) throw new Error(`register failed: ${res.status} ${JSON.stringify(res.body)}`)
+  if (verified) {
+    await app.ctx.db.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, res.body.user.id))
+    res.body.user.emailVerified = true
+  }
   return { ...res.body, password }
 }
 

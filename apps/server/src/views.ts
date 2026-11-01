@@ -21,6 +21,7 @@ export const publicUser = (u: UserRow): PublicUser => ({
 export const meView = (u: UserRow): Me => ({
   ...publicUser(u),
   email: u.email,
+  emailVerified: u.emailVerifiedAt !== null,
   statusPreference: u.statusPreference,
   createdAt: u.createdAt.toISOString(),
 })

@@ -8,6 +8,7 @@ import { and, count, eq, gt, isNull, lt, max, or, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { assertOutranks, channelAudience, requireActor, requireChannel, requireSpace, spaceMemberIds } from '../access.js'
 import type { Ctx } from '../app.js'
+import { requireVerifiedEmail } from '../auth.js'
 import { isUniqueViolation, type Db } from '../db/index.js'
 import { channels, invites, roles, spaceBans, spaceMembers, spaces, type InviteRow, type SpaceRow } from '../db/schema.js'
 import { badRequest, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
@@ -81,6 +82,10 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.post('/spaces', { config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (req, reply): Promise<SpaceSnapshot> => {
     const { name } = parse(CreateSpaceBody, req.body)
     const me = req.auth.user.id
+    // shortcut: two concurrent creates can both pass this check (2 spaces); a row lock on the user would close it.
+    if (!req.auth.user.emailVerifiedAt && (await db.select({ id: spaces.id }).from(spaces).where(eq(spaces.ownerId, me)).limit(1)).length) {
+      requireVerifiedEmail(req.auth.user, 'criar mais de um espaço')
+    }
     const id = uuidv7()
     await db.transaction(async (tx) => {
       await tx.insert(spaces).values({ id, name, ownerId: me })
@@ -199,6 +204,7 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
 
   app.post<{ Params: { id: string } }>('/spaces/:id/invites', { config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, reply): Promise<Invite> => {
     const { space } = await requireSpace(db, idParam(req.params.id), req.auth.user.id, Permission.CREATE_INVITES)
+    requireVerifiedEmail(req.auth.user, 'criar convites')
     const body = parse(CreateInviteBody, req.body)
     const expiresAt = body.maxAgeSeconds ? new Date(Date.now() + body.maxAgeSeconds * 1000) : null
     for (let attempt = 0; ; attempt++) {

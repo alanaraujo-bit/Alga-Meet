@@ -1,10 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { hash, verify, type Algorithm } from '@node-rs/argon2'
 import { uuidv7 } from '@alga/shared'
-import { eq } from 'drizzle-orm'
+import { and, eq, gt, lte, or } from 'drizzle-orm'
 import type { FastifyRequest } from 'fastify'
 import type { Db } from './db/index.js'
-import { sessions, users, type UserRow } from './db/schema.js'
+import { emailTokens, sessions, users, type UserRow } from './db/schema.js'
 import { HttpError } from './errors.js'
 
 // OWASP 2024 argon2id baseline: m=19 MiB, t=2, p=1.
@@ -89,4 +89,42 @@ export function authenticate(db: Db) {
 
 export async function hasSession(db: Db, userId: string): Promise<boolean> {
   return (await db.select({ id: sessions.id }).from(sessions).where(eq(sessions.userId, userId)).limit(1)).length > 0
+}
+
+/** 403 while the account's e-mail is unverified (api.ts lists what needs a verified e-mail). */
+export function requireVerifiedEmail(user: UserRow, toDoWhat: string): void {
+  if (!user.emailVerifiedAt) throw new HttpError('forbidden', `Confirme seu e-mail para ${toDoWhat}.`)
+}
+
+export type EmailTokenKind = 'verify_email' | 'password_reset'
+const EMAIL_TOKEN_TTL_MS: Record<EmailTokenKind, number> = { verify_email: DAY_MS, password_reset: 60 * 60 * 1000 }
+
+/**
+ * New single-use token (32 random bytes, base64url; only its SHA-256 is stored). The user's earlier token of the same
+ * kind stops working, and expired tokens of anyone are purged.
+ */
+export async function issueEmailToken(db: Db, userId: string, kind: EmailTokenKind): Promise<string> {
+  const token = randomBytes(32).toString('base64url')
+  await db.transaction(async (tx) => {
+    await tx.delete(emailTokens).where(or(and(eq(emailTokens.userId, userId), eq(emailTokens.kind, kind)), lte(emailTokens.expiresAt, new Date())))
+    await tx.insert(emailTokens).values({ tokenHash: sha256Hex(token), userId, kind, expiresAt: new Date(Date.now() + EMAIL_TOKEN_TTL_MS[kind]) })
+  })
+  return token
+}
+
+const liveToken = (token: string, kind: EmailTokenKind) =>
+  and(eq(emailTokens.tokenHash, sha256Hex(token)), eq(emailTokens.kind, kind), gt(emailTokens.expiresAt, new Date()))
+
+/** The owner of a live token, without using it up. */
+export async function peekEmailToken(db: Db, token: string, kind: EmailTokenKind): Promise<string | null> {
+  if (token.length > 128) return null
+  const [row] = await db.select({ userId: emailTokens.userId }).from(emailTokens).where(liveToken(token, kind))
+  return row?.userId ?? null
+}
+
+/** Uses the token up and returns its owner; one DELETE, so concurrent uses have a single winner. */
+export async function consumeEmailToken(db: Db, token: string, kind: EmailTokenKind): Promise<string | null> {
+  if (token.length > 128) return null
+  const [row] = await db.delete(emailTokens).where(liveToken(token, kind)).returning({ userId: emailTokens.userId })
+  return row?.userId ?? null
 }

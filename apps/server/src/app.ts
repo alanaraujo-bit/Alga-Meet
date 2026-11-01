@@ -6,6 +6,7 @@ import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify'
 import { authenticate, type AuthContext } from './auth.js'
 import type { Config } from './config.js'
 import { openDatabase, type Db } from './db/index.js'
+import { Mailer, createEmailSender } from './email.js'
 import { HttpError, installErrorHandling, safeUrl } from './errors.js'
 import { Files } from './files.js'
 import { Hub } from './gateway/hub.js'
@@ -28,6 +29,7 @@ export interface Ctx {
   hub: Hub
   voice: Voice
   files: Files
+  mail: Mailer
   log: FastifyBaseLogger
 }
 
@@ -58,7 +60,8 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   app.log.info({ driver: database.driver }, 'database ready')
   const hub = new Hub()
   const files = new Files(config, database.db, createStorage(config.storage), app.log)
-  const ctx: Ctx = { config, db: database.db, hub, voice: new Voice(config, database.db, hub, app.log), files, log: app.log }
+  const mail = new Mailer(createEmailSender(config.email, app.log, config.env === 'production'), app.log, config.email.linkUrl)
+  const ctx: Ctx = { config, db: database.db, hub, voice: new Voice(config, database.db, hub, app.log), files, mail, log: app.log }
   app.decorate('ctx', ctx)
   files.start()
 

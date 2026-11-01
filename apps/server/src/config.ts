@@ -63,6 +63,16 @@ const EnvSchema = z
     S3_URL_STYLE: z.enum(['virtual', 'path']).default('virtual'),
     MAX_ATTACHMENT_BYTES: z.coerce.number().int().min(1024).max(500 * 1024 * 1024).default(25 * 1024 * 1024),
     FILE_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(7 * 24 * 3600).default(3600),
+    /** console = .eml files in EMAIL_OUTBOX_DIR + log (dev); resend = Resend REST API. Production: explicit. */
+    EMAIL_DRIVER: z.enum(['console', 'resend']).optional(),
+    /** Lets production run the console driver (e.g. a staging box without a provider). */
+    ALGA_ALLOW_CONSOLE_EMAIL: bool,
+    EMAIL_OUTBOX_DIR: z.string().min(1).default(join(serverRoot, 'data', 'outbox')),
+    /** Sender, e.g. `Alga Meet <nao-responda@algameet.com.br>`; its domain must be verified at the provider. */
+    EMAIL_FROM: z.string().min(3).optional(),
+    RESEND_API_KEY: z.string().min(1).optional(),
+    /** Base of the links in e-mails: `<base>/verify-email?token=…`, `<base>/reset-password?token=…`. */
+    EMAIL_LINK_URL: z.url().default('algameet://auth'),
   })
   .superRefine((env, ctx) => {
     const devMode = env.ALGA_ALLOW_DEV_SECRETS || (env.NODE_ENV !== 'production' && LOOPBACK.has(env.HOST))
@@ -78,6 +88,17 @@ const EnvSchema = z
       if (!env.FILES_SECRET) ctx.addIssue({ code: 'custom', path: ['FILES_SECRET'], message: 'required in production (≥ 32 random characters)' })
       // Container disks are ephemeral: picking local storage must be a deliberate choice (with a volume).
       if (!env.STORAGE_DRIVER) ctx.addIssue({ code: 'custom', path: ['STORAGE_DRIVER'], message: 'required in production: s3, or local with a persistent UPLOADS_DIR' })
+    }
+    if (env.NODE_ENV === 'production' && !env.EMAIL_DRIVER) {
+      ctx.addIssue({ code: 'custom', path: ['EMAIL_DRIVER'], message: 'required in production: resend (or console with ALGA_ALLOW_CONSOLE_EMAIL=1)' })
+    }
+    if (env.NODE_ENV === 'production' && env.EMAIL_DRIVER === 'console' && !env.ALGA_ALLOW_CONSOLE_EMAIL) {
+      ctx.addIssue({ code: 'custom', path: ['EMAIL_DRIVER'], message: 'console only writes files on the server; set ALGA_ALLOW_CONSOLE_EMAIL=1 to allow it in production' })
+    }
+    if (env.EMAIL_DRIVER === 'resend') {
+      for (const k of ['RESEND_API_KEY', 'EMAIL_FROM'] as const) {
+        if (!env[k]) ctx.addIssue({ code: 'custom', path: [k], message: 'required with EMAIL_DRIVER=resend' })
+      }
     }
     if (env.STORAGE_DRIVER === 's3') {
       for (const k of ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const) {
@@ -103,7 +124,13 @@ export interface Config {
   publicUrl: string
   files: { secret: string; urlTtlSeconds: number; maxAttachmentBytes: number }
   storage: StorageConfig
+  email: EmailConfig
 }
+
+export type EmailConfig = { linkUrl: string; from: string } & (
+  | { driver: 'console'; outboxDir: string }
+  | { driver: 'resend'; apiKey: string }
+)
 
 export type StorageConfig =
   | { driver: 'local'; dir: string }
@@ -147,5 +174,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
           accessKeyId: e.S3_ACCESS_KEY_ID!, secretAccessKey: e.S3_SECRET_ACCESS_KEY!, pathStyle: e.S3_URL_STYLE === 'path',
         }
       : { driver: 'local', dir: e.UPLOADS_DIR },
+    email: {
+      linkUrl: e.EMAIL_LINK_URL.replace(/\/+$/, ''),
+      ...(e.EMAIL_DRIVER === 'resend'
+        ? { driver: 'resend' as const, apiKey: e.RESEND_API_KEY!, from: e.EMAIL_FROM! }
+        : { driver: 'console' as const, outboxDir: e.EMAIL_OUTBOX_DIR, from: e.EMAIL_FROM ?? 'Alga Meet <nao-responda@alga.localhost>' }),
+    },
   }
 }

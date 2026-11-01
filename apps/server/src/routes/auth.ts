@@ -1,30 +1,69 @@
-import { ChangePasswordBody, GatewayClose, LoginBody, RegisterBody, uuidv7, type AuthResponse, type Session } from '@alga/shared'
-import { and, desc, eq, ne, or } from 'drizzle-orm'
+import {
+  ChangePasswordBody, GatewayClose, LoginBody, PasswordResetConfirmBody, PasswordResetRequestBody, RegisterBody, VerifyEmailBody,
+  uuidv7, type AuthResponse, type Session,
+} from '@alga/shared'
+import { and, desc, eq, isNotNull, isNull, ne, or, sql } from 'drizzle-orm'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import type { Ctx } from '../app.js'
-import { createSession, hasSession, hashPassword, verifyPassword } from '../auth.js'
+import {
+  consumeEmailToken, createSession, hasSession, hashPassword, issueEmailToken, peekEmailToken, verifyPassword,
+} from '../auth.js'
 import { isUniqueViolation } from '../db/index.js'
-import { sessions, users } from '../db/schema.js'
-import { HttpError, conflict, idParam, invalid, notFound, parse } from '../errors.js'
+import { emailTokens, sessions, users, type UserRow } from '../db/schema.js'
+import { accountExistsMail, passwordResetMail, verifyEmailMail } from '../email-templates.js'
+import { HttpError, conflict, idParam, invalid, notFound, parse, safeErr } from '../errors.js'
+import { assertStrongPassword } from '../passwords.js'
 import { meView } from '../views.js'
 
 /** Per client IP (see TRUST_PROXY). */
 const authLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } }
 const MAX_FAILED_LOGINS = 10
 
-export function authPublicRoutes(app: FastifyInstance, { db }: Ctx): void {
+const usernameTaken = () => conflict('Nome de usuário já em uso.', { username: 'Nome de usuário já em uso.' })
+const badToken = () => invalid({ token: 'Link inválido, expirado ou já usado. Peça um novo.' })
+
+/** Closes the sockets of deleted sessions (4004); a user left without any session also leaves voice. */
+async function revoked({ db, hub, voice }: Ctx, userId: string, deleted: { id: string }[], reason: string): Promise<void> {
+  for (const s of deleted) hub.closeSession(s.id, GatewayClose.SESSION_REVOKED, reason)
+  if (deleted.length && !(await hasSession(db, userId))) await voice.disconnect(userId)
+}
+
+/** Runs after the response (same timing whatever the outcome; e-mail never delays or fails a request). */
+function later(ctx: Ctx, what: string, fn: () => Promise<void>): void {
+  void fn().catch((err: unknown) => ctx.log.error({ err: safeErr(err) }, `${what} failed`))
+}
+
+/**
+ * Verification mail for `user`, or, when another account already verified that address, a "you already have an
+ * account" mail to it (B5: the requester sees the same thing either way). Dropped beyond the per-address quota.
+ */
+function sendVerification(ctx: Ctx, user: UserRow): void {
+  if (!ctx.mail.reserve('verify', user.email)) return
+  later(ctx, 'verification mail', async () => {
+    const [owner] = await ctx.db.select({ username: users.username }).from(users)
+      .where(and(eq(users.email, user.email), isNotNull(users.emailVerifiedAt), ne(users.id, user.id)))
+    if (owner) return ctx.mail.send({ to: user.email, kind: 'account_exists', ...accountExistsMail(owner.username) })
+    const token = await issueEmailToken(ctx.db, user.id, 'verify_email')
+    ctx.mail.send({ to: user.email, kind: 'verify_email', ...verifyEmailMail(ctx.mail.link('verify-email', token), token) })
+  })
+}
+
+export function authPublicRoutes(app: FastifyInstance, ctx: Ctx): void {
+  const { db, hub, mail } = ctx
   // Failed logins per account, across IPs. Only failures count, and other accounts are unaffected, so an attacker
   // can at worst slow down the account they target (for 15 min), never lock everyone out.
   const loginKey = new WeakMap<FastifyRequest, string>()
   const failedLogins = app.createRateLimit({ max: MAX_FAILED_LOGINS, timeWindow: '15 minutes', keyGenerator: (req) => loginKey.get(req)! })
 
+  // B5: only the username can be reported as taken (usernames are public). The e-mail never is: the account is
+  // created unverified and the address gets either a verification link or a "you already have an account" mail.
   app.post('/auth/register', { config: authLimit }, async (req, reply): Promise<AuthResponse> => {
     const body = parse(RegisterBody, req.body)
-    const taken = await db.select({ email: users.email, username: users.username }).from(users)
-      .where(or(eq(users.email, body.email), eq(users.username, body.username)))
-    if (taken.length) throw takenError(taken, body)
+    assertStrongPassword(body.password, body, 'password')
+    const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.username, body.username))
+    if (taken) throw usernameTaken()
     const passwordHash = await hashPassword(body.password)
-    let user
+    let user: UserRow | undefined
     try {
       ;[user] = await db.insert(users).values({
         id: uuidv7(),
@@ -34,18 +73,21 @@ export function authPublicRoutes(app: FastifyInstance, { db }: Ctx): void {
         passwordHash,
       }).returning()
     } catch (err) {
-      if (isUniqueViolation(err)) throw conflict('E-mail ou nome de usuário já em uso.')
+      // users_verified_email_key never fires here (new accounts are unverified): only the username can collide.
+      if (isUniqueViolation(err)) throw usernameTaken()
       throw err
     }
     const { token } = await createSession(db, user!.id, req.headers['user-agent'] ?? '')
+    sendVerification(ctx, user!)
     reply.code(201)
     return { token, user: meView(user!) }
   })
 
   app.post('/auth/login', { config: authLimit }, async (req): Promise<AuthResponse> => {
     const body = parse(LoginBody, req.body)
+    // By e-mail only once verified: an unverified address may be claimed by several accounts (see register).
     const [user] = await db.select().from(users)
-      .where(or(eq(users.email, body.login), eq(users.username, body.login))).limit(1)
+      .where(or(and(eq(users.email, body.login), isNotNull(users.emailVerifiedAt)), eq(users.username, body.login))).limit(1)
     loginKey.set(req, `login:${user?.id ?? body.login}`)
     // Checked before argon2, so a locked account costs no CPU and gives no password oracle.
     const failures = await failedLogins(req, { increment: false })
@@ -60,27 +102,70 @@ export function authPublicRoutes(app: FastifyInstance, { db }: Ctx): void {
     const { token } = await createSession(db, user.id, req.headers['user-agent'] ?? '')
     return { token, user: meView(user) }
   })
+
+  // No auth: the link may be opened on another device or after logging out; the token is the proof.
+  app.post('/auth/verify-email', { config: authLimit }, async (req, reply) => {
+    const { token } = parse(VerifyEmailBody, req.body)
+    const userId = await consumeEmailToken(db, token, 'verify_email')
+    if (!userId) throw badToken()
+    let row: UserRow | undefined
+    try {
+      ;[row] = await db.update(users).set({ emailVerifiedAt: new Date() })
+        .where(and(eq(users.id, userId), isNull(users.emailVerifiedAt))).returning()
+    } catch (err) {
+      // Two accounts claimed the address and the other one confirmed it first.
+      if (isUniqueViolation(err)) throw conflict('Este e-mail já foi confirmado em outra conta.')
+      throw err
+    }
+    if (row) hub.dispatch([row.id], 'ME_UPDATE', meView(row))
+    return reply.code(204).send()
+  })
+
+  // Always 204, before any lookup (no enumeration by status or timing). 5 per 15 min per IP; per address, at most
+  // MAILS_PER_ADDRESS_PER_HOUR mails (further requests are dropped and do not replace the link already sent).
+  app.post('/auth/password-reset/request', { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } }, async (req, reply) => {
+    const { email } = parse(PasswordResetRequestBody, req.body)
+    if (mail.reserve('reset', email)) {
+      later(ctx, 'password reset mail', async () => {
+        // The verified owner; without one, the newest account claiming the address (confirming proves the inbox).
+        const [user] = await db.select({ id: users.id }).from(users).where(eq(users.email, email))
+          .orderBy(sql`${users.emailVerifiedAt} is null`, desc(users.createdAt)).limit(1)
+        if (!user) return // nothing is sent to addresses without an account (no spam relay)
+        const token = await issueEmailToken(db, user.id, 'password_reset')
+        mail.send({ to: email, kind: 'password_reset', ...passwordResetMail(mail.link('reset-password', token), token) })
+      })
+    }
+    return reply.code(204).send()
+  })
+
+  app.post('/auth/password-reset/confirm', { config: authLimit }, async (req, reply) => {
+    const body = parse(PasswordResetConfirmBody, req.body)
+    const userId = await peekEmailToken(db, body.token, 'password_reset')
+    const [user] = userId ? await db.select().from(users).where(eq(users.id, userId)) : []
+    if (!user) throw badToken()
+    assertStrongPassword(body.password, user, 'password')
+    const passwordHash = await hashPassword(body.password)
+    // Used up only now, so a refused password does not burn the link; concurrent confirms have one winner.
+    if (!(await consumeEmailToken(db, body.token, 'password_reset'))) throw badToken()
+    await db.update(users).set({ passwordHash }).where(eq(users.id, user.id))
+    if (!user.emailVerifiedAt) {
+      // Opening the mail proves the inbox, unless another account confirmed the address meanwhile.
+      await db.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, user.id))
+        .catch((err: unknown) => { if (!isUniqueViolation(err)) throw err })
+    }
+    await revoked(ctx, user.id, await db.delete(sessions).where(eq(sessions.userId, user.id)).returning({ id: sessions.id }), 'password reset')
+    return reply.code(204).send()
+  })
 }
 
-function takenError(taken: { email: string; username: string }[], body: { email: string; username: string }) {
-  const fields: Record<string, string> = {}
-  if (taken.some((t) => t.email === body.email)) fields.email = 'E-mail já cadastrado.'
-  if (taken.some((t) => t.username === body.username)) fields.username = 'Nome de usuário já em uso.'
-  return conflict('E-mail ou nome de usuário já em uso.', fields)
-}
-
-export function authRoutes(app: FastifyInstance, { db, hub, voice }: Ctx): void {
-  /** Closes the sockets of deleted sessions; a user left without any session also leaves voice. */
-  const revoked = async (userId: string, deleted: { id: string }[], reason: string) => {
-    for (const s of deleted) hub.closeSession(s.id, GatewayClose.SESSION_REVOKED, reason)
-    if (deleted.length && !(await hasSession(db, userId))) await voice.disconnect(userId)
-  }
+export function authRoutes(app: FastifyInstance, ctx: Ctx): void {
+  const { db } = ctx
   const deleteOthers = (req: FastifyRequest) => db.delete(sessions)
     .where(and(eq(sessions.userId, req.auth.user.id), ne(sessions.id, req.auth.sessionId))).returning({ id: sessions.id })
 
   app.post('/auth/logout', async (req, reply) => {
     const deleted = await db.delete(sessions).where(eq(sessions.id, req.auth.sessionId)).returning({ id: sessions.id })
-    await revoked(req.auth.user.id, deleted, 'logged out')
+    await revoked(ctx, req.auth.user.id, deleted, 'logged out')
     return reply.code(204).send()
   })
 
@@ -88,13 +173,21 @@ export function authRoutes(app: FastifyInstance, { db, hub, voice }: Ctx): void 
     const body = parse(ChangePasswordBody, req.body)
     const me = req.auth.user
     if (!(await verifyPassword(me.passwordHash, body.currentPassword))) throw invalid({ currentPassword: 'Senha atual incorreta.' })
+    assertStrongPassword(body.newPassword, me, 'newPassword')
     await db.update(users).set({ passwordHash: await hashPassword(body.newPassword) }).where(eq(users.id, me.id))
-    await revoked(me.id, await deleteOthers(req), 'password changed')
+    // A reset link mailed before the change must not undo it.
+    await db.delete(emailTokens).where(and(eq(emailTokens.userId, me.id), eq(emailTokens.kind, 'password_reset')))
+    await revoked(ctx, me.id, await deleteOthers(req), 'password changed')
+    return reply.code(204).send()
+  })
+
+  app.post('/auth/verify-email/resend', { config: { rateLimit: { max: 3, timeWindow: '15 minutes' } } }, async (req, reply) => {
+    if (!req.auth.user.emailVerifiedAt) sendVerification(ctx, req.auth.user)
     return reply.code(204).send()
   })
 
   app.delete('/auth/sessions', async (req, reply) => {
-    await revoked(req.auth.user.id, await deleteOthers(req), 'session revoked')
+    await revoked(ctx, req.auth.user.id, await deleteOthers(req), 'session revoked')
     return reply.code(204).send()
   })
 
@@ -115,7 +208,7 @@ export function authRoutes(app: FastifyInstance, { db, hub, voice }: Ctx): void 
       .where(and(eq(sessions.id, id), eq(sessions.userId, req.auth.user.id)))
       .returning({ id: sessions.id })
     if (!deleted.length) throw notFound('Sessão não encontrada.')
-    await revoked(req.auth.user.id, deleted, 'session revoked')
+    await revoked(ctx, req.auth.user.id, deleted, 'session revoked')
     return reply.code(204).send()
   })
 }

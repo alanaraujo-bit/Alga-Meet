@@ -6,6 +6,7 @@ import { and, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { isBlockedBetween, isFriend, profileAudience, requireChannel, sharesSpace } from '../access.js'
 import type { Ctx } from '../app.js'
+import { requireVerifiedEmail } from '../auth.js'
 import { isUniqueViolation, type Db, type Tx } from '../db/index.js'
 import { channelRecipients, channels, relationships, users, type UserRow } from '../db/schema.js'
 import { badRequest, conflict, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
@@ -221,6 +222,7 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
     for (const id of ids) {
       if (await isFriend(db, me, id)) continue
       if (ids.length > 1) throw forbidden('Só é possível adicionar amigos a um grupo.')
+      requireVerifiedEmail(req.auth.user, 'conversar com quem ainda não é seu amigo')
       if (!(await sharesSpace(db, me, id))) throw forbidden('Você só pode iniciar conversa com amigos ou membros de um espaço em comum.')
     }
     const id = uuidv7()
