@@ -71,6 +71,13 @@
       "when": 1793531689794,
       "tag": "0009_session_client",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793537702565,
+      "tag": "0010_space_e2ee",
+      "breakpoints": true
     }
   ]
 }

@@ -106,6 +106,13 @@ export type Dispatch =
    */
   | { t: 'VOICE_MOVE'; d: { channelId: string } }
   /**
+   * Only to the users in voice in `channelId`: the call's E2EE flag (VoiceJoinResponse.e2ee) is now `e2ee` (Space.e2ee
+   * changed; SPACE_UPDATE goes to the whole space). Nobody is removed and media keeps its old mode until each client
+   * rejoins: POST /voice/join (new token and flag), reconnect to LiveKit, e2ee_join only when true. Also sent right
+   * after a LiveKit join whose token predates the change.
+   */
+  | { t: 'VOICE_E2EE_CHANGED'; d: { channelId: string; e2ee: boolean } }
+  /**
    * Sent only to the user: their plan or owned/included cosmetics changed (purchase confirmed by the provider, renewal,
    * a cancellation reaching its end, expiry, refund). ME_UPDATE with the new Me.plan follows when the plan changed.
    */

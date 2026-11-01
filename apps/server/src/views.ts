@@ -42,6 +42,7 @@ export const spaceView = (s: SpaceRow): Space => ({
   iconUrl: s.iconUrl,
   ownerId: s.ownerId,
   createdAt: s.createdAt.toISOString(),
+  e2ee: s.e2ee,
 })
 
 export const roleView = (r: RoleRow): Role => ({

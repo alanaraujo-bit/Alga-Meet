@@ -1,4 +1,7 @@
-import { DEFAULT_EVERYONE_PERMISSIONS, Permission, type Channel, type Invite, type SpaceSnapshot, type VoiceJoinResponse } from '@alga/shared'
+import {
+  DECODE_ATTRIBUTE, DEFAULT_EVERYONE_PERMISSIONS, E2EE_ATTRIBUTE, MAX_DECODE_MIMES, Permission,
+  type Channel, type Invite, type SpaceSnapshot, type VoiceJoinResponse,
+} from '@alga/shared'
 import { eq } from 'drizzle-orm'
 import { TokenVerifier } from 'livekit-server-sdk'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -191,5 +194,83 @@ describe('livekit webhook', () => {
     await gwAlice.waitFor('VOICE_STATE_REMOVE', (d) => d.userId === bob.user.id)
     expect(s.app.ctx.voice.inChannel(voice.id)).toEqual([])
     gwAlice.close()
+  })
+})
+
+describe('per-call E2EE flag and decode capabilities', () => {
+  const claims = async (token: string) => new TokenVerifier(s.config.livekit.apiKey, s.config.livekit.apiSecret).verify(token)
+  const joinWith = (token: string, channelId: string, capabilities: unknown) =>
+    api<VoiceJoinResponse>(s.app, 'POST', '/voice/join', { token, body: { channelId, capabilities } })
+
+  it('DMs are E2EE, space channels follow Space.e2ee; the token carries alga.e2ee and the allowlisted alga.decode', async () => {
+    const a = await register(s.app)
+    const b = await register(s.app)
+    await befriend(s.app, a, b)
+    const dm = (await api<Channel>(s.app, 'POST', '/users/@me/channels', { token: a.token, body: { recipientIds: [b.user.id] } })).body
+    const legacy = await join(a.token, dm.id)
+    expect(legacy.body.e2ee).toBe(true)
+    const legacyClaims = await claims(legacy.body.token)
+    expect(legacyClaims.attributes).toMatchObject({ [E2EE_ATTRIBUTE]: 'true' })
+    expect(legacyClaims.attributes).not.toHaveProperty(DECODE_ATTRIBUTE) // older client: the mic name still carries it
+
+    // Raw getCapabilities() output: case-insensitive, duplicates and non-codecs (rtx, red, ulpfec) dropped.
+    const mimes = ['video/VP8', 'video/rtx', 'video/H264', 'video/H264', 'video/H265', 'video/AV1', 'video/red', 'video/ulpfec', 'video/H266']
+    const withCaps = await joinWith(a.token, dm.id, { e2ee: true, decode: mimes })
+    expect((await claims(withCaps.body.token)).attributes).toMatchObject({ [E2EE_ATTRIBUTE]: 'true', [DECODE_ATTRIBUTE]: 'vp8,h264,h265,av1' })
+    expect((await claims((await joinWith(a.token, dm.id, { e2ee: true, decode: ['video/rtx'] })).body.token)).attributes)
+      .toMatchObject({ [DECODE_ATTRIBUTE]: '' }) // announced, decodes none of ours
+    // A client that cannot do E2EE is refused from an E2EE call, with a field it can show.
+    const refused = await joinWith(b.token, dm.id, { e2ee: false, decode: [] })
+    expect(refused.status).toBe(409)
+    expect(refused.body.error).toMatchObject({ code: 'conflict', fields: { 'capabilities.e2ee': 'required' } })
+    // Validation at the boundary: mime shape, list cap, both fields required.
+    expect((await joinWith(b.token, dm.id, { e2ee: true, decode: ['h264'] })).status).toBe(400)
+    expect((await joinWith(b.token, dm.id, { e2ee: true, decode: Array(MAX_DECODE_MIMES + 1).fill('video/VP8') })).status).toBe(400)
+    expect((await joinWith(b.token, dm.id, { decode: [] })).status).toBe(400)
+
+    const { alice, bob, voice } = await setup()
+    const space = await join(bob.token, voice.id)
+    expect(space.body.e2ee).toBe(false)
+    expect((await claims(space.body.token)).attributes).toMatchObject({ [E2EE_ATTRIBUTE]: 'false' })
+    expect((await joinWith(bob.token, voice.id, { e2ee: false, decode: [] })).status).toBe(200) // nothing to refuse
+    expect((await join(alice.token, voice.id)).body.e2ee).toBe(false)
+  })
+
+  it('PATCH /spaces/:id e2ee (MANAGE_SPACE): SPACE_UPDATE, VOICE_E2EE_CHANGED to who is in the call, new joins get it', async () => {
+    const { alice, bob, voice, space } = await setup()
+    expect((await api(s.app, 'PATCH', `/spaces/${space.id}`, { token: bob.token, body: { e2ee: true } })).status).toBe(403)
+    expect(space.e2ee).toBe(false)
+    const gwAlice = await connect(s.port, alice.token)
+    const gwBob = await connect(s.port, bob.token)
+    await postWebhook(s.app, s.config, event('participant_joined', voice.id, bob.user.id))
+
+    const res = await api<SpaceSnapshot>(s.app, 'PATCH', `/spaces/${space.id}`, { token: alice.token, body: { e2ee: true } })
+    expect(res.body.e2ee).toBe(true)
+    expect(await gwAlice.waitFor('SPACE_UPDATE', (d) => d.id === space.id)).toMatchObject({ e2ee: true })
+    expect(await gwBob.waitFor('VOICE_E2EE_CHANGED')).toEqual({ channelId: voice.id, e2ee: true })
+    await gwAlice.expectNone('VOICE_E2EE_CHANGED') // not in the call
+    expect(s.app.ctx.voice.inChannel(voice.id).map((v) => v.userId)).toEqual([bob.user.id]) // nobody removed
+    expect((await join(alice.token, voice.id)).body.e2ee).toBe(true)
+    expect((await connect(s.port, alice.token).then(async (gw) => { const r = await gw.waitFor('READY'); gw.close(); return r }))
+      .spaces.find((sp) => sp.id === space.id)?.e2ee).toBe(true)
+    // Same value again: no new dispatch.
+    gwBob.events.length = 0
+    await api(s.app, 'PATCH', `/spaces/${space.id}`, { token: alice.token, body: { e2ee: true } })
+    await gwBob.expectNone('VOICE_E2EE_CHANGED')
+
+    // A token minted before the change (alga.e2ee 'true') joining after it was turned off: told to rejoin.
+    await api(s.app, 'PATCH', `/spaces/${space.id}`, { token: alice.token, body: { e2ee: false } })
+    await gwBob.waitFor('VOICE_E2EE_CHANGED', (d) => !d.e2ee)
+    const stale = event('participant_joined', voice.id, alice.user.id)
+    await postWebhook(s.app, s.config, { ...stale, participant: { ...stale.participant!, attributes: { [E2EE_ATTRIBUTE]: 'true' } } })
+    expect(await gwAlice.waitFor('VOICE_E2EE_CHANGED')).toEqual({ channelId: voice.id, e2ee: false })
+    // Matching token: nothing.
+    gwBob.events.length = 0
+    await postWebhook(s.app, s.config, event('participant_left', voice.id, bob.user.id))
+    const fresh = event('participant_joined', voice.id, bob.user.id)
+    await postWebhook(s.app, s.config, { ...fresh, participant: { ...fresh.participant!, attributes: { [E2EE_ATTRIBUTE]: 'false' } } })
+    await gwBob.expectNone('VOICE_E2EE_CHANGED')
+    gwAlice.close()
+    gwBob.close()
   })
 })

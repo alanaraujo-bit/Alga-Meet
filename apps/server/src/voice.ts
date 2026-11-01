@@ -4,7 +4,7 @@
  * Moderation (server mute/deafen, role changes) is enforced at the SFU through participant permissions.
  */
 import {
-  Permission, STREAM_PRESETS, STREAM_PRESETS_ATTRIBUTE, hasPermission,
+  DECODE_ATTRIBUTE, E2EE_ATTRIBUTE, Permission, STREAM_PRESETS, STREAM_PRESETS_ATTRIBUTE, hasPermission,
   type PlanId, type StreamPreset, type VoiceDisconnectReason, type VoiceState,
 } from '@alga/shared'
 import { eq } from 'drizzle-orm'
@@ -18,7 +18,7 @@ import { hasSession } from './auth.js'
 import { PLANS } from './billing/catalog.js'
 import type { Config } from './config.js'
 import type { Db } from './db/index.js'
-import { users } from './db/schema.js'
+import { spaces, users } from './db/schema.js'
 import type { Hub } from './gateway/hub.js'
 import { metrics } from './metrics.js'
 import { loadChannel } from './views.js'
@@ -75,6 +75,8 @@ export class Voice {
    * hooks it to remove their MLS leaf at once, without waiting for LiveKit's webhook.
    */
   onLeave: (userId: string, channelId: string) => void = () => {}
+  /** src/e2ee.ts sets it when the Delivery Service is up: without it no call is E2EE. */
+  e2eeAvailable = false
 
   constructor(
     private readonly config: Config,
@@ -99,19 +101,32 @@ export class Voice {
     return this.all().filter((s) => s.channelId === channelId)
   }
 
+  /** VoiceJoinResponse.e2ee: DM / group DM always, a space voice channel when Space.e2ee is on, never without the DS. */
+  async callE2ee(channel: { spaceId: string | null }): Promise<boolean> {
+    if (!this.e2eeAvailable) return false
+    if (!channel.spaceId) return true
+    const [s] = await this.db.select({ e2ee: spaces.e2ee }).from(spaces).where(eq(spaces.id, channel.spaceId))
+    return s?.e2ee ?? false
+  }
+
   /**
-   * Access token for `ch_<channelId>` with `voiceGrants` and the plan's screen-share presets as a participant
-   * attribute (no canUpdateOwnMetadata grant, so the client cannot change it).
+   * Access token for `ch_<channelId>` with `voiceGrants` and, as participant attributes (no canUpdateOwnMetadata
+   * grant, so the client cannot change them), the plan's screen-share presets, the call's E2EE flag and the codec ids
+   * the client decodes (only when it said).
    */
   async mintToken(
     user: { id: string; displayName: string }, channelId: string, permissions: number, mod = NO_MODERATION,
-    streamPresets: StreamPreset[] = PLANS.free.streamPresets,
+    streamPresets: StreamPreset[] = PLANS.free.streamPresets, call: { e2ee: boolean; decode?: string[] } = { e2ee: false },
   ): Promise<string> {
     const at = new AccessToken(this.config.livekit.apiKey, this.config.livekit.apiSecret, {
       identity: user.id,
       name: user.displayName,
       ttl: 60 * 60,
-      attributes: { [STREAM_PRESETS_ATTRIBUTE]: streamPresets.join(',') },
+      attributes: {
+        [STREAM_PRESETS_ATTRIBUTE]: streamPresets.join(','),
+        [E2EE_ATTRIBUTE]: String(call.e2ee),
+        ...(call.decode ? { [DECODE_ATTRIBUTE]: call.decode.join(',') } : {}),
+      },
     })
     at.addGrant({ roomJoin: true, room: roomName(channelId), ...voiceGrants(permissions, mod) })
     return at.toJwt()
@@ -135,7 +150,7 @@ export class Voice {
     const identity = ev.participant?.identity ?? ''
     switch (ev.event) {
       case 'participant_joined':
-        await this.participantJoined(channelId, identity, joinedAtOf(ev.participant), true, ev.participant?.attributes?.[STREAM_PRESETS_ATTRIBUTE])
+        await this.participantJoined(channelId, identity, joinedAtOf(ev.participant), true, ev.participant?.attributes)
         break
       case 'participant_left':
       case 'participant_connection_aborted':
@@ -152,8 +167,8 @@ export class Voice {
     }
   }
 
-  /** `presetsAttr`: the presets attribute LiveKit reports for the participant (from their token). */
-  async participantJoined(channelId: string, userId: string, joinedAt: string, ring: boolean, presetsAttr?: string): Promise<void> {
+  /** `attributes`: what LiveKit reports for the participant (from their token). */
+  async participantJoined(channelId: string, userId: string, joinedAt: string, ring: boolean, attributes: Record<string, string> = {}): Promise<void> {
     if (!UUID_RE.test(userId)) return
     const found = await loadChannel(this.db, channelId)
     if (!found || !VOICE_TYPES.includes(found.row.type)) {
@@ -214,7 +229,14 @@ export class Voice {
     }
     // A token minted before the mute/deafen still carries the old grants.
     if (mod.serverMute || mod.serverDeaf) await this.enforce(state, permissions)
+    // A Space.e2ee change between /voice/join and this join found no VoiceState to tell: rejoin with the new flag.
+    const e2eeAttr = attributes[E2EE_ATTRIBUTE]
+    if (e2eeAttr !== undefined) {
+      const e2ee = await this.callE2ee(row)
+      if (e2eeAttr !== String(e2ee)) this.hub.dispatch([userId], 'VOICE_E2EE_CHANGED', { channelId, e2ee })
+    }
     // Same for a plan change between /voice/join and this join: it found no VoiceState to update.
+    const presetsAttr = attributes[STREAM_PRESETS_ATTRIBUTE]
     if (presetsAttr !== undefined) {
       const presets = PLANS[await this.planOf(userId)].streamPresets
       if (presets.join(',') !== presetsAttr) await this.setStreamPresets(userId, presets)
@@ -319,7 +341,7 @@ export class Voice {
         const channelId = channelIdOfRoom(r.name)
         if (!channelId) continue
         for (const p of await this.rooms.listParticipants(r.name)) {
-          await this.participantJoined(channelId, p.identity, joinedAtOf(p), false, p.attributes[STREAM_PRESETS_ATTRIBUTE])
+          await this.participantJoined(channelId, p.identity, joinedAtOf(p), false, p.attributes)
           n++
         }
       }

@@ -101,6 +101,19 @@ Falha fechada:
   Mover: `VOICE_MOVE {channelId}` ao usuário, que sai da sala atual e pode entrar no destino mesmo cheio por 60 s.
   Desconectar: `VOICE_DISCONNECT {channelId, reason}`. `userLimit` é conferido no `participant_joined` (o excedente
   é removido do SFU com `reason: 'channel_full'`).
+- **E2EE por chamada** (0004 §5.1 fase 5a): `VoiceJoinResponse.e2ee` e o atributo `alga.e2ee` do token
+  (`'true'`/`'false'`) dizem se a chamada é de ponta a ponta. DM e grupo: sempre; canal de voz: `Space.e2ee` (coluna
+  `spaces.e2ee`, padrão `false`, `PATCH /spaces/:id` com `MANAGE_SPACE`); nenhuma sem o módulo MLS
+  (`Voice.callE2ee`). O DS só cria grupo para chamada E2EE; `e2ee_join` em outra → `E2EE_RESYNC_REQUIRED not_e2ee`.
+  `capabilities.e2ee: false` numa chamada E2EE → 409 `fields['capabilities.e2ee'] = 'required'` (sem `capabilities`,
+  cliente antigo, nada é recusado). **Mudou `Space.e2ee` com gente em voz**: ninguém sai da sala; quem está em cada
+  canal recebe `VOICE_E2EE_CHANGED {channelId, e2ee}` e deve reentrar (`POST /voice/join` → token e flag novos);
+  desligar descarta o grupo MLS e os dispositivos dele recebem `not_e2ee`; ligar forma o grupo conforme reentram.
+  Um `participant_joined` com `alga.e2ee` diferente do atual (token emitido antes da mudança) também recebe
+  `VOICE_E2EE_CHANGED`. Até todos reentrarem a sala fica mista (o cliente E2EE acusa os outros em `e2ee.mismatch`).
+- **Codecs que o cliente decodifica**: `capabilities.decode` (os `mimeType` de `RTCRtpReceiver.getCapabilities`, até
+  64, formato `video/<nome>`) vira o atributo `alga.decode` (`h265,h264,…`, só os de `DECODE_CODECS`, sem repetição;
+  vazio = nenhum dos nossos). Sem `capabilities` o atributo não vai e vale o nome da publicação do microfone.
 - **Relacionamentos**: cada `POST/PUT/DELETE /relationships` lê os dois sentidos dentro de uma transação com
   `pg_advisory_xact_lock` do par (B2): pedido × bloqueio concorrentes não deixam pedido pendente, e pedidos simultâneos
   dos dois lados viram amizade (antes: deadlock → 500).
@@ -308,12 +321,12 @@ Falha fechada:
   aleatório e `user_hash` com sal aleatório trocado todo dia e nunca gravado; expurgo aos 30 dias; vira histogramas
   `alga_call_*`.
 
-## Testes (`test/`, 175 casos)
+## Testes (`test/`, 183 casos)
 
 `npm test` roda em PGlite; `npm run test:pg` roda os mesmos casos num PostgreSQL 18 real (`test/pg-setup.ts`: um
 cluster UTF8 descartável por execução, um banco por `startServer`). Os dois passam.
 
-`e2ee.test.ts` (7): dispositivos de verdade = o WASM de `native/mls/pkg` + o controlador do desktop
+`e2ee.test.ts` (8): dispositivos de verdade = o WASM de `native/mls/pkg` + o controlador do desktop
 (`apps/desktop/src/main/mls/session.ts`) falando com este servidor por REST e gateway. Três dispositivos entram numa
 chamada e instalam a mesma chave para cada remetente (mesmo `export_secret`, mesmo código da chamada, código par a
 par simétrico); expulsar um membro gera o Remove na hora, ele recebe `removed`, a chave nova é outra e ele não exporta
@@ -324,10 +337,12 @@ frame `e2ee_*` de 21 KB aceito e o mesmo tamanho em outra op fecha com 4003; cot
 Registro por sessão, key package de outro dispositivo/forjado/lixo recusado, teto de 100 por dispositivo, logout
 apaga dispositivo e key packages; 10 resgates concorrentes de um estoque de 5 levam 5 diferentes (no PG real é a
 prova do `SKIP LOCKED`) e o estoque vazio faz o dispositivo enviar mais e entrar. `E2EE_DS_KEY` obrigatória em
-produção (32 bytes), aleatória em dev/test.
+produção (32 bytes), aleatória em dev/test. Espaço sem E2EE: `e2ee_join` recebe `not_e2ee` e não há grupo; ligar
+manda `VOICE_E2EE_CHANGED` e o grupo se forma na reentrada; desligar descarta o grupo vivo (`not_e2ee` aos dois).
 
 Auth, handshake do gateway, CORS, amizades, bloqueio, DMs, presença, espaços, convites, mensagens, voz (grants,
-limite, DM, webhook, VOICE_STATE_*, CALL_RING, kick derruba voz). `security.test.ts` (32): uma regressão por achado
+limite, DM, webhook, VOICE_STATE_*, CALL_RING, kick derruba voz, `alga.e2ee`/`alga.decode` no token, 409 para cliente
+sem E2EE, `PATCH e2ee` com `MANAGE_SPACE` e `VOICE_E2EE_CHANGED` só para quem está na chamada e para token antigo). `security.test.ts` (32): uma regressão por achado
 de `docs/security/server-review-2026-11-01.md`, incluindo a corrida B2 com 20 pares concorrentes (reproduzida no PG
 real antes da correção). `moderation.test.ts` (10): cargos (CRUD, hierarquia, reordenação), apelidos, ban/unban/kick,
 mute/deafen/mover/desconectar com as chamadas ao `RoomServiceClient` conferidas. `email.test.ts` (13): verificação

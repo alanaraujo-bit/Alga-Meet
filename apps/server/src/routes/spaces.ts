@@ -138,6 +138,7 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
     if (row!.iconUrl !== space.iconUrl) await swapImageKeys(ctx, 'icons', space.id, space.iconUrl, row!.iconUrl)
     const view = spaceView(row!)
     hub.dispatch(await spaceMemberIds(db, space.id), 'SPACE_UPDATE', view)
+    if (row!.e2ee !== space.e2ee) await ctx.e2ee.spaceChanged(space.id)
     return view
   })
 

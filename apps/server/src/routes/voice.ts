@@ -1,4 +1,4 @@
-import { Permission, VoiceJoinBody, hasPermission, type VoiceJoinResponse } from '@alga/shared'
+import { DECODE_CODECS, Permission, VoiceJoinBody, hasPermission, type VoiceJoinResponse } from '@alga/shared'
 import type { FastifyInstance } from 'fastify'
 import { NO_MODERATION, assertDmNotBlocked, requireChannel, voiceModeration } from '../access.js'
 import type { Ctx } from '../app.js'
@@ -9,12 +9,17 @@ import { roomName } from '../voice.js'
 
 export function voiceRoutes(app: FastifyInstance, { db, voice, config }: Ctx): void {
   app.post('/voice/join', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req): Promise<VoiceJoinResponse> => {
-    const { channelId } = parse(VoiceJoinBody, req.body)
+    const { channelId, capabilities } = parse(VoiceJoinBody, req.body)
     const me = req.auth.user
     const access = await requireChannel(db, channelId, me.id, Permission.CONNECT)
     const { channel, permissions } = access
     if (channel.type === 'text') throw badRequest('Canais de texto não têm voz.')
     await assertDmNotBlocked(db, access, me.id)
+    const e2ee = await voice.callE2ee(channel)
+    if (e2ee && capabilities?.e2ee === false) {
+      throw new HttpError('conflict', 'Esta chamada tem criptografia de ponta a ponta e este app não a suporta. Atualize o Alga Meet.', { 'capabilities.e2ee': 'required' })
+    }
+    const decode = capabilities && [...new Set(capabilities.decode.flatMap((m) => DECODE_CODECS[m.toLowerCase()] ?? []))]
     const limit = channel.userLimit ?? 0
     if (limit > 0 && !hasPermission(permissions, Permission.MOVE_MEMBERS) && !voice.hasMoveTicket(me.id, channel.id)) {
       const others = voice.inChannel(channel.id).filter((s) => s.userId !== me.id).length
@@ -22,7 +27,7 @@ export function voiceRoutes(app: FastifyInstance, { db, voice, config }: Ctx): v
     }
     const streamPresets = [...PLANS[me.plan].streamPresets]
     const token = await voice.mintToken(me, channel.id, permissions,
-      channel.spaceId ? await voiceModeration(db, channel.spaceId, me.id) : NO_MODERATION, streamPresets)
+      channel.spaceId ? await voiceModeration(db, channel.spaceId, me.id) : NO_MODERATION, streamPresets, { e2ee, decode })
     metrics.voiceTokens.inc({ kind: channel.spaceId ? 'space' : 'private' })
     return {
       url: config.livekit.publicUrl,
@@ -30,6 +35,7 @@ export function voiceRoutes(app: FastifyInstance, { db, voice, config }: Ctx): v
       room: roomName(channel.id),
       bitrateKbps: channel.bitrateKbps ?? 64,
       streamPresets,
+      e2ee,
     }
   })
 }

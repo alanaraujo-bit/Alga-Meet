@@ -43,10 +43,11 @@ const left = (channelId: string, userId: string) => postWebhook(s.app, s.config,
   room: { sid: 'RM_e2ee', name: `ch_${channelId}` }, participant: { sid: `PA_${seq}`, identity: userId, name: 'x' },
 })
 
-/** n users in one space, all in its voice channel (as LiveKit would report). */
-async function room(n: number) {
+/** n users in one space with E2EE on (`e2ee: false`: off, the default), all in its voice channel (as LiveKit would report). */
+async function room(n: number, e2ee = true) {
   const users = await Promise.all(Array.from({ length: n }, () => register(s.app)))
   const space = (await api<SpaceSnapshot>(s.app, 'POST', '/spaces', { token: users[0]!.token, body: { name: 'E2EE' } })).body
+  if (e2ee) expect((await api(s.app, 'PATCH', `/spaces/${space.id}`, { token: users[0]!.token, body: { e2ee } })).status).toBe(200)
   const inv = (await api<Invite>(s.app, 'POST', `/spaces/${space.id}/invites`, { token: users[0]!.token, body: {} })).body
   for (const u of users.slice(1)) await api(s.app, 'POST', `/invites/${inv.code}`, { token: u.token })
   const voice = space.channels.find((c) => c.type === 'voice')!
@@ -296,6 +297,33 @@ describe('Delivery Service ordering and validation', () => {
     expect((await stranger.gw.closed).code).toBe(GatewayClose.INVALID_PAYLOAD)
     for (let i = 0; i <= E2EE_FRAME_LIMIT; i++) me.gw.send({ op: 'e2ee_welcome_ack', channelId: voice.id, epoch: 0 })
     expect((await me.gw.closed).code).toBe(GatewayClose.RATE_LIMITED)
+  })
+})
+
+describe('Only E2EE calls have a group', () => {
+  it('e2ee_join in a space without E2EE is refused (not_e2ee); turning it off drops the live group, on lets it form', async () => {
+    const { users, space, voice } = await room(2, false)
+    const [a, b] = await Promise.all(users.map((u) => Device.open(u)))
+    await a!.session.joinCall(voice.id)
+    await until('refused', () => a!.gw.events.some((e) => e.t === 'E2EE_RESYNC_REQUIRED' && (e.d as { reason: string }).reason === 'not_e2ee'))
+    expect(s.app.ctx.e2ee.epochOf(voice.id)).toBeNull()
+
+    const owner = users[0]!.token
+    await api(s.app, 'PATCH', `/spaces/${space.id}`, { token: owner, body: { e2ee: true } })
+    for (const d of [a!, b!]) await d.gw.waitFor('VOICE_E2EE_CHANGED', (x) => x.channelId === voice.id && x.e2ee)
+    await a!.session.leaveCall(voice.id)
+    await a!.session.joinCall(voice.id)
+    await b!.session.joinCall(voice.id)
+    await settled([a!, b!])
+    expect(s.app.ctx.e2ee.epochOf(voice.id)).toBe(1)
+
+    await api(s.app, 'PATCH', `/spaces/${space.id}`, { token: owner, body: { e2ee: false } })
+    for (const d of [a!, b!]) {
+      await d.gw.waitFor('VOICE_E2EE_CHANGED', (x) => x.channelId === voice.id && !x.e2ee)
+      await d.gw.waitFor('E2EE_RESYNC_REQUIRED', (x) => x.channelId === voice.id && x.reason === 'not_e2ee')
+    }
+    expect(s.app.ctx.e2ee.epochOf(voice.id)).toBeNull()
+    for (const d of [a!, b!]) d.gw.close()
   })
 })
 

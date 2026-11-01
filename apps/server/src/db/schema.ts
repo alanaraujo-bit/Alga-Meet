@@ -98,6 +98,8 @@ export const spaces = pgTable('spaces', {
   iconUrl: text('icon_url'),
   ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
   createdAt: ts('created_at').notNull().defaultNow(),
+  /** Space.e2ee: calls in its voice channels are end-to-end encrypted (opt-in, rollout phase 5a). */
+  e2ee: boolean('e2ee').notNull().default(false),
 }, (t) => [index('spaces_owner_id_idx').on(t.ownerId)])
 
 export const spaceMembers = pgTable('space_members', {

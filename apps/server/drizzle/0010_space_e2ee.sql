@@ -1,0 +1,1 @@
+ALTER TABLE "spaces" ADD COLUMN "e2ee" boolean DEFAULT false NOT NULL;

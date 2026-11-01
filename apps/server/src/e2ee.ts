@@ -22,7 +22,7 @@ import type * as Glue from '../../../native/mls/pkg/alga_mls.js'
 import { assertDmNotBlocked, isBlockedBetween, profileAudience, requireChannel, sharesSpace } from './access.js'
 import type { Config } from './config.js'
 import type { Db, Tx } from './db/index.js'
-import { deviceKeys, keyPackages, type DeviceKeyRow } from './db/schema.js'
+import { channels, deviceKeys, keyPackages, type DeviceKeyRow } from './db/schema.js'
 import { HttpError, conflict, invalid, notFound, safeErr } from './errors.js'
 import type { Conn, Hub } from './gateway/hub.js'
 import { metrics } from './metrics.js'
@@ -126,6 +126,7 @@ export class E2ee {
     }
     this.mls = mls
     voice.onLeave = (userId, channelId) => this.left(userId, channelId)
+    voice.e2eeAvailable = mls !== null
   }
 
   stop(): void {
@@ -284,6 +285,27 @@ export class E2ee {
       .catch((err: unknown) => this.log.error({ err: safeErr(err) }, 'e2ee: leave failed'))
   }
 
+  /**
+   * Space.e2ee changed (PATCH /spaces/:id, after the update committed): the users in its voice channels get
+   * VOICE_E2EE_CHANGED and rejoin; nobody is removed. Turned off: each call's group is dropped and its devices get
+   * `not_e2ee`. Turned on: groups appear as members rejoin and send e2ee_join.
+   */
+  async spaceChanged(spaceId: string): Promise<void> {
+    if (!this.mls) return // no call is E2EE either way
+    const e2ee = await this.voice.callE2ee({ spaceId })
+    const rows = await this.db.select({ id: channels.id }).from(channels).where(and(eq(channels.spaceId, spaceId), eq(channels.type, 'voice')))
+    for (const { id } of rows) {
+      const inCall = this.voice.inChannel(id).map((s) => s.userId)
+      if (inCall.length) this.hub.dispatch(inCall, 'VOICE_E2EE_CHANGED', { channelId: id, e2ee })
+      if (e2ee) continue
+      // Queued behind any e2ee_join already running for this call (it read the old flag).
+      await this.locked(id, async () => {
+        const g = this.groups.get(id)
+        if (g) this.reset(g, 'space e2ee turned off', 'not_e2ee')
+      })
+    }
+  }
+
   groupCount(): number {
     return this.groups.size
   }
@@ -305,13 +327,17 @@ export class E2ee {
   private async join(conn: Conn, channelId: string, deviceId: string, epoch: number | undefined): Promise<void> {
     const { userId } = conn
     if (!(await this.sessionDevice(userId, conn.sessionId, deviceId))) return this.reply(conn, channelId, 'unknown_device')
+    let channel: { spaceId: string | null }
     try {
       const access = await requireChannel(this.db, channelId, userId, Permission.CONNECT)
       if (access.channel.type === 'text') throw new Error('text channel')
       await assertDmNotBlocked(this.db, access, userId)
+      channel = access.channel
     } catch {
       return this.reply(conn, channelId, 'forbidden')
     }
+    // Read under the call's lock: a spaceChanged() drop queued behind this join still removes the group it creates.
+    if (!(await this.voice.callE2ee(channel))) return this.reply(conn, channelId, 'not_e2ee')
     conn.e2eeDevice = deviceId
     this.armGrace(userId, channelId)
 
@@ -552,14 +578,14 @@ export class E2ee {
   }
 
   /** Stuck group: forget it and have every device involved re-join (the first one creates a new group). */
-  private reset(g: Group, why: string): void {
+  private reset(g: Group, why: string, reason: E2eeResyncReason = 'not_member'): void {
     this.log.warn({ channelId: g.channelId, why }, 'e2ee: group reset')
     this.drop(g)
     const devices = new Map<string, { userId: string; deviceId: string }>()
     for (const d of [...g.members, ...g.intents, ...(g.creator ? [g.creator] : [])]) {
       if (d.userId) devices.set(deviceIdentity(d.userId, d.deviceId), d)
     }
-    for (const d of devices.values()) this.resync(d.userId, d.deviceId, g.channelId, 'not_member')
+    for (const d of devices.values()) this.resync(d.userId, d.deviceId, g.channelId, reason)
   }
 
   private drop(g: Group): void {

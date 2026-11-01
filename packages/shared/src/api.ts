@@ -55,6 +55,9 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  * DELETE /channels/:id/recipients/@me                     -> 204 (leave a group DM; CHANNEL_DELETE to you, CHANNEL_UPDATE to the rest)
  * POST   /spaces                   CreateSpaceBody       -> SpaceSnapshot
  * PATCH  /spaces/:id               PatchSpaceBody        -> Space
+ *   MANAGE_SPACE; SPACE_UPDATE to the members. Changing `e2ee` while calls are live: new joins get the new value; the
+ *   users already in voice there get VOICE_E2EE_CHANGED (gateway.ts) and should rejoin. Nobody is removed from the
+ *   room. Turning it off also drops the call's MLS group (its devices get E2EE_RESYNC_REQUIRED `not_e2ee`).
  * DELETE /spaces/:id                                     -> 204 (owner only)
  * DELETE /spaces/:id/members/@me                         -> 204 (leave)
  * DELETE /spaces/:id/members/:userId                     -> 204 (kick)
@@ -119,7 +122,9 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  * POST   /invites/:code                                  -> SpaceSnapshot (join)
  * POST   /voice/join               VoiceJoinBody         -> VoiceJoinResponse
  *   The token carries the participant attribute STREAM_PRESETS_ATTRIBUTE (the user's plan presets); the server also
- *   checks every screen-share publication against them (see VoiceJoinResponse.streamPresets).
+ *   checks every screen-share publication against them (see VoiceJoinResponse.streamPresets). It also carries
+ *   E2EE_ATTRIBUTE (VoiceJoinResponse.e2ee) and, when the body has `capabilities`, DECODE_ATTRIBUTE. 409 `conflict`
+ *   with `fields['capabilities.e2ee']` = 'required' when the call is E2EE and `capabilities.e2ee` is false.
  * E2EE devices and key packages (bodies, models and the call flow in e2ee.ts; 10/min per route; 503 when the server
  * has no MLS module):
  * POST   /e2ee/devices             RegisterDeviceBody    -> E2eeDevice (201 new, 200 again: binds the device to this
@@ -313,6 +318,8 @@ export type CreateSpaceBody = z.infer<typeof CreateSpaceBody>
 export const PatchSpaceBody = z.object({
   name: z.string().trim().min(1).max(100).optional(),
   iconUrl: httpsUrl.nullable().optional(),
+  /** Space.e2ee. */
+  e2ee: z.boolean().optional(),
 })
 export type PatchSpaceBody = z.infer<typeof PatchSpaceBody>
 
@@ -402,7 +409,30 @@ export const VoiceModerationBody = z.object({
 })
 export type VoiceModerationBody = z.infer<typeof VoiceModerationBody>
 
-export const VoiceJoinBody = z.object({ channelId: z.string().uuid() })
+/** Token participant attribute: 'true' / 'false', same as VoiceJoinResponse.e2ee. */
+export const E2EE_ATTRIBUTE = 'alga.e2ee'
+/**
+ * Token participant attribute: codec ids the participant decodes, comma-separated (e.g. `h265,h264,vp8`; empty = none of
+ * ours), from VoiceJoinBody.capabilities.decode. Absent when the client sent no capabilities (older client: read the
+ * `alga.decode=` mic publication name instead).
+ */
+export const DECODE_ATTRIBUTE = 'alga.decode'
+/** Mime types (lowercased) that reach DECODE_ATTRIBUTE, and their ids there. Every other one (rtx, red, ulpfec…) is dropped. */
+export const DECODE_CODECS: Readonly<Record<string, string>> = {
+  'video/h264': 'h264', 'video/h265': 'h265', 'video/vp8': 'vp8', 'video/vp9': 'vp9', 'video/av1': 'av1',
+}
+export const MAX_DECODE_MIMES = 64
+
+export const VoiceJoinBody = z.object({
+  channelId: z.string().uuid(),
+  /** What this client can do. Optional (older clients): then nothing is refused and the token has no DECODE_ATTRIBUTE. */
+  capabilities: z.object({
+    /** false: this client cannot do E2EE, so joining an E2EE call is refused (409). */
+    e2ee: z.boolean(),
+    /** RTCRtpReceiver.getCapabilities('video').codecs[].mimeType as is (duplicates and non-codecs are fine). */
+    decode: z.array(z.string().regex(/^video\/[A-Za-z0-9-]{1,24}$/, 'mime type')).max(MAX_DECODE_MIMES),
+  }).optional(),
+})
 export type VoiceJoinBody = z.infer<typeof VoiceJoinBody>
 
 export interface VoiceJoinResponse {
@@ -420,4 +450,11 @@ export interface VoiceJoinResponse {
    * published above the plan's largest preset. Always sent; optional for older fixtures.
    */
   streamPresets?: StreamPreset[]
+  /**
+   * Whether this call is end-to-end encrypted, decided by the server: DM / group DM calls always, a space voice channel
+   * when Space.e2ee is on, never while the server has no Delivery Service. Same value as E2EE_ATTRIBUTE in the token.
+   * true: join the MLS group (e2ee_join) and publish nothing before it is active. false: no e2ee_join (the DS answers
+   * `not_e2ee`). VOICE_E2EE_CHANGED says when it changed during the call.
+   */
+  e2ee: boolean
 }

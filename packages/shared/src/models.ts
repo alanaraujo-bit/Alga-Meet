@@ -109,6 +109,11 @@ export interface Space {
   iconUrl: string | null
   ownerId: string
   createdAt: string
+  /**
+   * Calls in this space's voice channels are end-to-end encrypted (0004 §5.1 phase 5a: opt-in, default false; PATCH
+   * /spaces/:id with MANAGE_SPACE). DM calls always are. Always sent by the server; optional for older fixtures.
+   */
+  e2ee?: boolean
 }
 
 /** Full space snapshot as delivered in READY / SPACE_CREATE. */

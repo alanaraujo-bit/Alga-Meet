@@ -13,6 +13,8 @@ import { z } from 'zod'
  *   private keys in memory only, so registering again (every app start) empties the device's pool.
  *
  * Call flow (gateway, gateway.ts):
+ *   0. Only calls with VoiceJoinResponse.e2ee (DMs always, space voice channels per Space.e2ee) have a group; for any
+ *      other the DS answers `not_e2ee`.
  *   1. `e2ee_join` (after POST /voice/join, in parallel with the LiveKit connection). Empty call: E2EE_EPOCH with
  *      `create`, the client creates the group (group id = UTF-8 channelId, epoch 0, external sender = `externalSender`)
  *      and sends `e2ee_group_info`. Otherwise the DS claims one of the device's key packages and sends E2EE_PROPOSALS
@@ -129,6 +131,11 @@ export const E2EE_RESYNC_REASONS = [
   'forbidden',
   /** E2EE is off on this server. Do not retry. */
   'unavailable',
+  /**
+   * This call is not end-to-end encrypted (VoiceJoinResponse.e2ee false, or Space.e2ee was just turned off: see
+   * VOICE_E2EE_CHANGED). Drop the local group. Do not retry.
+   */
+  'not_e2ee',
 ] as const
 export type E2eeResyncReason = (typeof E2EE_RESYNC_REASONS)[number]
 
