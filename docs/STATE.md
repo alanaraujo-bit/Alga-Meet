@@ -31,7 +31,9 @@
 | UI onda 4a (assinatura, loja, deep links, convites) | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Rascunhos legais | `docs/legal` | **feito** (rascunho p/ advogado) |
 | Trust & Safety + LGPD (servidor) | `apps/server`, `docs/trust-safety` | **feito** — ver Validado |
-| UI onda 5 (telas de T&S/LGPD) | `apps/desktop/src/renderer` (exceto `media/`, `features/voice`, `features/chat`) | em andamento |
+| UI onda 5 (telas de T&S/LGPD) | `apps/desktop/src/renderer` | **feito** — ver Validado |
+| Servidor: complementos de T&S (status de exportação, resumo de mudanças legais, datas de restrição, denúncia duplicada, revisão de rate limit) | `apps/server` | em andamento |
+| Desenho de E2EE (`docs/decisions/0004-e2ee.md`) | docs | em andamento |
 | Servidor: cosméticos equipáveis/públicos, eventos de convite, retomar renovação, observabilidade | `apps/server` | **feito** — ver Validado |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Crítica de design independente | `docs/design/critique-2026-11-01.md` | **feito**: nota 5/10 vs Linear (tela de chamada ausente, layout clone do Discord, excesso de vermelho e bordas) → corrigindo na UI onda 2 |
@@ -54,6 +56,7 @@
 - UI onda 4a: compra sandbox ponta a ponta no app real (checkout → sandbox confirma → webhook → `ENTITLEMENTS_UPDATE` → UI), recusa e cancelamento no fim do período; loja de personalização com prévia no próprio perfil e cosméticos desenhados em CSS/SVG; deep links consumidos (verificar e-mail, reset, convite — a frio e por segunda instância); página de convites com revogar. Texto legal aplicado ("fica na sua conta, sem renovação"; reembolso 7 dias antes do clique). 85 testes no desktop. Capturas `docs/screenshots/2026-11-01-billing-*-v5.png`, `shop-*-v5.png`.
 - Trust & Safety/LGPD no servidor: idade (data de nascimento; <16 recusado; 16–17 só DM com amigos e sem compras), denúncias com snapshot de evidência, ações de conta (aviso/suspensão/banimento) aplicadas em login, gateway (4010) e voz, apelação com token, processo CSAM (`docs/trust-safety/csam-process.md`) com quarentena automática de anexos, exclusão de conta com carência de 7 dias e transferência de espaços, exportação de dados (zip, link 7 dias), logs de acesso 6 meses (Marco Civil), registro de aceite de termos, rotas de staff com log de auditoria. **153 testes em PGlite e PostgreSQL 18.**
 - Servidor (e66d7ef): equipar cosméticos (`PUT /users/@me/cosmetics`, `PublicUser.cosmetics`), `INVITE_CREATE/DELETE`, retomar renovação, `/metrics` Prometheus protegido por token (HTTP, gateway, READY, voz, webhooks, DB, rate limit, e-mail, billing, processo), `/ready`, telemetria de qualidade de chamada **opt-in, desligada por padrão**, agregada, sem conteúdo nem IP, retenção 30 dias; regras de alerta e guia em `docs/infra/observability.md`. **163 testes em PGlite e PostgreSQL 18.** Política de privacidade (rascunho) atualizada para declarar a telemetria opcional.
+- UI onda 5 (73cfbd7): cadastro com data de nascimento + aceite de termos, tela única de termos/data antes do shell, avisos para 16–17 anos na assinatura e loja, denúncias (perfil, espaço; mensagens via `messageReportEntries` a ligar no chat), tela de conta restrita com apelação, Configurações › Privacidade (ações na conta, exportar dados, excluir conta). Fluxos exercitados com ações reais de staff. 37 capturas, 109 testes no desktop.
 - Backend: 47 testes vitest (PGlite em memória, REST via inject + gateway via WebSocket real) passando, conferido pelo Maestro. Smoke test com LiveKit real: webhooks `room_started/finished` e `participant_joined/left` reais recebidos e assinatura verificada; `VOICE_STATE_UPDATE/REMOVE` entregues no gateway.
 
 ## Pesquisa concluída
