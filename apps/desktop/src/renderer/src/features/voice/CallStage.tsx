@@ -8,7 +8,8 @@ import { useData } from '@/store/data'
 import { channelTitle, displayName, voiceMembers } from '@/store/selectors'
 import { Avatar, Button, contextMenuHandler, Fronds, Icon, IconButton, Popover, SegmentedControl, Spinner, Switch, Tooltip, useEnvelope } from '@/ui'
 import { EASE_OUT_QUART } from '@/ui/motion'
-import { DecoratedAvatar } from '../billing/Cosmetics'
+import { AuraGlyph, DecoratedAvatar, ReactionLayer, StreamFrame } from '../billing/Cosmetics'
+import { useEncodingGate, useTileCount } from '../billing/engine'
 import { useLook } from '../billing/store'
 import { personEntries } from '../shell/people'
 import { ControlsDock } from './ControlsDock'
@@ -288,6 +289,9 @@ function PersonTile({ userId, channel, size }: { userId: string; channel: Channe
   const others = useMedia((st) => Object.keys(st.participants).length)
   const title = useData((st) => channelTitle(st, channel))
   const look = useLook(userId)
+  // Auras fall back to the default ring with more than 9 tiles, or while your own encode needs the CPU/GPU.
+  useTileCount(true)
+  useEncodingGate(isMe && self.live)
   if (!user) return null
 
   const serverDeaf = !!vs?.serverDeaf
@@ -312,12 +316,13 @@ function PersonTile({ userId, channel, size }: { userId: string; channel: Channe
       className={s.tile}
       style={small ? undefined : { width: '100%' }}
       data-user-id={userId}
+      data-speak-host
       onContextMenu={isMe ? undefined : contextMenuHandler(() => personEntries(user, { spaceId: channel.spaceId }), name)}
     >
       <div className={s.tileBody}>
-        {/* Cosmetics stay discreet on the stage: the avatar decoration only, never motion (the voice glow leads). */}
+        {/* Cosmetics stay discreet on the stage: a still decoration, and the voice aura in place of the default ring. */}
         {!(selfLive && size === 56) && (
-          <DecoratedAvatar user={user} size={selfLive ? (size === 96 ? 56 : 40) : size} glow decorative decoration={small ? undefined : look.decoration} />
+          <DecoratedAvatar user={user} size={selfLive ? (size === 96 ? 56 : 40) : size} glow decorative decoration={small ? undefined : look.decoration} aura={look.aura} />
         )}
         {selfLive && <SelfLive compact={size === 56} />}
         {!isMe && live && !watching && !small && (
@@ -348,8 +353,10 @@ function PersonTile({ userId, channel, size }: { userId: string; channel: Channe
             </span>
           </Tooltip>
         )}
+        <AuraGlyph id={look.aura} />
         <span>{isMe ? `${name} (${t.stage.you.toLowerCase()})` : name}</span>
       </span>
+      <ReactionLayer userId={userId} />
       {!small && (
         <span className={s.corner}>
           {(quality === 'poor' || quality === 'lost') && (
@@ -451,6 +458,7 @@ function StreamView({ userId, channel, small }: { userId: string; channel: Chann
   const [full, setFull] = useState(false)
   const v = useMedia(useShallow((st) => ({ quality: st.viewers[userId]?.quality ?? 'auto', volume: st.viewers[userId]?.volume ?? 1, audio: st.participants[userId]?.streamHasAudio ?? false })))
   const stats = useVoice((st) => st.stats)
+  const frame = useLook(userId).frame
 
   useEffect(() => {
     const el = video.current
@@ -501,6 +509,8 @@ function StreamView({ userId, channel, small }: { userId: string; channel: Chann
       tabIndex={small ? 0 : undefined}
     >
       <video ref={video} autoPlay playsInline muted disablePictureInPicture={false} />
+      {/* The streamer's frame: a sibling of the video, around its content, gone in full screen and PiP. */}
+      {frame && !small && <StreamFrame id={frame} video={video} />}
       {!playing && (
         <div className={s.loading}>
           <span>
