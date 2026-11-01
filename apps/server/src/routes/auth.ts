@@ -1,6 +1,6 @@
 import { GatewayClose, LoginBody, RegisterBody, uuidv7, type AuthResponse, type Session } from '@alga/shared'
 import { and, desc, eq, or } from 'drizzle-orm'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
 import type { Ctx } from '../app.js'
 import { createSession, hashPassword, verifyPassword } from '../auth.js'
 import { isUniqueViolation } from '../db/index.js'
@@ -8,9 +8,16 @@ import { sessions, users } from '../db/schema.js'
 import { HttpError, conflict, idParam, notFound, parse } from '../errors.js'
 import { meView } from '../views.js'
 
+/** Per client IP (see TRUST_PROXY). */
 const authLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } }
+const MAX_FAILED_LOGINS = 10
 
 export function authPublicRoutes(app: FastifyInstance, { db }: Ctx): void {
+  // Failed logins per account, across IPs. Only failures count, and other accounts are unaffected, so an attacker
+  // can at worst slow down the account they target (for 15 min), never lock everyone out.
+  const loginKey = new WeakMap<FastifyRequest, string>()
+  const failedLogins = app.createRateLimit({ max: MAX_FAILED_LOGINS, timeWindow: '15 minutes', keyGenerator: (req) => loginKey.get(req)! })
+
   app.post('/auth/register', { config: authLimit }, async (req, reply): Promise<AuthResponse> => {
     const body = parse(RegisterBody, req.body)
     const taken = await db.select({ email: users.email, username: users.username }).from(users)
@@ -39,8 +46,15 @@ export function authPublicRoutes(app: FastifyInstance, { db }: Ctx): void {
     const body = parse(LoginBody, req.body)
     const [user] = await db.select().from(users)
       .where(or(eq(users.email, body.login), eq(users.username, body.login))).limit(1)
+    loginKey.set(req, `login:${user?.id ?? body.login}`)
+    // Checked before argon2, so a locked account costs no CPU and gives no password oracle.
+    const failures = await failedLogins(req, { increment: false })
+    if (!failures.isAllowed && failures.remaining === 0) {
+      throw new HttpError('rate_limited', 'Muitas tentativas de login. Tente novamente mais tarde.')
+    }
     // Same message and (roughly) same cost whether the login exists or not.
     if (!(await verifyPassword(user?.passwordHash, body.password)) || !user) {
+      await failedLogins(req)
       throw new HttpError('unauthorized', 'Login ou senha inválidos.')
     }
     const { token } = await createSession(db, user.id, req.headers['user-agent'] ?? '')

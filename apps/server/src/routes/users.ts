@@ -14,6 +14,9 @@ import { channelView, meView, publicUser, recipientsOf, relationshipsOf } from '
 
 type RelType = 'friend' | 'incoming' | 'outgoing' | 'blocked'
 
+/** Route rate limit (keyed per user by the global keyGenerator in app.ts). */
+export const perMinute = (max: number) => ({ rateLimit: { max, timeWindow: '1 minute' } })
+
 /** Fan-out after the current user's row changed (PATCH /users/@me or gateway `presence`). */
 export async function afterMeUpdate(ctx: Ctx, before: UserRow, after: UserRow): Promise<void> {
   const { db, hub } = ctx
@@ -59,7 +62,8 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
 
   app.get('/users/@me', async (req): Promise<Me> => meView(req.auth.user))
 
-  app.patch('/users/@me', async (req): Promise<Me> => {
+  // Each change fans out USER_UPDATE to everyone who knows this user.
+  app.patch('/users/@me', { config: perMinute(10) }, async (req): Promise<Me> => {
     const body = parse(PatchMeBody, req.body)
     const before = req.auth.user
     if (!Object.keys(body).length) return meView(before)
@@ -85,7 +89,7 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
 
   app.get('/relationships', async (req): Promise<Relationship[]> => relationshipsOf(db, req.auth.user.id))
 
-  app.post('/relationships', async (req): Promise<Relationship> => {
+  app.post('/relationships', { config: perMinute(10) }, async (req): Promise<Relationship> => {
     const { username } = parse(FriendRequestBody, req.body)
     const me = req.auth.user.id
     const [target] = await db.select().from(users).where(eq(users.username, username))
@@ -154,7 +158,7 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
 
   // ---- private channels -------------------------------------------------------------------------
 
-  app.post('/users/@me/channels', async (req, reply): Promise<Channel> => {
+  app.post('/users/@me/channels', { config: perMinute(10) }, async (req, reply): Promise<Channel> => {
     const me = req.auth.user.id
     const ids = [...new Set(parse(OpenDmBody, req.body).recipientIds)].filter((id) => id !== me)
     if (!ids.length) throw invalid({ recipientIds: 'Informe ao menos um destinatário além de você.' })

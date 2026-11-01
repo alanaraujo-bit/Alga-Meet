@@ -5,6 +5,8 @@ import { loadConfig, serverRoot } from './config.js'
 
 const envFile = join(serverRoot, '.env')
 if (existsSync(envFile)) process.loadEnvFile(envFile)
+// `npm run dev` passes --dev: explicit, cross-platform dev mode (an unset NODE_ENV means production).
+if (process.argv.includes('--dev')) process.env.NODE_ENV ??= 'development'
 
 const config = loadConfig()
 const app = await buildApp(config)

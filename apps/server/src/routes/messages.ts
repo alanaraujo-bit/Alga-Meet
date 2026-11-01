@@ -72,7 +72,7 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
   })
 
   app.post<P>('/channels/:id/messages', {
-    config: { rateLimit: { max: 10, timeWindow: '10 seconds', keyGenerator: (req) => `msg:${req.auth.user.id}` } },
+    config: { rateLimit: { max: 10, timeWindow: '10 seconds' } },
   }, async (req): Promise<Message> => {
     const me = req.auth.user.id
     const access = await requireChannel(db, idParam(req.params.id), me, Permission.SEND_MESSAGES)
@@ -140,7 +140,7 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
     return reply.code(204).send()
   })
 
-  app.put<PE>('/channels/:id/messages/:mid/reactions/:emoji', async (req, reply) => {
+  app.put<PE>('/channels/:id/messages/:mid/reactions/:emoji', { config: { rateLimit: { max: 10, timeWindow: '5 seconds' } } }, async (req, reply) => {
     const me = req.auth.user.id
     const access = await requireChannel(db, idParam(req.params.id), me, Permission.ADD_REACTIONS)
     await assertDmNotBlocked(db, access, me)

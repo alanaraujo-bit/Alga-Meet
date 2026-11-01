@@ -2,7 +2,7 @@ import cors from '@fastify/cors'
 import rateLimit from '@fastify/rate-limit'
 import websocket from '@fastify/websocket'
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify'
-import { authenticate } from './auth.js'
+import { authenticate, type AuthContext } from './auth.js'
 import type { Config } from './config.js'
 import { openDatabase, type Db } from './db/index.js'
 import { HttpError, installErrorHandling } from './errors.js'
@@ -31,8 +31,11 @@ declare module 'fastify' {
 }
 
 export async function buildApp(config: Config): Promise<FastifyInstance> {
+  const tp = config.trustProxy
   const app = Fastify({
-    trustProxy: config.trustProxy,
+    // Fastify treats a bare hop count as "trust nothing"; a hop function is only safe when the app is reachable
+    // exclusively through the proxy (otherwise list the proxy IPs/CIDRs).
+    trustProxy: typeof tp === 'number' ? (_addr: string, hop: number) => hop < tp : tp,
     bodyLimit: 256 * 1024,
     logger: {
       level: config.logLevel,
@@ -63,18 +66,28 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     allowedHeaders: ['Authorization', 'Content-Type'],
     maxAge: 600,
   })
+  // Every route gets this ceiling unless it sets its own `config.rateLimit` (which inherits the key below).
+  // preHandler: runs after authentication, so authenticated routes are keyed per user, public ones per IP.
   await app.register(rateLimit, {
-    global: false,
+    global: true,
+    hook: 'preHandler',
+    max: 200,
+    timeWindow: '1 minute',
+    keyGenerator: (req) => {
+      const auth = (req as { auth?: AuthContext }).auth
+      return auth ? `u:${auth.user.id}` : `ip:${req.ip}`
+    },
     errorResponseBuilder: () => new HttpError('rate_limited', 'Muitas requisições. Tente novamente em instantes.'),
   })
   await app.register(websocket, { options: { maxPayload: 16 * 1024 } })
 
   const health = async () => ({ ok: true as const, version: config.version })
-  app.get('/health', health)
+  const unlimited = { config: { rateLimit: false as const } }
+  app.get('/health', unlimited, health)
   gatewayRoute(app, ctx)
 
   await app.register(async (api) => {
-    api.get('/health', health)
+    api.get('/health', unlimited, health)
     authPublicRoutes(api, ctx)
     invitePublicRoutes(api, ctx)
     await livekitWebhookRoute(api, ctx)

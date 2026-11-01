@@ -6,7 +6,7 @@ import { HttpError, badRequest, forbidden, parse } from '../errors.js'
 import { roomName } from '../voice.js'
 
 export function voiceRoutes(app: FastifyInstance, { db, voice, config }: Ctx): void {
-  app.post('/voice/join', async (req): Promise<VoiceJoinResponse> => {
+  app.post('/voice/join', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req): Promise<VoiceJoinResponse> => {
     const { channelId } = parse(VoiceJoinBody, req.body)
     const me = req.auth.user
     const access = await requireChannel(db, channelId, me.id, Permission.CONNECT)
@@ -33,7 +33,8 @@ export async function livekitWebhookRoute(app: FastifyInstance, { voice }: Ctx):
     hook.addContentTypeParser('application/webhook+json', { parseAs: 'string', bodyLimit: 1024 * 1024 }, (_req, body, done) => {
       done(null, body)
     })
-    hook.post('/livekit/webhook', async (req) => {
+    // Server-to-server and signature-checked; LiveKit bursts many events from one IP.
+    hook.post('/livekit/webhook', { config: { rateLimit: false } }, async (req) => {
       if (typeof req.body !== 'string') throw badRequest('Content-Type esperado: application/webhook+json.')
       let event
       try {

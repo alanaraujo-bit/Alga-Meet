@@ -61,10 +61,11 @@ describe('auth', () => {
     const ip = freshIp()
     const codes: number[] = []
     for (let i = 0; i < 10; i++) {
-      codes.push((await api(s.app, 'POST', '/auth/login', { ip, body: { login: 'ghost', password: 'x' } })).status)
+      // Distinct logins: this is the per-IP limit, not the per-account one (security.test.ts).
+      codes.push((await api(s.app, 'POST', '/auth/login', { ip, body: { login: `ghost-ip${i}`, password: 'x' } })).status)
     }
     expect(codes.every((c) => c === 401)).toBe(true)
-    const limited = await api(s.app, 'POST', '/auth/login', { ip, body: { login: 'ghost', password: 'x' } })
+    const limited = await api(s.app, 'POST', '/auth/login', { ip, body: { login: 'ghost-ip-last', password: 'x' } })
     expect(limited.status).toBe(429)
     expect(limited.body.error.code).toBe('rate_limited')
   })

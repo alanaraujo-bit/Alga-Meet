@@ -12,6 +12,7 @@ import { isUniqueViolation, type Db } from '../db/index.js'
 import { channels, invites, roles, spaceMembers, spaces, type InviteRow, type SpaceRow } from '../db/schema.js'
 import { badRequest, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
 import { exchangePresence } from '../gateway/hub.js'
+import { perMinute } from './users.js'
 import { channelView, memberView, spaceSnapshots, spaceView } from '../views.js'
 
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
@@ -63,7 +64,8 @@ async function removeMember(ctx: Ctx, spaceId: string, userId: string): Promise<
 }
 
 export function invitePublicRoutes(app: FastifyInstance, { db }: Ctx): void {
-  app.get<{ Params: { code: string } }>('/invites/:code', async (req): Promise<Invite> => {
+  // Public: keyed per IP. Also slows down brute-forcing codes.
+  app.get<{ Params: { code: string } }>('/invites/:code', { config: perMinute(30) }, async (req): Promise<Invite> => {
     const found = await loadInvite(db, codeParam(req.params.code))
     if (!found || !usable(found.invite)) throw notFound('Convite inválido ou expirado.')
     return inviteView(db, found.invite, found.space)
@@ -73,7 +75,7 @@ export function invitePublicRoutes(app: FastifyInstance, { db }: Ctx): void {
 export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
   const { db, hub, voice } = ctx
 
-  app.post('/spaces', async (req, reply): Promise<SpaceSnapshot> => {
+  app.post('/spaces', { config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (req, reply): Promise<SpaceSnapshot> => {
     const { name } = parse(CreateSpaceBody, req.body)
     const me = req.auth.user.id
     const id = uuidv7()
@@ -181,7 +183,7 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
 
   // ---- invites ----------------------------------------------------------------------------------
 
-  app.post<{ Params: { id: string } }>('/spaces/:id/invites', async (req, reply): Promise<Invite> => {
+  app.post<{ Params: { id: string } }>('/spaces/:id/invites', { config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, reply): Promise<Invite> => {
     const { space } = await requireSpace(db, idParam(req.params.id), req.auth.user.id, Permission.CREATE_INVITES)
     const body = parse(CreateInviteBody, req.body)
     const expiresAt = body.maxAgeSeconds ? new Date(Date.now() + body.maxAgeSeconds * 1000) : null
@@ -198,7 +200,7 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
     }
   })
 
-  app.post<{ Params: { code: string } }>('/invites/:code', async (req): Promise<SpaceSnapshot> => {
+  app.post<{ Params: { code: string } }>('/invites/:code', { config: perMinute(10) }, async (req): Promise<SpaceSnapshot> => {
     const me = req.auth.user.id
     const found = await loadInvite(db, codeParam(req.params.code))
     if (!found) throw notFound('Convite inválido ou expirado.')
