@@ -324,7 +324,8 @@ function LiveRoom({ channel, people, meId }: { channel: Channel; people: string[
     )
   }
 
-  const caption = connecting ? t.joining : others === 0 && channel.type === 'dm' ? t.call.waiting(title) : null
+  // A room of one says so, calmly: the stage is waiting for someone, not broken.
+  const caption = connecting ? t.joining : others === 0 && channel.type === 'dm' ? t.call.waiting(title) : ids.length === 1 ? t.stage.alone : null
   const cards = ids.filter((id) => live.includes(id))
   const seats = ids.filter((id) => !live.includes(id))
   const CARD_GAP = 40

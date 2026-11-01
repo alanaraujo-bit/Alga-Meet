@@ -62,7 +62,8 @@ describe('voice-only stage', () => {
     expect(voiceLayout(2, 976, 652).avatar).toBe(112)
     expect(voiceLayout(2, 1600, 860).avatar).toBe(128)
     expect(voiceLayout(3, 976, 480).avatar).toBe(88)
-    expect(voiceLayout(9, 976, 652).avatar).toBe(64)
+    expect(voiceLayout(9, 976, 652).avatar).toBe(88)
+    expect(voiceLayout(12, 700, 420).avatar).toBe(64)
     for (const n of [1, 3, 5, 8, 12]) {
       for (const [w, h] of [[976, 652], [700, 420], [1500, 860]] as const) {
         const l = voiceLayout(n, w, h)

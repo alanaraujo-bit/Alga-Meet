@@ -35,6 +35,7 @@ export const t = {
   stage: {
     emptyTitle: 'Ninguém aqui ainda',
     emptyBody: 'Entre e chame alguém. Quem chegar já te ouve.',
+    alone: 'Só você aqui. Quem entrar já te ouve.',
     preview: (n: number) => (n === 1 ? '1 pessoa conversando agora' : `${n} pessoas conversando agora`),
     you: 'Você',
     muted: 'Microfone desativado',

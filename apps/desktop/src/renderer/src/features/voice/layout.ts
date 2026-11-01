@@ -55,7 +55,7 @@ export function stageLayout(n: number, w: number, h: number, gap = GAP): StageLa
 }
 
 /** Avatar sizes of the voice-only stage (critique r3 #1): 112 normally, 128 on a big stage with few people, 88 on a
- *  short stage, 64 above 8 people or wherever the larger ones do not fit. */
+ *  short stage or above 8 people, 64 wherever the larger ones do not fit. */
 export type SeatSize = 64 | 88 | 112 | 128
 /** Name line under the face: 8 px gap + 22 px chip. */
 const SEAT_LABEL = 30
@@ -75,7 +75,7 @@ export interface VoiceLayout {
  * rows of about √(1.5 n) (5 → 3+2, 7 → 4+3, 9 → 3·3·3, 12 → 4·4·4). The largest size whose rows fit wins.
  */
 export function voiceLayout(n: number, w: number, h: number): VoiceLayout {
-  const sizes: SeatSize[] = n > 8 ? [64] : h < 560 ? [88, 64] : n <= 3 && h >= 760 && w >= 1100 ? [128, 112, 88, 64] : [112, 88, 64]
+  const sizes: SeatSize[] = n > 8 || h < 560 ? [88, 64] : n <= 3 && h >= 760 && w >= 1100 ? [128, 112, 88, 64] : [112, 88, 64]
   const want = n <= 4 ? n : Math.ceil(Math.sqrt(1.5 * n))
   let out: VoiceLayout | null = null
   for (const avatar of sizes) {
