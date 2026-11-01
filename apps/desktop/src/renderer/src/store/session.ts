@@ -18,6 +18,8 @@ interface SessionState {
   register(body: RegisterBody): Promise<void>
   logout(): Promise<void>
   send(frame: ClientFrame): boolean
+  /** Skip the backoff wait ("Tentar agora"). */
+  reconnect(): void
 }
 
 let gw: Gateway | null = null
@@ -91,5 +93,6 @@ export const useSession = create<SessionState>()((set, get) => {
     },
 
     send: (frame) => gw?.send(frame) ?? false,
+    reconnect: () => gw?.reconnectNow(),
   }
 })

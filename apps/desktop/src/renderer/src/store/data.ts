@@ -31,11 +31,16 @@ export interface DataState {
   messages: Record<string, MessageList>
   /** channelId -> userId -> expiry epoch ms */
   typing: Record<string, Record<string, number>>
+  /** Optimistic messages (keyed by nonce) whose send failed: kept in place for retry/discard. */
+  sendFailures: Record<string, true>
   apply(d: Dispatch): void
   /** Insert a page of history (newest-first from the API) or optimistic messages. */
   upsertMessages(channelId: string, msgs: Message[], opts?: { hasMoreBefore?: boolean }): void
   removeMessage(channelId: string, id: string): void
   setMessagesLoading(channelId: string, loading: boolean): void
+  setSendFailed(nonce: string, failed: boolean): void
+  /** Local read-state move (ack is optimistic; the server echoes READ_STATE_UPDATE). */
+  markRead(channelId: string, messageId: string): void
   reset(): void
 }
 
@@ -53,7 +58,8 @@ const empty = {
   readStates: {},
   messages: {},
   typing: {},
-} satisfies Omit<DataState, 'apply' | 'upsertMessages' | 'removeMessage' | 'setMessagesLoading' | 'reset'>
+  sendFailures: {},
+} satisfies Omit<DataState, 'apply' | 'upsertMessages' | 'removeMessage' | 'setMessagesLoading' | 'setSendFailed' | 'markRead' | 'reset'>
 
 const byId = <T extends { id: string }>(xs: T[]): Record<string, T> => Object.fromEntries(xs.map((x) => [x.id, x]))
 const omit = <T>(rec: Record<string, T>, key: string): Record<string, T> => {
@@ -72,8 +78,10 @@ function mergeMessages(list: MessageList, msgs: Message[]): MessageList {
   return { ...list, byId: map, ids: Object.keys(map).sort() }
 }
 
-function patchReaction(m: Message, emoji: string, delta: 1 | -1, mine: boolean): Message {
+export function patchReaction(m: Message, emoji: string, delta: 1 | -1, mine: boolean): Message {
   const existing = m.reactions.find((r) => r.emoji === emoji)
+  // Own reactions are applied optimistically; the gateway echo must not count them twice.
+  if (mine && (delta > 0 ? existing?.me : !existing?.me)) return m
   let reactions = existing
     ? m.reactions.map((r) => (r.emoji === emoji ? { ...r, count: r.count + delta, me: mine ? delta > 0 : r.me } : r))
     : delta > 0
@@ -87,6 +95,16 @@ export const useData = create<DataState>()((set, get) => ({
   ...empty,
 
   reset: () => set(empty),
+
+  setSendFailed: (nonce, failed) =>
+    set((s) => ({ sendFailures: failed ? { ...s.sendFailures, [nonce]: true } : omit(s.sendFailures, nonce) })),
+
+  markRead: (channelId, messageId) =>
+    set((s) => {
+      const cur = s.readStates[channelId]
+      if (cur?.lastReadMessageId && cur.lastReadMessageId >= messageId) return {}
+      return { readStates: { ...s.readStates, [channelId]: { channelId, lastReadMessageId: messageId, mentionCount: 0 } } }
+    }),
 
   setMessagesLoading: (channelId, loading) =>
     set((s) => ({ messages: { ...s.messages, [channelId]: { ...(s.messages[channelId] ?? emptyList()), loading } } })),
@@ -134,7 +152,14 @@ export const useData = create<DataState>()((set, get) => ({
           relationships: Object.fromEntries(r.relationships.map((x) => [x.user.id, x])),
           voiceStates: Object.fromEntries(r.voiceStates.map((v) => [v.userId, v])),
           readStates: Object.fromEntries(r.readStates.map((x) => [x.channelId, x])),
-          // Keep loaded history across reconnects; READY has no messages.
+          // READY has no messages: keep loaded history only where nothing was missed while offline.
+          messages: Object.fromEntries(
+            Object.entries(s.messages).filter(([cid, list]) => {
+              const last = channels[cid]?.lastMessageId
+              const newest = list.ids.findLast((id) => list.byId[id]?.nonce !== id)
+              return !!channels[cid] && (!last || (!!newest && newest >= last))
+            }),
+          ),
           typing: {},
         })
         return
@@ -200,10 +225,13 @@ export const useData = create<DataState>()((set, get) => ({
         const ch = s.channels[m.channelId]
         const typing = s.typing[m.channelId]
         get().upsertMessages(m.channelId, [m])
-        return set({
-          channels: ch ? { ...s.channels, [ch.id]: { ...ch, lastMessageId: m.id } } : s.channels,
+        set({
+          channels: ch && (!ch.lastMessageId || ch.lastMessageId < m.id) ? { ...s.channels, [ch.id]: { ...ch, lastMessageId: m.id } } : s.channels,
           typing: typing ? { ...s.typing, [m.channelId]: omit(typing, m.author.id) } : s.typing,
         })
+        // My own message (any device) never makes a channel unread.
+        if (m.author.id === s.me?.id) get().markRead(m.channelId, m.id)
+        return
       }
       case 'MESSAGE_UPDATE':
         return get().upsertMessages(ev.d.channelId, [ev.d])
