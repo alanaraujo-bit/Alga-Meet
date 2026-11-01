@@ -18,7 +18,8 @@
 | Desktop nativo onda 1 | `apps/desktop/src/main`, `preload`, instalador | **feito** — ver Validado |
 | Backend onda 2 (segurança + cargos/banimento/moderação) | `apps/server`, `packages/shared` | **feito** — ver Validado |
 | UI onda 2 (chamada, transmissão, configurações, correções da crítica) | `apps/desktop/src/renderer` (exceto `media/`) | em andamento |
-| Motor de mídia | `apps/desktop/src/renderer/src/media`: voz (Opus/DTX/RED, RNNoise, PTT, dispositivos) + transmissão (codecs, presets, áudio do sistema) + benchmarks | em andamento |
+| Motor de mídia onda 1 | `apps/desktop/src/renderer/src/media` | **feito** — ver Validado e Qualidade |
+| Backend onda 3 (anexos/avatares, testes em Postgres real, pacote de deploy) | `apps/server`, `infra/server` | em andamento |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Crítica de design independente | `docs/design/critique-2026-11-01.md` | **feito**: nota 5/10 vs Linear (tela de chamada ausente, layout clone do Discord, excesso de vermelho e bordas) → corrigindo na UI onda 2 |
 | Camada de dados do renderer | `lib/api.ts`, `lib/gateway.ts`, `store/*` | feito (Maestro), typecheck ok, sem teste de integração ainda |
@@ -39,9 +40,23 @@
 - `docs/infra/cost-model.md` — Railway sem UDP (confirmado); ~US$ 0,93k–1,98k/mês por 1k CCU com SFU em São Paulo; provedores por GB inviabilizam stream grátis. Decisões D11–D13 em `ARCHITECTURE.md`.
 
 ## Qualidade (voz / transmissão / interface / desempenho)
-Sem medições ainda. Metas iniciais (de `discord-benchmark.md`): stream 1080p60 grátis com encode por hardware; RAM ociosa ≤ 300 MB; voz ≥ paridade Opus 64–128 kbps com DTX+RED.
+Medições [MEDIDO] em `docs/benchmarks/media-baseline.md` — **localhost, duas instâncias Electron na mesma máquina (i5-13600KF, RTX 3070); não prova rede real.**
+| Métrica | Alga Meet | Discord (benchmark) | Meta |
+|---|---|---|---|
+| Latência de voz A→B via SFU (mediana / p95) | 46/50 ms cru · 53/55 ms padrão · 62/65 ms RNNoise | não medido | ≤ paridade |
+| Entrar no canal | 132 ms (p95 137) | não medido | < 500 ms |
+| Reconexão após queda de 3 s do SFU | 3,4 s após volta (padrão LiveKit: 6,0 s) | — | < 5 s |
+| RAM ociosa | ~200 MB privada | ~808 MB | ≤ 300 MB ✅ |
+| Em chamada de voz | 1,7 % CPU, 370 MB | não medido | — |
+| Transmissão 1080p60 (captura real) | 49–50 fps, 9,4 Mbps, encode HEVC por hardware (NVENC), 3,4 % CPU total, sem congelamentos | grátis: 720p30 | 1080p60 ✅ (teto ~52 fps veio da fonte de teste) |
+| 4K30 | HEVC sustenta 30 fps; H.264 cai para 1440p por CPU | — | — |
+| Opus | mono, DTX, FEC, RED negociado, 64 kbps; mic em silêncio cai para 0,1 kbps | Opus estéreo até 96 kbps | — |
+
+Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não decodifica HEVC (backup **ainda não exercitado**); H.264 por hardware não engata no Electron 45 (sempre OpenH264). Decisão em `docs/decisions/0001-media-engine.md`.
 
 ## Problemas conhecidos
+- **Memória do renderer cresceu com transmissões repetidas no mesmo processo (143 → 889 MB com VP8/VP9/AV1)** — investigar vazamento antes de liberar para usuários.
+- Pendências de mídia sem evidência: rede real (perda, NAT/TURN, FEC/RED sob perda), máquinas separadas, GPUs AMD/Intel, CPUs fracas, fallback H.264, latência de hardware de áudio, 1440p60 real, teste de escuta prolongado do RNNoise, desconexão física de dispositivo, PTT via hotkey global em chamada.
 - Lista de mensagens sem virtualização (históricos muito longos ficam lentos); sem autocomplete de menção nem seletor de emoji; DMs não podem ser fechadas.
 - Domínio do link de convite (`https://alga.meet/i/`) é provisório — precisa de domínio real.
 - Bundle do renderer ~835 KB (zod do `@alga/shared` entra no renderer).
