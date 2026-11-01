@@ -22,7 +22,8 @@
 | Mídia onda 2 (vazamento de memória, pedidos da UI, rede degradada) | `media/` | em andamento |
 | Motor de mídia onda 1 | `apps/desktop/src/renderer/src/media` | **feito** — ver Validado e Qualidade |
 | Backend onda 3 (anexos/avatares, Postgres real, pacote de deploy) | `apps/server`, `infra/` | **feito** — ver Validado |
-| Backend onda 4 (remoção de EXIF/GPS, verificação de e-mail, recuperação de senha) | `apps/server` | em andamento |
+| Backend onda 4 (EXIF/GPS, verificação de e-mail, reset de senha) | `apps/server` | **feito** — ver Validado |
+| Nativo onda 2 (deep links `algameet://`, notificação/badge/iniciar com Windows verificados) | `src/main`, `preload` | em andamento |
 | UI onda 3 (anexos, avatares, configurações do espaço: cargos/membros/banimentos) | `apps/desktop/src/renderer` (exceto `media/`, `features/voice`) | em andamento |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Crítica de design independente | `docs/design/critique-2026-11-01.md` | **feito**: nota 5/10 vs Linear (tela de chamada ausente, layout clone do Discord, excesso de vermelho e bordas) → corrigindo na UI onda 2 |
@@ -38,6 +39,7 @@
 - UI onda 1: design system (`docs/design/design-system.md`) + 20 componentes; telas de auth, onboarding (2 passos até criar/entrar em espaço), amigos, DMs, espaços, convites, chat completo (agrupamento, edição, respostas, reações, digitação, não lidas, reenvio em falha), banner de reconexão, Ctrl+K. Cada tela capturada no app real com dados criados pela API real (`docs/screenshots/2026-11-01-*-vN.png`, histórico de versões preservado). 18 testes unitários novos.
 - UI onda 2: palco de chamada com brilho de fala real, "Agora" (onde as pessoas estão), painel de voz, seletor de transmissão, assistir sob demanda/foco/tela cheia/stats, chamadas em DM com toque, moderação por tile, configurações completas (conta, voz e vídeo, atalhos, notificações, aparência, inicialização, avançado), emoji picker, autocomplete de @menção. Capturas de **duas instâncias reais na mesma sala LiveKit** (`docs/screenshots/2026-11-01-voice-stage-v5.png`, `stream-watching-v3.png`, `screen-picker-v3.png`, `settings-voice-v3.png`…). 57 testes no desktop. Maestro conferiu as capturas e abriu o app integrado nesta máquina (LiveKit + API + 2 janelas, perfis padrão e `bob`).
 - Backend onda 3: anexos em mensagens (multipart, tipo detectado pelo conteúdo, HTML/SVG disfarçado servido só como download), downloads com URL assinada por usuário (~1 h) e reverificação de acesso, avatares/ícones próprios (M9 fechado). **104 testes passando em PGlite e os mesmos 104 em PostgreSQL 18.6 real.** Corrida B2 (pedido de amizade × bloqueio) confirmada no Postgres real e corrigida com lock transacional. Build de produção sobe contra Postgres real. Pacote de deploy: `infra/server/Dockerfile`, `railway.ts`, `infra/livekit/livekit.prod.yaml` + Caddy/TURN 443, guia `docs/infra/deploy.md` (Docker build não testado — sem Docker na máquina).
+- Backend onda 4: imagens re-codificadas com sharp (EXIF/GPS removidos, orientação aplicada, bombas de descompressão rejeitadas); verificação de e-mail e recuperação de senha (driver console em dev → `apps/server/data/outbox/*.eml`; driver Resend em prod); B5 e B10 corrigidos (senha mínima 10 + lista de senhas comuns). Contas não verificadas não criam convites, não têm >1 espaço nem abrem DM com não-amigos. **120 testes em PGlite e em PostgreSQL 18.**
 - Backend: 47 testes vitest (PGlite em memória, REST via inject + gateway via WebSocket real) passando, conferido pelo Maestro. Smoke test com LiveKit real: webhooks `room_started/finished` e `participant_joined/left` reais recebidos e assinatura verificada; `VOICE_STATE_UPDATE/REMOVE` entregues no gateway.
 
 ## Pesquisa concluída
@@ -61,6 +63,7 @@ Medições [MEDIDO] em `docs/benchmarks/media-baseline.md` — **localhost, duas
 Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não decodifica HEVC (backup **ainda não exercitado**); H.264 por hardware não engata no Electron 45 (sempre OpenH264). Decisão em `docs/decisions/0001-media-engine.md`.
 
 ## Problemas conhecidos
+- E-mail sem retry (falha do provedor só aparece no log); HEIC/TIFF mantêm EXIF; contas não verificadas nunca são limpas.
 - Downloads de anexos passam pela API → egress do Railway (US$ 0,05/GB); buckets do Railway não têm backup; uploads > 5 min são cortados pelo Railway.
 - **Memória do renderer cresceu com transmissões repetidas no mesmo processo (143 → 889 MB com VP8/VP9/AV1)** — investigar vazamento antes de liberar para usuários.
 - Pendências de mídia sem evidência: rede real (perda, NAT/TURN, FEC/RED sob perda), máquinas separadas, GPUs AMD/Intel, CPUs fracas, fallback H.264, latência de hardware de áudio, 1440p60 real, teste de escuta prolongado do RNNoise, desconexão física de dispositivo, PTT via hotkey global em chamada.
@@ -84,6 +87,7 @@ Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não d
 | Repositório GitHub de releases `alanaraujo-bit/alga-meet` | Canal do auto-update. Precisa ser **público** (ou um repo público só de releases), senão o app teria que embutir um token | Autorizar criação | Auto-update não tem de onde baixar |
 | Deploy de teste: API+Postgres no Railway (~US$ 9–21/mês no beta) + domínio | Testar entre PCs diferentes | Autorizar criação no Railway; comprar/definir domínio | Só funciona nesta máquina |
 | Servidor com UDP para o SFU: VM São Paulo (Vultr ~US$ 40–80/mês + banda) **ou** LiveKit Cloud plano grátis | Railway não expõe UDP | Criar conta Vultr (ou LiveKit Cloud) e autorizar custo | Voz/tela só funcionam em rede local/dev |
+| Conta Resend + domínio de envio verificado (DKIM/SPF/DMARC) | E-mails de verificação e reset em produção | Criar conta, configurar DNS (ver `docs/infra/deploy.md`) | Produção não sobe sem provedor de e-mail |
 | Cotação escrita Latitude.sh São Paulo (pacote de banda) | O custo recomendado depende dela (US$ 4,9k vs 18,3k/mês a 10k CCU) | Pedir cotação antes da fase 1k CCU | Plano de custo a 1k+ CCU fica incerto |
 | Segunda máquina independente | Validar voz/tela entre dispositivos reais e NATs diferentes | Instalar o build em outro PC e entrar num canal | Só temos medições em localhost |
 
