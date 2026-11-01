@@ -29,7 +29,7 @@ import { desktop, killTree, r1, repo, sleep, summary } from './media-lab.mjs'
 const argv = process.argv.slice(2)
 const arg = (n, d) => argv.find((a) => a.startsWith(`--${n}=`))?.split('=')[1] ?? d
 const API = process.env.STG_API ?? 'https://api-staging-b3ea.up.railway.app'
-const SSH = ['-i', join(homedir(), '.ssh', 'alga_homeserver'), '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', 'alanaraujo@192.168.1.110']
+const SSH = ['-i', join(homedir(), '.ssh', 'alga_homeserver'), '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', process.env.ALGA_SFU_SSH ?? 'user@sfu-host']   // set ALGA_SFU_SSH=user@<LAN IP> (real value: docs/private/, not in git)
 const WORK = resolve(process.env.STG_WORK ?? join(tmpdir(), 'alga-stg'))
 const rel = relative(repo, WORK)
 if (!rel.startsWith('..') && !isAbsolute(rel)) throw new Error('STG_WORK must be outside the repo: it holds the test credentials')

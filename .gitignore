@@ -30,3 +30,6 @@ docs/references/**/_*.mjs
 
 # Vídeos de rolagem do site (apps/site/scripts/shoot.mjs) ficam só locais: pesados para o git.
 docs/site/videos/
+
+# Local-only operational notes (real home network values) — never published.
+docs/private/
