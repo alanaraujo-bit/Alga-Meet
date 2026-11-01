@@ -1,16 +1,18 @@
-import type { Ban, Invite } from '@alga/shared'
+import { Permission, type Ban, type Invite } from '@alga/shared'
 import { Check, Copy, Gavel, LayoutGrid, Link, Shield, Trash2, Users } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
+import { ApiRequestError } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
 import { errorText } from '@/lib/errors'
 import { inviteLink } from '@/lib/invite'
-import { createInvite, deleteSpace, listBans, patchSpace, unban, uploadSpaceIcon } from '@/store/actions'
+import { createInvite, deleteSpace, listBans, listInvites, patchSpace, revokeInvite, unban, uploadSpaceIcon } from '@/store/actions'
 import { useData } from '@/store/data'
+import { can, spacePermissions } from '@/store/selectors'
 import { useUi } from '@/store/ui'
-import { Avatar, Button, Modal, SegmentedControl, Spinner, TextField, tintFor, toast } from '@/ui'
+import { Avatar, Button, IconButton, Modal, SegmentedControl, Spinner, TextField, tintFor, toast } from '@/ui'
 import { initials } from '@/ui/Avatar'
 import { Group, Row, SettingsFrame, type FrameNav } from '../settings/Frame'
 import { ImagePicker } from '../settings/ImagePicker'
@@ -241,24 +243,48 @@ function Bans({ spaceId }: { spaceId: string }) {
 const EXPIRY = { h1: 3600, d1: 86400, d7: 604800, d30: 2592000, never: 0 } as const
 const USES = { u0: 0, u1: 1, u5: 5, u10: 10, u25: 25, u100: 100 } as const
 const relFmt = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-
-/** Invites made in this session, per space (the API has no list route yet). */
-const made = new Map<string, Invite[]>()
+/** Uses change as people join and there is no invite event on the gateway: refetch while the page is open. */
+const REFRESH_MS = 20_000
 
 function Invites({ spaceId }: { spaceId: string }) {
   const [expiry, setExpiry] = useState<keyof typeof EXPIRY>('d7')
   const [uses, setUses] = useState<keyof typeof USES>('u0')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<{ text: string; gated: boolean } | null>(null)
-  const [list, setList] = useState<Invite[]>(() => made.get(spaceId) ?? [])
+  const [list, setList] = useState<Invite[] | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [fresh, setFresh] = useState<string | null>(null)
+  const [revoking, setRevoking] = useState<Invite | null>(null)
+  const me = useData((x) => x.me?.id)
+  // The server lists every invite for MANAGE_SPACE, otherwise only your own; revoking follows the same rule.
+  const manages = useData((x) => can(spacePermissions(x, spaceId), Permission.MANAGE_SPACE))
+
+  const load = useCallback(() => {
+    listInvites(spaceId).then(
+      (l) => {
+        setList(l)
+        setLoadError(null)
+      },
+      (e: unknown) => setLoadError(errorText(e, t.error)),
+    )
+  }, [spaceId])
+  useEffect(() => {
+    load()
+    const id = setInterval(load, REFRESH_MS)
+    window.addEventListener('focus', load)
+    return () => {
+      clearInterval(id)
+      window.removeEventListener('focus', load)
+    }
+  }, [load])
+
   const create = async () => {
     setBusy(true)
     setError(null)
     try {
       const inv = await createInvite(spaceId, EXPIRY[expiry], USES[uses])
-      const next = [inv, ...list]
-      made.set(spaceId, next)
-      setList(next)
+      setList((l) => [inv, ...(l ?? []).filter((x) => x.code !== inv.code)])
+      setFresh(inv.code)
     } catch (e) {
       setError({ text: errorText(e, t.error), gated: needsVerification(e) })
     } finally {
@@ -291,30 +317,59 @@ function Invites({ spaceId }: { spaceId: string }) {
           )}
         </div>
       </Group>
-      {list.length > 0 && (
-        <Group title={t.invites.created}>
-          {list.map((inv) => (
-            <InviteRow key={inv.code} invite={inv} />
-          ))}
-        </Group>
-      )}
+      <Group title={t.invites.active} description={manages ? t.invites.activeAll : t.invites.activeOwn}>
+        {loadError && !list ? (
+          <Row label={<span className={st.error}>{loadError}</span>}>
+            <Button size="sm" onClick={load}>
+              {t.retry}
+            </Button>
+          </Row>
+        ) : !list ? (
+          <Row label={<Spinner size={16} label="Carregando" />} />
+        ) : list.length === 0 ? (
+          <p className={s.empty}>{t.invites.empty}</p>
+        ) : (
+          list.map((inv) => (
+            <InviteRow key={inv.code} invite={inv} fresh={inv.code === fresh} canRevoke={manages || inv.inviterId === me} onRevoke={() => setRevoking(inv)} />
+          ))
+        )}
+      </Group>
+      <RevokeInviteModal
+        invite={revoking}
+        onClose={() => setRevoking(null)}
+        onRevoked={(code) => {
+          setRevoking(null)
+          setList((l) => l?.filter((x) => x.code !== code) ?? null)
+          toast.success(t.invites.revoked)
+        }}
+      />
     </>
   )
 }
 
-function InviteRow({ invite }: { invite: Invite }) {
+function InviteRow({ invite, fresh, canRevoke, onRevoke }: { invite: Invite; fresh: boolean; canRevoke: boolean; onRevoke: () => void }) {
   const [copied, setCopied] = useState(false)
+  const inviter = useData((x) => x.users[invite.inviterId] ?? x.members[invite.space.id]?.[invite.inviterId]?.user)
+  const isMe = useData((x) => x.me?.id === invite.inviterId)
   useEffect(() => {
     if (!copied) return
     const id = setTimeout(() => setCopied(false), 1500)
     return () => clearTimeout(id)
   }, [copied])
   const link = inviteLink(invite.code)
+  const by = isMe ? t.invites.byYou : inviter ? t.invites.by(inviter.displayName) : t.invites.byGone
   return (
-    <Row label={<span className={s.inviteLink}>{link}</span>} hint={t.invites.meta(invite.expiresAt ? relFmt.format(new Date(invite.expiresAt)) : null, invite.maxUses)}>
+    <div className={`${s.personRow} ${fresh ? s.fresh : ''}`}>
+      {inviter ? <Avatar user={inviter} size={32} decorative /> : <span className={s.ghostAvatar} aria-hidden />}
+      <span className={s.personText}>
+        <span className={`${s.personName} ${s.inviteLink}`}>{link}</span>
+        <span className={`${s.personSub} tnum`}>
+          {by} · {t.invites.usesText(invite.uses, invite.maxUses)} · {invite.expiresAt ? t.invites.expiresAt(relFmt.format(new Date(invite.expiresAt))) : t.invites.noExpiry}
+        </span>
+      </span>
       <Button
         size="sm"
-        variant={copied ? 'secondary' : 'primary'}
+        variant={fresh && !copied ? 'primary' : 'secondary'}
         icon={copied ? Check : Copy}
         onClick={() => {
           void copyText(link)
@@ -323,6 +378,59 @@ function InviteRow({ invite }: { invite: Invite }) {
       >
         {copied ? t.invites.copied : t.invites.copy}
       </Button>
-    </Row>
+      <IconButton icon={Trash2} label={t.invites.revoke} danger disabledReason={canRevoke ? undefined : t.invites.revokeNo} onClick={onRevoke} />
+    </div>
+  )
+}
+
+function RevokeInviteModal({ invite, onClose, onRevoked }: { invite: Invite | null; onClose: () => void; onRevoked: (code: string) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  // Keeps the text while the modal animates out.
+  const [last, setLast] = useState(invite)
+  useEffect(() => {
+    if (!invite) return
+    setLast(invite)
+    setError(null)
+  }, [invite])
+  const inv = invite ?? last
+  const revoke = async () => {
+    if (!inv) return
+    setBusy(true)
+    setError(null)
+    try {
+      await revokeInvite(inv.code)
+      onRevoked(inv.code)
+    } catch (e) {
+      // Already gone (used up, expired, revoked by someone else): what the user wanted is true.
+      if (e instanceof ApiRequestError && e.status === 404) onRevoked(inv.code)
+      else setError(errorText(e, t.error))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal
+      open={!!invite}
+      onClose={onClose}
+      title={t.invites.revokeTitle}
+      description={inv ? t.invites.revokeBody(inviteLink(inv.code)) : undefined}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            {t.cancel}
+          </Button>
+          <Button variant="danger" loading={busy} onClick={() => void revoke()} data-autofocus>
+            {t.invites.revoke}
+          </Button>
+        </>
+      }
+    >
+      {error && (
+        <p className={`${st.rowHint} ${st.error}`} role="alert">
+          {error}
+        </p>
+      )}
+    </Modal>
   )
 }

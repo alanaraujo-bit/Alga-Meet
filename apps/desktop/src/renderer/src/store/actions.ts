@@ -186,6 +186,8 @@ export async function setStatus(statusPreference: StatusPreference): Promise<voi
 }
 export const createInvite = (spaceId: string, maxAgeSeconds = 604800, maxUses = 0) =>
   api<Invite>('POST', `/spaces/${spaceId}/invites`, { maxAgeSeconds, maxUses })
+export const listInvites = (spaceId: string) => api<Invite[]>('GET', `/spaces/${spaceId}/invites`)
+export const revokeInvite = (code: string) => api<void>('DELETE', `/invites/${encodeURIComponent(code)}`)
 export const previewInvite = (code: string) => api<Invite>('GET', `/invites/${encodeURIComponent(code)}`)
 export async function joinInvite(code: string): Promise<SpaceSnapshot> {
   const sp = await api<SpaceSnapshot>('POST', `/invites/${encodeURIComponent(code)}`)

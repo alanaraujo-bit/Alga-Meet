@@ -235,3 +235,14 @@
   font-weight: var(--w-regular);
   user-select: text;
 }
+.ghostAvatar {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+}
+/* The invite you just made: one quiet accent edge while you stay on the page (copy is its next step). */
+.fresh {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
