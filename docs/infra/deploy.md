@@ -41,7 +41,14 @@ de fato, o `railway.ts` (exige o SDK `railway` e a CLI) e o Caddy.
 - [ ] **Tamanho máximo de anexo** (`MAX_ATTACHMENT_BYTES`, padrão 25 MiB × 10 por mensagem).
   - O edge do Railway corta corpos que não terminam de subir em **5 minutos**. Com 7 Mbit/s de upload, isso dá cerca
     de 250 MB por envio.
-- [ ] **Guarda de segredos**: um cofre de senhas para `LIVEKIT_API_SECRET`, `FILES_SECRET` e a senha do Postgres.
+- [ ] **E-mail transacional (Resend)**: criar a conta, adicionar o domínio de envio (ex.: `algameet.com.br`, região
+      São Paulo/`sa-east-1` se oferecida) e publicar os registros de §1. O plano gratuito cobre o beta (na data de
+      escrita: 3.000 e-mails/mês, 100/dia; confira em resend.com/pricing). **[$]** acima disso.
+  - Decidir o remetente (`EMAIL_FROM`, ex.: `Alga Meet <nao-responda@algameet.com.br>`) e para onde os links dos
+    e-mails abrem (`EMAIL_LINK_URL`): deep link do app (`algameet://auth`, o desktop precisa registrar o protocolo) ou
+    uma página https que leia `?token=` e chame a API. O e-mail sempre traz também o código para colar no app.
+- [ ] **Guarda de segredos**: um cofre de senhas para `LIVEKIT_API_SECRET`, `FILES_SECRET`, `RESEND_API_KEY` e a senha
+      do Postgres.
 - [ ] **Aprovar o deploy** em si: o primeiro `railway config apply` e a criação da VM.
 
 ## 1. DNS
@@ -52,6 +59,20 @@ de fato, o `railway.ts` (exige o SDK `railway` e a CLI) e o Caddy.
 | `livekit.<domínio>` | A | IP público da VM | sinalização `wss://` (Caddy → 7880) |
 | `turn.<domínio>` | A | IP público da VM | TURN/TLS no 443 (Caddy → 5349) |
 
+E-mail (Resend → **Domains** → o domínio → copie os valores **exatamente** como o painel mostra; eles mudam com a
+região escolhida e a chave DKIM é única por domínio):
+
+| Registro | Tipo | Valor | Para quê |
+|---|---|---|---|
+| `resend._domainkey.<domínio>` | TXT | `p=MIGfMA0G…` (chave pública DKIM do painel) | **DKIM**: assina as mensagens |
+| `send.<domínio>` | MX (prioridade 10) | `feedback-smtp.<região>.amazonses.com` | Return-Path/bounces do envio |
+| `send.<domínio>` | TXT | `v=spf1 include:amazonses.com ~all` | **SPF** do subdomínio de envio |
+| `_dmarc.<domínio>` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@<domínio>` | **DMARC** (comece em `p=none`; depois de 2–4 semanas sem falhas nos relatórios, `p=quarantine`) |
+
+- O SPF fica no subdomínio `send.` (o envelope da Resend), então não conflita com um SPF que o domínio raiz já tenha
+  (e-mail do Google Workspace etc.). Não crie um segundo registro SPF na raiz.
+- Espere o painel da Resend marcar o domínio como **Verified** antes de ligar `EMAIL_DRIVER=resend` em produção: sem
+  isso a API da Resend recusa o envio (fica `e-mail not sent` no log da API).
 - Se o Railway pedir um registro TXT de verificação, crie-o também.
 - Use TTL de 300 s durante a implantação. Depois de estável, suba para 3600 s.
 - Sem proxy do Cloudflare (nuvem laranja) em `livekit.` e `turn.`: WebRTC e TURN precisam do IP real.
@@ -104,6 +125,10 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"  
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | `${{uploads.ACCESS_KEY_ID}}` / `${{uploads.SECRET_ACCESS_KEY}}` |
 | `S3_URL_STYLE` | `virtual` (ou `path`, se a aba Credentials disser) |
 | `MAX_ATTACHMENT_BYTES` | `26214400` (25 MiB) |
+| `EMAIL_DRIVER` | `resend` (obrigatório em produção; `console` só com `ALGA_ALLOW_CONSOLE_EMAIL=1`) |
+| `RESEND_API_KEY` | Resend → API Keys → *Sending access* restrito ao domínio (*sealed*) |
+| `EMAIL_FROM` | `Alga Meet <nao-responda@<domínio>>` (domínio verificado na Resend) |
+| `EMAIL_LINK_URL` | onde os links dos e-mails abrem (padrão `algameet://auth`; ver §0) |
 | `LOG_LEVEL` | `info` |
 
 7. **[$]** Em **Networking**, adicione o domínio `api.<domínio>` na porta 4000 e crie o CNAME (§1). O certificado
@@ -111,6 +136,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"  
 8. Faça o deploy e acompanhe os logs. Espere ver `database ready` e `Server listening`.
    - As migrações rodam antes de a API ouvir a porta.
    - A `0002` cria `attachments`/`storage_deletions` e apaga URLs externas de avatar/ícone (M9).
+   - A `0003` cria `email_tokens`, adiciona `users.email_verified_at` (contas existentes ficam verificadas) e troca o
+     índice único de e-mail por um parcial (só entre e-mails verificados).
    - Teste: `curl https://api.<domínio>/api/v1/health` → `{"ok":true,"version":"0.1.0"}`.
 9. **Confira o IP do cliente**: faça uma requisição do seu computador e compare o `remoteAddress` do log com
    `curl https://ifconfig.me`.
@@ -131,6 +158,9 @@ railway config apply --file infra/server/railway.ts   # [$] cria/altera recursos
 
 - Antes de aplicar, troque `OWNER/alga-meet` e os domínios marcados `TODO(owner)`.
 - Os segredos ficam como `preserve()`: defina-os no painel.
+- **Pendente**: o `railway.ts` ainda não declara as variáveis de e-mail. Acrescente `EMAIL_DRIVER: 'resend'`,
+  `RESEND_API_KEY: preserve()`, `EMAIL_FROM: preserve()` e `EMAIL_LINK_URL: preserve()` antes do primeiro apply. Sem
+  elas a API recusa subir em produção (falha fechada).
 
 ## 4. SFU (LiveKit) na Vultr São Paulo
 
@@ -192,7 +222,14 @@ A API continua com um único `LIVEKIT_URL`, atrás de um balanceador.
 - [ ] Anexo: enviar imagem e PDF. A imagem aparece inline; o PDF baixa como arquivo. O objeto aparece no bucket
       (aba Files).
 - [ ] Apagar a mensagem. Em até 1 min, o objeto some do bucket e a tabela `storage_deletions` fica vazia.
-- [ ] Avatar: o upload troca o `avatarUrl` para `https://api.<domínio>/api/v1/avatars/…`.
+- [ ] Avatar: o upload troca o `avatarUrl` para `https://api.<domínio>/api/v1/avatars/…` (`.webp`).
+- [ ] Privacidade de imagem: enviar uma foto de celular com localização. Baixar o anexo e conferir (`exiftool` ou as
+      propriedades do arquivo) que não há GPS nem dados da câmera, e que a foto aparece em pé.
+- [ ] E-mail: cadastrar com um endereço seu. A mensagem chega na caixa de entrada (não no spam) e, em "mostrar
+      original", aparece `spf=pass`, `dkim=pass` e `dmarc=pass`. O link confirma (`emailVerified: true`).
+- [ ] Cadastrar de novo com o mesmo endereço e outro username: a resposta é igual à de um cadastro novo e o endereço
+      recebe "Você já tem uma conta".
+- [ ] "Esqueci minha senha": o e-mail chega, a troca funciona e as outras sessões caem.
 - [ ] Voz: dois clientes se ouvem; *server mute* corta o microfone (smoke no `apps/server/README.md`).
 - [ ] O `remoteAddress` nos logs é o IP real do cliente (§3.1, passo 9).
 
@@ -200,7 +237,8 @@ A API continua com um único `LIVEKIT_URL`, atrás de um balanceador.
 
 - **API**: Railway → *Deployments* → deploy anterior → **Redeploy**.
   - As migrações são só para frente. A `0002` é aditiva e o código anterior funciona com ela; só a limpeza de URLs
-    externas de avatar não volta.
+    externas de avatar não volta. A `0003` também: o código anterior ignora `email_tokens`/`email_verified_at` e ainda
+    confere e-mail repetido antes de inserir (só a garantia do índice único fica mais fraca até reaplicar o novo código).
   - Antes de qualquer migração destrutiva futura, faça um backup manual (§7).
 - **Variáveis**: anote o valor antigo antes de mudar. Para reverter, volte o valor e faça redeploy.
 - **SFU**: no `docker-compose.prod.yaml`, volte a tag da imagem e rode `docker compose up -d`. Guarde uma cópia

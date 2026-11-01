@@ -318,6 +318,10 @@ um `describe` por achado; M8 em `moderation.test.ts`), depois a correção. Suí
 Atualização (2026-11-01, onda de uploads): `npm test -w apps/server` → **104/104** em PGlite e
 `npm run test:pg -w apps/server` → **104/104** num PostgreSQL 18 real (embedded-postgres). M9 e B2 revisados abaixo.
 
+Atualização (2026-11-01, onda de e-mail e privacidade de imagem): B5 e B10 corrigidos com a verificação de e-mail;
+imagens enviadas são re-codificadas sem EXIF/GPS (lacuna "uploads sem reprocessamento" do README). Suíte: **120/120**
+em PGlite e **120/120** em PostgreSQL 18 (`email.test.ts` com 13 casos; `uploads.test.ts` com 18).
+
 | Achado | Correção | Commit | Teste | Status |
 |---|---|---|---|---|
 | A1 rate limit de login | `TRUST_PROXY` = IPs/CIDRs ou nº de saltos (`true` recusado); 10 logins falhos/15 min por conta, conferido antes do argon2, além de 10/min/IP | `d02ab89` | `A1 trusted proxy + login limits` | Corrigido. Store em memória: com mais de uma instância, usar Redis |
@@ -336,12 +340,12 @@ Atualização (2026-11-01, onda de uploads): `npm test -w apps/server` → **104
 | B2 corrida no bloqueio | Upsert com `setWhere: type <> 'blocked'` (só um bloqueio substitui um bloqueio). Reproduzido depois no PostgreSQL real com 20 pares concorrentes: pedido × bloqueio deixava `outgoing` pendente para o bloqueado (20/20) e pedidos simultâneos dos dois lados davam deadlock (500). Agora cada `POST/PUT/DELETE /relationships` lê e grava os dois sentidos numa transação com `pg_advisory_xact_lock` do par | `da7d8f3`, `d00beba` | `B2/B3/B6` (2 casos concorrentes) | Corrigido e confirmado em PostgreSQL 18 |
 | B3 logs com dados | `safeErr` (sem `params`, sem `detail` do pg) em todos os logs de erro; `safeUrl` redige `/invites/<código>` | `da7d8f3` | `B2/B3/B6` | Corrigido |
 | B4 `position` sem teto | `.max(10_000)` (canais e cargos) | `da7d8f3` | `M9/B4 input bounds` | Corrigido |
-| B5 enumeração no registro | — | — | — | Adiado: exige verificação de e-mail e muda a UX do cadastro (o desktop mostra o erro por campo) |
+| B5 enumeração no registro | Só username em uso vira 409 (usernames são públicos). E-mail em uso cria conta não verificada com a mesma resposta de um cadastro novo, e o dono do endereço recebe "você já tem uma conta"; e-mail único só entre verificados (índice parcial), login por e-mail só com e-mail verificado. O pedido de amizade ainda diz "Usuário não encontrado" (username é público) | `5ef0576` | `email.test.ts › B5 registration does not reveal a taken e-mail` | Corrigido. Tempo de resposta igual: o e-mail sai depois da resposta |
 | B6 convites | Preview 30/min/IP; convites do criador apagados quando ele sai, é expulso ou banido | `da7d8f3`, `d02ab89` | `B2/B3/B6` | Corrigido |
 | B7 `canPublishData` | `false` | `7b7e0b8` | `M4/B1/B7/B8/B9 voice` | Corrigido |
 | B8 `streaming`/`video` sem permissão | Forçados a `false` sem `STREAM`/`SPEAK` | `7b7e0b8` | `M4/B1/B7/B8/B9 voice` | Corrigido |
 | B9 replay de webhook | `event.id` lembrado por 10 min | `7b7e0b8` | `M4/B1/B7/B8/B9 voice` | Corrigido |
-| B10 política de senha | — | — | — | Adiado: precisa de lista de senhas vazadas (HIBP k-anon ou top-N) e verificação de e-mail |
+| B10 política de senha | Mínimo de 10 caracteres (`MIN_PASSWORD_LENGTH`); no servidor, lista embutida de senhas comuns/vazadas ≥ 10 caracteres (`src/common-passwords.ts`, escrita para o projeto, sem licença de terceiros), repetições, sequências e senha contendo username/e-mail, no cadastro, troca e redefinição. Verificação de e-mail (24 h) e redefinição de senha (1 h, uso único, revoga sessões) | `5ef0576` | `email.test.ts › B10 password policy`, `› e-mail verification`, `› password reset` | Corrigido. Lista pequena; HIBP k-anon não é consultado |
 | B11 CORS permissivo | Sem padrão fora de dev/test; `CORS_ORIGINS` obrigatório em produção | `d02ab89` | `M1/B11 configuration fails closed` | Corrigido |
 
 Moderação no SFU validada com LiveKit 1.13.11 real (smoke em `apps/server/README.md`): após `serverMute`, o
