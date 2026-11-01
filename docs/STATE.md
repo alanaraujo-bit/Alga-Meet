@@ -39,7 +39,7 @@
 | E2EE fase 0 (08d73e3) | `native/mls`, `src/main/mls` | **GO: OpenMLS 0.9.2** (MIT) em `utilityProcess`: `.wasm` 2,23 MiB (662 KiB gzip); entrar numa chamada de 99 pessoas custa p95 9,7 ms de CPU (19,7 ms worker frio); worker 30–34 MB; 157 crates sem GPL (4 MPL-2.0 → aviso de terceiros) |
 | E2EE fase 1a (contrato + Delivery Service no servidor + identidade de dispositivo nativa) | `packages/shared`, `apps/server`, `src/main` | em andamento |
 | Servidor: downgrade de plano no meio da live (8f1854d, 2e3a0aa; 168 testes) | `apps/server`, `infra/livekit` | **feito** — atributo atualizado na hora; reverificação em 10 s muta transmissão acima do plano. Timeout de camada do LiveKit **mantido em 2 s** (1–1,5 s causou oscilação de camadas; detalhes em `infra/livekit/README.md`) |
-| Mídia: republicar a transmissão no downgrade (LiveKit mantém as camadas declaradas; sem isso o servidor muta cliente obediente) | `media/` | em andamento |
+| Mídia: republicar a transmissão no downgrade (6a2d551) | `media/` | **feito** — nova publicação 720p60 em 124–171 ms; servidor não muta após a reverificação de 10 s; espectador continua inscrito (maior lacuna entre quadros 150–223 ms em Original, 356–512 ms em Auto); áudio da tela sem interrupção; memória −1,0 MB/ciclo no fluxo real |
 | Crítica de design rodada 2 (`docs/design/critique-2026-11-01-r2.md`) | docs | **feito**: **6,5/10** (antes 5) — shell 6,5 · chat 7 · chamada 7 · transmissão 6 · configurações 7 · billing 8 / loja 5 · T&S 8 · consistência 5,5; identidade ainda é sobretudo a cor |
 | UI onda 7 (correções r2, marca única de 3 barras, identidade além da cor) | renderer, `build/` | em andamento |
 | QA independente da jornada completa (3 instâncias) | `docs/qa` | em andamento |
