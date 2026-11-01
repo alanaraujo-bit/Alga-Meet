@@ -77,7 +77,7 @@ for (const scale of [1, 1.25]) {
       await shot.screenshot({ path: join(OUT, `${id}.reduced@${scale}x.png`) })
       await reduce(page, false)
       const ms = id === 'effect_ha_hora_azul' ? 2600 : id.includes('poeira') ? 2200 : 1500
-      if (gifs && scale === 1 && (moves || aura)) {
+      if (gifs && scale === 1 && (moves || aura) && !id.startsWith('sound_')) {
         // Tight around what the stage shows (its children), with a little air.
         const box = await shot.evaluate((el) => {
           const rs = [...el.children].map((c) => c.getBoundingClientRect())
