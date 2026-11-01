@@ -11,6 +11,7 @@ export const t = {
     switchAction: 'Criar conta',
     forgot: 'Esqueci minha senha',
     resetDone: 'Senha trocada. Entre com a nova senha.',
+    invite: 'Você abriu um convite. Entre ou crie sua conta e ele abre em seguida.',
   },
   forgot: {
     title: 'Redefinir senha',
@@ -29,6 +30,8 @@ export const t = {
     password: 'Nova senha',
     submit: 'Trocar senha',
     resend: 'Pedir outro e-mail',
+    fromLink: 'Link do e-mail aberto. Agora é só escolher a senha nova.',
+    subtitleLink: 'Escolha a senha nova. Todas as sessões abertas serão encerradas.',
   },
   strength: [
     `Pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`,

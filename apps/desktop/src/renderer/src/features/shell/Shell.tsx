@@ -6,6 +6,7 @@ import { useUi } from '@/store/ui'
 import { EmptyState, Button } from '@/ui'
 import { Hash } from 'lucide-react'
 import { EASE_OUT_QUART } from '@/ui/motion'
+import { useDeepLink } from '../app/deepLinks'
 import { startNotifications } from '../app/notifications'
 import { ChatView } from '../chat/ChatView'
 import { FriendsView } from '../friends/FriendsView'
@@ -30,6 +31,7 @@ export function Shell() {
   useViewGuard()
   useEffect(() => startVoiceSync(), [])
   useEffect(() => startNotifications(), [])
+  useInviteLink()
   const view = useUi((st) => st.view)
   const order = useData((st) => st.spaceOrder)
 
@@ -97,6 +99,16 @@ function SpaceMain({ spaceId, channelId }: { spaceId: string; channelId: string 
   }
   if (ch.type === 'voice') return <CallStage key={ch.id} channel={ch} />
   return <ChatView key={ch.id} channelId={ch.id} aside={memberList ? <MemberList spaceId={spaceId} /> : null} />
+}
+
+/** algameet://invite/<code>: the join preview, as soon as there is a signed-in shell (links can arrive signed out). */
+function useInviteLink() {
+  const code = useDeepLink((x) => x.inviteCode)
+  useEffect(() => {
+    if (!code) return
+    useDeepLink.setState({ inviteCode: null })
+    useUi.getState().openModal({ kind: 'joinSpace', code })
+  }, [code])
 }
 
 /** Leave views that no longer exist (left a space, channel deleted). */

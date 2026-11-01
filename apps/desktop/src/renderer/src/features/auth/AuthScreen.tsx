@@ -1,7 +1,7 @@
 import { MIN_PASSWORD_LENGTH } from '@alga/shared'
 import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { ApiRequestError } from '@/lib/api'
 import { errorText, fieldErrors } from '@/lib/errors'
 import { parseEmailToken } from '@/lib/files'
@@ -9,6 +9,7 @@ import { confirmPasswordReset, requestPasswordReset } from '@/store/actions'
 import { useSession } from '@/store/session'
 import { Button, Icon, TextField } from '@/ui'
 import { EASE_OUT_QUART } from '@/ui/motion'
+import { useDeepLink } from '../app/deepLinks'
 import { LogoMark } from '../app/Logo'
 import { StrengthMeter, strengthHint } from './PasswordStrength'
 import { t } from './strings'
@@ -24,10 +25,21 @@ export function AuthScreen() {
   const [mode, setMode] = useState<Mode>('login')
   // Carries context between steps: the e-mail a reset link went to, or "senha trocada" back on the login.
   const [note, setNote] = useState<{ sentTo?: string; resetDone?: boolean }>({})
+  // algameet://auth/reset-password opens the reset form with the token already in place (consumed once).
+  const resetToken = useDeepLink((x) => x.resetToken)
+  const [prefill, setPrefill] = useState('')
   const go = (m: Mode, n: typeof note = {}) => {
     setNote(n)
     setMode(m)
+    if (m !== 'reset') setPrefill('')
   }
+  useEffect(() => {
+    if (!resetToken) return
+    setPrefill(resetToken)
+    useDeepLink.setState({ resetToken: null })
+    go('reset')
+  }, [resetToken])
+  const invite = useDeepLink((x) => !!x.inviteCode)
   return (
     <main className={s.screen}>
       <AnimatePresence mode="wait" initial={false}>
@@ -41,10 +53,10 @@ export function AuthScreen() {
           <div className={s.mark}>
             <LogoMark size={28} />
           </div>
-          {mode === 'login' && <LoginForm resetDone={!!note.resetDone} onSwitch={() => go('register')} onForgot={() => go('forgot')} />}
-          {mode === 'register' && <RegisterForm onSwitch={() => go('login')} />}
+          {mode === 'login' && <LoginForm resetDone={!!note.resetDone} invite={invite} onSwitch={() => go('register')} onForgot={() => go('forgot')} />}
+          {mode === 'register' && <RegisterForm invite={invite} onSwitch={() => go('login')} />}
           {mode === 'forgot' && <ForgotForm onSent={(email) => go('reset', { sentTo: email })} onHaveCode={() => go('reset')} onBack={() => go('login')} />}
-          {mode === 'reset' && <ResetForm sentTo={note.sentTo} onDone={() => go('login', { resetDone: true })} onResend={() => go('forgot')} onBack={() => go('login')} />}
+          {mode === 'reset' && <ResetForm key={prefill} sentTo={note.sentTo} initialToken={prefill} onDone={() => go('login', { resetDone: true })} onResend={() => go('forgot')} onBack={() => go('login')} />}
         </motion.div>
       </AnimatePresence>
       <p className={s.version}>v{window.alga?.config.version}</p>
@@ -92,7 +104,7 @@ function FormNote({ text }: { text: string }) {
   )
 }
 
-function LoginForm({ resetDone, onSwitch, onForgot }: { resetDone: boolean; onSwitch: () => void; onForgot: () => void }) {
+function LoginForm({ resetDone, invite, onSwitch, onForgot }: { resetDone: boolean; invite: boolean; onSwitch: () => void; onForgot: () => void }) {
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<Errors>({})
@@ -118,6 +130,7 @@ function LoginForm({ resetDone, onSwitch, onForgot }: { resetDone: boolean; onSw
       <p className={s.subtitle}>{t.login.subtitle}</p>
       <form className={s.form} onSubmit={onSubmit} noValidate>
         {resetDone && <FormNote text={t.login.resetDone} />}
+        {invite && !resetDone && <FormNote text={t.login.invite} />}
         <TextField
           label={t.login.login}
           name="login"
@@ -162,7 +175,7 @@ function LoginForm({ resetDone, onSwitch, onForgot }: { resetDone: boolean; onSw
   )
 }
 
-function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
+function RegisterForm({ invite, onSwitch }: { invite: boolean; onSwitch: () => void }) {
   const [v, setV] = useState({ email: '', displayName: '', username: '', password: '' })
   const [errors, setErrors] = useState<Errors>({})
   const { busy, error, submit } = useSubmit(
@@ -203,6 +216,7 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
       <h1 className={s.title}>{t.register.title}</h1>
       <p className={s.subtitle}>{t.register.subtitle}</p>
       <form className={s.form} onSubmit={onSubmit} noValidate>
+        {invite && <FormNote text={t.login.invite} />}
         <TextField label={t.register.email} type="email" autoComplete="email" autoFocus {...field('email')} />
         <TextField label={t.register.displayName} optional autoComplete="nickname" maxLength={32} hint={t.register.displayNameHint} {...field('displayName')} />
         <TextField
@@ -282,18 +296,25 @@ function ForgotForm({ onSent, onHaveCode, onBack }: { onSent: (email: string) =>
   )
 }
 
-function ResetForm({ sentTo, onDone, onResend, onBack }: { sentTo?: string; onDone: () => void; onResend: () => void; onBack: () => void }) {
+function ResetForm({ sentTo, initialToken, onDone, onResend, onBack }: { sentTo?: string; initialToken: string; onDone: () => void; onResend: () => void; onBack: () => void }) {
+  // A token from a deep link is a secret: it is used, never shown. A refusal brings the manual field back.
+  const [fromLink, setFromLink] = useState(!!initialToken)
   const [token, setToken] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<Errors>({})
+  const onFields = (f: Errors) => {
+    if (f.token && fromLink) setFromLink(false)
+    setErrors(f)
+  }
+  const value = fromLink ? initialToken : parseEmailToken(token)
   const { busy, error, submit } = useSubmit(async () => {
-    await confirmPasswordReset(parseEmailToken(token), password)
+    await confirmPasswordReset(value, password)
     onDone()
-  }, setErrors)
+  }, onFields)
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     const next: Errors = {}
-    if (!parseEmailToken(token)) next.token = t.errors.token
+    if (!value) next.token = t.errors.token
     if (password.length < MIN_PASSWORD_LENGTH) next.password = t.errors.passwordShort
     setErrors(next)
     if (Object.keys(next).length === 0) void submit()
@@ -301,26 +322,31 @@ function ResetForm({ sentTo, onDone, onResend, onBack }: { sentTo?: string; onDo
   return (
     <>
       <h1 className={s.title}>{t.reset.title}</h1>
-      <p className={s.subtitle}>{t.reset.subtitle}</p>
+      <p className={s.subtitle}>{fromLink ? t.reset.subtitleLink : t.reset.subtitle}</p>
       <form className={s.form} onSubmit={onSubmit} noValidate>
         {sentTo && <FormNote text={t.reset.sent(sentTo)} />}
-        <TextField
-          label={t.reset.token}
-          placeholder={t.reset.tokenPlaceholder}
-          autoComplete="one-time-code"
-          spellCheck={false}
-          autoFocus
-          value={token}
-          error={errors.token}
-          onChange={(e) => {
-            setToken(e.target.value)
-            setErrors((x) => ({ ...x, token: undefined }))
-          }}
-        />
+        {fromLink ? (
+          <FormNote text={t.reset.fromLink} />
+        ) : (
+          <TextField
+            label={t.reset.token}
+            placeholder={t.reset.tokenPlaceholder}
+            autoComplete="one-time-code"
+            spellCheck={false}
+            autoFocus
+            value={token}
+            error={errors.token}
+            onChange={(e) => {
+              setToken(e.target.value)
+              setErrors((x) => ({ ...x, token: undefined }))
+            }}
+          />
+        )}
         <TextField
           label={t.reset.password}
           type="password"
           autoComplete="new-password"
+          autoFocus={fromLink}
           value={password}
           error={errors.password}
           hint={password ? strengthHint(password) : t.register.passwordHint}

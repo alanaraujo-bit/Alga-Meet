@@ -9,6 +9,7 @@ import { AuthScreen } from '../auth/AuthScreen'
 import { applySavedHotkeys } from '../settings/hotkeys'
 import { Shell } from '../shell/Shell'
 import { BootSplash } from './BootSplash'
+import { startDeepLinks } from './deepLinks'
 import { TitleBar } from './TitleBar'
 import s from './app.module.css'
 
@@ -21,6 +22,8 @@ export function App() {
     void useSession.getState().boot()
     applySavedHotkeys()
   }, [])
+  // Signed in or not: links are held until the screen that uses them exists.
+  useEffect(() => startDeepLinks(), [])
 
   // Media engine notices (device unplugged, fallback to standard noise suppression…) surface as toasts.
   useEffect(

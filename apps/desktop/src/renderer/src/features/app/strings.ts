@@ -47,6 +47,13 @@ export const t = {
     copied: 'Copiado',
     statusError: 'Não foi possível alterar o status.',
   },
+  deepLinks: {
+    verified: 'E-mail confirmado. Tudo liberado.',
+    verifiedSignedOut: 'E-mail confirmado. Entre para continuar.',
+    verifyFailed: 'Não foi possível confirmar o e-mail. O link pode ter vencido: peça outro em Minha conta.',
+    resetSignedIn: 'Você abriu um link para criar uma senha nova. Trocar a senha encerra todas as sessões, inclusive esta.',
+    resetSignOut: 'Sair e trocar',
+  },
   voice: {
     connecting: 'Conectando à voz…',
     connected: 'Voz conectada',
