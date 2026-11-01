@@ -30,7 +30,8 @@ Ver `.env.example` (copie para `.env`; é carregado automaticamente). Validaçã
 `MAX_ATTACHMENT_BYTES`, `STORAGE_DRIVER` (`local` | `s3`), `UPLOADS_DIR`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`,
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_URL_STYLE` (`virtual` | `path`), `EMAIL_DRIVER` (`console` | `resend`),
 `ALGA_ALLOW_CONSOLE_EMAIL`, `EMAIL_OUTBOX_DIR`, `EMAIL_FROM`, `RESEND_API_KEY`, `EMAIL_LINK_URL`, `BILLING_PROVIDER`
-(`none` | `sandbox` | `mercadopago`), `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `MP_API_URL`, `BILLING_RETURN_URL`.
+(`none` | `sandbox` | `mercadopago`), `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `MP_API_URL`, `BILLING_RETURN_URL`,
+`REQUIRE_BIRTHDATE`, `LEGAL_URL`.
 
 Falha fechada:
 - **Sem `NODE_ENV` o servidor é produção**: exige `DATABASE_URL`, `CORS_ORIGINS`, `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET`
@@ -42,6 +43,8 @@ Falha fechada:
   `mercadopago` exige `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` e `BILLING_RETURN_URL` (https).
 - A chave `devkey` e o segredo de `infra/livekit/livekit.dev.yaml` (públicos) só são aceitos com `NODE_ENV=development`
   ou `test` **e** `HOST` loopback, ou com `ALGA_ALLOW_DEV_SECRETS=1` (ex. teste em LAN com `HOST=0.0.0.0`).
+- **Cadastro em produção** exige `birthDate` e `termsVersion` (`GET /legal`); fora de produção só com
+  `REQUIRE_BIRTHDATE=1` (até o desktop mandar os campos, o cadastro sem eles só gera `warn` no log).
 - `TRUST_PROXY`: `false` (padrão), IPs/CIDRs do proxy (`10.0.0.0/8,100.64.0.0/10`) ou número de saltos (`1`; só é
   seguro se a API não for alcançável sem o proxy). `true` é recusado: confiaria em qualquer `X-Forwarded-For`.
 
@@ -65,7 +68,12 @@ Falha fechada:
 | `src/gateway/` | conexões, fan-out, presença, `Throttle`; handshake, heartbeat, limites, READY, ops `presence`/`voice_state` |
 | `src/voice.ts` | tokens/grants LiveKit, webhook (assinatura + dedupe), `VoiceState` autoritativo, limite de usuários, moderação no SFU |
 | `src/billing/` | `catalog.ts` (planos, preços, cosméticos; versionado), `billing.ts` (motor: checkout, webhooks idempotentes, recompute de direitos, job de expiração), `provider.ts` (interface `PaymentProvider` + `SandboxProvider`), `mercadopago.ts` (Checkout Pro + preapproval, `x-signature`) |
-| `src/routes/` | `auth` (inclui verificação de e-mail e redefinição de senha), `users` (perfil, relacionamentos, DMs), `spaces` (espaços, membros, canais, convites, listar/revogar convites), `roles` (cargos, apelidos), `moderation` (bans, voz), `messages` (inclui envio multipart), `files` (download assinado, avatares/ícones), `voice`, `billing` |
+| `src/legal.ts` | `TERMS_VERSION`, faixa etária (`ageBracketOf`), prioridade e rótulos pt-BR dos motivos, prazos |
+| `src/trust-safety.ts` | medidas na conta (`applyAction`: warn/suspend/ban/lift aplicados em login, sessões, gateway 4010 e voz), token de recurso, quarentena de anexos com cópia em `evidence/` + SHA-256, retenção legal, `setStaffRole` |
+| `src/privacy.ts` | registros de acesso (Marco Civil art. 15), exclusão de conta (carência + expurgo), exportação (zip + link assinado por e-mail), job de retenção |
+| `src/zip.ts` | escritor de ZIP mínimo (deflate, sem zip64) para a exportação |
+| `scripts/grant-staff.ts` | único jeito de dar/tirar `staff_role` (`npx tsx scripts/grant-staff.ts <username> <admin\|moderator\|none>`; com PGlite, pare o servidor antes) |
+| `src/routes/` | `auth` (inclui verificação de e-mail e redefinição de senha), `users` (perfil, relacionamentos, DMs), `spaces` (espaços, membros, canais, convites, listar/revogar convites), `roles` (cargos, apelidos), `moderation` (bans, voz), `messages` (inclui envio multipart), `files` (download assinado, avatares/ícones), `voice`, `billing`, `privacy` (idade, aceite, exclusão, exportação, `/legal`), `reports` (denúncias, medidas da própria conta, recursos), `admin` (equipe, auditado) |
 
 ## Regras principais
 
@@ -188,6 +196,36 @@ Falha fechada:
     (`/v1/payments`, `/preapproval`, `/authorized_payments`), o corpo não é confiável. No painel do MP: URL
     `<PUBLIC_URL>/api/v1/billing/webhooks/mercadopago`, tópicos `payment`, `subscription_preapproval`,
     `subscription_authorized_payment`.
+- **Trust & Safety e privacidade** (decisões, retenção e operação em `docs/trust-safety/README.md`; abuso infantil em
+  `docs/trust-safety/csam-process.md`; contrato em `packages/shared/src/trust-safety.ts`):
+  - **Idade**: `birth_date` guardada só para a faixa (`Me.ageBracket`); < 16 no cadastro → 400 sem gravar nada; conta
+    antiga declara uma vez (`PATCH /users/@me/birth-date`), < 16 → suspensa (`underage`) e exclusão em 30 dias salvo
+    recurso. 16–17: DM só com amigos (nos dois sentidos) e sem compras.
+  - **Aceite**: `TERMS_VERSION` (`src/legal.ts`) no cadastro + `consent_records`; versão nova → `Me.needsTermsAcceptance`
+    até `POST /users/@me/accept-terms`.
+  - **Denúncias** (`POST /reports`, 10/h): retrato do alvo na hora (sobrevive à exclusão), sem autodenúncia, mensagem
+    só se o denunciante a vê, duplicada aberta = a mesma. `csam` = prioridade 100 + quarentena automática dos anexos +
+    retenção legal do autor.
+  - **Medidas** (equipe): warn / suspend até / ban / lift. Suspensão e banimento apagam as sessões, fecham o gateway com
+    **4010**, tiram da voz (`removeParticipant`); o login (senha certa) responde 403 com `error.restriction` e um token
+    de recurso (1 h). E-mail com a categoria, só para endereço verificado; `csam` não avisa e aparece como `other`.
+  - **Recursos**: `POST /appeals` (sessão ou token; 30 dias; um por medida; 10/h por IP); "aceito" levanta a medida.
+  - **Equipe**: `users.staff_role` só pelo script; `/admin/*` exige o papel (`access-logs`: admin); toda chamada vai
+    para `staff_audit_log` antes de executar (status depois); moderador não age sobre contas da equipe.
+  - **Quarentena**: anexo some na hora (404, `MESSAGE_UPDATE`), bytes copiados para `evidence/<id>` (nenhuma rota
+    serve) com SHA-256, original apagado só depois da cópia (falha → retido e retentado); `receiptConfirmed` com
+    protocolo apaga o material.
+  - **Exclusão** (`DELETE /users/@me`, senha): para a renovação da assinatura, 4004 em todas as sessões, expurgo em 7
+    dias (login cancela; retenção legal ou recurso aberto seguram). Espaços → maior cargo / mais antigo, ou excluídos;
+    mensagens `anonymize` (autor `REMOVED_USER_ID`, "Usuário removido", criado pela migração 0005) ou `delete`;
+    anexos/avatar/exportações sempre apagados; `subscriptions`/`orders` passam para `REMOVED_USER_ID` (FK `restrict`
+    mantida de propósito); `deleted_accounts` (username + SHA-256 do e-mail) 6 meses.
+  - **Exportação** (`POST /users/@me/export`, e-mail verificado, 1/24 h no banco): zip (`dados.json` + `LEIA-ME.txt`)
+    em `exports/`, link HMAC de 7 dias só por e-mail (`GET /exports/:id`), anexos com URL assinada de 7 dias.
+  - **Registros de acesso** (`access_logs`, sem FK): todo login/cadastro + 1º uso do dia por IP e user agent (hash),
+    REST e gateway; IP pela regra de `TRUST_PROXY`; expurgo aos 6 meses salvo retenção legal; sem porta de origem.
+  - **Job** (`Privacy.sweep`, a cada minuto): expurgos devidos, retenção (acesso 6 meses, casos decididos 6 meses salvo
+    `csam`, exportações vencidas), exportações pendentes; `TrustSafety.sweep` retenta cópias de prova.
 - **Sessões** expiram após 30 dias sem uso ou 90 dias do login; `POST /auth/password` revoga as outras;
   `DELETE /auth/sessions` revoga todas menos a atual; sem sessão o usuário sai da voz e o token LiveKit antigo não
   reentra.
@@ -196,15 +234,16 @@ Falha fechada:
   amizade, DMs, `POST /invites/:code` e `/voice/join` 10/min; `verify-email` e `password-reset/confirm` 10/min/IP;
   `password-reset/request` 5/15 min/IP; reenvio da verificação 3/15 min; e-mails 3/h por endereço e fluxo; preview de convite 30/min/IP; espaços 10/h; convites
   20/h; troca de senha 5/15 min; 30 arquivos anexados/10 min por usuário; avatar/ícone 5/min; downloads de
-  arquivo/avatar/ícone 1200/min/IP (uma página de chat carrega muitos de uma vez). Webhook do LiveKit e `/health` sem
-  limite.
+  arquivo/avatar/ícone 1200/min/IP (uma página de chat carrega muitos de uma vez); denúncias 10/h; recursos 10/h/IP;
+  `DELETE /users/@me` 5/15 min; exportação 1/24 h (no banco); data de nascimento 5/min. Webhook do LiveKit e `/health`
+  sem limite.
 - **Gateway**: `identify` em até 10 s; 120 frames/60 s por socket e 10 sockets por usuário (senão 4008);
   `presence`/`voice_state` no máximo 1 fan-out/s por usuário (o último valor vence); cliente que não lê (buffer >
   1 MiB) é derrubado. `voice_state` sem mudança não emite; `streaming`/`video` exigem `STREAM`/`SPEAK`.
 - Tokens LiveKit sem `canPublishData`. Webhooks repetidos (mesmo `id`) são ignorados por 10 min.
 - Logs: sem corpo, sem `authorization`, sem parâmetros SQL nem `detail` do Postgres, código de convite redigido.
 
-## Testes (`test/`, 138 casos)
+## Testes (`test/`, 153 casos)
 
 `npm test` roda em PGlite; `npm run test:pg` roda os mesmos casos num PostgreSQL 18 real (`test/pg-setup.ts`: um
 cluster UTF8 descartável por execução, um banco por `startServer`). Os dois passam.
@@ -232,6 +271,19 @@ cancelamento no fim do período → expiração pelo job (com `ENTITLEMENTS_UPDA
 (reembolso, cosmético próprio × coleção do plano), teto de anexo por plano, atributo de presets no token e mute de
 tela acima do plano, sandbox recusado em produção, e o adaptador Mercado Pago contra uma API simulada (`x-signature`,
 re-busca, `past_due`, cancelamento, compra avulsa). `spaces.test.ts` inclui listar/revogar convites (authz).
+`privacy.test.ts` (9): idade no cadastro (< 16 sem gravar nada, 16 hoje, 18, datas inválidas, sem data em dev,
+`REQUIRE_BIRTHDATE` e produção), declaração única e < 16 → suspensão + 4010 + exclusão segurada por recurso aceito,
+16–17 (DM só com amigos sem revelar idade, sem compra), aceite e novo aceite com histórico, registros de acesso (login,
+1º uso do dia por IP/app, gateway, expurgo de 6 meses salvo retenção legal, rota só de admin), exclusão (senha, 4004,
+cancelada pelo login, expurgo: herdeiro do espaço, espaço sozinho excluído, mensagens anonimizadas com anexos apagados
+no bucket, DM, pedido pago passa ao usuário removido, denúncia sem denunciante, `deleted_accounts`, eventos aos outros;
+`delete` e retenção legal) e exportação (e-mail verificado, 1/24 h, zip lido de volta, link e URLs de anexo de 7 dias,
+assinatura adulterada, expiração). `trust-safety.test.ts` (6): papel de equipe só pelo script + auditoria com status,
+denúncias (retrato que sobrevive, autodenúncia, visibilidade, duplicada, 10/h), suspensão (4010, `removeParticipant`,
+401, e-mail sem nota interna, login 403 com motivo, token de recurso, recurso aceito), ban/lift/warn/expiração/guardas
+(equipe só por admin, `csam` sem aviso), quarentena `csam` (404, `MESSAGE_UPDATE`, prioridade, prova + SHA-256,
+original apagado, retenção que segura a exclusão, `receiptConfirmed` com protocolo) e quarentena manual (idempotente,
+cópia que falha fica retida e é retentada).
 
 ## Smoke com LiveKit real (server mute)
 
@@ -267,3 +319,9 @@ na sala com `livekit-client` e publica o microfone; o dono chama `PATCH /spaces/
 - Dois checkouts de plano pagos ao mesmo tempo não são bloqueados: o recompute usa o melhor e o outro precisa de
   estorno manual. Pagamento duplo de um pedido é logado como erro (estorno manual).
 - Downloads de anexo passam pela API: o anexo de 100 MiB do Plus custa egress do Railway (ver lacuna acima).
+- **Trust & Safety** (detalhes em `docs/trust-safety/`): idade só autodeclarada; sem detecção por hash de material
+  conhecido nem envio automático ao Nidus/PF; quarentena sem "desfazer" (falsa denúncia → restauração manual); prova em
+  `evidence/` no mesmo bucket (recomendado bucket/política própria); denúncia comum preserva só os metadados dos
+  anexos; sem expurgo fiscal automático de `subscriptions`/`orders`; exportação montada em memória (sem zip64); conta
+  suspensa/banida não se autoexclui (pedido ao encarregado); registros de acesso sem porta de origem (D23); o cache de
+  "1º uso do dia" fica em memória (mesma ressalva do Redis).

@@ -27,6 +27,38 @@ Fatos do produto foram tirados de:
 
 Nada foi inventado. Onde o fato não estava no repositório, o texto traz `[PREENCHER]`.
 
+## 0. Status (atualizado em 2026-11-01, backend)
+
+O servidor agora cobre as lacunas abaixo. As decisões e o funcionamento estão em `docs/trust-safety/README.md`. O
+procedimento para abuso infantil está em `docs/trust-safety/csam-process.md`.
+
+Duas coisas ainda faltam em todas elas:
+
+- **as telas no desktop**;
+- **a revisão do texto** da Política e dos Termos. Os `[LACUNA]` correspondentes só podem sair depois que o desktop
+  entregar a tela.
+
+| # | Status | O que existe / o que falta |
+|---|---|---|
+| L1 | **Backend feito** | `birthDate` obrigatório em produção, recusa abaixo de 16 sem gravar nada, `Me.ageBracket`. Conta antiga declara uma vez. Abaixo de 16: suspensão, recurso e exclusão em 30 dias. A data serve só para a faixa (art. 13). **Falta:** desktop. Também falta decidir D2: a aferição continua sendo autodeclaração |
+| L2 | **Backend feito** | `POST /reports` com retrato do alvo e fila da equipe. Medidas na conta: aviso, suspensão até uma data e banimento, aplicadas no login, nas sessões, no gateway e na voz. E-mail com a categoria e recurso. A identidade de quem denuncia não é revelada. **Falta:** desktop (botão "Denunciar", tela de conta suspensa e de recurso) e um painel da equipe (hoje só a API) |
+| L3 | **Backend e procedimento feitos** | Denúncia `csam` põe os anexos em quarentena na hora, com prova e SHA-256 guardados à parte e a conta em retenção legal. Procedimento escrito, com o destino (PF/CNCA pelo Nidus) e os prazos da Portaria MJSP 1.312/2026. **Falta:** cadastro no Nidus (prazo por volta de dezembro de 2026), a pessoa responsável e o apoio psicológico |
+| L4 | **Backend feito** | `DELETE /users/@me` com senha e 7 dias de carência; entrar de novo cancela. Espaços vão ao membro de cargo mais alto, ou são excluídos. Os pagamentos ficam sem a identidade. As FKs `restrict` são tratadas, não removidas. D13 decidido: a pessoa escolhe, e o padrão é **anonimizar** como "Usuário removido". Anexos e avatar sempre apagados. **Falta:** desktop, e decidir o pedido de exclusão de conta suspensa ou banida |
+| L5 | **Backend feito** | `POST /users/@me/export`: zip com JSON e links assinados dos anexos, link de 7 dias enviado só por e-mail, 1 pedido por dia. **Falta:** desktop |
+| L6 | **Backend feito** | Tabela `access_logs`: cada login e o primeiro uso do dia por IP e app. Ficam 6 meses mesmo depois da exclusão da conta, com acesso só de admin e auditado. **Falta:** D23 (porta de origem) |
+| L7 | **Backend feito** | `termsVersion` no cadastro (obrigatório em produção), histórico em `consent_records`, `Me.needsTermsAcceptance` e `POST /users/@me/accept-terms`. **Falta:** desktop (caixa desmarcada e links de `GET /legal`) |
+| L10 | **Backend feito** | De 16 a 17 anos: DM só com amigos, nos dois sentidos, sem revelar a idade. Sem compras (P3). Não foi criado selo de espaço 18+, porque D7 proíbe conteúdo adulto em todo o serviço. **Falta:** desktop |
+| P3 | **Backend feito** | O checkout recusa quem tem 16 ou 17 anos. Também recusa idade desconhecida quando a data de nascimento é exigida. Fica pendente o modelo de assistência do responsável (D3) |
+| F3 | **Feito** | `staff_audit_log` registra toda chamada `/admin/*` antes de executar, inclusive a leitura da fila. A Política pode perder o `[LACUNA]` da seção 5 |
+| F6 | Parcial | Sessões, tokens e contas não verificadas continuam sem limpeza. O job novo faz a retenção de acesso, de casos e de exportações |
+
+Afirmações que mudam:
+
+- "Sessões sem IP" continua verdade: o IP fica em `access_logs`, não em `sessions`.
+- A linha "Registros de acesso" da Política deixa de ser `[LACUNA]`.
+- A linha "Denúncias e moderação" agora tem prazo implementado: 6 meses depois da decisão. Denúncias `csam` não têm
+  expurgo automático.
+
 ## 1. Lacunas que bloqueiam o lançamento
 
 Ordenadas por gravidade. "Grátis" bloqueia qualquer lançamento público. "Pago" bloqueia só a cobrança real.
@@ -93,17 +125,17 @@ Recomendado antes do lançamento pago, mas não obrigatório por lei federal hoj
 | D10 | Cosmético = **licença** enquanto a conta e o serviço existirem. Aviso de 90 dias se o serviço acabar. Perda "nos limites da lei" em banimento por violação grave | Conflita com a UI "para sempre" (P4). Decidir: (a) reembolso proporcional se o serviço acabar cedo; (b) se a perda por banimento é válida diante do CDC |
 | D11 | **Sem teto de indenização.** A responsabilidade segue o CDC | Cláusula que limita ou exonera responsabilidade perante consumidor é nula (CDC, art. 51, I). Não foi incluído nenhum teto |
 | D12 | Licença do conteúdo do usuário: **mundial, gratuita, não exclusiva, só para operar o serviço**, terminando quando o conteúdo é apagado (salvo backups) | "Mundial" porque a hospedagem fica nos EUA. Inclui recodificar imagens. Exclui expressamente IA, anúncios e venda |
-| D13 | Mensagens depois da exclusão da conta: **a pessoa escolhe** entre apagar tudo ou manter como "Usuário excluído" | Ponderar o direito de eliminação (art. 18, VI) com o histórico da conversa dos outros participantes. Decidir o padrão |
-| D14 | Prazos: conta excluída apagada em 30 dias; backups até 3 meses; moderação 6 meses após o fim do caso; fiscal ~5 anos; contas não verificadas 30 dias; logs técnicos conforme o provedor | Todos são propostas. Confirmar o fiscal com o contador. Os backups de 3 meses vêm de `deploy.md` §7 (mensal mantido 3 meses), ainda não configurados |
+| D13 | Mensagens depois da exclusão da conta: **a pessoa escolhe** entre apagar tudo ou manter como "Usuário excluído" | Ponderar o direito de eliminação (art. 18, VI) com o histórico da conversa dos outros participantes. **Implementado com o padrão "anonimizar"**: o texto fica sob um único "Usuário removido", então as mensagens de quem saiu não se ligam entre si. Anexos e avatar sempre são apagados. Confirmar o padrão |
+| D14 | Prazos: conta excluída apagada em 30 dias; backups até 3 meses; moderação 6 meses após o fim do caso; fiscal ~5 anos; contas não verificadas 30 dias; logs técnicos conforme o provedor | Todos são propostas. Confirmar o fiscal com o contador. Os backups de 3 meses vêm de `deploy.md` §7 (mensal mantido 3 meses), ainda não configurados. **Implementado:** exclusão em 7 dias (dentro dos 30), casos de moderação 6 meses depois da decisão (exceto `csam`), registros de acesso 6 meses. Fiscal e contas não verificadas: ainda sem expurgo |
 | D15 | A equipe acessa conteúdo só em denúncia, ordem judicial ou incidente | Sem E2EE é tecnicamente possível. Confirmar se a redação "não lemos por rotina" é suficiente e honesta |
 | D16 | **30 dias** de aviso para mudanças relevantes nos Termos e nos preços | Prática comum. Confirmar |
 | D17 | Denúncia sobre direitos de criança ou adolescente **identifica quem denuncia** | O art. 29, §2º, veda a denúncia anônima para remoção sem ordem judicial. Confirmar se outras denúncias podem ser feitas sem esse requisito (a denúncia no app já é autenticada) |
 | D18 | Encarregado nomeado, sem uso da dispensa de pequeno porte | Res. 2/2022: dados de adolescentes são critério específico de alto risco, que afasta o tratamento diferenciado. Confirmar se também é preciso o critério geral (larga escala) |
 | D19 | Voz e tela **não são dado sensível**: sem gravação, sem reconhecimento de voz, só encaminhadas em tempo real | Confirmar que não há tratamento biométrico (LGPD, art. 5º, II) |
 | D20 | O hook global de teclado e mouse (atalhos) está descrito com clareza suficiente | Ele observa todas as teclas enquanto há atalhos configurados, mas só compara localmente (`hotkeys.ts`). Avaliar se é preciso um aviso no momento da configuração |
-| D21 | Destinatário da comunicação do art. 27 (abuso infantil) | Polícia Federal? SaferNet? NCMEC (EUA)? O decreto pode ter definido. Não foi lido na íntegra (fonte 4) |
+| D21 | Destinatário da comunicação do art. 27 (abuso infantil) | **Respondido em 2026-11-01:** Polícia Federal, no CNCA ("Centro Nacional de Triagem de Notificações"), pelo Sistema Nidus. Base: Decreto 12.880/2026, arts. 36 a 39, e Portaria MJSP 1.312/2026. Depois que a PF confirma o recebimento, o material é apagado (art. 39, §2º). O cadastro no Nidus é obrigatório. Detalhes em `docs/trust-safety/csam-process.md`. A portaria em si não foi lida |
 | D22 | Foro no domicílio do consumidor | CDC, art. 101, I. Nenhuma cláusula de eleição de foro |
-| D23 | Porta lógica de origem nos registros de acesso | O Marco Civil fala só de IP, mas a jurisprudência do STJ costuma exigir a porta por causa do CGNAT. Atrás do proxy do Railway a porta do cliente pode não chegar à API |
+| D23 | Porta lógica de origem nos registros de acesso | O Marco Civil fala só de IP, mas a jurisprudência do STJ costuma exigir a porta por causa do CGNAT. Atrás do proxy do Railway a porta do cliente pode não chegar à API. **Continua aberto:** `access_logs` grava IP, data, hora e hash do user agent, mas não a porta |
 
 ## 4. Afirmações que precisam continuar verdadeiras
 
@@ -112,8 +144,13 @@ Se o código mudar, estes trechos mudam junto. Cada linha diz onde a afirmação
 - "Sem E2EE; o SFU pode ver a mídia": `docs/ARCHITECTURE.md` (Segurança).
 - "Sem telemetria; relatórios de travamento não são enviados": `crashReporter.start({ uploadToServer: false })` em
   `apps/desktop/src/main/log.ts`. Não há SDK de analytics no app.
-- "Sessões sem IP": `sessions` em `schema.ts` só tem `user_agent`, `created_at` e `last_used_at`. Isso **deixa de
-  valer** quando L6 for implementado em outra tabela; atualizar a linha da Política.
+- "Sessões sem IP": `sessions` em `schema.ts` só tem `user_agent`, `created_at` e `last_used_at`. Isso continua
+  verdade. O IP de cada uso está em `access_logs` desde a migração 0005 (L6), e a linha "Registros de acesso" da
+  Política deve dizer isso.
+- "A identidade de quem denuncia não é revelada": `reports.reporter_id` só aparece em `/admin/reports`, que exige
+  papel de equipe (`src/routes/admin.ts`).
+- "Data de nascimento usada só para aferir idade": `birth_date` só é lida por `ageBracketOf` (`src/legal.ts`) e pela
+  exportação da própria pessoa.
 - "Imagens sem metadados, exceto HEIC/TIFF/BMP/RAW" e "sem antivírus": `apps/server/README.md` (Lacunas conhecidas).
 - "Cancelar no app; benefícios até o fim do período; 3 dias de carência": `src/billing/` e `apps/server/README.md`.
 - "Grátis: 720p30/720p60/1080p30 e 25 MB. Plus: 1080p60/1440p60/4K30 e 100 MB": `catalog.ts` e
