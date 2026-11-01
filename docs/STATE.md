@@ -18,7 +18,8 @@
 | Desktop nativo onda 1 | `apps/desktop/src/main`, `preload`, instalador | **feito** — ver Validado |
 | Correções de segurança + cargos/banimento/moderação de voz | `apps/server`, `packages/shared` (aditivo) | em andamento |
 | Motor de mídia | `apps/desktop/src/renderer/src/media`: voz (Opus/DTX/RED, RNNoise, PTT, dispositivos) + transmissão (codecs, presets, áudio do sistema) + benchmarks | em andamento |
-| Design system + telas (onda 1: shell, auth, amigos, DMs, espaços, chat) | `apps/desktop/src/renderer` (exceto `media/`) | em andamento |
+| Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
+| Crítica de design independente | `docs/design/critique-*.md` | em andamento |
 | Camada de dados do renderer | `lib/api.ts`, `lib/gateway.ts`, `store/*` | feito (Maestro), typecheck ok, sem teste de integração ainda |
 
 ## Validado
@@ -27,6 +28,7 @@
 - Revisão de segurança independente do backend (`docs/security/server-review-2026-11-01.md`): 0 crítico, 2 alto, 10 médio, 11 baixo; sem IDOR. Correções em andamento.
 - Desktop nativo: bridge `window.alga` completo; 16 testes unitários (hotkeys, bounds, badge) + 21/21 checagens e2e com Playwright no app empacotado (tray, token via DPAPI sem texto puro no disco, captura negada sem escolha do usuário, hooks globais reais de PTT). Instalador NSIS 109 MiB: instalação silenciosa 7,8 s, desinstalação 6,2 s, dados do usuário preservados por padrão.
 - Eco do áudio do sistema na transmissão: resolvido sem módulo nativo com `restrictOwnAudio: true` (tom do próprio app caiu de −56 dB para −80 dB, outros apps intactos em −24 dB). `docs/decisions/0002-screen-audio-capture.md`.
+- UI onda 1: design system (`docs/design/design-system.md`) + 20 componentes; telas de auth, onboarding (2 passos até criar/entrar em espaço), amigos, DMs, espaços, convites, chat completo (agrupamento, edição, respostas, reações, digitação, não lidas, reenvio em falha), banner de reconexão, Ctrl+K. Cada tela capturada no app real com dados criados pela API real (`docs/screenshots/2026-11-01-*-vN.png`, histórico de versões preservado). 18 testes unitários novos.
 - Backend: 47 testes vitest (PGlite em memória, REST via inject + gateway via WebSocket real) passando, conferido pelo Maestro. Smoke test com LiveKit real: webhooks `room_started/finished` e `participant_joined/left` reais recebidos e assinatura verificada; `VOICE_STATE_UPDATE/REMOVE` entregues no gateway.
 
 ## Pesquisa concluída
@@ -38,6 +40,9 @@
 Sem medições ainda. Metas iniciais (de `discord-benchmark.md`): stream 1080p60 grátis com encode por hardware; RAM ociosa ≤ 300 MB; voz ≥ paridade Opus 64–128 kbps com DTX+RED.
 
 ## Problemas conhecidos
+- Lista de mensagens sem virtualização (históricos muito longos ficam lentos); sem autocomplete de menção nem seletor de emoji; DMs não podem ser fechadas.
+- Domínio do link de convite (`https://alga.meet/i/`) é provisório — precisa de domínio real.
+- Bundle do renderer ~835 KB (zod do `@alga/shared` entra no renderer).
 - Push-to-talk não funciona enquanto um jogo rodando como administrador tem o foco (limite do Windows para hooks de processo não elevado).
 - Notificação nativa, badge da barra de tarefas e iniciar com o Windows ainda não verificados visualmente.
 - **Sem E2EE de mídia.** Mídia é cifrada só até o SFU (DTLS-SRTP). Discord tem E2EE (DAVE) obrigatório desde 2026-03 → paridade necessária antes de lançamento público.
