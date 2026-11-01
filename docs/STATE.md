@@ -16,16 +16,18 @@
 |---|---|---|
 | Backend onda 1 | `apps/server` | **feito** — ver Validado |
 | Desktop nativo onda 1 | `apps/desktop/src/main`, `preload`, instalador | **feito** — ver Validado |
-| Correções de segurança + cargos/banimento/moderação de voz | `apps/server`, `packages/shared` (aditivo) | em andamento |
+| Backend onda 2 (segurança + cargos/banimento/moderação) | `apps/server`, `packages/shared` | **feito** — ver Validado |
+| UI onda 2 (chamada, transmissão, configurações, correções da crítica) | `apps/desktop/src/renderer` (exceto `media/`) | em andamento |
 | Motor de mídia | `apps/desktop/src/renderer/src/media`: voz (Opus/DTX/RED, RNNoise, PTT, dispositivos) + transmissão (codecs, presets, áudio do sistema) + benchmarks | em andamento |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
-| Crítica de design independente | `docs/design/critique-*.md` | em andamento |
+| Crítica de design independente | `docs/design/critique-2026-11-01.md` | **feito**: nota 5/10 vs Linear (tela de chamada ausente, layout clone do Discord, excesso de vermelho e bordas) → corrigindo na UI onda 2 |
 | Camada de dados do renderer | `lib/api.ts`, `lib/gateway.ts`, `store/*` | feito (Maestro), typecheck ok, sem teste de integração ainda |
 
 ## Validado
 - `@alga/shared`: 2 testes unitários (UUIDv7, permissões) passando.
 - Esqueleto desktop: `electron-vite build` e `typecheck` passando.
-- Revisão de segurança independente do backend (`docs/security/server-review-2026-11-01.md`): 0 crítico, 2 alto, 10 médio, 11 baixo; sem IDOR. Correções em andamento.
+- Revisão de segurança independente do backend (`docs/security/server-review-2026-11-01.md`): 0 crítico, 2 alto, 10 médio, 11 baixo; sem IDOR. **Corrigidos: todos os altos e médios + 9/11 baixos**, cada um com teste de regressão escrito antes (tabela de status no próprio relatório). Adiados: B5 (registro revela campo já usado) e B10 (senha mínima 8 sem lista de vazadas) — dependem de verificação de e-mail.
+- Backend onda 2: cargos (CRUD, ordem, atribuição), apelidos, banimento, moderação de voz (mute/ensurdecer/mover/desconectar). Mute de moderação **aplicado no SFU** (smoke real: LiveKit retirou a permissão de publicar microfone; republicar falhou com "insufficient permissions"). 87 testes passando (antes 47).
 - Desktop nativo: bridge `window.alga` completo; 16 testes unitários (hotkeys, bounds, badge) + 21/21 checagens e2e com Playwright no app empacotado (tray, token via DPAPI sem texto puro no disco, captura negada sem escolha do usuário, hooks globais reais de PTT). Instalador NSIS 109 MiB: instalação silenciosa 7,8 s, desinstalação 6,2 s, dados do usuário preservados por padrão.
 - Eco do áudio do sistema na transmissão: resolvido sem módulo nativo com `restrictOwnAudio: true` (tom do próprio app caiu de −56 dB para −80 dB, outros apps intactos em −24 dB). `docs/decisions/0002-screen-audio-capture.md`.
 - UI onda 1: design system (`docs/design/design-system.md`) + 20 componentes; telas de auth, onboarding (2 passos até criar/entrar em espaço), amigos, DMs, espaços, convites, chat completo (agrupamento, edição, respostas, reações, digitação, não lidas, reenvio em falha), banner de reconexão, Ctrl+K. Cada tela capturada no app real com dados criados pela API real (`docs/screenshots/2026-11-01-*-vN.png`, histórico de versões preservado). 18 testes unitários novos.
@@ -48,7 +50,8 @@ Sem medições ainda. Metas iniciais (de `discord-benchmark.md`): stream 1080p60
 - **Sem E2EE de mídia.** Mídia é cifrada só até o SFU (DTLS-SRTP). Discord tem E2EE (DAVE) obrigatório desde 2026-03 → paridade necessária antes de lançamento público.
 - Strings da UI direto em pt-BR, sem framework de i18n ainda.
 - Anexos/upload de arquivos fora do escopo da primeira fatia.
-- Backend sem rotas de cargos, apelidos, banimento e moderação de voz (`serverMute/serverDeaf` sempre false) — próxima onda do backend.
+- Sem permissões por canal (overwrites) ainda; sem verificação de e-mail nem recuperação de senha por e-mail (precisa provedor de e-mail).
+- Contadores de rate limit em memória (instância única).
 - Estado de voz, conexões do gateway e throttle de digitação em memória → instância única até introduzir Redis pub/sub.
 - Testado só em PGlite (Postgres 18 WASM); migração ainda não rodada em Postgres real.
 
