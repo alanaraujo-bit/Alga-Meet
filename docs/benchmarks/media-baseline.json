@@ -1,0 +1,4380 @@
+{
+  "when": "2026-11-01T05:11:23.163Z",
+  "idle": {
+    "route": "default (#/)",
+    "lab-a": {
+      "samples": 20,
+      "cpuPctMachine": {
+        "n": 20,
+        "median": 0,
+        "p95": 1,
+        "min": 0,
+        "max": 1,
+        "mean": 0.1
+      },
+      "privateMB": {
+        "n": 20,
+        "median": 201.8,
+        "p95": 205.5,
+        "min": 201.5,
+        "max": 205.5,
+        "mean": 201.9
+      },
+      "workingSetMB": {
+        "n": 20,
+        "median": 337.7,
+        "p95": 337.8,
+        "min": 337.5,
+        "max": 337.8,
+        "mean": 337.7
+      },
+      "byType": {
+        "Browser": {
+          "cpuMedian": 0,
+          "privMBMedian": 69.8
+        },
+        "GPU": {
+          "cpuMedian": 0,
+          "privMBMedian": 79.1
+        },
+        "Utility": {
+          "cpuMedian": 0,
+          "privMBMedian": 11.6
+        },
+        "Tab": {
+          "cpuMedian": 0,
+          "privMBMedian": 41.3
+        }
+      }
+    },
+    "lab-b": {
+      "samples": 20,
+      "cpuPctMachine": {
+        "n": 20,
+        "median": 0,
+        "p95": 0.1,
+        "min": 0,
+        "max": 0.1,
+        "mean": 0
+      },
+      "privateMB": {
+        "n": 20,
+        "median": 200.4,
+        "p95": 209.9,
+        "min": 200.1,
+        "max": 209.9,
+        "mean": 200.8
+      },
+      "workingSetMB": {
+        "n": 20,
+        "median": 413.2,
+        "p95": 413.3,
+        "min": 413,
+        "max": 413.3,
+        "mean": 413.2
+      },
+      "byType": {
+        "Browser": {
+          "cpuMedian": 0,
+          "privMBMedian": 68.8
+        },
+        "GPU": {
+          "cpuMedian": 0,
+          "privMBMedian": 78.6
+        },
+        "Utility": {
+          "cpuMedian": 0,
+          "privMBMedian": 11.5
+        },
+        "Tab": {
+          "cpuMedian": 0,
+          "privMBMedian": 41.5
+        }
+      }
+    }
+  },
+  "codecProbe": {
+    "send": [
+      "video/VP8",
+      "video/rtx",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=4d001f",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=4d001f",
+      "video/AV1 level-idx=5;profile=0;tier=0",
+      "video/VP9 profile-id=0",
+      "video/VP9 profile-id=2",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640032",
+      "video/H265 level-id=123;profile-id=1;tier-flag=0;tx-mode=SRST",
+      "video/red",
+      "video/ulpfec"
+    ],
+    "recv": [
+      "video/VP8",
+      "video/rtx",
+      "video/VP9 profile-id=0",
+      "video/VP9 profile-id=2",
+      "video/VP9 profile-id=1",
+      "video/VP9 profile-id=3",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=4d001f",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=4d001f",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=f4001f",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=f4001f",
+      "video/AV1 level-idx=5;profile=0;tier=0",
+      "video/AV1 level-idx=5;profile=1;tier=0",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=64001f",
+      "video/H264 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=64001f",
+      "video/H265 level-id=180;profile-id=1;tier-flag=0;tx-mode=SRST",
+      "video/H265 level-id=180;profile-id=2;tier-flag=0;tx-mode=SRST",
+      "video/red",
+      "video/ulpfec",
+      "video/flexfec-03 repair-window=10000000"
+    ],
+    "video/H264 1920x1080@60": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      }
+    },
+    "video/H264 2560x1440@60": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      }
+    },
+    "video/H264 3840x2160@30": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      }
+    },
+    "video/VP8 1920x1080@60": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      }
+    },
+    "video/VP8 2560x1440@60": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      }
+    },
+    "video/VP8 3840x2160@30": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      }
+    },
+    "video/VP9 1920x1080@60": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      }
+    },
+    "video/VP9 2560x1440@60": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      }
+    },
+    "video/VP9 3840x2160@30": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      }
+    },
+    "video/AV1 1920x1080@60": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      }
+    },
+    "video/AV1 2560x1440@60": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      }
+    },
+    "video/AV1 3840x2160@30": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": false
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      }
+    },
+    "video/H265 1920x1080@60": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      }
+    },
+    "video/H265 2560x1440@60": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      }
+    },
+    "video/H265 3840x2160@30": {
+      "encode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      },
+      "decode": {
+        "supported": true,
+        "smooth": true,
+        "powerEfficient": true
+      }
+    }
+  },
+  "env": {
+    "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) AlgaMeet/0.1.0 Chrome/156.0.8078.75 Electron/45.2.1 Safari/537.36",
+    "cores": 20,
+    "dpr": 1,
+    "screen": [
+      1920,
+      1080
+    ],
+    "electron": {
+      "electron": "45.2.1",
+      "chrome": "156.0.8078.75",
+      "gpu": {
+        "2d_canvas": "enabled",
+        "direct_rendering_display_compositor": "disabled_off_ok",
+        "gpu_compositing": "enabled",
+        "multiple_raster_threads": "enabled_on",
+        "opengl": "enabled_on",
+        "rasterization": "enabled",
+        "raw_draw": "disabled_off_ok",
+        "skia_graphite": "disabled_off",
+        "trees_in_viz": "disabled_off",
+        "video_decode": "enabled",
+        "video_encode": "enabled",
+        "webgl": "enabled",
+        "webgpu": "enabled",
+        "webnn": "disabled_off"
+      }
+    }
+  },
+  "joinMs": {
+    "firstJoinOfProcess": [
+      216,
+      168
+    ],
+    "subsequent": {
+      "n": 7,
+      "median": 132,
+      "p95": 137,
+      "min": 131,
+      "max": 137,
+      "mean": 133.4
+    }
+  },
+  "clock": {
+    "offsetMsBminusA": -0.1,
+    "evalRoundTripMs": 0.7
+  },
+  "opus": {
+    "sdp": {
+      "offer": [
+        "a=rtpmap:111 opus/48000/2",
+        "a=fmtp:111 minptime=10;stereo=1;useinbandfec=1",
+        "a=rtpmap:63 red/48000/2",
+        "a=fmtp:63 111/111",
+        "a=rtpmap:111 opus/48000/2",
+        "a=fmtp:111 minptime=10;stereo=1;useinbandfec=1",
+        "a=rtpmap:63 red/48000/2",
+        "a=fmtp:63 111/111",
+        "a=rtpmap:111 opus/48000/2",
+        "a=fmtp:111 minptime=10;stereo=1;useinbandfec=1",
+        "a=rtpmap:63 red/48000/2",
+        "a=fmtp:63 111/111",
+        "a=rtpmap:122 red/90000",
+        "a=rtpmap:122 red/90000",
+        "a=rtpmap:122 red/90000",
+        "a=rtpmap:111 opus/48000/2",
+        "a=fmtp:111 minptime=10;stereo=1;useinbandfec=1",
+        "a=rtpmap:63 red/48000/2",
+        "a=fmtp:63 111/111"
+      ],
+      "answer": [
+        "a=rtpmap:111 opus/48000/2",
+        "a=fmtp:111 minptime=10;usedtx=1;useinbandfec=1",
+        "a=rtpmap:63 red/48000/2",
+        "a=fmtp:63 111/111",
+        "a=rtpmap:111 opus/48000/2",
+        "a=fmtp:111 minptime=10;usedtx=1;useinbandfec=1",
+        "a=rtpmap:63 red/48000/2",
+        "a=fmtp:63 111/111",
+        "a=rtpmap:111 opus/48000/2",
+        "a=fmtp:111 minptime=10;usedtx=1;useinbandfec=1",
+        "a=rtpmap:63 red/48000/2",
+        "a=fmtp:63 111/111",
+        "a=rtpmap:63 red/48000/2",
+        "a=fmtp:63 111/111",
+        "a=rtpmap:111 opus/48000/2",
+        "a=fmtp:111 minptime=10;usedtx=1;useinbandfec=1"
+      ]
+    },
+    "sender": {
+      "codecs": [
+        {
+          "mimeType": "audio/red",
+          "clockRate": 48000,
+          "channels": 2,
+          "sdpFmtpLine": "111/111"
+        },
+        {
+          "mimeType": "audio/opus",
+          "clockRate": 48000,
+          "channels": 2,
+          "sdpFmtpLine": "minptime=10;usedtx=1;useinbandfec=1"
+        },
+        {
+          "mimeType": "audio/PCMU",
+          "clockRate": 8000,
+          "channels": 1
+        },
+        {
+          "mimeType": "audio/PCMA",
+          "clockRate": 8000,
+          "channels": 1
+        }
+      ],
+      "encodings": [
+        {
+          "active": true,
+          "adaptivePtime": false,
+          "maxBitrate": 64000,
+          "networkPriority": "high",
+          "priority": "high"
+        }
+      ]
+    },
+    "silentMicB": {
+      "packetsPerSec": 4.8,
+      "kbps": 0.1,
+      "targetBitrate": 64000
+    },
+    "receiverCodec": {
+      "id": "CIT01_111_minptime=10;stereo=1;useinbandfec=1",
+      "timestamp": 1793508531613.155,
+      "type": "codec",
+      "channels": 2,
+      "clockRate": 48000,
+      "mimeType": "audio/opus",
+      "payloadType": 111,
+      "sdpFmtpLine": "minptime=10;stereo=1;useinbandfec=1",
+      "transportId": "T01"
+    },
+    "playoutContext": {
+      "sampleRate": 48000,
+      "baseLatencyMs": 10,
+      "outputLatencyMs": 42
+    }
+  },
+  "latency": {
+    "off": {
+      "active": "off",
+      "sent": 40,
+      "received": 40,
+      "missed": 0,
+      "latencyMs": {
+        "n": 40,
+        "median": 46.3,
+        "p95": 49.5,
+        "min": 41.7,
+        "max": 49.7,
+        "mean": 46
+      },
+      "micSend": {
+        "packetsPerSec": 21.3,
+        "kbps": 26.4,
+        "targetBitrate": 64000
+      }
+    },
+    "standard": {
+      "active": "standard",
+      "sent": 40,
+      "received": 40,
+      "missed": 0,
+      "latencyMs": {
+        "n": 40,
+        "median": 53,
+        "p95": 55.4,
+        "min": 48.7,
+        "max": 55.5,
+        "mean": 52.1
+      },
+      "micSend": {
+        "packetsPerSec": 34.1,
+        "kbps": 48.1,
+        "targetBitrate": 64000
+      }
+    },
+    "advanced": {
+      "active": "advanced",
+      "sent": 40,
+      "received": 40,
+      "missed": 0,
+      "latencyMs": {
+        "n": 40,
+        "median": 62.1,
+        "p95": 64.6,
+        "min": 56.7,
+        "max": 65.4,
+        "mean": 61.6
+      },
+      "micSend": {
+        "packetsPerSec": 27.4,
+        "kbps": 37.7,
+        "targetBitrate": 64000
+      }
+    }
+  },
+  "inCallAudio": {
+    "lab-a": {
+      "samples": 30,
+      "cpuPctMachine": {
+        "n": 30,
+        "median": 1.7,
+        "p95": 2.2,
+        "min": 1.2,
+        "max": 2.4,
+        "mean": 1.7
+      },
+      "privateMB": {
+        "n": 30,
+        "median": 369.9,
+        "p95": 381.6,
+        "min": 367.1,
+        "max": 390.8,
+        "mean": 373
+      },
+      "workingSetMB": {
+        "n": 30,
+        "median": 649.1,
+        "p95": 659.6,
+        "min": 646.8,
+        "max": 668,
+        "mean": 652
+      },
+      "byType": {
+        "Browser": {
+          "cpuMedian": 0,
+          "privMBMedian": 75
+        },
+        "GPU": {
+          "cpuMedian": 0.7,
+          "privMBMedian": 94.8
+        },
+        "Utility": {
+          "cpuMedian": 0.1,
+          "privMBMedian": 86.4
+        },
+        "Tab": {
+          "cpuMedian": 0.9,
+          "privMBMedian": 113.8
+        }
+      }
+    },
+    "lab-b": {
+      "samples": 30,
+      "cpuPctMachine": {
+        "n": 30,
+        "median": 0.5,
+        "p95": 0.7,
+        "min": 0.5,
+        "max": 0.7,
+        "mean": 0.5
+      },
+      "privateMB": {
+        "n": 30,
+        "median": 331.9,
+        "p95": 340.3,
+        "min": 328.7,
+        "max": 341,
+        "mean": 333.4
+      },
+      "workingSetMB": {
+        "n": 30,
+        "median": 686.8,
+        "p95": 694.3,
+        "min": 685,
+        "max": 694.4,
+        "mean": 688.4
+      },
+      "byType": {
+        "Browser": {
+          "cpuMedian": 0,
+          "privMBMedian": 72.7
+        },
+        "GPU": {
+          "cpuMedian": 0.1,
+          "privMBMedian": 94.5
+        },
+        "Utility": {
+          "cpuMedian": 0.1,
+          "privMBMedian": 85.5
+        },
+        "Tab": {
+          "cpuMedian": 0.3,
+          "privMBMedian": 79.6
+        }
+      }
+    }
+  },
+  "voiceStateB": {
+    "lab-a": {
+      "identity": "lab-a",
+      "name": "LAB A",
+      "speaking": false,
+      "level": 0.0072060012499999965,
+      "micMuted": false,
+      "volume": 1,
+      "locallyMuted": false,
+      "streaming": false,
+      "streamHasAudio": false,
+      "quality": "excellent",
+      "audio": {
+        "bitrateKbps": 44.350481854684475,
+        "jitterMs": 10,
+        "packetLossPct": 0,
+        "audioLevel": 0,
+        "concealedPct": 0,
+        "jitterBufferMs": 34.84848484848485,
+        "codec": "audio/opus",
+        "fmtp": "minptime=10;stereo=1;useinbandfec=1"
+      }
+    }
+  },
+  "cspByPhase": {
+    "voice": "script-src 'self' 'wasm-unsafe-eval' (proposta, só no build do lab)",
+    "speech": "script-src 'self' 'wasm-unsafe-eval' (proposta, só no build do lab)",
+    "codecs": "script-src 'self' (como enviado)",
+    "reconnect": "script-src 'self' (como enviado)",
+    "screen": "script-src 'self' (como enviado)",
+    "synthetic": "script-src 'self' (como enviado)"
+  },
+  "speech": {
+    "note": "Windows SAPI TTS, 8 frases com pausas de 900 ms (WAV em loop)",
+    "clock": 0.1,
+    "modes": {
+      "off": {
+        "active": "off",
+        "sent": 11,
+        "received": {
+          "meanPowerDb": null,
+          "concealedPct": 0
+        },
+        "missed": 0,
+        "latencyMs": {
+          "n": 11,
+          "median": 51.3,
+          "p95": 63.3,
+          "min": 47.5,
+          "max": 63.3,
+          "mean": 53.1
+        },
+        "micSend": {
+          "packetsPerSec": 32.6,
+          "kbps": 76.2,
+          "targetBitrate": 64000
+        }
+      },
+      "standard": {
+        "active": "standard",
+        "sent": 11,
+        "received": {
+          "meanPowerDb": null,
+          "concealedPct": 0
+        },
+        "missed": 0,
+        "latencyMs": {
+          "n": 11,
+          "median": 38.7,
+          "p95": 52.9,
+          "min": 30.2,
+          "max": 52.9,
+          "mean": 39.2
+        },
+        "micSend": {
+          "packetsPerSec": 33.7,
+          "kbps": 78.8,
+          "targetBitrate": 64000
+        }
+      },
+      "advanced": {
+        "active": "advanced",
+        "sent": 11,
+        "received": {
+          "meanPowerDb": null,
+          "concealedPct": 0
+        },
+        "missed": 0,
+        "latencyMs": {
+          "n": 11,
+          "median": 45.5,
+          "p95": 53.1,
+          "min": 41.4,
+          "max": 53.1,
+          "mean": 46.3
+        },
+        "micSend": {
+          "packetsPerSec": 32.6,
+          "kbps": 74.9,
+          "targetBitrate": 64000
+        }
+      }
+    }
+  },
+  "codecs": {
+    "default:h264": {
+      "quality": "1080p60",
+      "codec": "h264",
+      "contentType": "motion",
+      "source": "captura real da tela 1920x1080 (ffplay testsrc2 @60 em tela cheia; captura crua medida ~52 fps)",
+      "negotiated": [
+        "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"
+      ],
+      "capture": {
+        "label": "",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "cursor": "always",
+          "deviceId": "screen:0:0",
+          "displaySurface": "monitor",
+          "frameRate": 60,
+          "height": 1080,
+          "logicalSurface": true,
+          "resizeMode": "crop-and-scale",
+          "width": 1920
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "f",
+            "res": "1920x1080",
+            "fps": 49,
+            "kbps": 8148,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 30,
+            "kbps": 1736,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 16,
+            "kbps": 473,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          }
+        ],
+        "topFps": {
+          "n": 24,
+          "median": 49,
+          "p95": 52,
+          "min": 44,
+          "max": 56,
+          "mean": 49.1
+        },
+        "topRes": [
+          "1920x1080"
+        ],
+        "totalKbps": {
+          "n": 24,
+          "median": 9820.3,
+          "p95": 10626.6,
+          "min": 7882.1,
+          "max": 10650,
+          "mean": 9776
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)"
+        ],
+        "powerEfficient": [
+          false
+        ],
+        "qualityLimitation": {
+          "none": 24
+        },
+        "codec": "video/H264"
+      },
+      "recv": {
+        "fps": {
+          "n": 24,
+          "median": 50,
+          "p95": 52,
+          "min": 44,
+          "max": 57,
+          "mean": 49.2
+        },
+        "res": [
+          "1920x1080"
+        ],
+        "kbps": {
+          "n": 24,
+          "median": 7881,
+          "p95": 8409.7,
+          "min": 6148.4,
+          "max": 8602.2,
+          "mean": 7706.5
+        },
+        "decoder": [
+          null
+        ],
+        "powerEfficient": [
+          null
+        ],
+        "codec": "video/H264",
+        "freezeCount": 0,
+        "totalFreezesMs": 0,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 24,
+          "median": 7.8,
+          "p95": 9.9,
+          "min": 6.5,
+          "max": 10.4,
+          "mean": 7.8
+        }
+      },
+      "frameTimes": {
+        "frames": 1234,
+        "fps": 49.3,
+        "meanMs": 20.3,
+        "stdevMs": 6.8,
+        "p95Ms": 33.5,
+        "p99Ms": 39,
+        "maxMs": 55.7,
+        "skipped": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 3.3,
+            "p95": 4,
+            "min": 3.1,
+            "max": 4.1,
+            "mean": 3.4
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 444.7,
+            "p95": 459,
+            "min": 442.7,
+            "max": 459.3,
+            "mean": 449.3
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 713.1,
+            "p95": 725.2,
+            "min": 711.2,
+            "max": 725.5,
+            "mean": 716.7
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 1.2,
+              "privMBMedian": 115.3
+            },
+            "GPU": {
+              "cpuMedian": 0,
+              "privMBMedian": 102.8
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 83.4
+            },
+            "Tab": {
+              "cpuMedian": 2,
+              "privMBMedian": 143.1
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 1,
+            "p95": 1.3,
+            "min": 0.9,
+            "max": 1.3,
+            "mean": 1
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 342.6,
+            "p95": 350.9,
+            "min": 338.3,
+            "max": 351.1,
+            "mean": 344.6
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 698.5,
+            "p95": 704.1,
+            "min": 691.3,
+            "max": 704.6,
+            "mean": 699.3
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 48.4
+            },
+            "GPU": {
+              "cpuMedian": 0.5,
+              "privMBMedian": 133.1
+            },
+            "Utility": {
+              "cpuMedian": 0.1,
+              "privMBMedian": 82.7
+            },
+            "Tab": {
+              "cpuMedian": 0.4,
+              "privMBMedian": 78.6
+            }
+          }
+        }
+      }
+    },
+    "default:h265": {
+      "quality": "1080p60",
+      "codec": "h265",
+      "contentType": "motion",
+      "source": "captura real da tela 1920x1080 (ffplay testsrc2 @60 em tela cheia; captura crua medida ~52 fps)",
+      "negotiated": [
+        "video/H265 level-id=123;profile-id=1;tier-flag=0;tx-mode=SRST"
+      ],
+      "capture": {
+        "label": "",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "cursor": "always",
+          "deviceId": "screen:0:0",
+          "displaySurface": "monitor",
+          "frameRate": 60,
+          "height": 1080,
+          "logicalSurface": true,
+          "resizeMode": "crop-and-scale",
+          "width": 1920
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "f",
+            "res": "1920x1080",
+            "fps": 49,
+            "kbps": 7896,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 30,
+            "kbps": 1542,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 15,
+            "kbps": 390,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          }
+        ],
+        "topFps": {
+          "n": 24,
+          "median": 47,
+          "p95": 53,
+          "min": 43,
+          "max": 54,
+          "mean": 47.5
+        },
+        "topRes": [
+          "1920x1080"
+        ],
+        "totalKbps": {
+          "n": 24,
+          "median": 9467.9,
+          "p95": 9909.8,
+          "min": 8899.8,
+          "max": 10036.5,
+          "mean": 9458.7
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))"
+        ],
+        "powerEfficient": [
+          true
+        ],
+        "qualityLimitation": {
+          "none": 24
+        },
+        "codec": "video/H265"
+      },
+      "recv": {
+        "fps": {
+          "n": 24,
+          "median": 47,
+          "p95": 52,
+          "min": 43,
+          "max": 53,
+          "mean": 47.5
+        },
+        "res": [
+          "1920x1080"
+        ],
+        "kbps": {
+          "n": 24,
+          "median": 7557.4,
+          "p95": 7981.5,
+          "min": 7207.9,
+          "max": 8045.8,
+          "mean": 7593.8
+        },
+        "decoder": [
+          null
+        ],
+        "powerEfficient": [
+          null
+        ],
+        "codec": "video/H265",
+        "freezeCount": 0,
+        "totalFreezesMs": 0,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 24,
+          "median": 8.4,
+          "p95": 9.4,
+          "min": 6.8,
+          "max": 9.7,
+          "mean": 8.4
+        }
+      },
+      "frameTimes": {
+        "frames": 1194,
+        "fps": 47.7,
+        "meanMs": 20.9,
+        "stdevMs": 7.6,
+        "p95Ms": 38.9,
+        "p99Ms": 39.1,
+        "maxMs": 55.8,
+        "skipped": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 3.2,
+            "p95": 4,
+            "min": 2.7,
+            "max": 4.1,
+            "mean": 3.3
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 606.1,
+            "p95": 610.6,
+            "min": 603.7,
+            "max": 611.2,
+            "mean": 606.4
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 777,
+            "p95": 782.1,
+            "min": 774.4,
+            "max": 782.9,
+            "mean": 777
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 1.1,
+              "privMBMedian": 115.5
+            },
+            "GPU": {
+              "cpuMedian": 0.9,
+              "privMBMedian": 267.7
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 82.7
+            },
+            "Tab": {
+              "cpuMedian": 1,
+              "privMBMedian": 139.9
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 0.9,
+            "p95": 1.3,
+            "min": 0.8,
+            "max": 1.4,
+            "mean": 1
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 338.5,
+            "p95": 345.3,
+            "min": 335.9,
+            "max": 345.6,
+            "mean": 339.8
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 685.5,
+            "p95": 690.6,
+            "min": 683,
+            "max": 691.2,
+            "mean": 686.4
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 46.4
+            },
+            "GPU": {
+              "cpuMedian": 0.5,
+              "privMBMedian": 137.4
+            },
+            "Utility": {
+              "cpuMedian": 0.1,
+              "privMBMedian": 82.4
+            },
+            "Tab": {
+              "cpuMedian": 0.4,
+              "privMBMedian": 71.8
+            }
+          }
+        }
+      }
+    },
+    "default:vp8": {
+      "quality": "1080p60",
+      "codec": "vp8",
+      "contentType": "motion",
+      "source": "captura real da tela 1920x1080 (ffplay testsrc2 @60 em tela cheia; captura crua medida ~52 fps)",
+      "negotiated": [
+        "video/VP8"
+      ],
+      "capture": {
+        "label": "",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "cursor": "always",
+          "deviceId": "screen:0:0",
+          "displaySurface": "monitor",
+          "frameRate": 60,
+          "height": 1080,
+          "logicalSurface": true,
+          "resizeMode": "crop-and-scale",
+          "width": 1920
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "f",
+            "res": "1920x1080",
+            "fps": 48,
+            "kbps": 7929,
+            "encoder": "SimulcastEncoderAdapter (libvpx, libvpx, libvpx)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T3"
+          },
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 29,
+            "kbps": 1656,
+            "encoder": "SimulcastEncoderAdapter (libvpx, libvpx, libvpx)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T3"
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 16,
+            "kbps": 387,
+            "encoder": "SimulcastEncoderAdapter (libvpx, libvpx, libvpx)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T3"
+          }
+        ],
+        "topFps": {
+          "n": 24,
+          "median": 48,
+          "p95": 52,
+          "min": 42,
+          "max": 53,
+          "mean": 48
+        },
+        "topRes": [
+          "1920x1080"
+        ],
+        "totalKbps": {
+          "n": 24,
+          "median": 10079.6,
+          "p95": 10753.8,
+          "min": 8860.8,
+          "max": 10931.3,
+          "mean": 10002.8
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (libvpx, libvpx, libvpx)"
+        ],
+        "powerEfficient": [
+          false
+        ],
+        "qualityLimitation": {
+          "none": 24
+        },
+        "codec": "video/VP8"
+      },
+      "recv": {
+        "fps": {
+          "n": 24,
+          "median": 48,
+          "p95": 52,
+          "min": 43,
+          "max": 53,
+          "mean": 48
+        },
+        "res": [
+          "1920x1080"
+        ],
+        "kbps": {
+          "n": 24,
+          "median": 7916.3,
+          "p95": 8894.2,
+          "min": 6969.9,
+          "max": 8912.4,
+          "mean": 7972.2
+        },
+        "decoder": [
+          null
+        ],
+        "powerEfficient": [
+          null
+        ],
+        "codec": "video/VP8",
+        "freezeCount": 0,
+        "totalFreezesMs": 0,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 24,
+          "median": 8.8,
+          "p95": 10.1,
+          "min": 7.4,
+          "max": 10.5,
+          "mean": 8.9
+        }
+      },
+      "frameTimes": {
+        "frames": 1194,
+        "fps": 47.7,
+        "meanMs": 21,
+        "stdevMs": 6.9,
+        "p95Ms": 38.8,
+        "p99Ms": 39,
+        "maxMs": 55.6,
+        "skipped": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 6.9,
+            "p95": 8.1,
+            "min": 6.1,
+            "max": 8.2,
+            "mean": 7
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 609.4,
+            "p95": 610.8,
+            "min": 599.5,
+            "max": 610.8,
+            "mean": 608.6
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 848.5,
+            "p95": 849.8,
+            "min": 846.4,
+            "max": 849.9,
+            "mean": 848.3
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 1.4,
+              "privMBMedian": 118.5
+            },
+            "GPU": {
+              "cpuMedian": 0,
+              "privMBMedian": 105.5
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 82.7
+            },
+            "Tab": {
+              "cpuMedian": 5.3,
+              "privMBMedian": 302.3
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 2.2,
+            "p95": 2.7,
+            "min": 1.9,
+            "max": 2.8,
+            "mean": 2.2
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 358.5,
+            "p95": 359.7,
+            "min": 357.1,
+            "max": 359.9,
+            "mean": 358.5
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 731.7,
+            "p95": 732.9,
+            "min": 729.7,
+            "max": 733.2,
+            "mean": 731.7
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 46.4
+            },
+            "GPU": {
+              "cpuMedian": 0.6,
+              "privMBMedian": 135.2
+            },
+            "Utility": {
+              "cpuMedian": 0.1,
+              "privMBMedian": 82.3
+            },
+            "Tab": {
+              "cpuMedian": 1.4,
+              "privMBMedian": 94.9
+            }
+          }
+        }
+      }
+    },
+    "default:vp9": {
+      "quality": "1080p60",
+      "codec": "vp9",
+      "contentType": "motion",
+      "source": "captura real da tela 1920x1080 (ffplay testsrc2 @60 em tela cheia; captura crua medida ~52 fps)",
+      "negotiated": [
+        "video/VP9 profile-id=0"
+      ],
+      "capture": {
+        "label": "",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "cursor": "always",
+          "deviceId": "screen:0:0",
+          "displaySurface": "monitor",
+          "frameRate": 60,
+          "height": 1080,
+          "logicalSurface": true,
+          "resizeMode": "crop-and-scale",
+          "width": 1920
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 0,
+            "kbps": 0,
+            "encoder": "SimulcastEncoderAdapter (libvpx)",
+            "powerEfficient": false,
+            "scalabilityMode": null
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 15,
+            "kbps": 916,
+            "encoder": "SimulcastEncoderAdapter (libvpx)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T3"
+          },
+          {
+            "rid": "f",
+            "res": "0x0",
+            "fps": 0,
+            "kbps": 0,
+            "encoder": "SimulcastEncoderAdapter (libvpx)",
+            "powerEfficient": false,
+            "scalabilityMode": null
+          }
+        ],
+        "topFps": {
+          "n": 24,
+          "median": 4,
+          "p95": 16,
+          "min": 0,
+          "max": 17,
+          "mean": 5.7
+        },
+        "topRes": [
+          "1280x720",
+          "640x360"
+        ],
+        "totalKbps": {
+          "n": 24,
+          "median": 932.3,
+          "p95": 1104.4,
+          "min": 726,
+          "max": 1119.7,
+          "mean": 925.5
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (libvpx)",
+          "SimulcastEncoderAdapter (libvpx, libvpx)"
+        ],
+        "powerEfficient": [
+          false
+        ],
+        "qualityLimitation": {
+          "bandwidth": 24
+        },
+        "codec": "video/VP9"
+      },
+      "recv": {
+        "fps": {
+          "n": 24,
+          "median": 15,
+          "p95": 16,
+          "min": 14,
+          "max": 16,
+          "mean": 15
+        },
+        "res": [
+          "640x360"
+        ],
+        "kbps": {
+          "n": 24,
+          "median": 362.9,
+          "p95": 416.3,
+          "min": 305.4,
+          "max": 444.8,
+          "mean": 362.8
+        },
+        "decoder": [
+          null
+        ],
+        "powerEfficient": [
+          null
+        ],
+        "codec": "video/VP9",
+        "freezeCount": 1,
+        "totalFreezesMs": 513,
+        "framesDropped": 1,
+        "jitterBufferMs": {
+          "n": 24,
+          "median": 128.5,
+          "p95": 186.3,
+          "min": 68.3,
+          "max": 213.8,
+          "mean": 132.7
+        }
+      },
+      "frameTimes": {
+        "frames": 376,
+        "fps": 15,
+        "meanMs": 66.8,
+        "stdevMs": 18.1,
+        "p95Ms": 89,
+        "p99Ms": 127.9,
+        "maxMs": 211.4,
+        "skipped": 0,
+        "width": 640,
+        "height": 360
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 1.7,
+            "p95": 2.3,
+            "min": 1.4,
+            "max": 2.4,
+            "mean": 1.7
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 1018.6,
+            "p95": 1019.4,
+            "min": 1016.3,
+            "max": 1019.4,
+            "mean": 1018.3
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 1227.2,
+            "p95": 1227.8,
+            "min": 1224.9,
+            "max": 1228.2,
+            "mean": 1226.6
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 1.2,
+              "privMBMedian": 120.3
+            },
+            "GPU": {
+              "cpuMedian": 0,
+              "privMBMedian": 107.8
+            },
+            "Utility": {
+              "cpuMedian": 0.1,
+              "privMBMedian": 82.5
+            },
+            "Tab": {
+              "cpuMedian": 0.4,
+              "privMBMedian": 707.9
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 0.5,
+            "p95": 0.6,
+            "min": 0.4,
+            "max": 0.7,
+            "mean": 0.5
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 331.5,
+            "p95": 333.5,
+            "min": 328.9,
+            "max": 334.2,
+            "mean": 331.5
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 693.5,
+            "p95": 696.8,
+            "min": 690.5,
+            "max": 698.2,
+            "mean": 693.7
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 46.1
+            },
+            "GPU": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 130.5
+            },
+            "Utility": {
+              "cpuMedian": 0,
+              "privMBMedian": 81.9
+            },
+            "Tab": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 72.1
+            }
+          }
+        }
+      }
+    },
+    "default:av1": {
+      "quality": "1080p60",
+      "codec": "av1",
+      "contentType": "motion",
+      "source": "captura real da tela 1920x1080 (ffplay testsrc2 @60 em tela cheia; captura crua medida ~52 fps)",
+      "negotiated": [
+        "video/AV1 level-idx=5;profile=0;tier=0"
+      ],
+      "capture": {
+        "label": "",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "cursor": "always",
+          "deviceId": "screen:0:0",
+          "displaySurface": "monitor",
+          "frameRate": 60,
+          "height": 1080,
+          "logicalSurface": true,
+          "resizeMode": "crop-and-scale",
+          "width": 1920
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 4,
+            "kbps": 26,
+            "encoder": "SimulcastEncoderAdapter (libaom, libaom)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T3"
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 15,
+            "kbps": 933,
+            "encoder": "SimulcastEncoderAdapter (libaom, libaom)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T3"
+          },
+          {
+            "rid": "f",
+            "res": "0x0",
+            "fps": 0,
+            "kbps": 0,
+            "encoder": "SimulcastEncoderAdapter (libaom, libaom)",
+            "powerEfficient": false,
+            "scalabilityMode": null
+          }
+        ],
+        "topFps": {
+          "n": 24,
+          "median": 0,
+          "p95": 19,
+          "min": 0,
+          "max": 23,
+          "mean": 5.3
+        },
+        "topRes": [
+          "1280x720",
+          "640x360"
+        ],
+        "totalKbps": {
+          "n": 24,
+          "median": 924.3,
+          "p95": 1119.3,
+          "min": 649.8,
+          "max": 1119.4,
+          "mean": 891.2
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (libaom)",
+          "SimulcastEncoderAdapter (libaom, libaom)"
+        ],
+        "powerEfficient": [
+          false
+        ],
+        "qualityLimitation": {
+          "bandwidth": 24
+        },
+        "codec": "video/AV1"
+      },
+      "recv": {
+        "fps": {
+          "n": 24,
+          "median": 15,
+          "p95": 16,
+          "min": 10,
+          "max": 17,
+          "mean": 14.7
+        },
+        "res": [
+          "640x360"
+        ],
+        "kbps": {
+          "n": 24,
+          "median": 372.5,
+          "p95": 446,
+          "min": 276.4,
+          "max": 469.2,
+          "mean": 373.2
+        },
+        "decoder": [
+          null
+        ],
+        "powerEfficient": [
+          null
+        ],
+        "codec": "video/AV1",
+        "freezeCount": 4,
+        "totalFreezesMs": 1065,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 24,
+          "median": 91.1,
+          "p95": 117.7,
+          "min": 52.5,
+          "max": 125.1,
+          "mean": 89.7
+        }
+      },
+      "frameTimes": {
+        "frames": 363,
+        "fps": 14.4,
+        "meanMs": 69.4,
+        "stdevMs": 28.5,
+        "p95Ms": 94.5,
+        "p99Ms": 211.2,
+        "maxMs": 311.3,
+        "skipped": 0,
+        "width": 640,
+        "height": 360
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 1.8,
+            "p95": 2.6,
+            "min": 1.5,
+            "max": 2.8,
+            "mean": 1.8
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 1101.5,
+            "p95": 1102.2,
+            "min": 1100.7,
+            "max": 1103.4,
+            "mean": 1101.4
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 1263,
+            "p95": 1263.6,
+            "min": 1261.9,
+            "max": 1265,
+            "mean": 1262.9
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 1.2,
+              "privMBMedian": 114.1
+            },
+            "GPU": {
+              "cpuMedian": 0,
+              "privMBMedian": 107.9
+            },
+            "Utility": {
+              "cpuMedian": 0.1,
+              "privMBMedian": 82.5
+            },
+            "Tab": {
+              "cpuMedian": 0.4,
+              "privMBMedian": 797
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 0.5,
+            "p95": 0.6,
+            "min": 0.4,
+            "max": 0.6,
+            "mean": 0.5
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 335.5,
+            "p95": 339.4,
+            "min": 334.1,
+            "max": 340.9,
+            "mean": 336.2
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 698.1,
+            "p95": 699.4,
+            "min": 697,
+            "max": 700.8,
+            "mean": 698.3
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 46.6
+            },
+            "GPU": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 133.7
+            },
+            "Utility": {
+              "cpuMedian": 0,
+              "privMBMedian": 81.9
+            },
+            "Tab": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 73.6
+            }
+          }
+        }
+      }
+    },
+    "default:h264-detail": {
+      "quality": "1080p60",
+      "codec": "h264",
+      "contentType": "detail",
+      "source": "captura real da tela 1920x1080 (ffplay testsrc2 @60 em tela cheia; captura crua medida ~52 fps)",
+      "negotiated": [
+        "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"
+      ],
+      "capture": {
+        "label": "",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "cursor": "always",
+          "deviceId": "screen:0:0",
+          "displaySurface": "monitor",
+          "frameRate": 60,
+          "height": 1080,
+          "logicalSurface": true,
+          "resizeMode": "crop-and-scale",
+          "width": 1920
+        },
+        "contentHint": "detail"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "f",
+            "res": "1920x1080",
+            "fps": 41,
+            "kbps": 7640,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 31,
+            "kbps": 1727,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 15,
+            "kbps": 372,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          }
+        ],
+        "topFps": {
+          "n": 24,
+          "median": 15,
+          "p95": 40,
+          "min": 4,
+          "max": 41,
+          "mean": 17.3
+        },
+        "topRes": [
+          "640x360",
+          "1280x720",
+          "1920x1080"
+        ],
+        "totalKbps": {
+          "n": 24,
+          "median": 2049.7,
+          "p95": 12177.4,
+          "min": 343,
+          "max": 16504.2,
+          "mean": 4312
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (OpenH264)",
+          "SimulcastEncoderAdapter (OpenH264, OpenH264)",
+          "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)"
+        ],
+        "powerEfficient": [
+          false
+        ],
+        "qualityLimitation": {
+          "bandwidth": 13,
+          "none": 11
+        },
+        "codec": "video/H264"
+      },
+      "recv": {
+        "fps": {
+          "n": 24,
+          "median": 15,
+          "p95": 39,
+          "min": 5,
+          "max": 42,
+          "mean": 17.7
+        },
+        "res": [
+          "640x360",
+          "1280x720",
+          "1920x1080"
+        ],
+        "kbps": {
+          "n": 24,
+          "median": 569.2,
+          "p95": 7374.4,
+          "min": 335,
+          "max": 9033.6,
+          "mean": 1948.3
+        },
+        "decoder": [
+          null
+        ],
+        "powerEfficient": [
+          null
+        ],
+        "codec": "video/H264",
+        "freezeCount": 2,
+        "totalFreezesMs": 1219,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 24,
+          "median": 7.1,
+          "p95": 18.4,
+          "min": 0.3,
+          "max": 18.6,
+          "mean": 7.3
+        }
+      },
+      "frameTimes": {
+        "frames": 480,
+        "fps": 19.2,
+        "meanMs": 52.2,
+        "stdevMs": 44.7,
+        "p95Ms": 89.1,
+        "p99Ms": 133.4,
+        "maxMs": 700.5,
+        "skipped": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 3.7,
+            "p95": 7.4,
+            "min": 1.6,
+            "max": 7.5,
+            "mean": 4.2
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 1191.6,
+            "p95": 1196.5,
+            "min": 1182.5,
+            "max": 1196.6,
+            "mean": 1189.5
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 1331,
+            "p95": 1341.8,
+            "min": 1307.7,
+            "max": 1341.9,
+            "mean": 1325
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 1.4,
+              "privMBMedian": 115.7
+            },
+            "GPU": {
+              "cpuMedian": 0,
+              "privMBMedian": 105.1
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 82.6
+            },
+            "Tab": {
+              "cpuMedian": 2.3,
+              "privMBMedian": 889.3
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 0.9,
+            "p95": 1.4,
+            "min": 0.5,
+            "max": 1.4,
+            "mean": 0.9
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 342.7,
+            "p95": 356.4,
+            "min": 336.4,
+            "max": 356.5,
+            "mean": 343.3
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 701.1,
+            "p95": 711.6,
+            "min": 696.6,
+            "max": 712.7,
+            "mean": 702.8
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 46.6
+            },
+            "GPU": {
+              "cpuMedian": 0.4,
+              "privMBMedian": 139.6
+            },
+            "Utility": {
+              "cpuMedian": 0.1,
+              "privMBMedian": 81.9
+            },
+            "Tab": {
+              "cpuMedian": 0.4,
+              "privMBMedian": 73.8
+            }
+          }
+        }
+      }
+    },
+    "PlatformH264CbpEncoding:h264": {
+      "quality": "1080p60",
+      "codec": "h264",
+      "contentType": "motion",
+      "source": "captura real da tela 1920x1080 (ffplay testsrc2 @60 em tela cheia; captura crua medida ~52 fps)",
+      "negotiated": [
+        "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"
+      ],
+      "capture": {
+        "label": "",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "cursor": "always",
+          "deviceId": "screen:0:0",
+          "displaySurface": "monitor",
+          "frameRate": 60,
+          "height": 1080,
+          "logicalSurface": true,
+          "resizeMode": "crop-and-scale",
+          "width": 1920
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "f",
+            "res": "1920x1080",
+            "fps": 43,
+            "kbps": 7010,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 30,
+            "kbps": 1760,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 15,
+            "kbps": 408,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          }
+        ],
+        "topFps": {
+          "n": 24,
+          "median": 47,
+          "p95": 52,
+          "min": 31,
+          "max": 52,
+          "mean": 46.1
+        },
+        "topRes": [
+          "1920x1080"
+        ],
+        "totalKbps": {
+          "n": 24,
+          "median": 9596.1,
+          "p95": 10702.4,
+          "min": 6902.9,
+          "max": 10761.3,
+          "mean": 9156.3
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)"
+        ],
+        "powerEfficient": [
+          false
+        ],
+        "qualityLimitation": {
+          "none": 24
+        },
+        "codec": "video/H264"
+      },
+      "recv": {
+        "fps": {
+          "n": 24,
+          "median": 47,
+          "p95": 53,
+          "min": 25,
+          "max": 55,
+          "mean": 46.4
+        },
+        "res": [
+          "1920x1080"
+        ],
+        "kbps": {
+          "n": 24,
+          "median": 7501.8,
+          "p95": 8608.7,
+          "min": 4349.7,
+          "max": 8643.9,
+          "mean": 7119.5
+        },
+        "decoder": [
+          null
+        ],
+        "powerEfficient": [
+          null
+        ],
+        "codec": "video/H264",
+        "freezeCount": 3,
+        "totalFreezesMs": 1061,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 24,
+          "median": 19,
+          "p95": 46.8,
+          "min": 7.7,
+          "max": 58.9,
+          "mean": 21.8
+        }
+      },
+      "frameTimes": {
+        "frames": 1139,
+        "fps": 45.6,
+        "meanMs": 21.9,
+        "stdevMs": 8.4,
+        "p95Ms": 38.9,
+        "p99Ms": 44.5,
+        "maxMs": 55.6,
+        "skipped": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 3.4,
+            "p95": 4.5,
+            "min": 2.8,
+            "max": 5,
+            "mean": 3.5
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 480.5,
+            "p95": 496.1,
+            "min": 476.8,
+            "max": 497.4,
+            "mean": 485.1
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 984.9,
+            "p95": 998.1,
+            "min": 982.3,
+            "max": 999.3,
+            "mean": 989
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 1.2,
+              "privMBMedian": 148.1
+            },
+            "GPU": {
+              "cpuMedian": 0,
+              "privMBMedian": 103.2
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 83.2
+            },
+            "Tab": {
+              "cpuMedian": 2,
+              "privMBMedian": 146
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 1,
+            "p95": 1.4,
+            "min": 0.9,
+            "max": 1.5,
+            "mean": 1.1
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 340.5,
+            "p95": 346.1,
+            "min": 337.6,
+            "max": 347.4,
+            "mean": 341.5
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 904,
+            "p95": 911.1,
+            "min": 902.1,
+            "max": 912.3,
+            "mean": 905.7
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 44.3
+            },
+            "GPU": {
+              "cpuMedian": 0.5,
+              "privMBMedian": 135.7
+            },
+            "Utility": {
+              "cpuMedian": 0.1,
+              "privMBMedian": 83.9
+            },
+            "Tab": {
+              "cpuMedian": 0.4,
+              "privMBMedian": 75.7
+            }
+          }
+        }
+      }
+    }
+  },
+  "rnnoiseFallback": {
+    "csp": "script-src 'self' (como enviado)",
+    "processing": "advanced",
+    "active": "standard",
+    "notice": "Supressão avançada indisponível (a CSP do app bloqueia WebAssembly (falta 'wasm-unsafe-eval' em script-src)). Usando o processamento padrão.",
+    "micLive": "live"
+  },
+  "reconnect": [
+    {
+      "downMs": 3161,
+      "serverStartMs": 60,
+      "a": {
+        "recoveredAfterServerUpMs": 2411,
+        "timeline": [
+          {
+            "t": 163,
+            "state": "connected",
+            "reason": null,
+            "mic": "live"
+          },
+          {
+            "t": 610,
+            "state": "reconnecting",
+            "reason": "Conexão instável — reconectando…",
+            "mic": "live"
+          },
+          {
+            "t": 5632,
+            "state": "connected",
+            "reason": null,
+            "mic": "live"
+          }
+        ]
+      },
+      "b": {
+        "recoveredAfterServerUpMs": 6128,
+        "timeline": [
+          {
+            "t": 163,
+            "state": "connected",
+            "reason": null,
+            "mic": "live"
+          },
+          {
+            "t": 610,
+            "state": "reconnecting",
+            "reason": "Conexão instável — reconectando…",
+            "mic": "live"
+          },
+          {
+            "t": 9349,
+            "state": "connected",
+            "reason": null,
+            "mic": "live"
+          }
+        ]
+      },
+      "lastReconnectMs": {
+        "a": 5096,
+        "b": 8746
+      }
+    },
+    {
+      "downMs": 3216,
+      "serverStartMs": 62,
+      "a": {
+        "recoveredAfterServerUpMs": 3828,
+        "timeline": [
+          {
+            "t": 212,
+            "state": "connected",
+            "reason": null,
+            "mic": "live"
+          },
+          {
+            "t": 320,
+            "state": "reconnecting",
+            "reason": "Conexão instável — reconectando…",
+            "mic": "live"
+          },
+          {
+            "t": 7106,
+            "state": "connected",
+            "reason": null,
+            "mic": "live"
+          }
+        ]
+      },
+      "b": {
+        "recoveredAfterServerUpMs": 2955,
+        "timeline": [
+          {
+            "t": 213,
+            "state": "connected",
+            "reason": null,
+            "mic": "live"
+          },
+          {
+            "t": 540,
+            "state": "reconnecting",
+            "reason": "Conexão instável — reconectando…",
+            "mic": "live"
+          },
+          {
+            "t": 6233,
+            "state": "connected",
+            "reason": null,
+            "mic": "live"
+          }
+        ]
+      },
+      "lastReconnectMs": {
+        "a": 6792,
+        "b": 5777
+      }
+    },
+    {
+      "downMs": 3142,
+      "serverStartMs": 63,
+      "a": {
+        "recoveredAfterServerUpMs": 4534,
+        "timeline": [
+          {
+            "t": 139,
+            "state": "connected",
+            "reason": null,
+            "mic": "live"
+          },
+          {
+            "t": 255,
+            "state": "reconnecting",
+            "reason": "Conexão instável — reconectando…",
+            "mic": "live"
+          },
+          {
+            "t": 7739,
+            "state": "connected",
+            "reason": null,
+            "mic": "live"
+          }
+        ]
+      },
+      "b": {
+        "recoveredAfterServerUpMs": 2902,
+        "timeline": [
+          {
+            "t": 139,
+            "state": "connected",
+            "reason": null,
+            "mic": "live"
+          },
+          {
+            "t": 364,
+            "state": "reconnecting",
+            "reason": "Conexão instável — reconectando…",
+            "mic": "live"
+          },
+          {
+            "t": 6107,
+            "state": "connected",
+            "reason": null,
+            "mic": "live"
+          }
+        ]
+      },
+      "lastReconnectMs": {
+        "a": 7551,
+        "b": 5800
+      }
+    }
+  ],
+  "enumerateDevices": [
+    {
+      "kind": "audioinput",
+      "hasId": true,
+      "label": "Fake Default Audio Input"
+    },
+    {
+      "kind": "audioinput",
+      "hasId": true,
+      "label": "Fake Audio Input 1"
+    },
+    {
+      "kind": "audioinput",
+      "hasId": true,
+      "label": "Fake Audio Input 2"
+    },
+    {
+      "kind": "videoinput",
+      "hasId": true,
+      "label": "fake_device_0"
+    },
+    {
+      "kind": "audiooutput",
+      "hasId": true,
+      "label": "Fake Default Audio Output"
+    },
+    {
+      "kind": "audiooutput",
+      "hasId": true,
+      "label": "Fake Audio Output 1"
+    },
+    {
+      "kind": "audiooutput",
+      "hasId": true,
+      "label": "Fake Audio Output 2"
+    }
+  ],
+  "reconnectLiveKitDefaultPolicy": {
+    "note": "mesma medição com a política padrão do LiveKit (antes da troca)",
+    "runs": [
+      {
+        "downMs": 3177,
+        "serverStartMs": 62,
+        "a": 4481,
+        "b": 6763,
+        "lastReconnectMs": {
+          "a": 7346,
+          "b": 9668
+        }
+      },
+      {
+        "downMs": 3102,
+        "serverStartMs": 124,
+        "a": 6694,
+        "b": 4733,
+        "lastReconnectMs": {
+          "a": 9331,
+          "b": 7430
+        }
+      },
+      {
+        "downMs": 3154,
+        "serverStartMs": 63,
+        "a": 8316,
+        "b": 5366,
+        "lastReconnectMs": {
+          "a": 11327,
+          "b": 8076
+        }
+      }
+    ]
+  },
+  "screen": {
+    "flags": [],
+    "h265:1080p60": {
+      "quality": "1080p60",
+      "codec": "h265",
+      "contentType": "motion",
+      "source": "captura real da tela 1920x1080 (ffplay testsrc2 @60 em tela cheia; captura crua medida ~52 fps)",
+      "negotiated": [
+        "video/H265 level-id=123;profile-id=1;tier-flag=0;tx-mode=SRST;x-google-start-bitrate=9090"
+      ],
+      "capture": {
+        "label": "",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "cursor": "always",
+          "deviceId": "screen:0:0",
+          "displaySurface": "monitor",
+          "frameRate": 60,
+          "height": 1080,
+          "logicalSurface": true,
+          "resizeMode": "crop-and-scale",
+          "width": 1920
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "f",
+            "res": "1920x1080",
+            "fps": 51,
+            "kbps": 7649,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 29,
+            "kbps": 1427,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 15,
+            "kbps": 367,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          }
+        ],
+        "topFps": {
+          "n": 59,
+          "median": 49,
+          "p95": 54,
+          "min": 42,
+          "max": 56,
+          "mean": 49.1
+        },
+        "topRes": [
+          "1920x1080"
+        ],
+        "totalKbps": {
+          "n": 59,
+          "median": 9421,
+          "p95": 9855.4,
+          "min": 4115.8,
+          "max": 9941.9,
+          "mean": 8882
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))"
+        ],
+        "powerEfficient": [
+          true
+        ],
+        "qualityLimitation": {
+          "none": 59
+        },
+        "codec": "video/H265"
+      },
+      "recv": {
+        "fps": {
+          "n": 59,
+          "median": 50,
+          "p95": 53,
+          "min": 42,
+          "max": 56,
+          "mean": 49.2
+        },
+        "res": [
+          "1920x1080"
+        ],
+        "kbps": {
+          "n": 59,
+          "median": 7514.8,
+          "p95": 8041.3,
+          "min": 2625,
+          "max": 8167.1,
+          "mean": 7060.5
+        },
+        "decoder": [
+          "ExternalDecoder (D3D11VideoDecoder)"
+        ],
+        "powerEfficient": [
+          true
+        ],
+        "codec": "video/H265",
+        "freezeCount": 0,
+        "totalFreezesMs": 0,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 59,
+          "median": 7.9,
+          "p95": 17.7,
+          "min": 5.5,
+          "max": 26.7,
+          "mean": 8.8
+        }
+      },
+      "frameTimes": {
+        "frames": 2953,
+        "fps": 49.2,
+        "meanMs": 20.3,
+        "stdevMs": 6.9,
+        "p95Ms": 33.5,
+        "p99Ms": 39,
+        "maxMs": 55.6,
+        "skipped": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 60,
+          "cpuPctMachine": {
+            "n": 60,
+            "median": 3.4,
+            "p95": 4,
+            "min": 2.9,
+            "max": 5,
+            "mean": 3.4
+          },
+          "privateMB": {
+            "n": 60,
+            "median": 542.3,
+            "p95": 555.1,
+            "min": 534.5,
+            "max": 556.2,
+            "mean": 542.3
+          },
+          "workingSetMB": {
+            "n": 60,
+            "median": 759,
+            "p95": 766.6,
+            "min": 750.4,
+            "max": 767.2,
+            "mean": 758
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 1.2,
+              "privMBMedian": 112.3
+            },
+            "GPU": {
+              "cpuMedian": 0.9,
+              "privMBMedian": 264.1
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 83.2
+            },
+            "Tab": {
+              "cpuMedian": 1.1,
+              "privMBMedian": 83.1
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 60,
+          "cpuPctMachine": {
+            "n": 60,
+            "median": 1.3,
+            "p95": 1.7,
+            "min": 1.1,
+            "max": 2.1,
+            "mean": 1.3
+          },
+          "privateMB": {
+            "n": 60,
+            "median": 358.1,
+            "p95": 367.7,
+            "min": 344.1,
+            "max": 369.8,
+            "mean": 356.7
+          },
+          "workingSetMB": {
+            "n": 60,
+            "median": 707,
+            "p95": 710.9,
+            "min": 701.2,
+            "max": 713.3,
+            "mean": 706.6
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 46.2
+            },
+            "GPU": {
+              "cpuMedian": 0.5,
+              "privMBMedian": 138
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 84.8
+            },
+            "Tab": {
+              "cpuMedian": 0.6,
+              "privMBMedian": 89.2
+            }
+          }
+        }
+      }
+    },
+    "h265:1440p60-synthetic": {
+      "quality": "1440p60",
+      "codec": "h265",
+      "contentType": "motion",
+      "source": "canvas sintético 2560x1440@60 (renderizado no processo do A)",
+      "negotiated": [
+        "video/H265 level-id=123;profile-id=1;tier-flag=0;tx-mode=SRST"
+      ],
+      "sourceFps": 57,
+      "capture": {
+        "label": "B44hGI9vcqArJX5zC+mbsu/nU+6xTtpkW51+dEZpFzFK+HP2f+mSoKMFtYxmzSvWkhaH0howIA1jKrquRJcSCw==",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "deviceId": "B44hGI9vcqArJX5zC+mbsu/nU+6xTtpkW51+dEZpFzFK+HP2f+mSoKMFtYxmzSvWkhaH0howIA1jKrquRJcSCw==",
+          "frameRate": 60,
+          "height": 1440,
+          "resizeMode": "none",
+          "width": 2560
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "f",
+            "res": "2560x1440",
+            "fps": 31,
+            "kbps": 13828,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 30,
+            "kbps": 1483,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 15,
+            "kbps": 400,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          }
+        ],
+        "topFps": {
+          "n": 19,
+          "median": 31,
+          "p95": 32,
+          "min": 30,
+          "max": 32,
+          "mean": 31
+        },
+        "topRes": [
+          "2560x1440"
+        ],
+        "totalKbps": {
+          "n": 19,
+          "median": 15924.6,
+          "p95": 16433,
+          "min": 15416.6,
+          "max": 16433,
+          "mean": 15922.4
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))"
+        ],
+        "powerEfficient": [
+          true
+        ],
+        "qualityLimitation": {
+          "none": 19
+        },
+        "codec": "video/H265"
+      },
+      "recv": {
+        "fps": {
+          "n": 19,
+          "median": 31,
+          "p95": 31,
+          "min": 30,
+          "max": 31,
+          "mean": 30.7
+        },
+        "res": [
+          "2560x1440"
+        ],
+        "kbps": {
+          "n": 19,
+          "median": 13988.5,
+          "p95": 14259,
+          "min": 13771,
+          "max": 14259,
+          "mean": 14020
+        },
+        "decoder": [
+          "ExternalDecoder (D3D11VideoDecoder)"
+        ],
+        "powerEfficient": [
+          true
+        ],
+        "codec": "video/H265",
+        "freezeCount": 0,
+        "totalFreezesMs": 0,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 19,
+          "median": 6.4,
+          "p95": 8.6,
+          "min": 5.8,
+          "max": 8.6,
+          "mean": 6.6
+        }
+      },
+      "frameTimes": {
+        "frames": 619,
+        "fps": 30.9,
+        "meanMs": 32.4,
+        "stdevMs": 4.9,
+        "p95Ms": 33.5,
+        "p99Ms": 50,
+        "maxMs": 50.2,
+        "skipped": 0,
+        "width": 2560,
+        "height": 1440
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 20,
+          "cpuPctMachine": {
+            "n": 20,
+            "median": 3.6,
+            "p95": 3.8,
+            "min": 3.2,
+            "max": 3.8,
+            "mean": 3.6
+          },
+          "privateMB": {
+            "n": 20,
+            "median": 681.6,
+            "p95": 688.1,
+            "min": 680,
+            "max": 688.1,
+            "mean": 682.1
+          },
+          "workingSetMB": {
+            "n": 20,
+            "median": 821.7,
+            "p95": 836.9,
+            "min": 820.1,
+            "max": 836.9,
+            "mean": 823.3
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 73.8
+            },
+            "GPU": {
+              "cpuMedian": 2.3,
+              "privMBMedian": 424.4
+            },
+            "Utility": {
+              "cpuMedian": 0.3,
+              "privMBMedian": 83.5
+            },
+            "Tab": {
+              "cpuMedian": 1,
+              "privMBMedian": 100
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 20,
+          "cpuPctMachine": {
+            "n": 20,
+            "median": 1.1,
+            "p95": 1.2,
+            "min": 1,
+            "max": 1.2,
+            "mean": 1.1
+          },
+          "privateMB": {
+            "n": 20,
+            "median": 355.2,
+            "p95": 356.3,
+            "min": 354,
+            "max": 356.3,
+            "mean": 355.1
+          },
+          "workingSetMB": {
+            "n": 20,
+            "median": 708.7,
+            "p95": 709.7,
+            "min": 707.2,
+            "max": 709.7,
+            "mean": 708.5
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 40.8
+            },
+            "GPU": {
+              "cpuMedian": 0.4,
+              "privMBMedian": 145.8
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 84.6
+            },
+            "Tab": {
+              "cpuMedian": 0.5,
+              "privMBMedian": 83.6
+            }
+          }
+        }
+      }
+    },
+    "h265:2160p30-synthetic": {
+      "quality": "2160p30",
+      "codec": "h265",
+      "contentType": "motion",
+      "source": "canvas sintético 3840x2160@30 (renderizado no processo do A)",
+      "negotiated": [
+        "video/H265 level-id=123;profile-id=1;tier-flag=0;tx-mode=SRST"
+      ],
+      "sourceFps": 28,
+      "capture": {
+        "label": "K60OnD7Ftl005IJxVhSddHPx1KuuVuYpp3ALsdORs+9iRMGgBJefuV7F0RnYVmJ6N96C6Dj24t6YKNwsEsV34g==",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "deviceId": "K60OnD7Ftl005IJxVhSddHPx1KuuVuYpp3ALsdORs+9iRMGgBJefuV7F0RnYVmJ6N96C6Dj24t6YKNwsEsV34g==",
+          "frameRate": 30,
+          "height": 2160,
+          "resizeMode": "none",
+          "width": 3840
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "f",
+            "res": "3840x2160",
+            "fps": 28,
+            "kbps": 18179,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 27,
+            "kbps": 1457,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 15,
+            "kbps": 373,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          }
+        ],
+        "topFps": {
+          "n": 24,
+          "median": 30,
+          "p95": 30,
+          "min": 28,
+          "max": 31,
+          "mean": 30
+        },
+        "topRes": [
+          "3840x2160"
+        ],
+        "totalKbps": {
+          "n": 24,
+          "median": 19548.4,
+          "p95": 20937.1,
+          "min": 18801.5,
+          "max": 21222,
+          "mean": 19635.2
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))"
+        ],
+        "powerEfficient": [
+          true
+        ],
+        "qualityLimitation": {
+          "none": 24
+        },
+        "codec": "video/H265"
+      },
+      "recv": {
+        "fps": {
+          "n": 24,
+          "median": 30,
+          "p95": 31,
+          "min": 27,
+          "max": 31,
+          "mean": 29.6
+        },
+        "res": [
+          "3840x2160"
+        ],
+        "kbps": {
+          "n": 24,
+          "median": 17721.3,
+          "p95": 19507.5,
+          "min": 16407.9,
+          "max": 19532.4,
+          "mean": 17711.1
+        },
+        "decoder": [
+          "ExternalDecoder (D3D11VideoDecoder)"
+        ],
+        "powerEfficient": [
+          true
+        ],
+        "codec": "video/H265",
+        "freezeCount": 0,
+        "totalFreezesMs": 0,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 24,
+          "median": 21.7,
+          "p95": 30.5,
+          "min": 16.2,
+          "max": 34.8,
+          "mean": 22.7
+        }
+      },
+      "frameTimes": {
+        "frames": 745,
+        "fps": 29.7,
+        "meanMs": 33.6,
+        "stdevMs": 4.2,
+        "p95Ms": 38.9,
+        "p99Ms": 50.1,
+        "maxMs": 72.5,
+        "skipped": 0,
+        "width": 3840,
+        "height": 2160
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 4,
+            "p95": 4.3,
+            "min": 3.7,
+            "max": 4.4,
+            "mean": 4
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 907.5,
+            "p95": 921.6,
+            "min": 893.5,
+            "max": 922,
+            "mean": 907
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 965.4,
+            "p95": 993.7,
+            "min": 951.8,
+            "max": 999.4,
+            "mean": 967.7
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 73.8
+            },
+            "GPU": {
+              "cpuMedian": 2.7,
+              "privMBMedian": 642.9
+            },
+            "Utility": {
+              "cpuMedian": 0.3,
+              "privMBMedian": 83.6
+            },
+            "Tab": {
+              "cpuMedian": 1,
+              "privMBMedian": 106.2
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 1.1,
+            "p95": 1.2,
+            "min": 0.9,
+            "max": 1.2,
+            "mean": 1.1
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 382,
+            "p95": 385.6,
+            "min": 380.7,
+            "max": 386.1,
+            "mean": 382.6
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 713.3,
+            "p95": 715.6,
+            "min": 712.2,
+            "max": 716,
+            "mean": 713.5
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 40.7
+            },
+            "GPU": {
+              "cpuMedian": 0.3,
+              "privMBMedian": 173.1
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 84.5
+            },
+            "Tab": {
+              "cpuMedian": 0.5,
+              "privMBMedian": 83.6
+            }
+          }
+        }
+      }
+    },
+    "h265:1080p60-synthetic": {
+      "quality": "1080p60",
+      "codec": "h265",
+      "contentType": "motion",
+      "source": "canvas sintético 1920x1080@60 (renderizado no processo do A)",
+      "negotiated": [
+        "video/H265 level-id=123;profile-id=1;tier-flag=0;tx-mode=SRST;x-google-start-bitrate=9090"
+      ],
+      "sourceFps": 54,
+      "capture": {
+        "label": "yBEfS2HU1BpHUz63LhhbnPbl648lGd+iENLInOun/T5ecsVkQHRbDW5ZiOHkGwl5yF+TaWDr6BmLIiO0DAJBGg==",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "deviceId": "yBEfS2HU1BpHUz63LhhbnPbl648lGd+iENLInOun/T5ecsVkQHRbDW5ZiOHkGwl5yF+TaWDr6BmLIiO0DAJBGg==",
+          "frameRate": 60,
+          "height": 1080,
+          "resizeMode": "none",
+          "width": 1920
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "f",
+            "res": "1920x1080",
+            "fps": 20,
+            "kbps": 8007,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 15,
+            "kbps": 1567,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 15,
+            "kbps": 397,
+            "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+            "powerEfficient": true,
+            "scalabilityMode": "L1T1"
+          }
+        ],
+        "topFps": {
+          "n": 29,
+          "median": 20,
+          "p95": 22,
+          "min": 18,
+          "max": 22,
+          "mean": 20
+        },
+        "topRes": [
+          "1920x1080"
+        ],
+        "totalKbps": {
+          "n": 29,
+          "median": 9970.9,
+          "p95": 10309.5,
+          "min": 8291.9,
+          "max": 10575.7,
+          "mean": 9884.4
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))"
+        ],
+        "powerEfficient": [
+          true
+        ],
+        "qualityLimitation": {
+          "none": 29
+        },
+        "codec": "video/H265"
+      },
+      "recv": {
+        "fps": {
+          "n": 29,
+          "median": 20,
+          "p95": 22,
+          "min": 19,
+          "max": 22,
+          "mean": 20.2
+        },
+        "res": [
+          "1920x1080"
+        ],
+        "kbps": {
+          "n": 29,
+          "median": 8035.8,
+          "p95": 8390.1,
+          "min": 7038,
+          "max": 8398.2,
+          "mean": 7988.3
+        },
+        "decoder": [
+          "ExternalDecoder (D3D11VideoDecoder)"
+        ],
+        "powerEfficient": [
+          true
+        ],
+        "codec": "video/H265",
+        "freezeCount": 0,
+        "totalFreezesMs": 0,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 29,
+          "median": 3.5,
+          "p95": 15.7,
+          "min": 1.8,
+          "max": 20.9,
+          "mean": 5.4
+        }
+      },
+      "frameTimes": {
+        "frames": 607,
+        "fps": 20.2,
+        "meanMs": 49.5,
+        "stdevMs": 16,
+        "p95Ms": 66.9,
+        "p99Ms": 72.4,
+        "maxMs": 100.3,
+        "skipped": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 30,
+          "cpuPctMachine": {
+            "n": 30,
+            "median": 2.5,
+            "p95": 2.8,
+            "min": 2.3,
+            "max": 3,
+            "mean": 2.5
+          },
+          "privateMB": {
+            "n": 30,
+            "median": 596,
+            "p95": 622,
+            "min": 586,
+            "max": 623.8,
+            "mean": 602.5
+          },
+          "workingSetMB": {
+            "n": 30,
+            "median": 756,
+            "p95": 779.4,
+            "min": 747.2,
+            "max": 781.1,
+            "mean": 762.4
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 74.7
+            },
+            "GPU": {
+              "cpuMedian": 1.5,
+              "privMBMedian": 327.6
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 84.1
+            },
+            "Tab": {
+              "cpuMedian": 0.7,
+              "privMBMedian": 107.8
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 30,
+          "cpuPctMachine": {
+            "n": 30,
+            "median": 0.8,
+            "p95": 1.1,
+            "min": 0.7,
+            "max": 1.1,
+            "mean": 0.8
+          },
+          "privateMB": {
+            "n": 30,
+            "median": 351.4,
+            "p95": 363.9,
+            "min": 348.1,
+            "max": 365.3,
+            "mean": 353.3
+          },
+          "workingSetMB": {
+            "n": 30,
+            "median": 712,
+            "p95": 721.2,
+            "min": 708.8,
+            "max": 721.8,
+            "mean": 713.2
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 41.8
+            },
+            "GPU": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 134.3
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 85
+            },
+            "Tab": {
+              "cpuMedian": 0.4,
+              "privMBMedian": 90.4
+            }
+          }
+        }
+      }
+    },
+    "h264:1080p60": {
+      "quality": "1080p60",
+      "codec": "h264",
+      "contentType": "motion",
+      "source": "captura real da tela 1920x1080 (ffplay testsrc2 @60 em tela cheia; captura crua medida ~52 fps)",
+      "negotiated": [
+        "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"
+      ],
+      "capture": {
+        "label": "",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "cursor": "always",
+          "deviceId": "screen:0:0",
+          "displaySurface": "monitor",
+          "frameRate": 60,
+          "height": 1080,
+          "logicalSurface": true,
+          "resizeMode": "crop-and-scale",
+          "width": 1920
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "f",
+            "res": "1920x1080",
+            "fps": 46,
+            "kbps": 7376,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 30,
+            "kbps": 1648,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 15,
+            "kbps": 406,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          }
+        ],
+        "topFps": {
+          "n": 59,
+          "median": 48,
+          "p95": 55,
+          "min": 42,
+          "max": 56,
+          "mean": 48.3
+        },
+        "topRes": [
+          "1920x1080"
+        ],
+        "totalKbps": {
+          "n": 59,
+          "median": 9847,
+          "p95": 10805.7,
+          "min": 6384.4,
+          "max": 11352.6,
+          "mean": 9776.7
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)"
+        ],
+        "powerEfficient": [
+          false
+        ],
+        "qualityLimitation": {
+          "none": 59
+        },
+        "codec": "video/H264"
+      },
+      "recv": {
+        "fps": {
+          "n": 59,
+          "median": 48,
+          "p95": 54,
+          "min": 43,
+          "max": 55,
+          "mean": 48.3
+        },
+        "res": [
+          "1920x1080"
+        ],
+        "kbps": {
+          "n": 59,
+          "median": 7848.3,
+          "p95": 8649.8,
+          "min": 4687,
+          "max": 8738.1,
+          "mean": 7703
+        },
+        "decoder": [
+          "ExternalDecoder (D3D11VideoDecoder)"
+        ],
+        "powerEfficient": [
+          true
+        ],
+        "codec": "video/H264",
+        "freezeCount": 0,
+        "totalFreezesMs": 0,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 59,
+          "median": 8.3,
+          "p95": 24.3,
+          "min": 6.6,
+          "max": 36.2,
+          "mean": 9.7
+        }
+      },
+      "frameTimes": {
+        "frames": 2897,
+        "fps": 48.3,
+        "meanMs": 20.7,
+        "stdevMs": 7.3,
+        "p95Ms": 38.8,
+        "p99Ms": 39.1,
+        "maxMs": 55.8,
+        "skipped": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 60,
+          "cpuPctMachine": {
+            "n": 60,
+            "median": 3.4,
+            "p95": 3.8,
+            "min": 3,
+            "max": 4.1,
+            "mean": 3.4
+          },
+          "privateMB": {
+            "n": 60,
+            "median": 438.5,
+            "p95": 448.2,
+            "min": 428.9,
+            "max": 448.3,
+            "mean": 437.8
+          },
+          "workingSetMB": {
+            "n": 60,
+            "median": 697.6,
+            "p95": 701.8,
+            "min": 690.3,
+            "max": 702.9,
+            "mean": 696.8
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 1.2,
+              "privMBMedian": 113.2
+            },
+            "GPU": {
+              "cpuMedian": 0,
+              "privMBMedian": 97.7
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 84.1
+            },
+            "Tab": {
+              "cpuMedian": 2,
+              "privMBMedian": 143.3
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 60,
+          "cpuPctMachine": {
+            "n": 60,
+            "median": 1.3,
+            "p95": 1.6,
+            "min": 1.1,
+            "max": 1.6,
+            "mean": 1.3
+          },
+          "privateMB": {
+            "n": 60,
+            "median": 354.2,
+            "p95": 369.3,
+            "min": 337.4,
+            "max": 369.8,
+            "mean": 353.6
+          },
+          "workingSetMB": {
+            "n": 60,
+            "median": 710.1,
+            "p95": 720.9,
+            "min": 702,
+            "max": 721.2,
+            "mean": 710.4
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 43.7
+            },
+            "GPU": {
+              "cpuMedian": 0.5,
+              "privMBMedian": 133.2
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 85.5
+            },
+            "Tab": {
+              "cpuMedian": 0.6,
+              "privMBMedian": 92.2
+            }
+          }
+        }
+      }
+    },
+    "h264:1080p60-synthetic": {
+      "quality": "1080p60",
+      "codec": "h264",
+      "contentType": "motion",
+      "source": "canvas sintético 1920x1080@60 (renderizado no processo do A)",
+      "negotiated": [
+        "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"
+      ],
+      "capture": {
+        "label": "aznZh+EQC36RP0fPUNLuUK0uGOLdzQTA4OYuMLb9FrgINEfomVtltqUlq+ZZKjbMRGMEy17NjxpUEMIojYTv0Q==",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "deviceId": "aznZh+EQC36RP0fPUNLuUK0uGOLdzQTA4OYuMLb9FrgINEfomVtltqUlq+ZZKjbMRGMEy17NjxpUEMIojYTv0Q==",
+          "frameRate": 60,
+          "height": 1080,
+          "resizeMode": "none",
+          "width": 1920
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "f",
+            "res": "1920x1080",
+            "fps": 3,
+            "kbps": 1335,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 6,
+            "kbps": 1086,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 8,
+            "kbps": 267,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          }
+        ],
+        "topFps": {
+          "n": 30,
+          "median": 4,
+          "p95": 14,
+          "min": 1,
+          "max": 14,
+          "mean": 5.3
+        },
+        "topRes": [
+          "640x360",
+          "1280x720",
+          "1920x1080"
+        ],
+        "totalKbps": {
+          "n": 30,
+          "median": 2175,
+          "p95": 3378.1,
+          "min": 741.9,
+          "max": 3862.1,
+          "mean": 2111.9
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (OpenH264)",
+          "SimulcastEncoderAdapter (OpenH264, OpenH264)",
+          "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)"
+        ],
+        "powerEfficient": [
+          false
+        ],
+        "qualityLimitation": {
+          "bandwidth": 18,
+          "none": 12
+        },
+        "codec": "video/H264"
+      },
+      "recv": {
+        "fps": {
+          "n": 30,
+          "median": 5,
+          "p95": 14,
+          "min": 1,
+          "max": 14,
+          "mean": 5.4
+        },
+        "res": [
+          "640x360",
+          "1280x720",
+          "1920x1080"
+        ],
+        "kbps": {
+          "n": 30,
+          "median": 979.6,
+          "p95": 1860.9,
+          "min": 350.1,
+          "max": 2138.9,
+          "mean": 969.2
+        },
+        "decoder": [
+          "ExternalDecoder (D3D11VideoDecoder)"
+        ],
+        "powerEfficient": [
+          true
+        ],
+        "codec": "video/H264",
+        "freezeCount": 6,
+        "totalFreezesMs": 3207,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 30,
+          "median": 117.8,
+          "p95": 175.5,
+          "min": 46.3,
+          "max": 186.9,
+          "mean": 106.3
+        }
+      },
+      "frameTimes": {
+        "frames": 160,
+        "fps": 5.3,
+        "meanMs": 190.1,
+        "stdevMs": 172.7,
+        "p95Ms": 556,
+        "p99Ms": 900.9,
+        "maxMs": 1056.3,
+        "skipped": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 30,
+          "cpuPctMachine": {
+            "n": 30,
+            "median": 1.7,
+            "p95": 2.1,
+            "min": 1.1,
+            "max": 2.1,
+            "mean": 1.7
+          },
+          "privateMB": {
+            "n": 30,
+            "median": 414.3,
+            "p95": 428.8,
+            "min": 403.8,
+            "max": 430.2,
+            "mean": 414.6
+          },
+          "workingSetMB": {
+            "n": 30,
+            "median": 685.9,
+            "p95": 692.2,
+            "min": 668.3,
+            "max": 692.5,
+            "mean": 681.7
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 43.8
+            },
+            "GPU": {
+              "cpuMedian": 0.4,
+              "privMBMedian": 126.4
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 85
+            },
+            "Tab": {
+              "cpuMedian": 1.1,
+              "privMBMedian": 158.7
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 30,
+          "cpuPctMachine": {
+            "n": 30,
+            "median": 0.5,
+            "p95": 0.6,
+            "min": 0.4,
+            "max": 0.7,
+            "mean": 0.5
+          },
+          "privateMB": {
+            "n": 30,
+            "median": 340.5,
+            "p95": 348.7,
+            "min": 327.5,
+            "max": 349.6,
+            "mean": 338.6
+          },
+          "workingSetMB": {
+            "n": 30,
+            "median": 697.6,
+            "p95": 701.6,
+            "min": 690.5,
+            "max": 702,
+            "mean": 696.6
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 46.8
+            },
+            "GPU": {
+              "cpuMedian": 0.1,
+              "privMBMedian": 124.4
+            },
+            "Utility": {
+              "cpuMedian": 0.1,
+              "privMBMedian": 84.7
+            },
+            "Tab": {
+              "cpuMedian": 0.3,
+              "privMBMedian": 81.1
+            }
+          }
+        }
+      }
+    },
+    "h264:1440p60-synthetic": {
+      "quality": "1440p60",
+      "codec": "h264",
+      "contentType": "motion",
+      "source": "canvas sintético 2560x1440@60 (renderizado no processo do A)",
+      "negotiated": [
+        "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"
+      ],
+      "capture": {
+        "label": "1U9dgl/bnMqKdZfhnmiuRSfoZsVGAtE/sUm8xwhq0jKa+AyVnyqlDc9JE4hJ3HGjeaxPpPu2R2xFTnOH2uZe+w==",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "deviceId": "1U9dgl/bnMqKdZfhnmiuRSfoZsVGAtE/sUm8xwhq0jKa+AyVnyqlDc9JE4hJ3HGjeaxPpPu2R2xFTnOH2uZe+w==",
+          "frameRate": 60,
+          "height": 1440,
+          "resizeMode": "none",
+          "width": 2560
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "f",
+            "res": "2560x1440",
+            "fps": 21,
+            "kbps": 13784,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "h",
+            "res": "1280x720",
+            "fps": 18,
+            "kbps": 1647,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "q",
+            "res": "640x360",
+            "fps": 14,
+            "kbps": 430,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          }
+        ],
+        "topFps": {
+          "n": 59,
+          "median": 7,
+          "p95": 23,
+          "min": 3,
+          "max": 24,
+          "mean": 10.1
+        },
+        "topRes": [
+          "2560x1440"
+        ],
+        "totalKbps": {
+          "n": 59,
+          "median": 5992.4,
+          "p95": 16507,
+          "min": 3501.7,
+          "max": 17268.1,
+          "mean": 8245
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)"
+        ],
+        "powerEfficient": [
+          false
+        ],
+        "qualityLimitation": {
+          "none": 59
+        },
+        "codec": "video/H264"
+      },
+      "recv": {
+        "fps": {
+          "n": 59,
+          "median": 6,
+          "p95": 23,
+          "min": 3,
+          "max": 23,
+          "mean": 10
+        },
+        "res": [
+          "2560x1440"
+        ],
+        "kbps": {
+          "n": 59,
+          "median": 4823.4,
+          "p95": 14187.5,
+          "min": 2228.6,
+          "max": 14831.1,
+          "mean": 6682
+        },
+        "decoder": [
+          "ExternalDecoder (D3D11VideoDecoder)"
+        ],
+        "powerEfficient": [
+          true
+        ],
+        "codec": "video/H264",
+        "freezeCount": 0,
+        "totalFreezesMs": 0,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 59,
+          "median": 66.8,
+          "p95": 101.2,
+          "min": 36.1,
+          "max": 106,
+          "mean": 67.9
+        }
+      },
+      "frameTimes": {
+        "frames": 606,
+        "fps": 10.1,
+        "meanMs": 99,
+        "stdevMs": 78.4,
+        "p95Ms": 261.4,
+        "p99Ms": 355.8,
+        "maxMs": 522.8,
+        "skipped": 0,
+        "width": 2560,
+        "height": 1440
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 60,
+          "cpuPctMachine": {
+            "n": 60,
+            "median": 3.2,
+            "p95": 4.7,
+            "min": 2.5,
+            "max": 5.2,
+            "mean": 3.5
+          },
+          "privateMB": {
+            "n": 60,
+            "median": 539.5,
+            "p95": 546.5,
+            "min": 532,
+            "max": 547,
+            "mean": 540.5
+          },
+          "workingSetMB": {
+            "n": 60,
+            "median": 784.3,
+            "p95": 790.4,
+            "min": 776.6,
+            "max": 792,
+            "mean": 785
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 41.4
+            },
+            "GPU": {
+              "cpuMedian": 0.6,
+              "privMBMedian": 177.5
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 84.4
+            },
+            "Tab": {
+              "cpuMedian": 2.4,
+              "privMBMedian": 236.2
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 60,
+          "cpuPctMachine": {
+            "n": 60,
+            "median": 0.7,
+            "p95": 1.1,
+            "min": 0.5,
+            "max": 1.3,
+            "mean": 0.8
+          },
+          "privateMB": {
+            "n": 60,
+            "median": 352,
+            "p95": 356.9,
+            "min": 347.6,
+            "max": 357.3,
+            "mean": 352.7
+          },
+          "workingSetMB": {
+            "n": 60,
+            "median": 705.9,
+            "p95": 711.1,
+            "min": 701.5,
+            "max": 711.4,
+            "mean": 706.6
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 45.4
+            },
+            "GPU": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 140.8
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 84.3
+            },
+            "Tab": {
+              "cpuMedian": 0.4,
+              "privMBMedian": 81.1
+            }
+          }
+        }
+      }
+    },
+    "h264:2160p30-synthetic": {
+      "quality": "2160p30",
+      "codec": "h264",
+      "contentType": "motion",
+      "source": "canvas sintético 3840x2160@30 (renderizado no processo do A)",
+      "negotiated": [
+        "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"
+      ],
+      "capture": {
+        "label": "65ukhu0k7xALMzmjndZ50CArgoZ8e0T7tFD9rMI0wskng6j7fOckwXswGtqPz1FCARxiprH+s6yIJa2CEHMgtw==",
+        "settings": {
+          "aspectRatio": 1.7777777777777777,
+          "deviceId": "65ukhu0k7xALMzmjndZ50CArgoZ8e0T7tFD9rMI0wskng6j7fOckwXswGtqPz1FCARxiprH+s6yIJa2CEHMgtw==",
+          "frameRate": 30,
+          "height": 2160,
+          "resizeMode": "none",
+          "width": 3840
+        },
+        "contentHint": "motion"
+      },
+      "send": {
+        "layers": [
+          {
+            "rid": "f",
+            "res": "2560x1440",
+            "fps": 30,
+            "kbps": 17748,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "h",
+            "res": "853x480",
+            "fps": 30,
+            "kbps": 1267,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          },
+          {
+            "rid": "q",
+            "res": "427x240",
+            "fps": 15,
+            "kbps": 298,
+            "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+            "powerEfficient": false,
+            "scalabilityMode": "L1T1"
+          }
+        ],
+        "topFps": {
+          "n": 24,
+          "median": 30,
+          "p95": 31,
+          "min": 21,
+          "max": 31,
+          "mean": 28.1
+        },
+        "topRes": [
+          "3840x2160",
+          "2560x1440"
+        ],
+        "totalKbps": {
+          "n": 24,
+          "median": 19505.9,
+          "p95": 20295.1,
+          "min": 16392.7,
+          "max": 20430,
+          "mean": 19412.8
+        },
+        "encoder": [
+          "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)"
+        ],
+        "powerEfficient": [
+          false
+        ],
+        "qualityLimitation": {
+          "none": 6,
+          "cpu": 18
+        },
+        "codec": "video/H264"
+      },
+      "recv": {
+        "fps": {
+          "n": 24,
+          "median": 30,
+          "p95": 31,
+          "min": 22,
+          "max": 31,
+          "mean": 28.5
+        },
+        "res": [
+          "3840x2160",
+          "2560x1440"
+        ],
+        "kbps": {
+          "n": 24,
+          "median": 17849.9,
+          "p95": 18608.5,
+          "min": 15141.4,
+          "max": 18811.1,
+          "mean": 17736.6
+        },
+        "decoder": [
+          "ExternalDecoder (D3D11VideoDecoder)"
+        ],
+        "powerEfficient": [
+          true
+        ],
+        "codec": "video/H264",
+        "freezeCount": 0,
+        "totalFreezesMs": 0,
+        "framesDropped": 0,
+        "jitterBufferMs": {
+          "n": 24,
+          "median": 29.5,
+          "p95": 49.6,
+          "min": 23.6,
+          "max": 50.8,
+          "mean": 33
+        }
+      },
+      "frameTimes": {
+        "frames": 713,
+        "fps": 28.5,
+        "meanMs": 35.1,
+        "stdevMs": 8.1,
+        "p95Ms": 55.7,
+        "p99Ms": 66.8,
+        "maxMs": 100.1,
+        "skipped": 0,
+        "width": 2560,
+        "height": 1440
+      },
+      "cpu": {
+        "lab-a": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 5.2,
+            "p95": 6.5,
+            "min": 4.8,
+            "max": 6.6,
+            "mean": 5.4
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 716.2,
+            "p95": 777.2,
+            "min": 704.9,
+            "max": 785.9,
+            "mean": 726.6
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 931.5,
+            "p95": 972.9,
+            "min": 921.9,
+            "max": 981.9,
+            "mean": 938.4
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 41.4
+            },
+            "GPU": {
+              "cpuMedian": 0.5,
+              "privMBMedian": 271.9
+            },
+            "Utility": {
+              "cpuMedian": 0.3,
+              "privMBMedian": 83.9
+            },
+            "Tab": {
+              "cpuMedian": 4.3,
+              "privMBMedian": 319
+            }
+          }
+        },
+        "lab-b": {
+          "samples": 25,
+          "cpuPctMachine": {
+            "n": 25,
+            "median": 1.1,
+            "p95": 1.2,
+            "min": 1,
+            "max": 1.3,
+            "mean": 1.1
+          },
+          "privateMB": {
+            "n": 25,
+            "median": 371.2,
+            "p95": 389.7,
+            "min": 359.7,
+            "max": 389.9,
+            "mean": 370
+          },
+          "workingSetMB": {
+            "n": 25,
+            "median": 716.8,
+            "p95": 723.3,
+            "min": 709.1,
+            "max": 723.5,
+            "mean": 716.5
+          },
+          "byType": {
+            "Browser": {
+              "cpuMedian": 0,
+              "privMBMedian": 45.3
+            },
+            "GPU": {
+              "cpuMedian": 0.3,
+              "privMBMedian": 157.7
+            },
+            "Utility": {
+              "cpuMedian": 0.2,
+              "privMBMedian": 84
+            },
+            "Tab": {
+              "cpuMedian": 0.5,
+              "privMBMedian": 85.3
+            }
+          }
+        }
+      }
+    }
+  }
+}
