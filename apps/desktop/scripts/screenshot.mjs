@@ -17,7 +17,7 @@ import { createServer, connect } from 'node:net'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { _electron as electron } from 'playwright'
+import { _electron as electron, chromium } from 'playwright'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const appDir = join(here, '..')
@@ -287,7 +287,8 @@ async function seed(saved) {
   await api(T('ana'), 'POST', `/channels/${dmB.id}/ack`, { messageId: last.id })
   await dm('carla', dmC, 'Te mandei o arquivo dos ícones novos 💌')
 
-  // Wave 3: real uploads (synthetic media from ffmpeg), roles, a nickname, people to moderate.
+  // Wave 3: real uploads (generated demo pictures, demoMedia; video and audio from ffmpeg), roles, a nickname, people to moderate.
+  await demoMedia()
   const media = testMedia()
   await api(T('ana'), 'PATCH', '/users/@me', { avatarUrl: null })
   await apiForm(T('bruno'), 'PUT', '/users/@me/avatar', fileForm([media('avatar-bruno.png')]))
@@ -353,7 +354,8 @@ async function launch({ width = 1320, height = 840, scale, keepProfile, apiUrl, 
   await app.evaluate(({ BrowserWindow }, [w, h]) => {
     const win = BrowserWindow.getAllWindows()[0]
     win.setContentSize(w, h)
-    win.center()
+    // Automation windows open off-screen (main/window.ts): keep them there, never over the owner's screen.
+    if (win.getBounds().x > -10000) win.center()
   }, [width, height])
   await page.waitForLoadState('domcontentloaded')
   await sleep(400)
@@ -718,7 +720,7 @@ async function settingsShots(saved) {
 
 // ── wave 3: attachments, uploads, space settings ─────────────
 
-/** Synthetic media for uploads (ffmpeg test sources): never files from this machine. */
+/** Synthetic media for uploads: pictures from demoMedia (generated, on-palette), video/audio from ffmpeg test sources. Never files from this machine. */
 function testMedia() {
   const dir = join(work, 'media')
   mkdirSync(dir, { recursive: true })
@@ -2261,7 +2263,7 @@ const resize = (x, w, h) =>
   x.app.evaluate(({ BrowserWindow }, [w, h]) => {
     const win = BrowserWindow.getAllWindows()[0]
     win.setContentSize(w, h)
-    win.center()
+    if (win.getBounds().x > -10000) win.center()
   }, [w, h])
 const hasVideo = (page) => page.waitForFunction(() => [...document.querySelectorAll('video')].some((v) => v.readyState >= 2 && v.videoWidth > 0), null, { timeout: 20_000 })
 const park = async (page, x = 700, y = 120) => {
@@ -2589,6 +2591,658 @@ async function r3Shots(saved) {
   return ids
 }
 
+// ── demo content (wave 9): what the screenshots show is worthy of the product ──
+// Avatars, attachments and the shared screen are drawn here by Chromium (canvas): abstract, on the Índigo palette,
+// never a photo, a face or a file from this machine. Generated once into work/media (a marker file says which
+// generation), so every section of this script uploads the same pictures.
+const DEMO_VERSION = 'demo-v3'
+/** [file, kind, hue, width, height]: avatars 512², attachments at their old sizes. */
+const DEMO_FILES = [
+  ['avatar-bruno.png', 'dunes', 235, 512, 512],
+  ['avatar-carla.png', 'sun', 18, 512, 512],
+  ['avatar-diego.png', 'orbit', 150, 512, 512],
+  ['avatar-fabio.png', 'prism', 295, 512, 512],
+  ['avatar-gui.png', 'fronds', 340, 512, 512],
+  ['orla.jpg', 'sea', 20, 1600, 1000],
+  ['retrato.jpg', 'pebbles', 280, 900, 1200],
+  ['fractal.png', 'dunes', 255, 1200, 800],
+  ['vida.png', 'fronds', 150, 900, 1200],
+  ['padrao-720p.png', 'orbit', 275, 1280, 720],
+  ['barras.png', 'sea', 250, 1920, 1080],
+  ['icone.png', 'fronds', 279, 600, 600],
+  ['foto-perfil.jpg', 'sun', 330, 1600, 1200],
+]
+/** Ten extra people for crowded rooms (LiveKit participants in a headless Chromium); two keep their initials. */
+const CROWD = [
+  ['helena', 'Helena Prado', 'pebbles', 255],
+  ['igor', 'Igor Matos', 'dunes', 315],
+  ['julia', 'Júlia Campos', 'sun', 275],
+  ['leo', 'Leo Barros', null, 0],
+  ['marina', 'Marina Teles', 'fronds', 140],
+  ['nuno', 'Nuno Faria', 'orbit', 235],
+  ['olivia', 'Olívia Reis', 'prism', 15],
+  ['paulo', 'Paulo Sena', 'pebbles', 300],
+  ['rita', 'Rita Lopes', null, 0],
+  ['sofia', 'Sofia Dantas', 'dunes', 345],
+]
+
+/** In the page: one composition per kind, seeded, with a top-left light and a whisper of grain (material, not flat). */
+function drawDemo(specs) {
+  const out = {}
+  for (const { name, kind, hue, w, h, seed } of specs) {
+    let s = seed
+    const r = () => (s = (s * 16807) % 2147483647) / 2147483647
+    const c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    const g = c.getContext('2d')
+    const m = Math.min(w, h)
+    const col = (l, ch, hh, a = 1) => `oklch(${l} ${ch} ${(((hh % 360) + 360) % 360).toFixed(1)} / ${a})`
+    const bg = g.createLinearGradient(0, 0, w * 0.45, h)
+    bg.addColorStop(0, col(0.45, 0.1, hue))
+    bg.addColorStop(1, col(0.21, 0.065, hue + 35))
+    g.fillStyle = bg
+    g.fillRect(0, 0, w, h)
+    const disc = (x, y, rad, stops) => {
+      const gr = g.createRadialGradient(x - rad * 0.25, y - rad * 0.3, 0, x, y, rad)
+      for (const [o, cc] of stops) gr.addColorStop(o, cc)
+      g.fillStyle = gr
+      g.beginPath()
+      g.arc(x, y, rad, 0, Math.PI * 2)
+      g.fill()
+    }
+    if (kind === 'sun' || kind === 'sea') {
+      const sky = g.createLinearGradient(0, 0, 0, h * 0.62)
+      sky.addColorStop(0, col(0.3, 0.08, hue + 250))
+      sky.addColorStop(0.6, col(0.52, 0.11, hue + 330))
+      sky.addColorStop(1, col(0.74, 0.12, hue + 10))
+      g.fillStyle = sky
+      g.fillRect(0, 0, w, h * 0.62)
+      disc(w * 0.5, h * 0.6, m * 0.2, [[0, col(0.97, 0.05, hue + 60)], [0.6, col(0.86, 0.12, hue + 40)], [1, col(0.78, 0.13, hue + 20, 0)]])
+      for (let i = 0; i < 4; i++) {
+        g.fillStyle = col(0.34 - i * 0.045, 0.07, hue + 260 + i * 10, 0.96)
+        g.fillRect(0, h * (0.62 + i * 0.1), w, h)
+      }
+      if (kind === 'sea')
+        for (let i = 0; i < 26; i++) {
+          const y = h * (0.64 + r() * 0.34)
+          const half = m * (0.02 + r() * 0.09) * (1 - (y / h - 0.62))
+          g.fillStyle = col(0.88, 0.09, hue + 40, 0.18 + r() * 0.3)
+          g.fillRect(w * 0.5 - half + (r() - 0.5) * m * 0.04, y, half * 2, Math.max(2, m * 0.004))
+        }
+    } else if (kind === 'dunes') {
+      for (let i = 0; i < 5; i++) {
+        const y = h * (0.32 + i * 0.14)
+        g.fillStyle = col(0.56 - i * 0.075, 0.095, hue + i * 9, 0.96)
+        g.beginPath()
+        g.moveTo(0, h)
+        g.lineTo(0, y)
+        g.bezierCurveTo(w * 0.3, y - h * (0.12 + r() * 0.08), w * 0.65, y + h * (0.08 + r() * 0.06), w, y - h * 0.05)
+        g.lineTo(w, h)
+        g.closePath()
+        g.fill()
+      }
+    } else if (kind === 'orbit') {
+      const cx = w * 0.58
+      const cy = h * 0.42
+      for (let i = 8; i >= 1; i--) {
+        g.strokeStyle = col(0.74 + i * 0.015, 0.08, hue - i * 6, 0.1 + 0.045 * (8 - i))
+        g.lineWidth = m * 0.018
+        g.beginPath()
+        g.arc(cx, cy, m * 0.065 * i, 0, Math.PI * 2)
+        g.stroke()
+      }
+      disc(cx, cy, m * 0.12, [[0, col(0.96, 0.04, hue)], [1, col(0.72, 0.13, hue)]])
+    } else if (kind === 'prism') {
+      for (let i = 0; i < 4; i++) {
+        g.fillStyle = col(0.62 + i * 0.07, 0.1 - i * 0.015, hue + i * 22, 0.36)
+        g.beginPath()
+        g.moveTo(w * (0.08 + i * 0.18), h)
+        g.lineTo(w * (0.44 + i * 0.18), 0)
+        g.lineTo(w * (0.62 + i * 0.18), 0)
+        g.lineTo(w * (0.26 + i * 0.18), h)
+        g.closePath()
+        g.fill()
+      }
+    } else if (kind === 'fronds') {
+      // Two blades leaning together: a nod to the mark's idea (two presences), never the mark itself.
+      const blade = (x, bw, bh, lean, color) => {
+        g.fillStyle = color
+        g.beginPath()
+        g.moveTo(x, h)
+        g.bezierCurveTo(x - bw, h - bh * 0.5, x + lean - bw * 0.4, h - bh * 0.9, x + lean, h - bh)
+        g.bezierCurveTo(x + lean + bw * 0.5, h - bh * 0.85, x + bw, h - bh * 0.45, x + bw * 0.6, h)
+        g.closePath()
+        g.fill()
+      }
+      blade(w * 0.4, m * 0.2, h * 0.84, m * 0.08, col(0.88, 0.05, hue + 20, 0.95))
+      blade(w * 0.58, m * 0.15, h * 0.58, -m * 0.02, col(0.7, 0.13, hue - 10, 0.92))
+    } else if (kind === 'pebbles') {
+      for (const [x, y, rad, dl, dh] of [[0.36, 0.42, 0.27, 0.2, -10], [0.64, 0.5, 0.22, 0.12, 25], [0.48, 0.7, 0.18, 0.28, 50]])
+        disc(w * x, h * y, m * rad, [[0, col(0.62 + dl, 0.1, hue + dh, 0.92)], [1, col(0.45 + dl * 0.5, 0.11, hue + dh, 0.8)]])
+    }
+    const light = g.createRadialGradient(w * 0.2, h * 0.08, 0, w * 0.2, h * 0.08, Math.max(w, h) * 0.9)
+    light.addColorStop(0, 'rgba(255,255,255,0.12)')
+    light.addColorStop(1, 'rgba(255,255,255,0)')
+    g.fillStyle = light
+    g.fillRect(0, 0, w, h)
+    const img = g.getImageData(0, 0, w, h)
+    for (let i = 0; i < img.data.length; i += 4) {
+      const n = (r() - 0.5) * 9
+      img.data[i] += n
+      img.data[i + 1] += n
+      img.data[i + 2] += n
+    }
+    g.putImageData(img, 0, 0)
+    out[name] = c.toDataURL(name.endsWith('.png') ? 'image/png' : 'image/jpeg', 0.9)
+  }
+  return out
+}
+
+/** Generates DEMO_FILES (+ the crowd's avatars) into work/media once; testMedia() then finds them there. */
+async function demoMedia() {
+  const dir = join(work, 'media')
+  mkdirSync(dir, { recursive: true })
+  const marker = join(dir, `.${DEMO_VERSION}`)
+  const crowd = CROWD.filter(([, , kind]) => kind).map(([key, , kind, hue]) => [`avatar-${key}.png`, kind, hue, 512, 512])
+  if (!existsSync(marker)) {
+    const browser = await chromium.launch()
+    try {
+      const page = await browser.newPage()
+      const specs = [...DEMO_FILES, ...crowd].map(([name, kind, hue, w, h], i) => ({ name, kind, hue, w, h, seed: 7919 * (i + 3) }))
+      const out = await page.evaluate(drawDemo, specs)
+      for (const [name, url] of Object.entries(out)) writeFileSync(join(dir, name), Buffer.from(url.split(',')[1], 'base64'))
+      writeFileSync(marker, new Date().toISOString())
+    } finally {
+      await browser.close()
+    }
+  }
+  return (n) => join(dir, n)
+}
+
+/**
+ * The shared screen: a calm, real-looking editor (this repo's own layout.ts, highlighted on the palette), a terminal
+ * with the test run and a cursor that types. Full screen on top while a share is captured, so neither the picker's
+ * thumbnails nor the stream ever show the real desktop.
+ */
+function sceneHtml() {
+  const code = readFileSync(join(appDir, 'src/renderer/src/features/voice/layout.ts'), 'utf8').split('\n').slice(0, 46)
+  const esc = (x) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const KW = /\b(export|const|function|return|for|if|let|of|interface|type|import|from|new|Math)\b/g
+  const line = (l) => {
+    if (/^\s*(\/\/|\/\*|\*)/.test(l)) return `<i class="c">${esc(l)}</i>`
+    return esc(l)
+      .replace(/('[^']*')/g, '<b class="s">$1</b>')
+      .replace(/\b(\d+(\.\d+)?)\b/g, '<b class="n">$1</b>')
+      .replace(KW, '<b class="k">$1</b>')
+      .replace(/\b([A-Z][A-Za-z]+)\b/g, '<b class="t">$1</b>')
+      .replace(/(\w+)(?=\()/g, '<b class="f">$1</b>')
+  }
+  const rows = code.map((l, i) => `<div class="ln${i === 30 ? ' cur' : ''}"><span class="no">${i + 1}</span><span class="tx">${line(l) || ' '}</span></div>`).join('')
+  const mini = code.map((l) => `<i style="width:${Math.min(100, l.length * 1.1)}%;margin-left:${(l.match(/^\s*/)[0].length * 1.2).toFixed(0)}%"></i>`).join('')
+  const tree = ['voice', '  CallStage.tsx', '  ControlsDock.tsx', '  E2ee.tsx', '  layout.ts', '  layout.test.ts', '  stage.module.css', 'shell', 'switcher', 'ui']
+    .map((x, i) => `<div class="tr${i === 4 ? ' on' : ''}${x.startsWith('  ') ? '' : ' dir'}">${esc(x.trim())}</div>`)
+    .join('')
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0}body{background:#0b0b0c;color:#d0d6e0;font:13px/1.4 'Segoe UI Variable Text','Segoe UI',sans-serif;height:100vh;overflow:hidden;display:grid;grid-template-rows:34px 1fr 24px}
+.top{display:flex;align-items:center;justify-content:center;color:#8a8f98;font-size:12px;border-bottom:1px solid #1a1b1e}
+.main{display:grid;grid-template-columns:48px 250px 1fr 120px;min-height:0}
+.act{border-right:1px solid #16171a;display:grid;align-content:start;gap:14px;padding:14px 0;justify-items:center}.act i{width:20px;height:20px;border-radius:5px;background:#202128}.act i:first-child{background:#3a3c6a}
+.side{background:#0d0e10;border-right:1px solid #16171a;padding:12px 8px}.side h4{font:600 11px/1 'Segoe UI';letter-spacing:.06em;color:#62666d;margin:4px 8px 12px}
+.tr{padding:4px 8px 4px 22px;border-radius:6px;color:#8a8f98}.tr.dir{padding-left:8px;color:#d0d6e0}.tr.on{background:rgba(150,152,255,.13);color:#f7f8f8}
+.ed{display:grid;grid-template-rows:38px 1fr 210px;min-width:0;background:#0f1011}
+.tabs{display:flex;border-bottom:1px solid #1a1b1e;background:#0d0e10}.tab{padding:0 18px;display:flex;align-items:center;color:#8a8f98;border-right:1px solid #16171a}.tab.on{background:#0f1011;color:#f7f8f8;box-shadow:inset 0 2px 0 #8b8ef7}
+.code{font:15px/24px 'Cascadia Code','Cascadia Mono',Consolas,monospace;padding:14px 0;overflow:hidden;white-space:pre}
+.ln{display:flex}.ln.cur{background:rgba(255,255,255,.035)}.no{width:64px;text-align:right;padding-right:22px;color:#3d4047}.ln.cur .no{color:#8a8f98}
+.k{color:#b4a7f5;font-weight:400}.s{color:#e9bd8f;font-weight:400}.n{color:#f2a7c1;font-weight:400}.t{color:#9cc7f0;font-weight:400}.f{color:#ececf2;font-weight:400}.c{color:#5d626b}
+#cursor{display:inline-block;width:2px;height:19px;background:#f7f8f8;vertical-align:-4px;animation:b 1.05s steps(1) infinite}@keyframes b{50%{opacity:0}}
+.term{border-top:1px solid #1a1b1e;background:#0c0d0e;padding:10px 20px;font:13px/21px 'Cascadia Code',Consolas,monospace;color:#8a8f98;overflow:hidden}.term b{color:#61c28e;font-weight:400}.term em{color:#f7f8f8;font-style:normal}
+.mini{background:#0f1011;border-left:1px solid #16171a;padding:16px 12px;display:grid;align-content:start;gap:3px}.mini i{display:block;height:3px;border-radius:2px;background:#2a2c33}.mini i:nth-child(n+28):nth-child(-n+36){background:#3a3c6a}
+.bar{display:flex;align-items:center;gap:18px;padding:0 14px;font-size:12px;color:#8a8f98;border-top:1px solid #1a1b1e;background:#0b0b0c}.bar span:first-child{color:#d0d6e0}
+</style></head><body>
+<div class="top">layout.ts — alga-meet</div>
+<div class="main"><div class="act"><i></i><i></i><i></i><i></i></div>
+<div class="side"><h4>EXPLORADOR</h4>${tree}</div>
+<div class="ed"><div class="tabs"><div class="tab on">layout.ts</div><div class="tab">CallStage.tsx</div><div class="tab">stage.module.css</div></div>
+<div class="code" id="code">${rows}</div>
+<div class="term"><div><em>$</em> npm test -w apps/desktop</div><div>&nbsp;✓ src/renderer/src/features/voice/layout.test.ts <b>(9 tests)</b> 4ms</div><div>&nbsp;✓ src/renderer/src/ui/personHue.test.ts <b>(2 tests)</b> 3ms</div><div>&nbsp;✓ src/renderer/src/features/voice/directCall.test.ts <b>(2 tests)</b> 2ms</div><div>&nbsp;</div><div>&nbsp;Test Files <b>22 passed</b> (22)</div><div>&nbsp;Tests <b>284 passed</b> (284)</div><div><em>$</em> <span id="cmd"></span></div></div></div>
+<div class="mini">${mini}</div></div>
+<div class="bar"><span>main</span><span>TypeScript</span><span>UTF-8</span><span style="margin-left:auto">Ln 31, Col 12</span></div>
+<script>
+const cur = document.querySelector('.ln.cur .tx'); const base = cur.innerHTML; const add = '  // calm, balanced rows'; let i = 0
+const c = document.createElement('span'); c.id = 'cursor'
+setInterval(() => { i = (i + 1) % (add.length + 40); cur.innerHTML = base + '<i class="c">' + add.slice(0, Math.min(i, add.length)) + '</i>'; cur.appendChild(c) }, 90)
+const cmd = 'npm run typecheck -w apps/desktop'; let j = 0; setInterval(() => { j = (j + 1) % (cmd.length + 30); document.getElementById('cmd').textContent = cmd.slice(0, j) }, 110)
+</script></body></html>`
+}
+
+/** Shows the scene full screen, on top of everything, without taking focus (main process of `app`). */
+async function startScene(app) {
+  await app.evaluate(async ({ BrowserWindow, screen }, html) => {
+    const b = screen.getPrimaryDisplay().bounds
+    const w = new BrowserWindow({ ...b, frame: false, show: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, backgroundColor: '#0b0b0c', webPreferences: { backgroundThrottling: false } })
+    w.setAlwaysOnTop(true, 'screen-saver')
+    await w.loadURL(`data:text/html;base64,${html}`)
+    w.showInactive()
+    globalThis.__algaScene = w
+  }, Buffer.from(sceneHtml()).toString('base64'))
+  await sleep(800)
+}
+async function stopScene(app) {
+  await app.evaluate(() => globalThis.__algaScene?.destroy()).catch(() => undefined)
+}
+
+/** Ten extra accounts (saved with the others), verified, with their generated avatars. */
+async function ensureCrowd(saved, media) {
+  saved.crowd ??= {}
+  for (const [key, displayName, kind] of CROWD) {
+    let u = saved.crowd[key]
+    if (u) {
+      try {
+        u.me = await api(u.token, 'GET', '/users/@me')
+        continue
+      } catch {
+        const r = await api(null, 'POST', '/auth/login', { login: u.username, password: u.password })
+        Object.assign(u, { token: r.token, me: r.user })
+        continue
+      }
+    }
+    u = saved.crowd[key] = await freshUser(key, displayName)
+    await verifyEmail(u)
+    if (kind) await apiForm(u.token, 'PUT', '/users/@me/avatar', fileForm([media(`avatar-${key}.png`)]))
+    writeFileSync(usersFile, JSON.stringify(saved, null, 2))
+  }
+  return CROWD.map(([key]) => saved.crowd[key])
+}
+
+/**
+ * LiveKit participants for crowded rooms: one headless Chromium page, one Room per person, tokens from the real
+ * POST /voice/join (so the server sees them as voice states). `speak`: the SAPI speech loop as their microphone;
+ * the others publish a silent track (unmuted, quiet).
+ */
+async function startCrowd() {
+  const { speech } = speechWav()
+  // A loopback origin (intercepted, nothing listens there) so the page may reach our local SFU (private network rules).
+  const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required', '--disable-web-security'] })
+  const page = await browser.newPage()
+  const lk = readFileSync(join(dirname(require.resolve('livekit-client')), 'livekit-client.esm.mjs'))
+  await page.route('http://127.0.0.1:7999/**', (route) => {
+    const p = new URL(route.request().url()).pathname
+    if (p === '/lk.mjs') return route.fulfill({ body: lk, contentType: 'text/javascript' })
+    if (p === '/speech.wav') return route.fulfill({ body: readFileSync(speech), contentType: 'audio/wav' })
+    return route.fulfill({ contentType: 'text/html', body: "<!doctype html><script type=module>import * as LK from '/lk.mjs'; window.LK = LK; window.ready = true</script>" })
+  })
+  await page.goto('http://127.0.0.1:7999/')
+  await page.waitForFunction(() => window.ready)
+  await page.evaluate(async () => {
+    const ctx = new AudioContext()
+    await ctx.resume()
+    const buf = await ctx.decodeAudioData(await (await fetch('/speech.wav')).arrayBuffer())
+    window.bots = {}
+    window.addBot = async (id, url, token, speak, offset) => {
+      const room = new window.LK.Room({ adaptiveStream: false, dynacast: false })
+      await room.connect(url, token, { autoSubscribe: false })
+      const dest = ctx.createMediaStreamDestination()
+      if (speak) {
+        const src = ctx.createBufferSource()
+        src.buffer = buf
+        src.loop = true
+        src.connect(dest)
+        src.start(0, offset % buf.duration)
+      } else {
+        const quiet = ctx.createConstantSource()
+        quiet.offset.value = 0
+        quiet.connect(dest)
+        quiet.start()
+      }
+      await room.localParticipant.publishTrack(dest.stream.getAudioTracks()[0], { source: window.LK.Track.Source.Microphone, dtx: false })
+      window.bots[id] = room
+    }
+    window.dropBot = async (id) => {
+      await window.bots[id]?.disconnect()
+      delete window.bots[id]
+    }
+  })
+  const add = async (u, channelId, speak = false) => {
+    const res = await api(u.token, 'POST', '/voice/join', { channelId })
+    await page.evaluate(([id, url, token, sp, off]) => window.addBot(id, url, token, sp, off), [u.me.id, res.url, res.token, speak, Math.random() * 6])
+  }
+  const drop = (u) => page.evaluate((id) => window.dropBot(id), u.me.id)
+  return { add, drop, close: () => browser.close() }
+}
+
+/** Face count on A's stage (the bare seats plus live cards). */
+const seats = (page) => page.evaluate(() => document.querySelectorAll('[data-seat]').length)
+async function waitSeats(page, n, timeout = 30_000) {
+  const t0 = Date.now()
+  while (Date.now() - t0 < timeout) {
+    if ((await seats(page)) >= n) return
+    await sleep(200)
+  }
+  throw new Error(`stage never showed ${n} people`)
+}
+/** The room's light has settled on someone (opacity 1 and a hue). */
+async function waitLight(page, timeout = 15_000) {
+  const t0 = Date.now()
+  while (Date.now() - t0 < timeout) {
+    const ok = await page.evaluate(() => {
+      const el = document.querySelector('[class*="_light_"]')
+      return !!el && el.style.opacity === '1'
+    })
+    if (ok) return true
+    await sleep(100)
+  }
+  return false
+}
+
+/** A burst of screenshots right after `act`, keeping the frame where `probe` says the motion is mid-way. */
+async function midFrame(page, screen, act, probe) {
+  await act()
+  for (let i = 0; i < 8; i++) {
+    const v = await page.evaluate(probe)
+    if (v) {
+      const p = nextPath(screen)
+      await page.screenshot({ path: p })
+      shots.push(p)
+      console.log('  ✓', p.slice(repo.length + 1), `(${v})`)
+      return
+    }
+  }
+  console.warn(`  ${screen}: the motion was too fast to catch mid-way`)
+}
+
+// ── v3: the wave-9 screens, from one fixture (seed), real instances in real rooms ──
+// V3_PARTS=auth,chat,switcher,stage,crowd,stream,e2ee,unsafe; V3_STACK=<your stack script> (`stop-api`, `start`,
+// with NO_DS=1 an API without the E2EE Delivery Service) for the refused DM call.
+async function v3Shots(saved) {
+  console.log('v3 (wave 9)…')
+  const lk = await fetch(`${LK_HTTP}/`).then((r) => r.ok, () => false)
+  if (!lk) throw new Error(`LiveKit is not reachable at ${LK_HTTP}`)
+  const part = (n) => !process.env.V3_PARTS || process.env.V3_PARTS.split(',').includes(n)
+  const U = saved.users
+  const media = await demoMedia()
+
+  if (part('auth')) {
+    const { app, page } = await launch()
+    try {
+      await page.getByLabel('E-mail ou nome de usuário').waitFor()
+      await sleep(700)
+      await park(page, 40, 400)
+      await shot(page, 'auth-login')
+      await page.getByLabel('E-mail ou nome de usuário').fill('ninguem.aqui')
+      await page.getByLabel('Senha', { exact: true }).fill('senha-errada-123')
+      await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+      await page.getByRole('alert').first().waitFor()
+      await page.getByLabel('Senha', { exact: true }).focus()
+      await page.getByLabel('Senha', { exact: true }).evaluate((el) => el.dispatchEvent(new KeyboardEvent('keydown', { key: 'A', bubbles: true, modifierCapsLock: true })))
+      await page.mouse.move(40, 400)
+      await shot(page, 'auth-login-error')
+      await resize({ app }, 1920, 1080)
+      await sleep(600)
+      await shot(page, 'auth-login-1920x1080')
+    } finally {
+      await close(app)
+    }
+  }
+
+  const offs = [connectPresence(U.carla.token), connectPresence(U.diego.token, 'idle')]
+  const crowd = await ensureCrowd(saved, media)
+  const ids = await seed(saved)
+  for (const k of ['diego', 'fabio', 'gui']) await apiForm(U[k].token, 'PUT', '/users/@me/avatar', fileForm([media(`avatar-${k}.png`)])).catch(() => undefined)
+  await api(U.gui.token, 'POST', `/invites/${saved.inviteCode}`).catch(() => undefined)
+  for (const c of crowd) await api(c.token, 'POST', `/invites/${saved.inviteCode}`).catch(() => undefined)
+  const { speech, silence } = speechWav()
+  const A = await launch({ extra: MEDIA_FLAGS(silence) })
+  const B = await launch({ profile: 'shots-b', extra: MEDIA_FLAGS(speech) })
+  for (const [n, x] of [['A', A], ['B', B]]) {
+    x.page.on('console', (m) => m.type() === 'error' && console.log(`  ${n} console.error:`, m.text().slice(0, 240)))
+    x.page.on('pageerror', (e) => console.log(`  ${n} pageerror:`, e.message))
+  }
+  const bruno = U.bruno.me.id
+  let bots = null
+  try {
+    await login(A.page, U.ana)
+    await login(B.page, U.bruno)
+    await rail(B.page, /^Estúdio Alga/).click()
+    await channels(B.page).getByRole('button', { name: /Sala de foco/ }).click()
+    await waitConnected(B.page)
+
+    if (part('chat')) {
+      await A.page.getByRole('button', { name: 'Conversas', exact: true }).click()
+      await A.page.getByRole('region', { name: 'Agora' }).getByText('Sala de foco').waitFor({ timeout: 15_000 })
+      await park(A.page)
+      await sleep(600)
+      await shot(A.page, 'home-agora')
+      await rail(A.page, /^Estúdio Alga/).click()
+      await channels(A.page).getByRole('button', { name: /^geral/ }).click()
+      await A.page.getByText('Eu topo testar também').waitFor()
+      await park(A.page)
+      await sleep(700)
+      await shot(A.page, 'chat-channel')
+      await A.page.getByRole('log').getByRole('button', { name: 'Ana Ribeiro', exact: true }).first().click()
+      await A.page.getByRole('dialog', { name: 'Ana Ribeiro' }).waitFor()
+      await sleep(1200)
+      await shot(A.page, 'profile-owner-chip')
+      await A.page.keyboard.press('Escape')
+      await A.page.getByLabel('Membros').getByRole('button', { name: /Bruno Costa/ }).click()
+      await A.page.getByRole('dialog', { name: 'Bruno Costa' }).waitFor()
+      await sleep(1300)
+      await shot(A.page, 'profile-person-hue')
+      await A.page.keyboard.press('Escape')
+    }
+
+    if (part('switcher')) {
+      await park(A.page)
+      await midFrame(A.page, 'switcher-grow', () => A.page.keyboard.press('Control+K'), () => {
+        const w = document.querySelector('[role="dialog"][aria-label="Ir para"]')?.getBoundingClientRect().width ?? 0
+        return w > 430 && w < 590 ? `${Math.round(w)} px wide` : null
+      })
+      await sleep(400)
+      await shot(A.page, 'switcher-open')
+      await A.page.keyboard.type('sala')
+      await sleep(300)
+      await shot(A.page, 'switcher-query-actions')
+      await A.page.keyboard.press('Escape')
+      await sleep(300)
+    }
+
+    if (part('stage')) {
+      // One person: Ana alone in Sala de jogo.
+      await rail(A.page, /^Estúdio Alga/).click()
+      await channels(A.page).getByRole('button', { name: /Sala de jogo/ }).click()
+      await waitConnected(A.page)
+      await sleep(1400)
+      await park(A.page)
+      await shot(A.page, 'voice-stage-1')
+      // Two: Ana joins Bruno; the faces come in one after the other (the burst keeps a mid-way frame).
+      await midFrame(A.page, 'voice-join-choreography', () => channels(A.page).getByRole('button', { name: /Sala de foco/ }).click(), () => {
+        const op = [...document.querySelectorAll('[class*="_appear_"]')].map((e) => Number(getComputedStyle(e).opacity))
+        return op.length >= 2 && op.some((o) => o > 0.05 && o < 0.95) ? `opacity ${op.map((o) => o.toFixed(2)).join(' / ')}` : null
+      })
+      await waitConnected(A.page)
+      await sleep(1500)
+      console.log(`  bruno --speak at capture: ${(await waitSpeaking(A.page, bruno, 0.45)).toFixed(2)}`)
+      await waitLight(A.page)
+      await park(A.page)
+      await shot(A.page, 'voice-stage-2')
+      await waitSpeaking(B.page, bruno, 0.3)
+      await park(B.page)
+      await shot(B.page, 'voice-stage-2-self-speaking')
+      await dock(A.page).getByRole('button', { name: 'Desativar microfone' }).click()
+      await sleep(900)
+      await park(A.page)
+      await shot(A.page, 'voice-self-muted')
+      await dock(A.page).getByRole('button', { name: 'Ativar microfone' }).click()
+      // In a call, Ctrl K offers the call's actions first.
+      await A.page.keyboard.press('Control+K')
+      await sleep(500)
+      await shot(A.page, 'switcher-in-call')
+      await A.page.keyboard.press('Escape')
+    }
+
+    if (part('crowd')) {
+      bots = await startCrowd()
+      const counts = [3, 5, 8, 12]
+      let added = 0
+      for (const n of counts) {
+        while (added < n - 2) {
+          // Two of them talk (the light moves between real voices); the rest listen with an open mic.
+          await bots.add(crowd[added], ids.focus.id, added === 2 || added === 7)
+          added++
+        }
+        await waitSeats(A.page, n)
+        await sleep(2500)
+        await waitLight(A.page)
+        await park(A.page)
+        await shot(A.page, `voice-stage-${n}`)
+      }
+      await resize(A, 1920, 1080)
+      await sleep(1800)
+      await park(A.page)
+      await shot(A.page, 'voice-stage-12-1920x1080')
+      await resize(A, 1320, 840)
+      for (const c of crowd.slice(5)) await bots.drop(c)
+      await sleep(2500)
+      await resize(A, 960, 600)
+      await sleep(1500)
+      await park(A.page)
+      await shot(A.page, 'voice-stage-5-960x600')
+      await resize(A, 1320, 840)
+      for (const c of crowd.slice(0, 5)) await bots.drop(c)
+      await sleep(2000)
+    }
+
+    if (part('stream')) {
+      // Carla shares from a third instance WITHOUT fake devices (they would swap the capture for Chromium's synthetic
+      // screen) and WITHOUT a microphone: the harness denies audio capture there, so nothing from this machine's mic
+      // ever reaches the call. Her screen is the procedural editor, full screen on top while it is captured.
+      const C = await launch({ profile: 'shots-c', extra: ['--disable-features=CalculateNativeWinOcclusion', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] })
+      await C.app.evaluate(({ session }) => {
+        const audio = (details) => (details?.mediaTypes ?? []).includes('audio') || details?.mediaType === 'audio'
+        session.defaultSession.setPermissionRequestHandler((_wc, perm, cb, details) => cb(!(perm === 'media' && audio(details))))
+        session.defaultSession.setPermissionCheckHandler((_wc, perm, _origin, details) => !(perm === 'media' && audio(details)))
+      })
+      try {
+        await login(C.page, U.carla)
+        await rail(C.page, /^Estúdio Alga/).click()
+        await channels(C.page).getByRole('button', { name: /Sala de foco/ }).click()
+        await waitConnected(C.page)
+        await startScene(C.app)
+        await dock(C.page).getByRole('button', { name: 'Compartilhar tela' }).click()
+        const picker = C.page.getByRole('dialog', { name: 'Compartilhar tela' })
+        await picker.waitFor()
+        await picker.locator('img').first().waitFor({ timeout: 20_000 })
+        await sleep(1800)
+        await shot(C.page, 'screen-picker')
+        await picker.getByRole('button', { name: 'Transmitir' }).click()
+        await picker.waitFor({ state: 'detached', timeout: 15_000 })
+        await C.page.getByText('Você está transmitindo').first().waitFor()
+        await sleep(3500)
+        await park(C.page)
+        await shot(C.page, 'screen-sharing-self')
+        await A.page.getByRole('button', { name: 'Assistir' }).first().waitFor({ timeout: 15_000 })
+        await park(A.page)
+        await sleep(800)
+        await shot(A.page, 'stream-card-unwatched')
+        await A.page.getByRole('button', { name: 'Assistir' }).first().click()
+        await hasVideo(A.page)
+        await sleep(3500)
+        await park(A.page, 10, 400)
+        await shot(A.page, 'stream-watching')
+      } finally {
+        await stopScene(C.app)
+        await C.page.getByRole('button', { name: 'Desconectar' }).first().click().catch(() => undefined)
+        await sleep(600)
+        await close(C.app)
+      }
+      await sleep(800)
+    }
+
+    if (part('e2ee')) {
+      for (const x of [A, B]) await x.page.getByRole('button', { name: 'Desconectar' }).first().click().catch(() => undefined)
+      await sleep(1200)
+      // DM call: always end-to-end encrypted. The lock sits at the top of the DM stage; it opens the codes.
+      await A.page.getByRole('button', { name: 'Conversas', exact: true }).click()
+      await A.page.getByRole('button', { name: /Bruno Costa/ }).first().click()
+      await A.page.getByRole('button', { name: 'Iniciar chamada de voz' }).click()
+      await B.page.getByRole('alertdialog').waitFor({ timeout: 20_000 })
+      await B.page.getByRole('button', { name: 'Atender' }).click()
+      await waitConnected(B.page)
+      const lock = A.page.getByRole('button', { name: 'Criptografia de ponta a ponta' })
+      await lock.waitFor({ timeout: 20_000 })
+      await sleep(1500)
+      await waitSpeaking(A.page, bruno, 0.4)
+      await park(A.page)
+      await shot(A.page, 'dm-call-e2ee')
+      await lock.click()
+      const sheet = A.page.getByRole('dialog', { name: 'Verificar a criptografia' })
+      await sheet.waitFor()
+      await sheet.getByRole('button', { name: 'Ver código' }).first().click()
+      // Both codes computed (the pairwise one runs a slow KDF in main, once per pair).
+      await A.page.waitForFunction(() => !document.querySelector('[role="dialog"]')?.textContent?.includes('Calculando'), null, { timeout: 30_000 }).catch(() => undefined)
+      await sleep(500)
+      await park(A.page, 40, 400)
+      await shot(A.page, 'e2ee-verify-sheet')
+      await sheet.getByRole('button', { name: 'Fechar' }).click()
+      await sheet.waitFor({ state: 'detached' })
+      for (const x of [A, B]) await x.page.getByRole('button', { name: 'Desconectar' }).first().click().catch(() => undefined)
+      await sleep(1500)
+      // A space room with E2EE on, then someone in the SFU without keys: the red band.
+      await api(U.ana.token, 'PATCH', `/spaces/${ids.s1.id}`, { e2ee: true })
+      await rail(A.page, /^Estúdio Alga/).click()
+      await channels(A.page).getByRole('button', { name: /Sala de foco/ }).click()
+      await rail(B.page, /^Estúdio Alga/).click()
+      await channels(B.page).getByRole('button', { name: /Sala de foco/ }).click()
+      await A.page.getByRole('button', { name: 'Criptografia de ponta a ponta' }).waitFor({ timeout: 25_000 })
+      await sleep(2000)
+      await park(A.page)
+      await shot(A.page, 'voice-stage-e2ee')
+      bots ??= await startCrowd()
+      await bots.add(crowd[0], ids.focus.id, false)
+      await A.page.getByRole('alert').filter({ hasText: 'não conseguimos verificar' }).waitFor({ timeout: 20_000 })
+      await sleep(800)
+      await park(A.page)
+      await shot(A.page, 'e2ee-mismatch')
+      await bots.drop(crowd[0])
+      await api(U.ana.token, 'PATCH', `/spaces/${ids.s1.id}`, { e2ee: false })
+      await sleep(2500)
+    }
+
+    if (part('unsafe') && process.env.V3_STACK) {
+      // A server without the Delivery Service offers DM calls without E2EE: the client refuses before connecting.
+      for (const x of [A, B]) await x.page.getByRole('button', { name: 'Desconectar' }).first().click().catch(() => undefined)
+      spawnSync(process.execPath, [process.env.V3_STACK, 'stop-api'], { stdio: 'inherit' })
+      spawnSync(process.execPath, [process.env.V3_STACK, 'start'], { stdio: 'inherit', env: { ...process.env, NO_DS: '1' } })
+      try {
+        await A.page.getByRole('navigation', { name: 'Espaços' }).waitFor()
+        await sleep(4000)
+        await A.page.getByRole('button', { name: 'Conversas', exact: true }).click()
+        await A.page.getByRole('button', { name: /Bruno Costa/ }).first().click()
+        await A.page.getByRole('button', { name: 'Iniciar chamada de voz' }).click()
+        await A.page.getByRole('dialog', { name: /Chamada sem criptografia recusada/ }).waitFor({ timeout: 20_000 })
+        await sleep(500)
+        await park(A.page, 40, 400)
+        await shot(A.page, 'dm-call-unsafe-refused')
+        await A.page.keyboard.press('Escape')
+      } finally {
+        spawnSync(process.execPath, [process.env.V3_STACK, 'stop-api'], { stdio: 'inherit' })
+        spawnSync(process.execPath, [process.env.V3_STACK, 'start'], { stdio: 'inherit' })
+      }
+    }
+  } catch (e) {
+    await A.page.screenshot({ path: join(work, 'fail-a.png') }).catch(() => undefined)
+    await B.page.screenshot({ path: join(work, 'fail-b.png') }).catch(() => undefined)
+    throw e
+  } finally {
+    await bots?.close().catch(() => undefined)
+    await stopScene(A.app)
+    for (const x of [A, B]) await x.page.getByRole('button', { name: 'Desconectar' }).first().click().catch(() => undefined)
+    await close(A.app)
+    await close(B.app)
+    offs.forEach((off) => off())
+  }
+}
+
 // ── main ──────────────────────────────────────────────────────
 if (!args.includes('--skip-build')) {
   console.log('building…')
@@ -2611,6 +3265,7 @@ if (serverUp && ['auth', 'home', 'chat', 'spaces', 'attachments', 'uploads', 'sp
   await mainShots(saved)
 }
 if (serverUp && only?.includes('r3')) await r3Shots(await ensureUsers())
+if (serverUp && only?.includes('v3')) await v3Shots(await ensureUsers())
 if (serverUp && want('trust')) await trustShots()
 if (serverUp && want('wave6')) await wave6Shots()
 console.log(`\n${shots.length} screenshots.`)
