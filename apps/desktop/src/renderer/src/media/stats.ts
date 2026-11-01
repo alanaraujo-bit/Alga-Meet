@@ -101,7 +101,8 @@ export function audioIn({ cur, prev }: { cur: Report; prev: Report }): AudioInSt
   const lost = num(s.packetsLost) - num(p?.packetsLost)
   const recv = num(s.packetsReceived) - num(p?.packetsReceived)
   const samples = num(s.totalSamplesReceived) - num(p?.totalSamplesReceived)
-  const concealed = num(s.concealedSamples) - num(p?.concealedSamples)
+  // Invented samples only: comfort noise while the other side is silent (DTX) is not a glitch.
+  const concealed = num(s.concealedSamples) - num(s.silentConcealedSamples) - (num(p?.concealedSamples) - num(p?.silentConcealedSamples))
   const emitted = num(s.jitterBufferEmittedCount) - num(p?.jitterBufferEmittedCount)
   const jbDelay = num(s.jitterBufferDelay) - num(p?.jitterBufferDelay)
   return {

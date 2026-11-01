@@ -17,12 +17,15 @@ import {
   type RemoteParticipant,
   type RemoteTrack,
   type RemoteTrackPublication,
+  type TrackPublishOptions,
 } from 'livekit-client'
+import { STREAM_PRESETS_ATTRIBUTE } from '@alga/shared'
 import { PttLatch, perceptualLevel, rmsDb } from './vad'
 import { PrefsStore, type InputMode, type ProcessingMode } from './prefs'
-import { availablePresets, contentSettings, defaultPreset, getPreset, pickCodec, recordSustain, simulcastFor, type ContentType, type ScreenPreset, type ScreenPresetId, type VideoCodecId } from './presets'
+import { availablePresets, clampPreset, contentSettings, gatePresets, isPresetId, pickCodec, recordSustain, simulcastFor, type ContentType, type ScreenPreset, type ScreenPresetId, type VideoCodecId } from './presets'
 import { VoiceGraph, VoiceProcessor, captureConstraints } from './processing'
-import { playCue, setCueOutput, type Cue } from './sounds'
+import { playCue, setCueOutput, startRing, stopRing, type Cue, type RingKind } from './sounds'
+import { stallStep, type StallState } from './stall'
 import { StatsDelta, audioIn, audioOut, videoIn, videoOut } from './stats'
 import { initialState, patch, useMedia, type ConnectionState, type MediaState, type DeviceInfo, type ParticipantView, type Quality, type StreamQuality } from './store'
 import type { GateReport } from './vad-gate.worklet'
@@ -39,6 +42,8 @@ export interface JoinParams {
   publishMic?: boolean
   /** Voice RED (each packet repeats the previous frame). Default true: measured in docs/benchmarks/media-network.md. */
   red?: boolean
+  /** Screen-share presets the user's plan allows (VoiceJoinResponse.streamPresets). The token attribute, when present, wins. */
+  streamPresets?: readonly string[]
 }
 
 export interface ScreenShareOptions {
@@ -80,6 +85,8 @@ const TERMINAL = new Set([DisconnectReason.CLIENT_INITIATED, DisconnectReason.DU
 /** protobuf TrackSource.MICROPHONE in ParticipantPermission.canPublishSources (livekit-client doesn't re-export the enum). */
 const PROTO_MICROPHONE = 2
 const LEVEL_TICK_MS = 50
+/** Stall guard (viewer side) poll period. */
+const STALL_TICK_MS = 200
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 const bridge = (): Partial<Window['alga']> | undefined => (typeof window !== 'undefined' ? window.alga : undefined)
@@ -110,7 +117,13 @@ class MediaEngine {
   private deltas = new Map<string, StatsDelta>()
   private audioEls = new Set<HTMLMediaElement>()
   private viewerEls = new Map<string, Set<HTMLVideoElement>>()
-  private screenPub: { video: LocalTrackPublication; audio: LocalTrackPublication | null; preset: ScreenPreset; fps: number[] } | null = null
+  private screenPub: { video: LocalTrackPublication; audio: LocalTrackPublication | null; preset: ScreenPreset; cpuLimited: boolean[]; sourceId: string | null } | null = null
+  /** Presets this machine sustains (probeEncoder); the conservative software list until the probe answers. */
+  private capable: ScreenPreset[] = availablePresets({ hardware: false })
+  /** Presets the user's plan allows (join response, token attribute, Me.plan); null = unknown. */
+  private plan: ScreenPresetId[] | null = null
+  /** Live re-caps run one at a time (a plan change arrives as ENTITLEMENTS_UPDATE, ME_UPDATE and the attribute). */
+  private recapOp: Promise<void> = Promise.resolve()
   private activeInput: string | null = null
   private activeOutput: string | null = null
   private test: { graph: VoiceGraph | null; stream: MediaStream | null; el: HTMLAudioElement | null } = { graph: null, stream: null, el: null }
@@ -126,6 +139,13 @@ class MediaEngine {
   private meters = new Map<string, { src: MediaStreamAudioSourceNode; an: AnalyserNode; buf: Float32Array<ArrayBuffer>; level: number }>()
   private levelTimer: ReturnType<typeof setInterval> | null = null
   private channelName: string | null = null
+  /** Per watched stream: decode progress and the temporary layer cap of the stall guard. */
+  private stalls = new Map<string, StallState>()
+  private stallTimer: ReturnType<typeof setInterval> | null = null
+  /** Lab only: false = leave layer switching to the SFU (measures what the guard buys, media-network.md §3). */
+  stallGuard = true
+  /** Mic re-published because the SFU answered it without DTX (ensureDtx); read by the lab. */
+  private dtxRepairs = 0
 
   /** Wire OS/bridge integrations once (idempotent). Called lazily by every public entry point. */
   private start(): void {
@@ -149,6 +169,7 @@ class MediaEngine {
       else void this.leave()
     })
     void this.refreshDevices(false)
+    this.syncPlan()
     void this.probeEncoder()
   }
 
@@ -173,6 +194,7 @@ class MediaEngine {
     this.clearRejoin()
     this.last = params
     this.userLeft = false
+    if (params.streamPresets) this.setPlanPresets(params.streamPresets)
     const t0 = performance.now()
     this.setConn('connecting', null, { channelId: params.channelId ?? null, joinMs: null })
     const kbps = params.bitrateKbps ?? DEFAULT_KBPS
@@ -203,6 +225,7 @@ class MediaEngine {
     if (this.room !== room) return
     void room.startAudio().catch(() => undefined)
     patch('self', { identity: room.localParticipant.identity })
+    this.planFromRoom(room)
     for (const rp of room.remoteParticipants.values()) this.addRemote(rp)
     await this.syncMic(room)
     if (this.room !== room) return
@@ -274,7 +297,7 @@ class MediaEngine {
     patch('self', { speaking: false, level: 0, gateOpen: false })
   }
 
-  private async publishMic(room: Room, kbps: number): Promise<void> {
+  private async publishMic(room: Room, kbps: number, repairs = 0): Promise<void> {
     const p = this.prefs.get()
     const graph = new VoiceGraph({ rnnoise: false, onReport: (r) => this.onGateReport(r) })
     this.graph = graph
@@ -291,6 +314,8 @@ class MediaEngine {
       patch('self', { micAvailable: true })
       patch('devices', { inputId: this.activeInput })
       void this.refreshDevices(false)
+      // After the join, not in its way: queued behind this op. At most 2 repairs (the race can repeat right away).
+      if (repairs < 2) this.micOp = this.micOp.then(() => this.ensureDtx(room, track, kbps, repairs + 1))
     } catch (e) {
       this.mic?.stop()
       this.mic = null
@@ -299,6 +324,23 @@ class MediaEngine {
       patch('self', { micAvailable: false })
       this.notify(`Microfone indisponível (${errText(e)}). Você está só ouvindo.`)
     }
+  }
+
+  /**
+   * Now and then (3 of 24 joins, media-network.md §2) the SFU answers the mic's m-line like an unmapped placeholder:
+   * Opus `stereo=1` without `usedtx`, i.e. 50 packets/s of silence instead of ~5. Seen on the negotiated sender
+   * codec. The fix is the server-unmute path: drop the mic and publish a fresh one (new capture, new m-line, new
+   * AddTrackRequest). Re-publishing the same track was measured to leave it silent (0 packets/s, nothing heard).
+   */
+  private async ensureDtx(room: Room, track: LocalAudioTrack, kbps: number, attempt: number): Promise<void> {
+    const fmtp = await opusFmtp(track)
+    if (fmtp === null || fmtp.includes('usedtx=1') || this.room !== room || this.mic !== track) return
+    this.dtxRepairs++
+    // The second try waits a moment: one bad answer right after another was seen once in 32 joins.
+    if (attempt > 1) await new Promise((r) => setTimeout(r, 1000))
+    if (this.room !== room || this.mic !== track) return
+    await this.dropMic(room)
+    if (this.room === room && this.micAllowed(room)) await this.publishMic(room, kbps, attempt)
   }
 
   private wire(room: Room): void {
@@ -327,6 +369,10 @@ class MediaEngine {
       .on(RoomEvent.ParticipantPermissionsChanged, (_prev, p) => {
         if (p === room.localParticipant && useMedia.getState().connection.state === 'connected') void this.syncMic(room)
       })
+      // The server rewrites this attribute when the plan changes mid-call (billing → voice.setStreamPresets).
+      .on(RoomEvent.ParticipantAttributesChanged, (changed, p) => {
+        if (p === room.localParticipant && STREAM_PRESETS_ATTRIBUTE in changed) this.planFromRoom(room)
+      })
       // The SFU can unpublish our mic itself (permission revoked): LiveKit stops the track; release our side too.
       .on(RoomEvent.LocalTrackUnpublished, (pub) => {
         if (pub.source === Track.Source.Microphone && this.mic && pub.track === this.mic) {
@@ -343,6 +389,7 @@ class MediaEngine {
         this.reconnectT0 = 0
         this.setConn('connected', null, { lastReconnectMs: ms, reconnects: useMedia.getState().connection.reconnects + 1 })
         void this.syncMic(room)
+        this.planFromRoom(room)
       })
       .on(RoomEvent.Disconnected, (reason) => void this.onDisconnected(room, reason))
       .on(RoomEvent.MediaDevicesError, (e) => this.notify(`Erro de dispositivo: ${errText(e)}`))
@@ -828,11 +875,13 @@ class MediaEngine {
     if (!room) throw new Error('Entre em um canal de voz antes de transmitir.')
     if (this.screenPub) await this.stopScreenShare(true)
     const p = this.prefs.get()
-    const preset = getPreset(opts.quality ?? p.screenPreset)
     const contentType = opts.contentType ?? p.contentType
+    // Never above what the plan allows and this machine sustains; the wish is kept so an upgrade can lift the cap.
+    const want = opts.quality ?? p.screenPreset
+    const preset = clampPreset(want, useMedia.getState().screen.offered, contentType)
     const codec = opts.codec ?? useMedia.getState().screen.codec
     const audio = opts.audio ?? false
-    this.prefs.set({ screenPreset: preset.id, contentType, ...(opts.codec && { codec: opts.codec }) })
+    this.prefs.set({ screenPreset: want, contentType, ...(opts.codec && { codec: opts.codec }) })
     patch('screen', { preset: preset.id, contentType, codec, audio, error: null })
     let stream: MediaStream
     try {
@@ -843,7 +892,7 @@ class MediaEngine {
     }
     try {
       const pub = await this.publishScreen(room, stream, preset, contentType, codec)
-      this.screenPub = { ...pub, preset, fps: [] }
+      this.screenPub = { ...pub, preset, cpuLimited: [], sourceId: opts.sourceId ?? null }
       for (const el of this.ownEls) pub.video.track?.attach(el)
       patch('screen', { active: true, sourceId: opts.sourceId ?? null })
       this.cue('streamStart')
@@ -861,15 +910,11 @@ class MediaEngine {
     video.addEventListener('ended', () => void this.stopScreenShare())
     const size = video.getSettings()
     const svc = codec === 'vp9' || codec === 'av1'
-    const advanced = svc || codec === 'h265'
     const vpub = await room.localParticipant.publishTrack(video, {
       source: Track.Source.ScreenShare,
       name: 'screen',
       videoCodec: codec,
-      // Codecs not every viewer can decode get an H.264 backup the SFU switches to per subscriber.
-      backupCodec: advanced ? { codec: 'h264', encoding: { maxBitrate: preset.maxBitrate, maxFramerate: preset.fps } } : false,
-      screenShareEncoding: { maxBitrate: preset.maxBitrate, maxFramerate: preset.fps, priority: 'high' },
-      screenShareSimulcastLayers: simulcastFor(preset, size.width, size.height).map((l) => new VideoPreset(l.width, l.height, l.maxBitrate, l.fps)),
+      ...layerOptions(preset, size.width, size.height, codec),
       simulcast: true,
       scalabilityMode: svc ? 'L3T3_KEY' : undefined,
       degradationPreference: degradation,
@@ -895,6 +940,7 @@ class MediaEngine {
     video.addEventListener('ended', () => void this.stopScreenShare())
     await vtrack.replaceTrack(video, true)
     old.stop()
+    cur.sourceId = sourceId
     const a = stream.getAudioTracks()[0]
     if (a && cur.audio?.track) {
       const oldA = cur.audio.track.mediaStreamTrack
@@ -924,10 +970,8 @@ class MediaEngine {
       await room?.localParticipant.unpublishTrack(track, true).catch(() => undefined)
     }
     if (room && transceivers.length) await releaseTransceivers(room, transceivers)
-    if (cur.fps.length >= 10) {
-      const sorted = [...cur.fps].sort((a, b) => a - b)
-      const sustain = recordSustain(this.prefs.get().sustain, cur.preset.id, cur.preset.fps, sorted[Math.floor(sorted.length / 2)]!)
-      this.prefs.set({ sustain })
+    if (cur.cpuLimited.length >= 10) {
+      this.prefs.set({ encoderSustain: recordSustain(this.prefs.get().encoderSustain, cur.preset.id, cur.cpuLimited) })
       void this.probeEncoder()
     }
     patch('screen', { active: false, stats: null, sourceId: null })
@@ -951,20 +995,105 @@ class MediaEngine {
     const chosen = this.prefs.get().codec
     const codec = chosen ?? pickCodec(hw)
     const hardware = hw[codec] ?? false
-    const offered = availablePresets(
+    this.capable = availablePresets(
       { hardware, sourceWidth: Math.round(screen.width * devicePixelRatio), sourceHeight: Math.round(screen.height * devicePixelRatio) },
-      this.prefs.get().sustain,
+      this.prefs.get().encoderSustain,
     )
-    const cur = useMedia.getState().screen.preset
-    patch('screen', { codec, codecAuto: !chosen, offered, hardwareEncoder: hardware, preset: offered.some((o) => o.id === cur) ? cur : defaultPreset(offered).id })
+    patch('screen', { codec, codecAuto: !chosen, hardwareEncoder: hardware })
+    this.syncPlan()
+  }
+
+  /**
+   * Screen-share presets the user's plan allows (Me.plan.streamPresets, VoiceJoinResponse.streamPresets or the
+   * token attribute); null = unknown. During a share the live stream is re-capped down, or lifted back, in place.
+   */
+  setPlanPresets(list: readonly string[] | null): void {
+    this.start()
+    const next = list ? list.filter(isPresetId) : null
+    if (String(next) === String(this.plan) && (next === null) === (this.plan === null)) return
+    this.plan = next
+    this.syncPlan()
+  }
+
+  private planFromRoom(room: Room): void {
+    const raw = room.localParticipant.attributes?.[STREAM_PRESETS_ATTRIBUTE]
+    if (raw !== undefined) this.setPlanPresets(raw.split(','))
+  }
+
+  /** offered/locked = machine × plan. A live share above the result is re-capped; one capped earlier is lifted back. */
+  private syncPlan(): void {
+    const { offered, locked } = gatePresets(this.capable, this.plan)
+    const target = clampPreset(this.prefs.get().screenPreset, offered, useMedia.getState().screen.contentType)
+    patch('screen', { offered, locked, plan: this.plan, ...(!this.screenPub && { preset: target.id }) })
+    const live = this.screenPub?.preset
+    if (!live || live.id === target.id) return
+    // Say it once, calmly: the stream keeps going, only its ceiling moved.
+    this.notify(offered.some((p) => p.id === live.id) ? `A transmissão agora vai em ${target.label}.` : `Seu plano não inclui ${live.label}: a transmissão continua, em ${target.label}.`)
+    void this.recap(target)
+  }
+
+  /** Quality of the live share (applied in place, viewers stay) or of the next one. */
+  async setScreenQuality(id: ScreenPresetId): Promise<void> {
+    this.start()
+    this.prefs.set({ screenPreset: id })
+    const s = useMedia.getState().screen
+    const target = clampPreset(id, s.offered, s.contentType)
+    if (!this.screenPub) return patch('screen', { preset: target.id })
+    await this.recap(target)
+  }
+
+  /**
+   * Re-cap the live share in place. Same publication (viewers stay subscribed); a new capture of the same source
+   * at the new size/fps is swapped in with replaceTrack (like switchScreenSource), then every encoding of every
+   * sender (simulcast layers + backup codec) is rewritten for the new ladder. The SFU keeps the layer list declared
+   * at publish; what goes on the wire follows the new caps right away.
+   */
+  private recap(preset: ScreenPreset): Promise<void> {
+    const run = async () => {
+      const cur = this.screenPub
+      if (!cur || !this.room || cur.preset.id === preset.id) return
+      const vtrack = cur.video.track as LocalVideoTrack
+      const codec = useMedia.getState().screen.codec
+      let video = vtrack.mediaStreamTrack
+      if (cur.sourceId) {
+        // Chromium shares one capture device per source: a second capture of it only gets frames up to the size/fps
+        // the first one runs at (measured: 720p → 1080p stayed 1280×720). Going up, raise the live track first.
+        if (preset.height > cur.preset.height || preset.fps > cur.preset.fps) {
+          await video.applyConstraints({ width: { max: preset.width }, height: { max: preset.height }, frameRate: { ideal: preset.fps, max: preset.fps } }).catch(() => undefined)
+        }
+        const stream = await this.capture(cur.sourceId, false, preset)
+        if (this.screenPub !== cur) return stream.getTracks().forEach((t) => t.stop())
+        const old = video
+        video = stream.getVideoTracks()[0]!
+        video.contentHint = old.contentHint
+        video.addEventListener('ended', () => void this.stopScreenShare())
+        const size = video.getSettings()
+        // replaceTrack recomputes encodings from publishOptions when the size changes: hand it the new ladder first.
+        vtrack.publishOptions = { ...vtrack.publishOptions, ...layerOptions(preset, size.width, size.height, codec) }
+        await vtrack.replaceTrack(video, true)
+        old.stop()
+      } else {
+        // An injected stream (lab patterns): only the frame rate can follow, the encoder caps below do the rest.
+        await video.applyConstraints({ frameRate: { ideal: preset.fps, max: preset.fps } }).catch(() => undefined)
+      }
+      const size = video.getSettings()
+      vtrack.publishOptions = { ...vtrack.publishOptions, ...layerOptions(preset, size.width, size.height, codec) }
+      await applyEncodings(vtrack, preset, size.width ?? preset.width, size.height ?? preset.height)
+      cur.preset = preset
+      cur.cpuLimited = []
+      patch('screen', { preset: preset.id })
+    }
+    this.recapOp = this.recapOp.then(run, run).catch((e: unknown) => this.notify(`Não foi possível ajustar a qualidade da transmissão: ${errText(e)}`))
+    return this.recapOp
   }
 
   /** `codec: null` returns to automatic. */
   setScreenDefaults(p: { quality?: ScreenPresetId; contentType?: ContentType; codec?: VideoCodecId | null }): void {
     this.start()
     this.prefs.set({ ...(p.quality && { screenPreset: p.quality }), ...(p.contentType && { contentType: p.contentType }), ...(p.codec !== undefined && { codec: p.codec }) })
-    patch('screen', { ...(p.quality && { preset: p.quality }), ...(p.contentType && { contentType: p.contentType }) })
+    patch('screen', { ...(p.contentType && { contentType: p.contentType }) })
     if (p.codec !== undefined) void this.probeEncoder()
+    else this.syncPlan()
   }
 
   // ───────────────────────────── screen share (viewer) ─────────────────────────────
@@ -978,6 +1107,7 @@ class MediaEngine {
     if (!room || !vpub) return
     // adaptiveStream is fixed per track at subscription time; "source" subscribes this one track without it.
     if (quality === 'source') room.options.adaptiveStream = false
+    this.stalls.delete(identity)
     vpub.setSubscribed(true)
     if (quality === 'source') vpub.setVideoQuality(VideoQuality.HIGH)
     rp?.getTrackPublication(Track.Source.ScreenShareAudio)?.setSubscribed(true)
@@ -989,6 +1119,7 @@ class MediaEngine {
     rp?.getTrackPublication(Track.Source.ScreenShare)?.setSubscribed(false)
     rp?.getTrackPublication(Track.Source.ScreenShareAudio)?.setSubscribed(false)
     this.deltas.delete(`v:${identity}`)
+    this.stalls.delete(identity)
     useMedia.setState((s) => {
       const viewers = { ...s.viewers }
       delete viewers[identity]
@@ -1049,12 +1180,46 @@ class MediaEngine {
     this.uiTimer = setInterval(() => this.tickUi(), 200)
     this.statsTimer = setInterval(() => void this.tickStats(), 1000)
     this.levelTimer = setInterval(() => this.tickLevels(), LEVEL_TICK_MS)
+    this.stallTimer = setInterval(() => void this.tickStalls(), STALL_TICK_MS)
   }
   private stopTimers(): void {
     if (this.uiTimer) clearInterval(this.uiTimer)
     if (this.statsTimer) clearInterval(this.statsTimer)
     if (this.levelTimer) clearInterval(this.levelTimer)
-    this.uiTimer = this.statsTimer = this.levelTimer = null
+    if (this.stallTimer) clearInterval(this.stallTimer)
+    this.uiTimer = this.statsTimer = this.levelTimer = this.stallTimer = null
+    this.stalls.clear()
+  }
+
+  /**
+   * Stall guard. When the sender's top layer stops (its uplink can't carry it, WebRTC drops that simulcast layer),
+   * the SFU only notices after its screen-share stream tracker times out and the viewer freezes meanwhile: 3.7–4.5 s
+   * on a 3 Mbit/s uplink (docs/benchmarks/media-network.md §3). Here: frames stopped while the link still carries
+   * data = that layer is gone, so ask the SFU for the next one down now; after a hold, try one back up (the hold
+   * doubles while it keeps happening). A dead link (outage) or a still picture (no motion, few fps) is left alone.
+   */
+  private async tickStalls(): Promise<void> {
+    const room = this.room
+    if (!room || !this.stallGuard) return
+    const now = performance.now()
+    for (const id of Object.keys(useMedia.getState().viewers)) {
+      const pub = room.remoteParticipants.get(id)?.getTrackPublication(Track.Source.ScreenShare)
+      const track = pub?.track
+      if (!pub || !track || !pub.isEnabled) {
+        this.stalls.delete(id)
+        continue
+      }
+      let frames = 0
+      let link = 0
+      ;(await track.getRTCStatsReport())?.forEach((s: Record<string, unknown>) => {
+        if (s.type === 'inbound-rtp' && s.kind === 'video') frames = Number(s.framesDecoded ?? 0)
+        else if (s.type === 'candidate-pair' && s.nominated) link += Number(s.bytesReceived ?? 0) + Number(s.responsesReceived ?? 0)
+      })
+      if (this.room !== room) return
+      const next = stallStep(this.stalls.get(id), frames, link, now)
+      this.stalls.set(id, next.state)
+      if (next.layer !== undefined) pub.setVideoQuality(next.layer as unknown as VideoQuality)
+    }
   }
 
   private addMeter(identity: string, track: MediaStreamTrack): void {
@@ -1140,7 +1305,7 @@ class MediaEngine {
     if (this.screenPub?.video.track) {
       screenStats = videoOut(this.delta('screen').next(await this.screenPub.video.track.getRTCStatsReport()))
       const top = screenStats?.layers[0]
-      if (top && top.fps > 0) this.screenPub.fps.push(top.fps)
+      if (top && top.fps > 0) this.screenPub.cpuLimited.push(top.qualityLimitationReason === 'cpu')
     }
     const viewers = { ...useMedia.getState().viewers }
     for (const id of Object.keys(viewers)) {
@@ -1161,6 +1326,14 @@ class MediaEngine {
   setSoundsEnabled(on: boolean): void {
     this.prefs.set({ sounds: on })
     patch('self', { sounds: on })
+    if (!on) stopRing()
+  }
+
+  /** Incoming call ring / outgoing ringback (looped, respects the sounds setting); null stops it. */
+  ring(kind: RingKind | null): void {
+    this.start()
+    if (kind && this.prefs.get().sounds) startRing(kind)
+    else stopRing()
   }
 
   private cue(c: Cue): void {
@@ -1178,7 +1351,7 @@ class MediaEngine {
 
   /** Dev/benchmark access (MediaLab only). Not part of the UI contract. */
   get debug() {
-    return { room: this.room, graph: this.graph, mic: this.mic, screen: this.screenPub, prefs: this.prefs }
+    return { room: this.room, graph: this.graph, mic: this.mic, screen: this.screenPub, prefs: this.prefs, dtxRepairs: this.dtxRepairs }
   }
 }
 
@@ -1198,6 +1371,67 @@ async function releaseTransceivers(room: Room, transceivers: RTCRtpTransceiver[]
   // shortcut: placeholders add one m-line per stopped transceiver (as many as before the fix, minus encoders); revisit if SDP size starts to show in negotiation time.
   for (const kind of kinds) pc.addTransceiverOfKind(kind, { direction: 'inactive' })
   await room.engine.negotiate().catch(() => undefined)
+}
+
+/** Encoding options of a screen publication for `preset` at the real capture size (top, simulcast ladder, backup codec). */
+function layerOptions(preset: ScreenPreset, width: number | undefined, height: number | undefined, codec: VideoCodecId): TrackPublishOptions {
+  const advanced = codec === 'vp9' || codec === 'av1' || codec === 'h265'
+  return {
+    // Codecs not every viewer can decode get an H.264 backup the SFU switches to per subscriber.
+    backupCodec: advanced ? { codec: 'h264', encoding: { maxBitrate: preset.maxBitrate, maxFramerate: preset.fps } } : false,
+    screenShareEncoding: { maxBitrate: preset.maxBitrate, maxFramerate: preset.fps, priority: 'high' },
+    screenShareSimulcastLayers: simulcastFor(preset, width, height).map((l) => new VideoPreset(l.width, l.height, l.maxBitrate, l.fps)),
+  }
+}
+
+/**
+ * Rewrite every encoding of a live screen track (primary and backup senders) for `preset` at `w`×`h`: scaled by the
+ * short side as LiveKit's computeVideoEncodings does, bitrate and fps capped. Layers dynacast turned off too, so they
+ * come back already capped. Under LiveKit's sender lock: dynacast's getParameters/setParameters must not interleave.
+ */
+async function applyEncodings(track: LocalVideoTrack, preset: ScreenPreset, w: number, h: number): Promise<void> {
+  const layers = [...simulcastFor(preset, w, h), { width: w, height: h, fps: preset.fps, maxBitrate: preset.maxBitrate }]
+  const short = Math.min(w, h)
+  // shortcut: LiveKit 2.23's private senderLock; if a later version drops it we only lose the guard against a concurrent dynacast update.
+  const unlock = await (track as unknown as { senderLock?: { lock(): Promise<() => void> } }).senderLock?.lock()
+  try {
+    for (const sender of [track.sender, ...[...track.simulcastCodecs.values()].map((c) => c.sender)]) {
+      if (!sender) continue
+      // A sender whose track was just swapped can refuse once ("getParameters() has never been called"): fresh params, retry.
+      for (let attempt = 0; ; attempt++) {
+        const params = sender.getParameters()
+        const enc = params.encodings ?? []
+        if (!enc.length) break
+        // The encodings published (dynacast toggles them by rid), lowest first: the last one is the top layer.
+        enc.forEach((e, i) => {
+          const l = layers[Math.max(0, layers.length - enc.length + i)]!
+          e.scaleResolutionDownBy = Math.max(1, short / Math.min(l.width, l.height))
+          e.maxBitrate = l.maxBitrate
+          e.maxFramerate = Math.min(preset.fps, l.fps)
+        })
+        try {
+          await sender.setParameters(params)
+          break
+        } catch (e) {
+          if (attempt >= 2) throw e
+          await new Promise((r) => setTimeout(r, 100))
+        }
+      }
+    }
+  } finally {
+    unlock?.()
+  }
+}
+
+/** The Opus fmtp the mic's sender negotiated (waits for the answer); null = not known within `ms`. */
+async function opusFmtp(track: LocalAudioTrack, ms = 3000): Promise<string | null> {
+  const t0 = performance.now()
+  while (performance.now() - t0 < ms) {
+    const c = track.sender?.getParameters().codecs?.find((x) => /opus/i.test(x.mimeType))
+    if (c) return c.sdpFmtpLine ?? ''
+    await new Promise((r) => setTimeout(r, 100))
+  }
+  return null
 }
 
 /** Size of the first real frame (getSettings() can report the capture buffer instead). null = unknown. */

@@ -20,7 +20,8 @@ export interface MediaPrefs {
   contentType: ContentType
   /** null = automatic (pickCodec over the hardware probe). */
   codec: VideoCodecId | null
-  sustain: SustainRecord
+  /** Encoder sustain per preset (CPU-limitation based; the old fps-based `sustain` key is ignored). */
+  encoderSustain: SustainRecord
   sounds: boolean
 }
 
@@ -36,7 +37,7 @@ export const DEFAULT_PREFS: MediaPrefs = {
   screenPreset: '1080p60',
   contentType: 'motion',
   codec: null,
-  sustain: {},
+  encoderSustain: {},
   sounds: true,
 }
 

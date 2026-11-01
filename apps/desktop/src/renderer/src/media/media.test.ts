@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_HANGOVER_MS, PttLatch, VadGate, perceptualLevel, rmsDb } from './vad'
-import { SCREEN_PRESETS, availablePresets, contentSettings, defaultPreset, getPreset, pickCodec, recordSustain, simulcastFor } from './presets'
+import { STREAM_PRESETS } from '@alga/shared'
+import { SCREEN_PRESETS, availablePresets, clampPreset, contentSettings, defaultPreset, gatePresets, getPreset, pickCodec, recordSustain, simulcastFor } from './presets'
 import { PrefsStore } from './prefs'
+import { stallStep, type StallState } from './stall'
 
 const run = (g: VadGate, db: number, ms: number) => {
   let open = false
@@ -72,18 +74,48 @@ describe('PttLatch', () => {
 })
 
 describe('presets', () => {
-  const ids = (l: { id: string }[]) => l.map((p) => p.id)
-  it('software encoder: up to 1080p30 only', () => {
-    expect(ids(availablePresets({ hardware: false }))).toEqual(['720p30', '1080p30'])
+  const ids = (l: readonly { id: string }[]) => l.map((p) => p.id)
+  it('software encoder: up to 1080p30 only (720p60 fits under that pixel rate)', () => {
+    expect(ids(availablePresets({ hardware: false }))).toEqual(['720p30', '720p60', '1080p30'])
   })
   it('hardware encoder on a 1440p monitor: up to 1440p60, never 4K (upscaling)', () => {
-    expect(ids(availablePresets({ hardware: true, sourceWidth: 2560, sourceHeight: 1440 }))).toEqual(['720p30', '1080p30', '1080p60', '1440p60'])
+    expect(ids(availablePresets({ hardware: true, sourceWidth: 2560, sourceHeight: 1440 }))).toEqual(['720p30', '720p60', '1080p30', '1080p60', '1440p60'])
   })
-  it('hides a preset that failed to hold its fps more often than not', () => {
-    let r = recordSustain({}, '1440p60', 60, 41)
-    r = recordSustain(r, '1440p60', 60, 59)
+  it('every preset stays within the plan contract the server checks (STREAM_PRESETS)', () => {
+    for (const p of SCREEN_PRESETS) {
+      const c = STREAM_PRESETS[p.id]
+      expect(Math.min(p.width, p.height)).toBeLessThanOrEqual(c.height)
+      expect(p.fps).toBeLessThanOrEqual(c.fps)
+      expect(p.maxBitrate).toBeLessThanOrEqual(c.maxBitrateKbps * 1000)
+      expect(p.simulcast).toHaveLength(2) // 3 layers in all
+    }
+    expect(Object.keys(STREAM_PRESETS).sort()).toEqual(ids(SCREEN_PRESETS).sort())
+  })
+  it('plan gate: free on a 1080p HW machine offers 720p30/720p60/1080p30 and locks only 1080p60', () => {
+    const capable = availablePresets({ hardware: true, sourceWidth: 1920, sourceHeight: 1080 })
+    const free = gatePresets(capable, ['720p30', '720p60', '1080p30'])
+    expect(ids(free.offered)).toEqual(['720p30', '720p60', '1080p30'])
+    expect(ids(free.locked)).toEqual(['1080p60']) // 1440p60/4K are not sold to a machine that can't do them
+    const plus = gatePresets(capable, ['720p30', '720p60', '1080p30', '1080p60', '1440p60', '2160p30'])
+    expect(ids(plus.offered)).toEqual(['720p30', '720p60', '1080p30', '1080p60'])
+    expect(plus.locked).toEqual([])
+    expect(gatePresets(capable, null)).toEqual({ offered: capable, locked: [] }) // plan unknown: the server enforces
+    expect(ids(gatePresets([getPreset('1080p60')], ['720p30']).offered)).toEqual(['720p30']) // never empty
+  })
+  it('clamp: the best allowed preset below the wish, keeping fps for motion and resolution for detail', () => {
+    const offered = gatePresets(availablePresets({ hardware: true, sourceWidth: 1920, sourceHeight: 1080 }), ['720p30', '720p60', '1080p30']).offered
+    expect(clampPreset('1080p60', offered, 'motion').id).toBe('720p60')
+    expect(clampPreset('1080p60', offered, 'detail').id).toBe('1080p30')
+    expect(clampPreset('720p60', offered).id).toBe('720p60')
+    expect(clampPreset('2160p30', offered, 'motion').id).toBe('1080p30') // 4K30 never becomes 60 fps
+    expect(clampPreset('720p30', [getPreset('1080p30')]).id).toBe('1080p30') // nothing below: the lowest offered
+  })
+  it('hides a preset whose encoder was CPU-limited in most of its shares (a calm screen at low fps is not a failure)', () => {
+    const cpu = (n: number) => Array.from({ length: 20 }, (_, i) => i < n)
+    let r = recordSustain({}, '1440p60', cpu(15))
+    r = recordSustain(r, '1440p60', cpu(2))
     expect(ids(availablePresets({ hardware: true }, r))).toContain('1440p60') // 1 ok / 1 bad: keep
-    r = recordSustain(r, '1440p60', 60, 38)
+    r = recordSustain(r, '1440p60', cpu(20))
     expect(ids(availablePresets({ hardware: true }, r))).not.toContain('1440p60')
   })
   it('defaults to 1080p60 when offered', () => {
@@ -146,5 +178,42 @@ describe('PrefsStore volumes', () => {
     const broken = { getItem: () => '{nope', setItem: () => { throw new Error('quota') } }
     const p = new PrefsStore(broken)
     expect(p.setVolume('u', 0.7)).toBe(0.7)
+  })
+})
+
+describe('stall guard', () => {
+  // Feed ticks of 200 ms: `fps` frames per second decoded, link counter always growing unless `dead`.
+  const run = (ticks: Array<{ fps: number; dead?: boolean }>) => {
+    let st: StallState | undefined
+    let frames = 0
+    let link = 0
+    let now = 0
+    const asks: Array<[number, number]> = []
+    for (const k of ticks) {
+      frames += (k.fps * 200) / 1000
+      if (!k.dead) link += 1000
+      now += 200
+      const r = stallStep(st, Math.floor(frames), link, now)
+      st = r.state
+      if (r.layer !== undefined) asks.push([now, r.layer])
+    }
+    return asks
+  }
+  const repeat = (n: number, t: { fps: number; dead?: boolean }) => Array.from({ length: n }, () => t)
+
+  it('steps down one layer ~0.6 s after a moving picture stops while data still arrives', () => {
+    const asks = run([...repeat(15, { fps: 30 }), ...repeat(10, { fps: 0 })])
+    expect(asks).toEqual([[3600, 1]])
+  })
+  it('leaves a dead link (outage) and a still picture alone', () => {
+    expect(run([...repeat(15, { fps: 30 }), ...repeat(20, { fps: 0, dead: true })])).toEqual([])
+    expect(run([...repeat(30, { fps: 2 }), ...repeat(20, { fps: 0 })])).toEqual([])
+  })
+  it('tries the top layer again after the hold, and holds twice as long after a second stall', () => {
+    const asks = run([...repeat(15, { fps: 30 }), ...repeat(5, { fps: 0 }), ...repeat(60, { fps: 30 }), ...repeat(5, { fps: 0 }), ...repeat(100, { fps: 30 })])
+    expect(asks.map((a) => a[1])).toEqual([1, 2, 1, 2])
+    const [down1, up1, down2, up2] = asks.map((a) => a[0])
+    expect(up1! - down1!).toBeGreaterThanOrEqual(8000)
+    expect(up2! - down2!).toBeGreaterThanOrEqual(16000)
   })
 })

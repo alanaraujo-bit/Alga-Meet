@@ -97,7 +97,12 @@ export interface MediaState {
     codecAuto: boolean
     audio: boolean
     sourceId: string | null
+    /** What you can pick: sustained by this machine AND allowed by your plan. */
     offered: ScreenPreset[]
+    /** Sustained by this machine but not in your plan (show with the plan hint; never a preset the hardware can't do). */
+    locked: ScreenPreset[]
+    /** Presets your plan allows (STREAM_PRESETS ids); null = not known yet (the server still enforces). */
+    plan: ScreenPresetId[] | null
     hardwareEncoder: boolean | null
     stats: VideoOutStats | null
     error: string | null
@@ -141,6 +146,8 @@ export const initialState = (): MediaState => ({
     audio: false,
     sourceId: null,
     offered: [],
+    locked: [],
+    plan: null,
     hardwareEncoder: null,
     stats: null,
     error: null,
