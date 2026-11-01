@@ -1,0 +1,45 @@
+# TLS front for the home SFU. Template: install.sh renders it into caddy.yaml, replacing <DOMAIN>.
+# Image livekit/caddyl4 (Caddy + layer4 module). One public port, 443, split by SNI:
+#   <DOMAIN>      -> TLS terminated here -> LiveKit signaling (HTTP/WebSocket) on livekit:7880
+#   turn.<DOMAIN> -> TLS terminated here -> LiveKit TURN (external_tls) on livekit:5349
+# Certificates: Let's Encrypt via ACME (HTTP-01 on port 80), stored in ./caddy_data. Same layout as
+# infra/livekit/caddy.prod.yaml, with compose service names instead of localhost (bridge network).
+admin:
+  config:
+    persist: false               # read-only container: do not write autosave.json
+logging:
+  logs:
+    default:
+      level: INFO
+storage:
+  module: file_system
+  root: /data
+apps:
+  tls:
+    certificates:
+      automate:
+        - <DOMAIN>
+        - turn.<DOMAIN>
+  layer4:
+    servers:
+      main:
+        listen: [":443"]
+        routes:
+          - match:
+              - tls:
+                  sni: ["turn.<DOMAIN>"]
+            handle:
+              - handler: tls
+              - handler: proxy
+                upstreams:
+                  - dial: ["livekit:5349"]
+          - match:
+              - tls:
+                  sni: ["<DOMAIN>"]
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["livekit:7880"]

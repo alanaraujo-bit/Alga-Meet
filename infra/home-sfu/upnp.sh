@@ -1,0 +1,41 @@
+#!/bin/sh
+# UPnP port mapper (runs in the `upnp` container, host network). Asks the router to forward the SFU ports to this
+# host, refreshes every 20 min (1 h lease), and deletes the mappings when the container stops (compose down/stop).
+set -u
+MAPS="80/TCP 443/TCP 7881/TCP 7882/UDP 3478/UDP"
+
+if [ "${UPNP:-1}" = 0 ]; then
+  echo "UPNP=0: nothing to do (forward the ports on the router by hand, README section 2)"
+  while :; do touch /tmp/ok; sleep 600; done
+fi
+
+lan=${UPNP_LAN_IP:-$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')}
+[ -n "$lan" ] || { echo "no LAN IPv4 found; set UPNP_LAN_IP in .env"; exit 1; }
+
+mine=""   # only delete what we mapped: a failed add may mean another device owns that port
+cleanup() {
+  for m in $mine; do upnpc -d "${m%/*}" "${m#*/}" >/dev/null 2>&1; done
+  echo "mappings removed"
+  exit 0
+}
+trap cleanup TERM INT
+
+while :; do
+  ok=0; mine=""
+  for m in $MAPS; do
+    port=${m%/*}; proto=${m#*/}
+    # Lease of 1 h; some routers only accept permanent (0) leases (error 725), so retry with 0.
+    out=$(upnpc -e alga-sfu -a "$lan" "$port" "$port" "$proto" 3600 2>&1)
+    echo "$out" | grep -q 'is redirected to internal' ||
+      out=$(upnpc -e alga-sfu -a "$lan" "$port" "$port" "$proto" 0 2>&1)
+    if echo "$out" | grep -q 'is redirected to internal'; then
+      ok=$((ok + 1)); mine="$mine $m"; echo "ok    $port/$proto -> $lan:$port"
+    else
+      echo "FAIL  $port/$proto: $(echo "$out" | grep -i -m1 -E 'fail|error|no igd|not found' || echo "$out" | tail -n1)"
+    fi
+  done
+  wan=$(upnpc -s 2>/dev/null | sed -n 's/^ExternalIPAddress = //p')
+  echo "$(date -u +%FT%TZ) $ok/5 mapped, router WAN IP: ${wan:-unknown}"
+  [ "$ok" = 5 ] && touch /tmp/ok
+  sleep 1200 & wait $!
+done

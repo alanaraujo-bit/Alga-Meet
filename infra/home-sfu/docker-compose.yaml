@@ -1,0 +1,115 @@
+# Home-server SFU stack (README.md). Lives in ~/alga-sfu next to .env (secrets, mode 600) and the files install.sh
+# renders (livekit.yaml, caddy.yaml). Start/update: ./install.sh   Health: ./doctor.sh
+#
+# Bridge networking with published ports, not host networking: Docker's DNAT rules let these ports in even with
+# ufw enabled (same path the box's other services use), and nothing here needs sudo.
+name: alga-sfu
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: 10m, max-file: "3" }   # without rotation the logs grow until the disk is full
+
+services:
+  livekit:
+    # Pinned: the version the server's moderation/voice paths were validated against (scripts/livekit.mjs).
+    image: livekit/livekit-server:v1.13.11
+    command: --config /etc/livekit.yaml
+    restart: unless-stopped
+    user: "${ALGA_UID:-1000}:${ALGA_GID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:?missing in .env}: ${LIVEKIT_API_SECRET:?missing in .env}"
+      NODE_IP: "${NODE_IP:-}"   # used only with use_external_ip: false (livekit.home.yaml)
+    ports:
+      - "7881:7881/tcp"
+      - "7882:7882/udp"
+      - "3478:3478/udp"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7880/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging: *logging
+
+  caddy:
+    image: livekit/caddyl4:v2.11.3
+    command: run --config /etc/caddy.yaml --adapter yaml
+    restart: unless-stopped
+    user: "${ALGA_UID:-1000}:${ALGA_GID:-1000}"   # ports < 1024 are allowed inside a bridge-network container
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      HOME: /data
+      XDG_DATA_HOME: /data
+      XDG_CONFIG_HOME: /data/config
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+    volumes:
+      - ./caddy.yaml:/etc/caddy.yaml:ro
+      - ./caddy_data:/data
+    tmpfs: [/tmp]
+    depends_on: [livekit]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]   # admin API, container-local
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *logging
+
+  duckdns:
+    # Updates <sub>.duckdns.org (A, and AAAA when DUCKDNS_IPV6=1) every 5 min. Host network: sees the host's IPv6.
+    image: curlimages/curl:8.22.0
+    entrypoint: ["/bin/sh", "/duckdns.sh"]
+    restart: unless-stopped
+    network_mode: host
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      DUCKDNS_SUBDOMAIN: "${DUCKDNS_SUBDOMAIN:?missing in .env}"
+      DUCKDNS_TOKEN: "${DUCKDNS_TOKEN:?missing in .env}"
+      DUCKDNS_IPV6: "${DUCKDNS_IPV6:-0}"
+    volumes:
+      - ./duckdns.sh:/duckdns.sh:ro
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "test -n \"$$(find /tmp/ok -mmin -11 2>/dev/null)\""]
+      interval: 60s
+      timeout: 5s
+      start_period: 30s
+    logging: *logging
+
+  upnp:
+    # Asks the router (UPnP IGD) to forward the SFU ports to this host, refreshes the lease, removes them on stop.
+    # Set UPNP=0 in .env to skip (ports forwarded by hand on the router). Host network: SSDP multicast + real LAN IP.
+    build:
+      dockerfile_inline: |
+        FROM alpine:3.24.3
+        RUN apk add --no-cache miniupnpc
+    image: alga-sfu-upnp:local
+    entrypoint: ["/bin/sh", "/upnp.sh"]
+    restart: unless-stopped
+    network_mode: host
+    user: "${ALGA_UID:-1000}:${ALGA_GID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      UPNP: "${UPNP:-1}"
+      UPNP_LAN_IP: "${UPNP_LAN_IP:-}"   # empty = this host's LAN IP (route to the internet)
+    volumes:
+      - ./upnp.sh:/upnp.sh:ro
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "test -n \"$$(find /tmp/ok -mmin -31 2>/dev/null)\""]
+      interval: 60s
+      timeout: 5s
+      start_period: 60s
+    logging: *logging

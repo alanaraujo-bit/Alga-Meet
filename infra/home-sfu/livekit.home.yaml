@@ -1,0 +1,51 @@
+# Home-server SFU (one node, Docker bridge network, behind the home router). Template: install.sh renders it into
+# livekit.yaml, replacing <DOMAIN> (e.g. alga.duckdns.org), <API_KEY> and <API_URL> from .env.
+#
+# Published on the host (docker-compose.yaml) and forwarded by the router (upnp service or by hand):
+#   7882/udp  WebRTC media, ALL participants on ONE port (UDP mux) -> one router rule instead of 10,000
+#   7881/tcp  ICE over TCP (networks that block UDP)
+#   3478/udp  TURN/UDP
+#   443/tcp   Caddy: wss://<DOMAIN> -> 7880 and TURN/TLS turn.<DOMAIN> -> 5349 (split by SNI)
+# 7880 and 5349 are never published: only Caddy reaches them, over the compose network.
+#
+# Keys are not in this file: the container gets LIVEKIT_KEYS="<key>: <secret>" from .env, the SAME pair as the
+# Railway API's LIVEKIT_API_KEY / LIVEKIT_API_SECRET (tokens and webhooks are signed with it).
+port: 7880
+bind_addresses:
+  - ""
+rtc:
+  udp_port: 7882
+  tcp_port: 7881
+  # Learn the public IPv4 via STUN at startup (the container only sees its 172.x address). ipwatch.sh (cron) recreates
+  # the container when the public IP changes, because LiveKit never looks again while running.
+  use_external_ip: true
+  # LiveKit normally confirms the STUN answer by sending a packet to <public IP>:7882 from inside the LAN. That only
+  # works if the router does NAT loopback (hairpin); measured on this LAN without it: validation failed and LiveKit
+  # silently advertised the private IP. Port forwarding is checked by doctor.sh instead.
+  skip_external_ip_validation: true
+  # If STUN fails (log: "could not resolve external IP"), pin the IP instead. node_ip is IGNORED while
+  # use_external_ip is true (tested on 1.13.11), so switch both:
+  #   use_external_ip: false
+  #   node_ip: <public IPv4>          # or NODE_IP=<public IPv4> in .env; ipwatch.sh keeps NODE_IP current
+  enable_loopback_candidate: false
+turn:
+  enabled: true
+  domain: turn.<DOMAIN>              # DuckDNS answers every name under <DOMAIN> with the same IP: no extra record
+  # Caddy terminates TLS on 443 and forwards plain TCP here, so LiveKit needs no certificate files.
+  tls_port: 5349
+  external_tls: true
+  udp_port: 3478
+webhook:
+  # Key *name* (not the secret) that signs webhooks; must be the key in LIVEKIT_KEYS.
+  api_key: <API_KEY>
+  urls:
+    - <API_URL>/api/v1/livekit/webhook
+room:
+  # Same as dev/prod: rooms close quickly after the last participant leaves.
+  empty_timeout: 20
+  departure_timeout: 10
+logging:
+  level: info
+# No `video.stream_tracker_manager` block on purpose: the screenshare layer-timeout stays at LiveKit's default
+# (decision and measurements in infra/livekit/README.md).
+# No `redis:` block: a single node needs none.
