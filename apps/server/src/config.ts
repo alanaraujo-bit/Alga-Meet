@@ -67,6 +67,8 @@ const EnvSchema = z
     EMAIL_DRIVER: z.enum(['console', 'resend']).optional(),
     /** Lets production run the console driver (e.g. a staging box without a provider). */
     ALGA_ALLOW_CONSOLE_EMAIL: bool,
+    /** Staging only: register marks the e-mail verified and sends no verification mail. Needs EMAIL_DRIVER=console + ALGA_ALLOW_CONSOLE_EMAIL=1. */
+    ALGA_AUTO_VERIFY_EMAIL: bool,
     EMAIL_OUTBOX_DIR: z.string().min(1).default(join(serverRoot, 'data', 'outbox')),
     /** Sender, e.g. `Alga Meet <nao-responda@algameet.com.br>`; its domain must be verified at the provider. */
     EMAIL_FROM: z.string().min(3).optional(),
@@ -115,6 +117,10 @@ const EnvSchema = z
     }
     if (env.NODE_ENV === 'production' && env.EMAIL_DRIVER === 'console' && !env.ALGA_ALLOW_CONSOLE_EMAIL) {
       ctx.addIssue({ code: 'custom', path: ['EMAIL_DRIVER'], message: 'console only writes files on the server; set ALGA_ALLOW_CONSOLE_EMAIL=1 to allow it in production' })
+    }
+    // Fail closed: never next to a real provider, i.e. never where real users register.
+    if (env.ALGA_AUTO_VERIFY_EMAIL && !(env.EMAIL_DRIVER === 'console' && env.ALGA_ALLOW_CONSOLE_EMAIL)) {
+      ctx.addIssue({ code: 'custom', path: ['ALGA_AUTO_VERIFY_EMAIL'], message: 'staging only: requires EMAIL_DRIVER=console and ALGA_ALLOW_CONSOLE_EMAIL=1' })
     }
     if (env.EMAIL_DRIVER === 'resend') {
       for (const k of ['RESEND_API_KEY', 'EMAIL_FROM'] as const) {
@@ -175,7 +181,8 @@ export interface BillingConfig {
   mercadopago?: { accessToken: string; webhookSecret: string; apiUrl: string }
 }
 
-export type EmailConfig = { linkUrl: string; from: string } & (
+/** `autoVerify`: ALGA_AUTO_VERIFY_EMAIL (staging only, console driver only). */
+export type EmailConfig = { linkUrl: string; from: string; autoVerify: boolean } & (
   | { driver: 'console'; outboxDir: string }
   | { driver: 'resend'; apiKey: string }
 )
@@ -224,6 +231,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       : { driver: 'local', dir: e.UPLOADS_DIR },
     email: {
       linkUrl: e.EMAIL_LINK_URL.replace(/\/+$/, ''),
+      autoVerify: e.ALGA_AUTO_VERIFY_EMAIL,
       ...(e.EMAIL_DRIVER === 'resend'
         ? { driver: 'resend' as const, apiKey: e.RESEND_API_KEY!, from: e.EMAIL_FROM! }
         : { driver: 'console' as const, outboxDir: e.EMAIL_OUTBOX_DIR, from: e.EMAIL_FROM ?? 'Alga Meet <nao-responda@alga.localhost>' }),

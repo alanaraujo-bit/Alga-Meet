@@ -98,6 +98,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   ctx.privacy.start()
   ctx.telemetry.start()
   app.log.info({ provider: config.billing.provider }, 'billing ready')
+  if (config.email.autoVerify) app.log.warn('staging: auto-verifying e-mails')
 
   // preClose runs before @fastify/websocket's own client shutdown, so socket close handlers see hub.closing.
   app.addHook('preClose', async () => {

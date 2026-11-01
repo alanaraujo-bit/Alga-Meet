@@ -248,6 +248,13 @@ describe('B10 password policy', () => {
 })
 
 describe('e-mail drivers and config', () => {
+  const PROD = {
+    NODE_ENV: 'production', DATABASE_URL: 'postgres://u:p@db:5432/alga', CORS_ORIGINS: 'null',
+    LIVEKIT_API_KEY: 'k', LIVEKIT_API_SECRET: 'a-real-production-secret-0123456789abcdef',
+    PUBLIC_URL: 'https://api.example.com', FILES_SECRET: 's'.repeat(32), STORAGE_DRIVER: 'local', E2EE_DS_KEY: 'A'.repeat(43) + '=',
+  }
+  const RESEND = { EMAIL_DRIVER: 'resend', RESEND_API_KEY: 're_x', EMAIL_FROM: 'Alga Meet <nao-responda@example.com>' }
+
   const msg: EmailMessage = { to: 'ana@example.com', kind: 'verify_email', subject: 'Confirme seu e-mail', text: 'Olá\ntoken=SEGREDO', html: '<p>Olá</p>' }
   it('console driver: one .eml per message; the body (token) is logged only outside production', async () => {
     const dir = join(s.config.email.driver === 'console' ? s.config.email.outboxDir : '', 'driver-test')
@@ -287,12 +294,6 @@ describe('e-mail drivers and config', () => {
   })
 
   it('production fails closed: EMAIL_DRIVER required, console only when allowed, resend needs its key and sender', () => {
-    const PROD = {
-      NODE_ENV: 'production', DATABASE_URL: 'postgres://u:p@db:5432/alga', CORS_ORIGINS: 'null',
-      LIVEKIT_API_KEY: 'k', LIVEKIT_API_SECRET: 'a-real-production-secret-0123456789abcdef',
-      PUBLIC_URL: 'https://api.example.com', FILES_SECRET: 's'.repeat(32), STORAGE_DRIVER: 'local', E2EE_DS_KEY: 'A'.repeat(43) + '=',
-    }
-    const RESEND = { EMAIL_DRIVER: 'resend', RESEND_API_KEY: 're_x', EMAIL_FROM: 'Alga Meet <nao-responda@example.com>' }
     expect(() => loadConfig(PROD)).toThrow(/EMAIL_DRIVER/)
     expect(() => loadConfig({ ...PROD, EMAIL_DRIVER: 'console' })).toThrow(/ALGA_ALLOW_CONSOLE_EMAIL/)
     expect(loadConfig({ ...PROD, EMAIL_DRIVER: 'console', ALGA_ALLOW_CONSOLE_EMAIL: '1' }).email.driver).toBe('console')
@@ -300,5 +301,50 @@ describe('e-mail drivers and config', () => {
     expect(() => loadConfig({ ...PROD, ...RESEND, EMAIL_FROM: undefined })).toThrow(/EMAIL_FROM/)
     expect(loadConfig({ ...PROD, ...RESEND }).email).toMatchObject({ driver: 'resend', apiKey: 're_x', linkUrl: 'algameet://auth' })
     expect(loadConfig({ NODE_ENV: 'test' }).email.driver).toBe('console')
+  })
+
+  it('ALGA_AUTO_VERIFY_EMAIL fails closed: off by default, only with EMAIL_DRIVER=console and ALGA_ALLOW_CONSOLE_EMAIL=1', () => {
+    const STAGING = { ...PROD, EMAIL_DRIVER: 'console', ALGA_ALLOW_CONSOLE_EMAIL: '1' }
+    expect(loadConfig(STAGING).email.autoVerify).toBe(false)
+    expect(loadConfig({ ...STAGING, ALGA_AUTO_VERIFY_EMAIL: '1' }).email.autoVerify).toBe(true)
+    for (const bad of [
+      { ...STAGING, ALGA_ALLOW_CONSOLE_EMAIL: '0' },
+      { ...PROD, ...RESEND },
+      { ...PROD, ...RESEND, ALGA_ALLOW_CONSOLE_EMAIL: '1' },
+      { NODE_ENV: 'test' }, // console by default, but not explicit
+      { NODE_ENV: 'test', EMAIL_DRIVER: 'console' },
+    ]) expect(() => loadConfig({ ...bad, ALGA_AUTO_VERIFY_EMAIL: '1' })).toThrow(/ALGA_AUTO_VERIFY_EMAIL/)
+  })
+})
+
+describe('ALGA_AUTO_VERIFY_EMAIL (staging without a provider)', () => {
+  let st: TestServer
+  let stSent: MockInstance<(msg: EmailMessage) => Promise<void>>
+  beforeAll(async () => {
+    st = await startServer({ EMAIL_DRIVER: 'console', ALGA_ALLOW_CONSOLE_EMAIL: '1', ALGA_AUTO_VERIFY_EMAIL: '1' })
+    stSent = vi.spyOn(st.app.ctx.mail.sender, 'send')
+  })
+  afterAll(async () => { await st.close() })
+  const reg = (email: string, username: string) =>
+    api<AuthResponse>(st.app, 'POST', '/auth/register', { ip: freshIp(), body: { email, username, password: STRONG } })
+
+  it('register verifies at creation, sends no link, and the account can invite; a verified-elsewhere address stays unverified (B5)', async () => {
+    const a = await reg(`${fresh()}@example.com`, fresh())
+    expect(a.status).toBe(201)
+    expect(a.body.user.emailVerified).toBe(true)
+    const space = (await api<SpaceSnapshot>(st.app, 'POST', '/spaces', { token: a.body.token, body: { name: 'staging' } })).body
+    expect((await api<Invite>(st.app, 'POST', `/spaces/${space.id}/invites`, { token: a.body.token, body: {} })).status).toBe(201)
+    expect((await api(st.app, 'POST', '/auth/login', { ip: freshIp(), body: { login: a.body.user.email, password: STRONG } })).status).toBe(200)
+
+    // Same address again: 201 as always, created unverified, and the owner is told (no link to the newcomer).
+    const dup = await reg(a.body.user.email.toUpperCase(), fresh())
+    expect(dup.status).toBe(201)
+    expect(dup.body.user.emailVerified).toBe(false)
+    await vi.waitFor(() => expect(stSent.mock.calls.some(([m]) => m.to === a.body.user.email && m.kind === 'account_exists')).toBe(true), { timeout: 3000 })
+    // Usernames are still reported as taken (also when the address would collide too).
+    expect((await reg(`${fresh()}@example.com`, a.body.user.username)).status).toBe(409)
+    expect((await reg(a.body.user.email, a.body.user.username)).status).toBe(409)
+    await settle()
+    expect(stSent.mock.calls.filter(([m]) => m.kind === 'verify_email')).toEqual([])
   })
 })

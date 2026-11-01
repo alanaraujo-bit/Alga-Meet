@@ -81,28 +81,34 @@ export function authPublicRoutes(app: FastifyInstance, ctx: Ctx): void {
     const passwordHash = await hashPassword(body.password)
     let user: UserRow | undefined
     const now = new Date()
+    const insert = (emailVerifiedAt: Date | null) => db.transaction(async (tx) => {
+      const [row] = await tx.insert(users).values({
+        id: uuidv7(),
+        email: body.email,
+        username: body.username,
+        displayName: body.displayName ?? body.username,
+        passwordHash,
+        emailVerifiedAt,
+        ...(body.birthDate ? { birthDate: body.birthDate, birthDateSetAt: now } : {}),
+        ...(body.termsVersion ? { termsVersion: body.termsVersion, termsAcceptedAt: now } : {}),
+      }).returning()
+      if (body.termsVersion) await tx.insert(consentRecords).values({ id: uuidv7(), userId: row!.id, termsVersion: body.termsVersion, acceptedAt: now })
+      return row
+    })
     try {
-      user = await db.transaction(async (tx) => {
-        const [row] = await tx.insert(users).values({
-          id: uuidv7(),
-          email: body.email,
-          username: body.username,
-          displayName: body.displayName ?? body.username,
-          passwordHash,
-          ...(body.birthDate ? { birthDate: body.birthDate, birthDateSetAt: now } : {}),
-          ...(body.termsVersion ? { termsVersion: body.termsVersion, termsAcceptedAt: now } : {}),
-        }).returning()
-        if (body.termsVersion) await tx.insert(consentRecords).values({ id: uuidv7(), userId: row!.id, termsVersion: body.termsVersion, acceptedAt: now })
-        return row
-      })
+      // ALGA_AUTO_VERIFY_EMAIL (staging): if another account already verified the address, users_verified_email_key
+      // fires and the account is created unverified as usual (B5 mail). shortcut: emailVerified in the response then
+      // tells the two cases apart (B5 oracle); fine on a closed staging, never turn it on for open sign-ups.
+      user = await insert(ctx.config.email.autoVerify ? now : null)
+        .catch((err: unknown) => { if (ctx.config.email.autoVerify && isUniqueViolation(err)) return insert(null); throw err })
     } catch (err) {
-      // users_verified_email_key never fires here (new accounts are unverified): only the username can collide.
+      // Unverified inserts never hit users_verified_email_key: only the username can collide.
       if (isUniqueViolation(err)) throw usernameTaken()
       throw err
     }
     const { token } = await createSession(db, user!.id, req.headers['user-agent'] ?? '', algaClientHeader(req.headers['x-alga-client']))
     await ctx.privacy.recordUse(user!.id, req.ip, req.headers['user-agent'], 'login')
-    sendVerification(ctx, user!)
+    if (!user!.emailVerifiedAt) sendVerification(ctx, user!)
     reply.code(201)
     return { token, user: meView(user!, ctx.config.files.maxAttachmentBytes) }
   })

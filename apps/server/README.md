@@ -29,7 +29,7 @@ Ver `.env.example` (copie para `.env`; é carregado automaticamente). Validaçã
 `ALGA_ALLOW_DEV_SECRETS`, `CORS_ORIGINS`, `HEARTBEAT_INTERVAL_MS`, `PUBLIC_URL`, `FILES_SECRET`, `FILE_URL_TTL_SECONDS`,
 `MAX_ATTACHMENT_BYTES`, `STORAGE_DRIVER` (`local` | `s3`), `UPLOADS_DIR`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`,
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_URL_STYLE` (`virtual` | `path`), `EMAIL_DRIVER` (`console` | `resend`),
-`ALGA_ALLOW_CONSOLE_EMAIL`, `EMAIL_OUTBOX_DIR`, `EMAIL_FROM`, `RESEND_API_KEY`, `EMAIL_LINK_URL`, `BILLING_PROVIDER`
+`ALGA_ALLOW_CONSOLE_EMAIL`, `ALGA_AUTO_VERIFY_EMAIL`, `EMAIL_OUTBOX_DIR`, `EMAIL_FROM`, `RESEND_API_KEY`, `EMAIL_LINK_URL`, `BILLING_PROVIDER`
 (`none` | `sandbox` | `mercadopago`), `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `MP_API_URL`, `BILLING_RETURN_URL`,
 `REQUIRE_BIRTHDATE`, `LEGAL_URL`, `METRICS_TOKEN`, `E2EE_DS_KEY`, `E2EE_MLS_PKG`.
 
@@ -39,6 +39,11 @@ Falha fechada:
   Service; em dev/test é aleatória por processo), `STORAGE_DRIVER` explícito (`s3` exige as 4 variáveis `S3_*`) e
   `EMAIL_DRIVER` explícito (`resend` exige `RESEND_API_KEY` e `EMAIL_FROM`; `console` só com
   `ALGA_ALLOW_CONSOLE_EMAIL=1`). O banco precisa ser UTF8 (a subida falha caso contrário). `npm run dev` passa `--dev`.
+- **`ALGA_AUTO_VERIFY_EMAIL=1` é só para staging fechado** (sem provedor de e-mail): `POST /auth/register` cria a conta
+  já com o e-mail confirmado e não envia o link; a subida loga `staging: auto-verifying e-mails` (warn). É recusado
+  sem `EMAIL_DRIVER=console` **e** `ALGA_ALLOW_CONSOLE_EMAIL=1`, então nunca convive com um provedor real. Um endereço
+  já confirmado em outra conta continua não confirmado (e o dono recebe o aviso de B5), mas o `emailVerified` da
+  resposta passa a distinguir os dois casos: não use com cadastro aberto.
 - **Pagamentos**: em produção o padrão é `BILLING_PROVIDER=none` (checkout 503). `sandbox` é **recusado em produção**,
   sem válvula de escape (nem `ALGA_ALLOW_DEV_SECRETS`); staging usa `mercadopago` com credenciais de teste do MP.
   `mercadopago` exige `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` e `BILLING_RETURN_URL` (https).
