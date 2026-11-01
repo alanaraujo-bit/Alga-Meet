@@ -2,6 +2,7 @@ import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
 import { log } from './log'
+import { clampZoom } from './ui-logic'
 
 export interface SavedBounds {
   x?: number
@@ -13,10 +14,14 @@ export interface SavedBounds {
 
 export interface Settings {
   closeToTray: boolean
+  /** Renderer zoom factor (webContents.setZoomFactor), ZOOM_MIN..ZOOM_MAX. */
+  zoomFactor: number
+  /** Tray icon breathes while in voice (also off when Windows asks for reduced motion). */
+  trayAnimation: boolean
   window?: SavedBounds
 }
 
-const DEFAULTS: Settings = { closeToTray: true }
+const DEFAULTS: Settings = { closeToTray: true, zoomFactor: 1, trayAnimation: true }
 let cache: Settings | null = null
 
 const file = () => join(app.getPath('userData'), 'settings.json')
@@ -32,7 +37,11 @@ const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.
 
 function sanitize(raw: unknown): Settings {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
-  const s: Settings = { closeToTray: typeof r.closeToTray === 'boolean' ? r.closeToTray : DEFAULTS.closeToTray }
+  const s: Settings = {
+    closeToTray: typeof r.closeToTray === 'boolean' ? r.closeToTray : DEFAULTS.closeToTray,
+    zoomFactor: typeof r.zoomFactor === 'number' && Number.isFinite(r.zoomFactor) ? clampZoom(r.zoomFactor) : DEFAULTS.zoomFactor,
+    trayAnimation: typeof r.trayAnimation === 'boolean' ? r.trayAnimation : DEFAULTS.trayAnimation,
+  }
   const w = (r.window && typeof r.window === 'object' ? r.window : null) as Record<string, unknown> | null
   const width = num(w?.width)
   const height = num(w?.height)

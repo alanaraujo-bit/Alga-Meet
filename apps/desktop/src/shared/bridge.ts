@@ -19,6 +19,11 @@ export interface AppConfig {
   isPackaged: boolean
   /** Coarse CPU vendor class for opt-in call-quality telemetry (never the model string). */
   cpuVendor: 'intel' | 'amd' | 'apple' | 'qualcomm' | 'other' | 'unknown'
+  /**
+   * Friendly OS name, e.g. "Windows 11" / "Windows 10" (from os.release(), build 22000+ is 11). Send it to the API as
+   * `X-Alga-Client: ${version}; ${osVersion}` on every request (packages/shared/src/api.ts).
+   */
+  osVersion: string
 }
 
 export interface CaptureSource {
@@ -136,6 +141,12 @@ export interface AlgaBridge {
     /** Taskbar overlay badge with unread mention count (0 clears). */
     setBadge(count: number): void
     flashFrame(): void
+    /** UI zoom (webContents zoom factor), persisted per profile and applied when the window opens. */
+    zoom: {
+      get(): Promise<number>
+      /** Clamped to 0.8..1.5 (2 decimals); rejects anything but a finite number. Applies at once. */
+      set(factor: number): Promise<void>
+    }
   }
 
   screen: {
@@ -217,6 +228,9 @@ export interface AlgaBridge {
     setStartAtLogin(enabled: boolean): Promise<void>
     getCloseToTray(): Promise<boolean>
     setCloseToTray(enabled: boolean): Promise<void>
+    /** Tray icon "breathes" while in voice with mic and audio on (default on; always off under Windows reduced motion). */
+    getTrayAnimation(): Promise<boolean>
+    setTrayAnimation(enabled: boolean): Promise<void>
     openExternal(url: string): Promise<void>
     /** Opens the logs folder in Explorer. */
     openLogs(): Promise<void>

@@ -16,6 +16,8 @@ export const IPC = {
   winFocusChanged: 'alga:win:focus-changed', // event
   winSetBadge: 'alga:win:set-badge', // send
   winFlashFrame: 'alga:win:flash-frame', // send
+  winGetZoom: 'alga:win:get-zoom', // invoke
+  winSetZoom: 'alga:win:set-zoom', // invoke
 
   screenGetSources: 'alga:screen:get-sources', // invoke
   screenSelect: 'alga:screen:select', // invoke
@@ -45,6 +47,8 @@ export const IPC = {
   appSetStartAtLogin: 'alga:app:set-start-at-login', // invoke
   appGetCloseToTray: 'alga:app:get-close-to-tray', // invoke
   appSetCloseToTray: 'alga:app:set-close-to-tray', // invoke
+  appGetTrayAnimation: 'alga:app:get-tray-animation', // invoke
+  appSetTrayAnimation: 'alga:app:set-tray-animation', // invoke
   appOpenExternal: 'alga:app:open-external', // invoke
   appOpenLogs: 'alga:app:open-logs', // invoke
   appQuit: 'alga:app:quit', // send

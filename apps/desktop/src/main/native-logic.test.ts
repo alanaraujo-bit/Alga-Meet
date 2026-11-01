@@ -1,8 +1,11 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { badgeBitmap, badgeText } from './badge'
 import { fitBounds } from './bounds'
 import { findDeepLinkArg, parseDeepLink, redactLink } from './deep-link-logic'
 import { ChordMatcher, ChordRecorder, ESC, chordLabel } from './hotkey-logic'
+import { TRAY_BREATH, TRAY_FRAME_MS, clampZoom, osVersionLabel, trayAnimates } from './ui-logic'
 
 const CTRL = 29
 const SHIFT = 42
@@ -203,5 +206,46 @@ describe('deep links', () => {
     expect(redactLink(`algameet://invite/SECRET123/x`)).toBe('algameet://invite (29 chars)')
     expect(redactLink(`algameet://auth/verify-email?token=${T}&x`)).toBe(`algameet://auth (${35 + T.length + 2} chars)`)
     expect(redactLink('algameet:SECRET')).toBe('algameet: (15 chars)')
+  })
+})
+
+describe('UI zoom', () => {
+  it('clamps to 0.8..1.5 with 2 decimals and rejects non-numbers', () => {
+    expect(clampZoom(1)).toBe(1)
+    expect(clampZoom(1.25)).toBe(1.25)
+    expect(clampZoom(0.1)).toBe(0.8)
+    expect(clampZoom(9)).toBe(1.5)
+    expect(clampZoom(1.23456)).toBe(1.23)
+    for (const bad of [NaN, Infinity, '1.2', null, undefined, {}]) expect(() => clampZoom(bad)).toThrow(TypeError)
+  })
+})
+
+describe('tray breathing', () => {
+  const v = (connected: boolean, muted = false, deafened = false) => ({ connected, muted, deafened })
+  it('animates only in voice with mic and audio on, the setting on and no reduced motion', () => {
+    expect(trayAnimates(v(true), true, false)).toBe(true)
+    expect(trayAnimates(v(false), true, false)).toBe(false)
+    expect(trayAnimates(v(true, true), true, false)).toBe(false)
+    expect(trayAnimates(v(true, false, true), true, false)).toBe(false)
+    expect(trayAnimates(v(true), false, false)).toBe(false)
+    expect(trayAnimates(v(true), true, true)).toBe(false)
+  })
+  it('ships every frame at every tray DPI, starting from the static connected icon', () => {
+    expect(TRAY_BREATH[0]).toBe('connected')
+    expect(TRAY_FRAME_MS).toBe(250)
+    for (const frame of new Set(TRAY_BREATH))
+      for (const suffix of ['', '@1.25x', '@1.5x', '@2x', '@2.5x'])
+        expect(existsSync(join(__dirname, '..', '..', 'build', 'runtime', `tray-${frame}${suffix}.png`)), `${frame}${suffix}`).toBe(true)
+  })
+})
+
+describe('osVersionLabel', () => {
+  it('tells Windows 11 from 10 by build number', () => {
+    expect(osVersionLabel('win32', '10.0.26300')).toBe('Windows 11')
+    expect(osVersionLabel('win32', '10.0.22000')).toBe('Windows 11')
+    expect(osVersionLabel('win32', '10.0.19045')).toBe('Windows 10')
+    expect(osVersionLabel('win32', '6.3.9600')).toBe('Windows')
+    expect(osVersionLabel('darwin', '24.1.0')).toBe('macOS 15')
+    expect(osVersionLabel('linux', '6.8.0-45-generic')).toBe('Linux')
   })
 })

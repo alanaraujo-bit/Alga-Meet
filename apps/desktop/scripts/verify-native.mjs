@@ -89,6 +89,9 @@ const appUrl = page.url()
 
 const cfg = await page.evaluate(() => window.alga.config)
 check('bridge config', cfg.profile === PROFILE && cfg.platform === 'win32' && cfg.isPackaged === false && cfg.apiUrl === env.ALGA_API_URL, cfg)
+check('config.osVersion is a friendly Windows name (X-Alga-Client)', /^Windows (10|11)$/.test(cfg.osVersion), cfg.osVersion)
+const ua = await page.evaluate(() => navigator.userAgent)
+check('user agent carries "AlgaMeet/<version>" (server fallback label)', ua.includes(`AlgaMeet/${cfg.version}`), ua)
 
 const tray = await hook(app, () => globalThis.__alga.trayState())
 check('tray exists (idle)', tray.exists && !tray.voice.connected, tray)
@@ -97,6 +100,49 @@ await sleep(150)
 const tray2 = await hook(app, () => globalThis.__alga.trayState())
 check('tray reflects voice state', tray2.voice.connected && tray2.voice.muted && tray2.voice.channelName === 'Geral', tray2.voice)
 await page.evaluate(() => window.alga.tray.setVoiceState({ connected: false, muted: false, deafened: false }))
+
+// Tray breathing: a 250 ms frame timer only while in voice with mic and audio on; none otherwise.
+// (Each frame is one tray.setImage, ~0.2 ms on the main thread: under 1 ms per second while it runs.)
+const reducedMotion = await hook(app, ({ systemPreferences }) => systemPreferences.getAnimationSettings().prefersReducedMotion)
+const voiceState = (s) => page.evaluate((v) => window.alga.tray.setVoiceState(v), s)
+const framesOver = async (ms) => {
+  const t0 = (await hook(app, () => globalThis.__alga.trayState())).ticks
+  await sleep(ms)
+  return (await hook(app, () => globalThis.__alga.trayState())).ticks - t0
+}
+await voiceState({ connected: true, muted: false, deafened: false, channelName: 'Geral' })
+const breathing = await framesOver(2000)
+await voiceState({ connected: true, muted: true, deafened: false, channelName: 'Geral' })
+const mutedTray = await hook(app, () => globalThis.__alga.trayState())
+const still = await framesOver(1000)
+check(
+  'tray breathes in voice (~4 frames/s), stops when muted',
+  reducedMotion ? breathing === 0 : breathing >= 6 && breathing <= 10 && !mutedTray.animating && still === 0,
+  { reducedMotion, framesIn2s: breathing, framesMuted1s: still },
+)
+await voiceState({ connected: true, muted: false, deafened: false })
+await page.evaluate(() => window.alga.app.setTrayAnimation(false))
+const off = await hook(app, () => globalThis.__alga.trayState())
+check('trayAnimation setting off: no timer even in voice', !off.animating && (await page.evaluate(() => window.alga.app.getTrayAnimation())) === false, off)
+await page.evaluate(() => window.alga.app.setTrayAnimation(true))
+await voiceState({ connected: false, muted: false, deafened: false })
+check('out of voice: no timer', !(await hook(app, () => globalThis.__alga.trayState())).animating)
+
+const zoomOf = () => hook(app, ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.getZoomFactor())
+const zoom0 = await page.evaluate(() => window.alga.window.zoom.get())
+await page.evaluate(() => window.alga.window.zoom.set(9))
+const zoomHigh = [await page.evaluate(() => window.alga.window.zoom.get()), await zoomOf()]
+await page.evaluate(() => window.alga.window.zoom.set(0.1))
+const zoomLow = await zoomOf()
+const zoomBad = await page.evaluate(() => window.alga.window.zoom.set('big').then(() => 'resolved', () => 'rejected'))
+check('window.zoom: default 1, clamped to 0.8..1.5, applied at once, junk rejected', zoom0 === 1 && zoomHigh[0] === 1.5 && zoomHigh[1] === 1.5 && zoomLow === 0.8 && zoomBad === 'rejected', {
+  zoom0, zoomHigh, zoomLow, zoomBad,
+})
+await page.evaluate(() => window.alga.window.zoom.set(1.25))
+await page.reload()
+await page.waitForFunction(() => !!window.alga?.config)
+check('zoom survives a renderer reload', (await zoomOf()) === 1.25, await zoomOf())
+await page.evaluate(() => window.alga.window.zoom.set(1)) // the OS screenshot below is at 100 %
 
 const enc = await hook(app, async ({ safeStorage }) => ({
   available: await safeStorage.isAsyncEncryptionAvailable(),
@@ -140,7 +186,7 @@ const thumb = await page.evaluate(async (url) => {
   await i.decode()
   return [i.naturalWidth, i.naturalHeight]
 }, sources[0].thumbnail)
-check('thumbnail ~320 px wide', thumb[0] > 200 && thumb[0] <= 320, thumb)
+check('thumbnail ~640 px wide (capture.ts)', thumb[0] > 320 && thumb[0] <= 640, thumb)
 
 const gdm = (constraints) =>
   page.evaluate(
@@ -213,6 +259,7 @@ let rect
 for (let i = 0; i < 5 && (!rect || rect.occluded); i++) rect = await osScreenshot(app, shotPath)
 check('OS screenshot of the window (native caption buttons), not occluded', existsSync(shotPath) && !rect.occluded, { file: shotPath, rect })
 await page.evaluate(() => window.alga.window.setBadge(0))
+await page.evaluate(() => window.alga.window.zoom.set(1.1))
 await app.close()
 
 // ---------- run 2: persistence ----------
@@ -220,6 +267,8 @@ await app.close()
 const closeToTray = await page.evaluate(() => window.alga.app.getCloseToTray())
 const bounds = await hook(app, ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds())
 check('settings persist across restart (closeToTray, bounds)', closeToTray === false && bounds.x === 120 && bounds.width === 1180, { closeToTray, bounds })
+const zoomBack = [await page.evaluate(() => window.alga.window.zoom.get()), await hook(app, ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.getZoomFactor())]
+check('zoom persists per profile and is applied when the window opens', zoomBack[0] === 1.1 && zoomBack[1] === 1.1, zoomBack)
 check('token survives restart', (await page.evaluate(() => window.alga.auth.getToken())) === token)
 await page.evaluate(() => window.alga.auth.setToken(null))
 check('setToken(null) deletes the file', !existsSync(join(userData, 'session.bin')))

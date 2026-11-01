@@ -8,6 +8,7 @@ import { emit, handle, int, on } from './ipc'
 import { log } from './log'
 import { rendererUrl } from './security'
 import { getSettings, updateSettings } from './settings'
+import { clampZoom } from './ui-logic'
 
 const DEFAULT_SIZE = { width: 1320, height: 840 }
 const MIN_SIZE = { width: 960, height: 600 }
@@ -76,6 +77,7 @@ export function createMainWindow(title: string, startHidden: boolean): BrowserWi
       nodeIntegration: false,
       webviewTag: false,
       spellcheck: true,
+      zoomFactor: getSettings().zoomFactor,
     },
   })
   pendingMaximize = saved?.maximized === true
@@ -113,6 +115,8 @@ export function createMainWindow(title: string, startHidden: boolean): BrowserWi
   win.on('closed', () => {
     win = null
   })
+  // Reloads (dev HMR, renderer recovery) keep the saved zoom.
+  win.webContents.on('did-finish-load', () => win?.webContents.setZoomFactor(getSettings().zoomFactor))
 
   void win.loadURL(rendererUrl).catch((err) => log.error('renderer failed to load', rendererUrl, err))
   return win
@@ -126,5 +130,11 @@ export function registerWindowIpc(): void {
   on(IPC.winSetBadge, (count) => setBadge(int(count, 0, 1_000_000)))
   on(IPC.winFlashFrame, () => {
     if (win && !win.isFocused()) win.flashFrame(true)
+  })
+  handle(IPC.winGetZoom, () => getSettings().zoomFactor)
+  handle(IPC.winSetZoom, (f) => {
+    const zoomFactor = clampZoom(f)
+    updateSettings({ zoomFactor })
+    win?.webContents.setZoomFactor(zoomFactor)
   })
 }

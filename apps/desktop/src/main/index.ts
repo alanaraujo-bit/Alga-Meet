@@ -1,5 +1,5 @@
 import './chromium-flags'
-import { cpus } from 'node:os'
+import { cpus, release } from 'node:os'
 import { join } from 'node:path'
 import { app, ipcMain, shell } from 'electron'
 import type { AppConfig } from '../shared/bridge'
@@ -15,7 +15,8 @@ import { initPower } from './power'
 import { getToken, setToken } from './secure-store'
 import { applySecurity, isExternalWebUrl } from './security'
 import { getSettings, updateSettings } from './settings'
-import { createTray, destroyTray, registerTrayIpc, trayState } from './tray'
+import { createTray, destroyTray, registerTrayIpc, setTrayAnimation, trayState } from './tray'
+import { osVersionLabel } from './ui-logic'
 import { initUpdater } from './updater'
 import { createMainWindow, registerWindowIpc, setQuitting, showMainWindow } from './window'
 
@@ -45,6 +46,7 @@ const config: AppConfig = {
   platform: process.platform,
   isPackaged: app.isPackaged,
   cpuVendor: cpuVendorOf(cpus()[0]?.model ?? ''),
+  osVersion: osVersionLabel(process.platform, release()),
 }
 
 // Dev only, opt-in: route algameet:// to this checkout (and profile). Packaged builds are registered by the
@@ -77,6 +79,8 @@ function registerAppIpc(): void {
   handle(IPC.appSetStartAtLogin, (v) => app.setLoginItemSettings({ openAtLogin: bool(v), args: loginArgs }))
   handle(IPC.appGetCloseToTray, () => getSettings().closeToTray)
   handle(IPC.appSetCloseToTray, (v) => updateSettings({ closeToTray: bool(v) }))
+  handle(IPC.appGetTrayAnimation, () => getSettings().trayAnimation)
+  handle(IPC.appSetTrayAnimation, (v) => setTrayAnimation(bool(v)))
   handle(IPC.appOpenExternal, async (u) => {
     const url = str(u, 4096)
     if (!isExternalWebUrl(url)) throw new TypeError('only http(s) URLs')

@@ -36,6 +36,10 @@ const bridge: AlgaBridge = {
     onFocusChange: (cb) => subscribe(IPC.winFocusChanged, cb),
     setBadge: (count) => ipcRenderer.send(IPC.winSetBadge, Math.min(1_000_000, Math.max(0, Math.floor(Number(count) || 0)))),
     flashFrame: () => ipcRenderer.send(IPC.winFlashFrame),
+    zoom: {
+      get: () => ipcRenderer.invoke(IPC.winGetZoom),
+      set: (factor) => ipcRenderer.invoke(IPC.winSetZoom, Number(factor)),
+    },
   },
 
   screen: {
@@ -107,6 +111,8 @@ const bridge: AlgaBridge = {
     setStartAtLogin: (enabled) => ipcRenderer.invoke(IPC.appSetStartAtLogin, enabled === true),
     getCloseToTray: () => ipcRenderer.invoke(IPC.appGetCloseToTray),
     setCloseToTray: (enabled) => ipcRenderer.invoke(IPC.appSetCloseToTray, enabled === true),
+    getTrayAnimation: () => ipcRenderer.invoke(IPC.appGetTrayAnimation),
+    setTrayAnimation: (enabled) => ipcRenderer.invoke(IPC.appSetTrayAnimation, enabled === true),
     openExternal: (url) => ipcRenderer.invoke(IPC.appOpenExternal, String(url)),
     openLogs: () => ipcRenderer.invoke(IPC.appOpenLogs),
     quit: () => ipcRenderer.send(IPC.appQuit),
