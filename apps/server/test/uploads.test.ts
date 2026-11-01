@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { loadConfig } from '../src/config.js'
 import { attachments, storageDeletions } from '../src/db/schema.js'
 import { safeUrl } from '../src/errors.js'
-import { contentDisposition, safeFilename } from '../src/files.js'
+import { contentDisposition, isInlineType, safeFilename } from '../src/files.js'
 import { parseRange } from '../src/routes/files.js'
 import { S3Storage } from '../src/storage.js'
 import { api, connect, register, startServer, type TestServer } from './helpers.js'
@@ -498,5 +498,11 @@ describe('S3 driver', () => {
       spy.mockRestore()
     }
     expect(urls).toEqual(['https://b-123.t3.storageapi.dev/avatars/u/x.png'])
+  })
+})
+
+describe('inline types', () => {
+  it('plays Opus voice notes inline (file-type reports "audio/ogg; codecs=opus")', () => {
+    expect(isInlineType('audio/ogg; codecs=opus')).toBe(true)
   })
 })

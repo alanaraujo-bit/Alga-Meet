@@ -25,7 +25,7 @@ import type { Storage } from './storage.js'
 const INLINE_TYPES = new Set([
   'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif',
   'video/mp4', 'video/webm',
-  'audio/mpeg', 'audio/ogg', 'audio/opus', 'audio/wav', 'audio/flac', 'audio/x-flac', 'audio/mp4', 'audio/x-m4a', 'audio/webm',
+  'audio/mpeg', 'audio/ogg', 'audio/ogg; codecs=opus', 'audio/opus', 'audio/wav', 'audio/flac', 'audio/x-flac', 'audio/mp4', 'audio/x-m4a', 'audio/webm',
 ])
 const OCTET = 'application/octet-stream'
 /** Larger images decode to gigabytes in every viewer's renderer: they are kept as downloads. */
