@@ -23,7 +23,7 @@ export function sessionDevice(userAgent: string, clientInfo: string | null): { c
     const [version, os] = clientInfo.split('; ') // stored only after algaClientHeader
     return { client: `Alga Meet ${version}`, os: os ?? null }
   }
-  // Electron's default User-Agent carries "<productName>/<version>".
+  // Electron's default User-Agent carries "AlgaMeet/<version>" (productName without spaces).
   const app = /Alga ?Meet\/(\d{1,4}(?:\.\d{1,4}){0,3})/i.exec(userAgent)
   return {
     client: app ? `Alga Meet ${app[1]}` : (UA_CLIENTS.find(([re]) => re.test(userAgent))?.[1] ?? null),

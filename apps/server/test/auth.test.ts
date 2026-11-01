@@ -104,7 +104,7 @@ describe('auth', () => {
   })
 
   it('labels sessions with the X-Alga-Client header, else coarse User-Agent tokens, and refreshes the label on use', async () => {
-    const ELECTRON_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Alga Meet/0.1.0 Chrome/142.0.0.0 Electron/45.2.1 Safari/537.36'
+    const ELECTRON_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) AlgaMeet/0.1.0 Chrome/156.0.8078.75 Electron/45.2.1 Safari/537.36'
     const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36'
     const first = await register(s.app)
     const login = (headers: Record<string, string>) =>
