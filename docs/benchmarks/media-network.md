@@ -16,10 +16,11 @@ O Windows não tem `tc`/`netem`. Para medir perda, atraso, jitter, limite de ban
 | Voz a 10 % de perda: RED+FEC / só RED / só FEC / nada | 0,4–1,0 % / 0,7–1,2 % / 6,0 % / 6,3 % de ocultação |
 | Tela 1080p30 / 1080p60, rede limpa | 29 fps / 50 fps em 1920×1080, 0 congelamentos |
 | Tela, RTT 150 ± 30 ms + 2 % perda | espectador cai para 720p30 (1080p30) ou 360p15 (1080p60); 4 congelamentos, ~1 s |
-| Tela, subida de 3 Mbit/s | 20–23 fps, maioria 720p, 1 congelamento de 3,7–4,5 s |
+| Tela, subida de 3 Mbit/s | 20–23 fps, maioria 720p, 1 congelamento de 3,7–4,5 s (antes) |
+| Tela, subida cai para 3 Mbit/s no ar, espectador em Original | só o SFU: congelamento > 2 s em 7/12 rodadas (até 4,6 s); **com o stall guard: 0/12, pior 1,2 s** (§3.1) |
 | Tela, queda de 3 s | vídeo de volta em 0,4–1,6 s após a rede voltar (Original); 3,2 s em Automática |
 
-**Padrões:** voz continua **RED + FEC in-band + DTX** (RED corta a ocultação 5–9×; FEC soma um pouco a 10 % sem custo de banda ou latência mensurável). Nenhum padrão de tela mudou por estes números; o congelamento longo com uplink baixo fica como PENDENTE (§3).
+**Padrões:** voz continua **RED + FEC in-band + DTX** (RED corta a ocultação 5–9×; FEC soma um pouco a 10 % sem custo de banda ou latência mensurável). Na tela, o congelamento longo na troca de camada com uplink baixo foi corrigido no cliente (stall guard, §3.1).
 
 ## Montagem [MEDIDO]
 
@@ -85,7 +86,16 @@ Repetição só do par que decide (2 rodadas cada, DTX conferido):
 - **RED é o que importa:** com RED a ocultação cai de 3,0 → 0,4–0,5 % a 5 % de perda e de 6,3 → 0,7–1,2 % a 10 % (5–9× menos), e os microcortes de ~90–180/min para 10–30/min. O FEC in-band sozinho quase não ajuda (2,3 % contra 3,0 % a 5 %; 6,0 % contra 6,3 % a 10 %).
 - **FEC em cima do RED:** igual a 5 % e um pouco melhor a 10 % (0,4–1,0 % contra 0,7–1,2 % em 3 rodadas). Não custa latência mensurável: o jitter buffer variou 32–81 ms entre entradas, sem relação com o FEC (na 1ª rodada RED+FEC deu 64–81 ms e só RED 30–41 ms; na repetição os dois ficaram em 32–55 ms). Também não custa banda: 73–76 kbps enviados com ou sem FEC (o Opus divide o mesmo alvo). [HIPÓTESE] É a proteção que sobra para um assinante que o SFU atende sem RED.
 - **Decisão: os padrões ficam RED + FEC + DTX** (decisão 0001 §2). `join({ red: false })` existe para diagnóstico.
-- **Achado:** sair e entrar **na hora** (mesma identidade, sem pausa) às vezes volta com o SFU respondendo o microfone como `stereo=1` sem `usedtx` (DTX desligado: 50 pacotes/s no silêncio). Com 1,5 s entre sair e entrar, 12/12 entradas vieram com DTX. **PENDENTE:** reproduzir isolado e ver se é o SFU reaproveitando a sessão que está saindo.
+- **Achado:** às vezes o SFU responde o microfone como `stereo=1` sem `usedtx` (DTX desligado: 50 pacotes/s no silêncio). Ver §2.1.
+
+### 2.1 Microfone sem DTX ao (re)entrar [MEDIDO]
+
+`node apps/desktop/scripts/media-net.mjs --phase=rejoin --reps=N [--settle=ms]`: A (microfone em silêncio, RED ligado) sai e entra na mesma sala, N vezes sem pausa e N vezes com 1,5 s; depois de 2,5–4 s, pacotes/s enviados pelo microfone e recebidos por B, e as linhas fmtp do Opus na resposta do SFU.
+
+- **Não é a pausa:** 3 de 24 entradas voltaram sem DTX, as 3 **com** 1,5 s de pausa (0/12 sem pausa nessa rodada; a rodada da §2 tinha visto o contrário). É intermitente, ~1 em 8–16 entradas.
+- **O que acontece:** na resposta do SFU, a seção do microfone vem igual às seções de reserva sem faixa (`minptime=10;stereo=1;useinbandfec=1`, o `stereo=1` é o que a nossa oferta põe em todo áudio). O SFU não associou a m-line à faixa publicada (que pediu DTX e mono). O `sender.getParameters().codecs` mostra o mesmo fmtp, então o cliente consegue ver.
+- **Correção no cliente (`ensureDtx`, depois da entrada, sem atrasá-la):** se o Opus negociado não tem `usedtx=1`, derruba e publica um microfone novo (o caminho do *server unmute*). Republicar a **mesma** faixa foi medido e rejeitado: o microfone ficou mudo (0 pacotes/s, B não ouvia nada). Com o microfone novo: 64 entradas, 5 respostas ruins em 4 entradas; 2 corrigidas na hora, e 2 entradas receberam uma segunda resposta ruim logo em seguida (o motor tenta até 2 vezes, a segunda após 1 s) e ficaram sem DTX, **sempre com áudio chegando em B** (50–51 pacotes/s).
+- **Veredito:** a causa está no SFU (LiveKit 1.13.11, associação da m-line na resposta), não na pausa nem no nosso pedido. O cliente reduz o efeito (≈ 1 em 32 entradas fica sem DTX, contra ≈ 1 em 8) e nunca deixa o microfone mudo. **PENDENTE (servidor/infra):** reproduzir com um LiveKit mais novo e com `--settle` maior; se persistir, reportar ao LiveKit com o par oferta/resposta (`rejoin.runs[].answerFmtp` no JSON).
 
 ## 3. Transmissão de tela sob rede degradada [MEDIDO]
 
@@ -109,10 +119,47 @@ Repetição só do par que decide (2 rodadas cada, DTX conferido):
 
 - **Rede boa:** o pipeline entrega o preset (1080p30 a 29 fps; 1080p60 a 50 fps, o mesmo teto da fonte de ~52 fps de `media-baseline.md` §2).
 - **RTT alto + 2 % de perda:** o transmissor continua mandando 1080p, mas o estimador de banda do espectador baixa a camada: 720p30 no preset 1080p30 e **360p15 no 1080p60** (n=1 por célula; a diferença entre os presets pode ser variação do estimador, **PENDENTE** repetir). O simulcast faz o que deve: o espectador degrada sozinho, sem derrubar o transmissor.
-- **Subida limitada a 3 Mbit/s:** o transmissor desce para 720p (`qualityLimitationReason: bandwidth`), mas a troca de camada no espectador custou **um congelamento de 3,7–4,5 s**. É o pior número desta página para tela; o padrão do produto (1080p60, 8 Mbit/s) não cabe num uplink doméstico de 3 Mbit/s. **PENDENTE:** medir a rampa inicial com teto baixo (começar numa camada menor ou limitar o `maxBitrate` pelo uplink medido).
+- **Subida limitada a 3 Mbit/s:** o transmissor desce para 720p (`qualityLimitationReason: bandwidth`), mas a troca de camada no espectador custou **um congelamento de 3,7–4,5 s** (antes do stall guard; ver §3.1, que mede e corrige isso). O padrão do produto (1080p60, 8 Mbit/s) não cabe num uplink doméstico de 3 Mbit/s.
 - **Queda de 3 s:** o vídeo volta em 0,4–1,6 s depois que a rede volta (1 congelamento, o da própria queda); com Automática, 3,2 s.
 
-## 4. O que este proxy não mostra (PENDENTE)
+### 3.1 O congelamento na troca de camada e o stall guard [MEDIDO]
+
+**Causa (linha do tempo de B a cada 200 ms + camada alta de A, `uplink` no JSON).** A subida de A cai de ilimitada para 3 Mbit/s com a transmissão no ar. Em ~0,6 s o WebRTC de A desliga a camada alta (1080p a 0 fps, `qualityLimitationReason: bandwidth`). B, em Original, estava inscrito nela: o SFU para de lhe mandar quadros, mas só troca B para a camada de 720p (que A continua mandando) quando o rastreador de camadas de tela dele dá a alta como parada. Exemplo (1080p60, rep 1): último quadro em t = 1,0 s, camada alta a 0 fps em t = 1,6 s, B parado até t = 5,7 s, quando chega o primeiro quadro de 720p. Não é rampa inicial, nem bitrate inicial, nem `degradationPreference`: é o tempo de detecção do SFU, e o mesmo acontece toda vez que a camada alta, depois de voltar, cai de novo.
+
+**Correção (cliente, `media/stall.ts` + `tickStalls`, decisão 0001 §13).** Quem assiste vê quadros pararem enquanto o enlace ainda traz dados (contador do par ICE andando): pede a camada de baixo na hora (`setVideoQuality`), o SFU troca e pede um quadro-chave. Depois de 8 s tenta a camada alta de novo; se ela cair outra vez, a espera dobra (até 60 s). Queda total (nada chega) e imagem parada (< 8 fps) não disparam.
+
+**Método.** `node apps/desktop/scripts/media-net.mjs --phase=uplink --reps=N`: janela 1920×1080@60, codec automático (HEVC), B em Original; 6 s de rede limpa, a subida de A cai para 3 Mbit/s (RTT 50, fila de 300 ms) e B é medido por 30 s. A mesma rodada alterna o guard desligado (`media.stallGuard = false`, comportamento anterior) e ligado. Maior intervalo sem quadro novo em B (amostras de 200 ms) e o tempo total de congelamento do Chromium (`totalFreezesDuration`).
+
+| Preset | Quem troca a camada | n | maior congelamento (mediana) | pior caso | rodadas com congelamento > 2 s | congelamento total na janela (mediana) | fps em B (mediana) | maior congelamento por rodada (ms) |
+|---|---|---|---|---|---|---|---|---|
+| 1080p30 | só o SFU (antes) | 6 | 1,8 s | 4,5 s | 3/6 | 3,4 s | 25,8 | [0,0,0,3641,4244,4452] |
+| 1080p30 | **stall guard** | 6 | 0,8 s | 1,2 s | 0/6 | 1,5 s | 27,3 | [0,810,610,809,807,1213] |
+| 1080p60 | só o SFU (antes) | 6 | 2,9 s | 4,6 s | 4/6 | 3,7 s | 25,4 | [0,4641,3032,2853,1820,3840] |
+| 1080p60 | **stall guard** | 6 | 0,8 s | 1,2 s | 0/6 | 2,0 s | 26,8 | [0,1010,810,811,605,1210] |
+
+- **O congelamento longo some:** só com o SFU, 7 de 12 rodadas tiveram um congelamento de 2,9–4,6 s; com o guard, 0 de 12, e o pior foi 1,2 s (perceber + troca + quadro-chave; mediana 0,8 s). O congelamento total na janela de 30 s também caiu (mediana 3,4 → 1,5 s em 1080p30, 3,7 → 2,0 s em 1080p60).
+- **O custo:** o guard volta a tentar a camada alta depois da espera (o SFU também faz isso sozinho quando ela reaparece); se ela cai de novo, há outro congelamento curto (0,4–1,2 s) até a espera dobrar. Em rodadas onde a camada alta nunca parou, o SFU sozinho não congelou nada e o guard pode somar um desses. **PENDENTE:** o transmissor desligar a camada alta por um tempo quando ela oscila (precisa conviver com o dynacast do LiveKit, que reativa camadas pedidas).
+- **Do lado do servidor** o mesmo tempo de detecção vale para todos os espectadores; um rastreador de camadas de tela mais curto na configuração do LiveKit reduziria o congelamento também para quem não tem o guard (clientes antigos). Fica como sugestão para a infra.
+
+## 4. Viabilidade dos presets, 720p60 incluído [MEDIDO]
+
+`--phase=presets`: janela 1920×1080@60 atrás das outras, rede limpa, B em Original, 10 s de rampa e 15 s de medição; registro de sustentação zerado e o *probe* refeito para o codec testado (mede o encoder, não o portão). CPU = máquina inteira (20 threads), instância A.
+
+| Codec (encoder) | Preset pedido | Publicado | Camada alta enviada | B decodifica | Limitação | CPU de A |
+|---|---|---|---|---|---|---|
+| HEVC (NVENC) | 720p30 | 720p30 | 1280×720 @29, 2,0 Mbps | 29 fps | nenhuma | 1,9 % |
+| HEVC (NVENC) | **720p60** | 720p60 | 1280×720 @**51**, 2,9 Mbps | 50 fps | nenhuma | 2,8 % |
+| HEVC (NVENC) | 1080p30 | 1080p30 | 1920×1080 @29, 5,0 Mbps | 29 fps | nenhuma | 2,4 % |
+| HEVC (NVENC) | 1080p60 | 1080p60 | 1920×1080 @52, 7,7 Mbps | 53 fps | nenhuma | 3,6 % |
+| H.264 (OpenH264, software) | 720p30 | 720p30 | 1280×720 @29, 2,0 Mbps | 29 fps | nenhuma | 1,6 % |
+| H.264 (OpenH264, software) | **720p60** | 720p60 | 1280×720 @**51**, 2,9 Mbps | 52 fps | nenhuma | 2,7 % |
+| H.264 (OpenH264, software) | 1080p30 | 1080p30 | 1920×1080 @29, 5,1 Mbps | 29 fps | nenhuma | 2,5 % |
+| H.264 (OpenH264, software) | 1080p60 | **720p60** (portão: software não oferece 1080p60) | 1280×720 @52, 3,0 Mbps | 51 fps | nenhuma | 2,6 % |
+
+- **720p60 é viável nos dois encoders**: 51 fps (o teto da captura de janela, ~52 fps), sem limitação de CPU nem de banda, ~2,8 % da máquina. Fica dentro do teto de software (taxa de pixels abaixo de 1080p30), então aparece também em máquinas sem encoder de hardware.
+- **O registro de sustentação escondia presets bons.** Ele marcava "falhou" quando o fps mediano ficava abaixo de 90 % do alvo; a captura de janela no Windows não passa de ~52 fps e uma tela parada manda poucos quadros, então o perfil do laboratório tinha 1080p60 com 30 "falhas" (e 720p60 com 2) com o encoder a 3 % de CPU, e os dois sumiam do seletor depois de duas transmissões calmas. Agora conta como falha só a sessão em que a camada alta passou a maior parte do tempo limitada por CPU (`qualityLimitationReason: 'cpu'`), e o registro ganhou outra chave (`encoderSustain`), descartando o antigo.
+
+## 5. O que este proxy não mostra (PENDENTE)
 
 - NAT, TURN/TCP, Wi-Fi, filas de roteador com tráfego cruzado, reordenação, perda correlacionada com congestionamento, mudança de rota.
 - Máquinas e relógios separados; a CPU é compartilhada pelos dois clientes, o SFU e o proxy.

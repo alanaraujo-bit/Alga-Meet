@@ -66,20 +66,27 @@ Medido com captura real a 1080p60:
 
 ### 6. Presets e o que oferecer
 
-| Preset | Resolução / fps | Teto de bitrate |
-|---|---|---|
-| 720p30 | 1280×720 @30 | 2,5 Mbps |
-| 1080p30 | 1920×1080 @30 | 4,5 Mbps |
-| **1080p60** (padrão) | 1920×1080 @60 | 8 Mbps |
-| 1440p60 | 2560×1440 @60 | 14 Mbps |
-| 4K30 | 3840×2160 @30 | 18 Mbps |
+| Preset | Resolução / fps | Teto de bitrate | Escada de simulcast | Plano (D11) |
+|---|---|---|---|---|
+| 720p30 | 1280×720 @30 | 2 Mbps | 180p15 + 360p30 | Grátis |
+| **720p60** | 1280×720 @60 | 3 Mbps | 180p15 + 360p30 | Grátis |
+| 1080p30 | 1920×1080 @30 | 5 Mbps | 360p15 + 720p30 | Grátis |
+| **1080p60** (padrão) | 1920×1080 @60 | 8 Mbps | 360p15 + 720p30 | Alga Plus |
+| 1440p60 | 2560×1440 @60 | 12 Mbps | 360p15 + 720p30 | Alga Plus |
+| 4K30 | 3840×2160 @30 | 16 Mbps | 360p15 + 720p30 | Alga Plus |
+
+- **Os tetos são os do contrato do plano** (`STREAM_PRESETS` em `packages/shared/src/billing.ts`), que o servidor confere nas camadas declaradas ao publicar (lado curto, e o maior bitrate com 10 % de folga). Antes eram 2,5/4,5/8/14/18 Mbps: o 4K30 a 18 Mbps passava dos 17,6 Mbps que o servidor aceita até para o Plus, e seria silenciado. Um teste garante que nenhum preset passa do contrato.
+- Os presets de 720p ganharam a terceira camada (180p15): a regra das três camadas do §5 vale para todos.
+- **720p60 (novo, grátis):** 51 fps (teto da captura de janela) a 2,9 Mbps, sem limitação, ~2,8 % da máquina com NVENC **e** com OpenH264 [MEDIDO, `media-network.md` §4]. Cabe no teto de software, então também é oferecido sem encoder de hardware.
 
 `availablePresets` (puro, testado) oferece só o que a máquina sustenta:
 - Teto de taxa de pixels de 1440p60 com encoder HW e de 1080p30 sem.
 - Nunca acima da resolução da fonte (sem upscaling): **nesta máquina, com monitor 1080p, aparecem 720p30/1080p30/1080p60**.
-- Some o preset que falhou mais vezes do que segurou ≥ 90 % do fps alvo, com ≥ 2 sessões registradas (`recordSustain` ao parar cada transmissão).
+- Some o preset cujo encoder ficou **limitado por CPU** (`qualityLimitationReason: 'cpu'`) na maior parte de mais da metade das sessões, com ≥ 2 registradas (`recordSustain` ao parar cada transmissão). Antes a regra era "fps < 90 % do alvo", que confundia tela parada e o teto de ~52 fps da captura com falta de encoder e escondia 1080p60/720p60 de quem tinha NVENC sobrando (`media-network.md` §4); o registro antigo é descartado.
 
 O teto de software (1080p30) é conservador de propósito: o OpenH264 segurou 1080p a 48 fps com ~0,4 núcleo no renderer *desta* CPU, mas precisa caber ao lado de um jogo numa CPU modesta. **PENDENTE:** calibrar em máquinas fracas.
+
+**Plano × máquina** (`gatePresets`, `clampPreset`, puros e testados): `screen.offered` = o que a máquina sustenta **e** o plano permite; `screen.locked` = o que ela sustentaria mas o plano não inclui (o seletor mostra com a dica do Alga Plus; um preset que este hardware não aguenta nunca é oferecido como upgrade). O plano vem de `VoiceJoinResponse.streamPresets`, do atributo `alga.stream_presets` do token (o servidor o reescreve quando o plano muda no meio da chamada) e de `Me.plan`/`ENTITLEMENTS_UPDATE` pela UI. O motor **nunca publica acima de `offered`**: um pedido fora dele vira o melhor preset abaixo, mantendo o fps em movimento (1080p60 → 720p60) e a resolução em detalhe (→ 1080p30). O pedido original fica guardado: num upgrade o limite sai sozinho.
 
 ### 7. Tipo de conteúdo
 
@@ -106,7 +113,28 @@ O `unpublishTrack` do LiveKit só deixa os transceivers **inativos**. O Chromium
 
 O moderador muta pelo SFU (`updateParticipant` tira `microphone` de `canPublishSources`); o SFU despublica o microfone e o LiveKit para a faixa. O motor reage a `ParticipantPermissionsChanged`: fecha a captura (`self.serverMuted = true`) e, quando a permissão volta, **republica sozinho** (mutado se o usuário estiver auto-mutado, como no `join`). Entrar já server-mutado não tenta publicar (antes: aviso falso "Microfone indisponível"). Antes da correção o participante ficava mudo até reentrar [MEDIDO, `media-baseline.md` §4.5].
 
-### 12. Flags do Chromium
+### 12. Plano no meio da transmissão (D11)
+
+Quando o plano muda com a transmissão no ar (assinatura confirmada, reembolso, fim do período), o motor **recapa no lugar**, sem despublicar: quem assiste continua inscrito e não volta para o cartão "Assistir".
+- Nova captura da mesma fonte no tamanho/fps do novo preset (mesma lógica do tamanho real de janela do §5), trocada com `replaceTrack`, e depois **todas** as codificações de todos os *senders* (as 3 camadas e o codec reserva H.264) reescritas sob a trava de *sender* do LiveKit: escala pelo lado curto, `maxBitrate` e `maxFramerate`. Camadas que o dynacast desligou também, para voltarem já limitadas. `publishOptions` da faixa é atualizado antes, porque o `replaceTrack` do LiveKit recalcula as codificações a partir dele.
+- Descer: acima do novo plano → o melhor preset permitido (movimento mantém o fps) + um aviso único. Subir: o limite sai e volta o que você tinha pedido. A UI também deixa trocar a qualidade ao vivo pelo seletor (`setScreenQuality`).
+- O SFU guarda a lista de camadas declarada na publicação; o que vai no fio segue os novos limites na hora. O servidor só confere a transmissão no `track_published`, então hoje um rebaixamento no meio nunca chega a ser silenciado; o cliente rebaixa mesmo assim (honestidade, e para quando o servidor passar a conferir). Evidência de ponta a ponta [MEDIDO, `docs/benchmarks/media-plan.json`, `apps/desktop/scripts/media-plan.mjs`: API e LiveKit próprios, cobrança **sandbox**, janela real 1920×1080@60, Ana transmite e Bruno assiste em Original]:
+
+| Passo | O que aconteceu |
+|---|---|
+| Ana (Grátis) entra | `streamPresets` = 720p30/720p60/1080p30; `offered` igual, `locked` = só 1080p60 (1440p60/4K não aparecem: monitor 1080p) |
+| Pede 1080p60 | publica **720p60** (1280×720 a 55 fps); Bruno recebe 1280×720 a 52 fps; o SFU **não** silencia |
+| Upgrade no meio (checkout sandbox aprovado) | atributo do plano no cliente em **48 ms**; limite levantado (1080p60 no ar) em **302 ms**; Bruno decodifica 1920×1080 em **420 ms**, 52 fps; aviso "A transmissão agora vai em 1080p 60 fps." |
+| Downgrade no meio (webhook sandbox `revoked`, assinado) | atributo em **35 ms**; recapada para 720p60 em **93 ms**; Bruno em 1280×720 em **200 ms**, 52 fps; não silenciada; aviso único |
+| Controle: portão do cliente desligado, 1080p60 no Grátis | o servidor **silencia** a faixa (`track_published` → `muted: true`), como deve |
+
+Dois detalhes medidos no caminho: (1) o Chromium compartilha um dispositivo de captura por fonte, então uma segunda captura da mesma janela só recebia quadros do tamanho da primeira (720p → 1080p continuava 1280×720); a recapa agora sobe as restrições da faixa ao vivo antes de capturar de novo. (2) Logo depois do `replaceTrack`, o `setParameters` do *sender* às vezes recusa ("getParameters() has never been called"); o motor relê os parâmetros e tenta de novo.
+
+### 13. Quem assiste não espera o SFU perceber (stall guard)
+
+Com a subida do transmissor apertada, o WebRTC desliga a camada alta do simulcast; o SFU só percebe quando o rastreador de camadas de tela dele expira, e até lá quem assiste em Original fica congelado (3,7–4,5 s em `media-network.md` §3). `stall.ts` (puro, testado) olha os quadros decodificados a cada 200 ms: se uma imagem em movimento (≥ 8 fps) para por ≥ 5 quadros (≥ 500 ms) **enquanto o enlace ainda traz dados**, pede ao SFU a camada de baixo (`setVideoQuality`) na hora; depois de 8 s tenta subir de novo, e o intervalo dobra (até 60 s) se a camada alta continuar caindo. Queda de rede (nada chega) e tela parada não disparam. Números em `media-network.md` §3.1.
+
+### 14. Flags do Chromium
 
 **Nenhuma.** O que precisamos já vem ligado no Chromium 156: HEVC HW encode, decodificação D3D11 e captura de tela a ~52 fps. `PlatformH264CbpEncoding` foi medida e não mudou nada (H.264 continua OpenH264). As flags do harness (oclusão/backgrounding) ficam só no script do lab. `chromium-flags.ts` registra o que foi avaliado.
 
@@ -115,10 +143,13 @@ O moderador muta pelo SFU (`updateParticipant` tira `microphone` de `canPublishS
 - O 1080p60 grátis (diferencial nº 1 do benchmark) é viável nesta classe de máquina com ~0,7 núcleo de CPU total no transmissor. Em máquinas sem HEVC HW, cai para H.264 por software, e o teto oferecido desce para 1080p30.
 - Com ~200 MB ociosos e ~370 MB em chamada, a meta "≤ 1/3 do Discord ocioso" (≤ 300 MB) está cumprida no ocioso.
 - Depende de mudar a CSP para a Supressão avançada funcionar em produção.
+- O plano (D11) é aplicado no cliente antes de publicar e mantido no meio da transmissão, nos dois sentidos, sem derrubar quem assiste (§6, §12).
+- O congelamento de 3,7–4,6 s na troca de camada com subida apertada virou ≤ 1,2 s (stall guard, §13; 0/12 rodadas com congelamento > 2 s, contra 7/12).
 - Dívidas medidas que ficam:
   - Janelas cujo tamanho real gera camada ímpar ainda caem no backup H.264 (§5).
-  - Com a subida limitada a 3 Mbit/s, a troca de camada da tela congelou o espectador por 3,7–4,5 s; sob RTT 150 ms + 2 % de perda o 1080p60 caiu para 360p15 no espectador (`media-network.md` §3, n=1).
-  - Sair e entrar na mesma sala sem pausa às vezes volta com o microfone sem DTX (`media-network.md` §2).
+  - Sob RTT 150 ms + 2 % de perda o 1080p60 caiu para 360p15 no espectador (`media-network.md` §3, n=1). O stall guard ainda soma congelamentos curtos quando a camada alta oscila; o transmissor poderia segurá-la desligada (PENDENTE).
+  - O SFU às vezes responde o microfone sem DTX (~1 em 8–16 entradas, com ou sem pausa; `media-network.md` §2.1). O cliente detecta e publica um microfone novo (até 2 vezes): ~1 em 32 entradas ainda fica sem DTX, sempre com áudio. Causa no SFU, PENDENTE com LiveKit mais novo.
+  - O servidor só confere a transmissão no `track_published` (camadas declaradas na publicação); a recapa no lugar não muda essa lista.
   - 1440p60 e 60 fps reais sem fonte adequada aqui.
   - Rede real (NAT/TURN/Wi-Fi) e máquinas independentes; perda, atraso e quedas já medidos com proxy local (`media-network.md`).
 

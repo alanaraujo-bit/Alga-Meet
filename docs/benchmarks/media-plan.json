@@ -1,0 +1,109 @@
+{
+  "plan": {
+    "when": "2026-11-01T09:15:03.377Z",
+    "steps": [
+      {
+        "name": "ana entra (Grátis)",
+        "joinStreamPresets": [
+          "720p30",
+          "720p60",
+          "1080p30"
+        ],
+        "plan": [
+          "720p30",
+          "720p60",
+          "1080p30"
+        ],
+        "offered": [
+          "720p30",
+          "720p60",
+          "1080p30"
+        ],
+        "locked": [
+          "1080p60"
+        ],
+        "hardware": true,
+        "codec": "h265"
+      },
+      {
+        "name": "pede 1080p60 no Grátis",
+        "publishedPreset": "720p60",
+        "sentTop": "1280x720@51",
+        "bruno": {
+          "fps": 54.9,
+          "size": "1280x720"
+        },
+        "sfu": {
+          "muted": false,
+          "layers": [
+            "320x180@100k",
+            "640x360@425k",
+            "1280x720@3000k"
+          ]
+        }
+      },
+      {
+        "name": "upgrade (sandbox) durante a transmissão",
+        "planAttributeMs": 48,
+        "liftedMs": 302,
+        "brunoSees1080Ms": 420,
+        "offered": [
+          "720p30",
+          "720p60",
+          "1080p30",
+          "1080p60"
+        ],
+        "locked": [],
+        "publishedPreset": "1080p60",
+        "sentTop": "1920x1080@54",
+        "bruno": {
+          "fps": 52.3,
+          "size": "1920x1080"
+        },
+        "sfu": {
+          "muted": false,
+          "layers": [
+            "320x180@100k",
+            "640x360@425k",
+            "1280x720@3000k"
+          ]
+        },
+        "notice": "A transmissão agora vai em 1080p 60 fps."
+      },
+      {
+        "name": "downgrade (webhook revoked) durante a transmissão",
+        "planAttributeMs": 35,
+        "recappedMs": 93,
+        "brunoSees720Ms": 200,
+        "publishedPreset": "720p60",
+        "sentTop": "1280x720@49",
+        "bruno": {
+          "fps": 52.1,
+          "size": "1280x720"
+        },
+        "sfu": {
+          "muted": false,
+          "layers": [
+            "320x180@100k",
+            "640x360@425k",
+            "1280x720@3000k"
+          ]
+        },
+        "notice": "Seu plano não inclui 1080p 60 fps: a transmissão continua, em 720p 60 fps."
+      },
+      {
+        "name": "controle: portão do cliente desligado, 1080p60 no Grátis",
+        "serverMuted": true,
+        "sfu": {
+          "muted": true,
+          "layers": [
+            "640x360@400k",
+            "1280x720@1700k",
+            "1920x1080@8000k"
+          ]
+        },
+        "apiLog": 1
+      }
+    ]
+  }
+}

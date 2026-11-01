@@ -3,7 +3,7 @@
 // address (node_ip). scripts/netem/udp-impair.mjs listens there and relays to the SFU's own address, so every
 // media packet of both Electron instances crosses the impairment proxy. Signalling (WebSocket) is not impaired.
 //
-//   node apps/desktop/scripts/media-net.mjs [--no-build] [--phase=voice,protection,screen] [--seconds=25]
+//   node apps/desktop/scripts/media-net.mjs [--no-build] [--phase=voice,protection,screen,uplink,rejoin,presets] [--seconds=25] [--reps=2] [--fresh]
 //
 // Results: docs/benchmarks/media-network.json (numbers quoted in media-network.md).
 import { spawnSync } from 'node:child_process'
@@ -313,6 +313,174 @@ async function phaseScreen(sig) {
   }
 }
 
+// ─────────────── uplink cap: the downswitch freeze, stall guard off vs on ───────────────
+/** Longest run (ms) without a new decoded frame in a 200 ms timeline, and when it started. */
+function longestGap(tl) {
+  let best = { ms: 0, at: null }
+  let since = tl[0]
+  for (const s of tl) {
+    if (s.framesDecoded > since.framesDecoded) since = s
+    else if (s.t - since.t > best.ms) best = { ms: s.t - since.t, at: since.t }
+  }
+  return best
+}
+async function phaseUplink(sig) {
+  const REPS = Number(arg('reps', 2))
+  await startPattern1080()
+  const a = await launch('lab-a', sig.silence, [], false)
+  const b = await launch('lab-b', sig.silence, [], true)
+  a.token = await token('lab-a')
+  b.token = await token('lab-b')
+  // Appends (--fresh to restart): repetitions of this phase accumulate across runs.
+  if (!results.uplink?.runs || process.argv.includes('--fresh')) results.uplink = { method: 'janela 1920x1080@60, B em Original; 6 s de rede limpa, depois a subida de A cai para 3 Mbit/s (RTT 50, fila 300 ms) e B é medido por 30 s', runs: [] }
+  results.uplink.when = new Date().toISOString()
+  const rep0 = Math.max(-1, ...results.uplink.runs.map((r) => r.rep)) + 1
+  try {
+    await Promise.all([gotoLab(a), gotoLab(b)])
+    await join_(b)
+    await join_(a, false)
+    await sleep(2000)
+    const sourceId = await ev(a, async () => (await window.__mediaLab.media.getScreenSources()).find((s) => s.kind === 'window' && s.name.includes('AlgaPattern1080'))?.id ?? null)
+    if (!sourceId) throw new Error('1080p pattern window not found')
+    for (let rep = rep0; rep < rep0 + REPS; rep++) {
+      for (const guard of [false, true]) {
+        for (const quality of ['1080p30', '1080p60']) {
+          proxy.reset()
+          await ev(b, (on) => { window.__mediaLab.media.stallGuard = on }, guard)
+          await ev(a, (o) => window.__mediaLab.media.startScreenShare(o), { sourceId, audio: false, quality })
+          await sleep(800)
+          await ev(b, () => window.__mediaLab.media.watch('lab-a', 'source'))
+          await sleep(6000)
+          profile({ delay: 25, rate: 3000, queue: 300 }, { delay: 25 })
+          const tl = await screenTimeline(a, b, 30_000)
+          const s = summarize(tl)
+          const gap = longestGap(tl)
+          const run = { rep, guard, quality, ...s, longestGapMs: gap.ms, longestGapAt: gap.at, timeline: tl.map((x) => [x.t, x.framesDecoded, x.w, x.top, x.limit]) }
+          results.uplink.runs.push(run)
+          log(`uplink ${quality} guard=${guard} rep ${rep}`, JSON.stringify({ fps: s.fps, res: s.res, freezes: s.freezes, freezeMs: s.freezeMs, longestGapMs: gap.ms, at: gap.at }))
+          save()
+          await ev(b, () => window.__mediaLab.media.unwatch('lab-a'))
+          await ev(a, () => window.__mediaLab.media.stopScreenShare())
+          proxy.reset()
+          await sleep(3000)
+        }
+      }
+    }
+  } finally {
+    proxy.reset()
+    stopPattern1080()
+    await close(a)
+    await close(b)
+  }
+}
+
+// ─────────────── preset viability (720p60 among its neighbours), HW HEVC vs software H.264 ───────────────
+async function phasePresets(sig) {
+  await startPattern1080()
+  const a = await launch('lab-a', sig.silence, [], false)
+  const b = await launch('lab-b', sig.silence, [], true)
+  a.token = await token('lab-a')
+  b.token = await token('lab-b')
+  results.presets = { note: 'h265 = NVENC (HW); h264 = OpenH264 (software)', when: new Date().toISOString(), method: 'janela 1920x1080@60 (ffplay atrás das outras), rede limpa pelo proxy, B em Original; 10 s de rampa e 15 s de medição (1 amostra/s)', runs: [] }
+  try {
+    await Promise.all([gotoLab(a), gotoLab(b)])
+    await join_(b)
+    await join_(a, false)
+    await sleep(2000)
+    const sourceId = await ev(a, async () => (await window.__mediaLab.media.getScreenSources()).find((s) => s.kind === 'window' && s.name.includes('AlgaPattern1080'))?.id ?? null)
+    if (!sourceId) throw new Error('1080p pattern window not found')
+    for (const codec of ['h265', 'h264']) {
+      // Measure the encoder, not the gate: empty sustain record, and the probe answers for the codec under test.
+      await ev(a, (c) => {
+        window.__mediaLab.media.debug.prefs.set({ encoderSustain: {} })
+        window.__mediaLab.media.setScreenDefaults({ codec: c })
+      }, codec)
+      await sleep(1000)
+      for (const quality of ['720p30', '720p60', '1080p30', '1080p60']) {
+        proxy.reset()
+        await ev(a, (o) => window.__mediaLab.media.startScreenShare(o), { sourceId, audio: false, quality, codec, contentType: 'motion' })
+        await sleep(800)
+        await ev(b, () => window.__mediaLab.media.watch('lab-a', 'source'))
+        await sleep(10_000)
+        const stop = L.sampler([a, b])
+        const send = []
+        const recv = []
+        for (let i = 0; i < 15; i++) {
+          const [sa, sb] = await Promise.all([state(a), state(b)])
+          const top = sa.screen.stats?.layers?.slice().sort((x, y) => y.width - x.width)[0]
+          if (top) send.push(top)
+          const v = sb.viewers['lab-a']?.stats
+          if (v) recv.push(v)
+          await sleep(1000)
+        }
+        const cpu = await stop()
+        const st = await state(a)
+        const med = (xs) => r1(L.median(xs))
+        const run = {
+          codec, quality, published: st.screen.preset,
+          sendTop: { res: [...new Set(send.map((l) => `${l.width}x${l.height}`))], fps: med(send.map((l) => l.fps)), kbps: Math.round(L.median(send.map((l) => l.bitrateKbps))), encoder: [...new Set(send.map((l) => l.encoderImplementation))], hw: [...new Set(send.map((l) => l.powerEfficientEncoder))], limitation: [...new Set(send.map((l) => l.qualityLimitationReason))] },
+          recv: { res: [...new Set(recv.map((v) => `${v.width}x${v.height}`))], fps: med(recv.map((v) => v.fps)), freezes: recv.at(-1)?.freezeCount ?? null },
+          cpu,
+        }
+        results.presets.runs.push(run)
+        log(`preset ${codec} ${quality}`, JSON.stringify({ sendTop: run.sendTop, recv: run.recv }))
+        save()
+        await ev(b, () => window.__mediaLab.media.unwatch('lab-a'))
+        await ev(a, () => window.__mediaLab.media.stopScreenShare())
+        await sleep(2000)
+      }
+    }
+    await ev(a, () => window.__mediaLab.media.setScreenDefaults({ codec: null }))
+  } finally {
+    stopPattern1080()
+    await close(a)
+    await close(b)
+  }
+}
+
+// ─────────────── leave + join right away: does the mic keep DTX? ───────────────
+async function phaseRejoin(sig) {
+  const N = Number(arg('reps', 12))
+  // --red=false: plain Opus, the configuration of the cell where the SFU once answered stereo=1 without usedtx (§2).
+  const red = arg('red', 'true') !== 'false'
+  const joinA = () => ev(a, ({ url, token, red }) => window.__mediaLab.media.join({ url, token, bitrateKbps: 64, channelId: 'lab', red }), { url: L.LK_URL, token: a.token, red })
+  const a = await launch('lab-a', sig.silence)
+  const b = await launch('lab-b', sig.silence)
+  a.token = await token('lab-a')
+  b.token = await token('lab-b')
+  results.rejoin ??= { method: 'A (microfone em silêncio) sai e entra na mesma sala; 2,5 s depois, pacotes/s do microfone por 2 s (DTX ≈ 5/s, sem DTX 50/s) e a linha fmtp do Opus na resposta do SFU', runs: [] }
+  results.rejoin.when = new Date().toISOString()
+  try {
+    await Promise.all([gotoLab(a), gotoLab(b)])
+    await join_(b)
+    await joinA()
+    await sleep(3000)
+    for (const pause of [0, 1500]) {
+      for (let i = 0; i < N; i++) {
+        await leave(a)
+        if (pause) await sleep(pause)
+        await joinA()
+        await sleep(Number(arg('settle', 2500)))
+        const [s0, i0] = [await sender(a), await inbound(b)]
+        await sleep(2000)
+        const [s1, i1] = [await sender(a), await inbound(b)]
+        const heardPps = r1(((i1?.packetsReceived ?? 0) - (i0?.packetsReceived ?? 0)) / 2)
+        const pps = r1(((s1.packetsSent - s0.packetsSent) * 1000) / Math.max(1, s1.t - s0.t))
+        const sdp = await ev(a, () => window.__mediaLab.publisherSdpAudio())
+        const answerOpus = sdp.answer.filter((l) => /^a=fmtp:/.test(l))
+        const repairs = await ev(a, () => window.__mediaLab.media.debug.dtxRepairs ?? null)
+        const run = { red, pause, i, pps, heardPps, dtx: pps < 20, repairs, sendFmtp: s1.codecs, answerFmtp: [...new Set(answerOpus)] }
+        results.rejoin.runs.push(run)
+        log(`rejoin red=${red} pause=${pause} #${i}: ${pps} pkt/s sent, ${heardPps} heard by B, repairs so far ${repairs}`, JSON.stringify([...new Set(answerOpus)]))
+        save()
+      }
+    }
+  } finally {
+    await close(a)
+    await close(b)
+  }
+}
+
 // ─────────────── main ───────────────
 try {
   if (!process.argv.includes('--no-build')) {
@@ -326,6 +494,9 @@ try {
   if (phases.includes('voice')) await phaseVoice(sig)
   if (phases.includes('protection')) await phaseProtection(sig)
   if (phases.includes('screen')) await phaseScreen(sig)
+  if (phases.includes('uplink')) await phaseUplink(sig)
+  if (phases.includes('rejoin')) await phaseRejoin(sig)
+  if (phases.includes('presets')) await phasePresets(sig)
   results.proxyTotals = proxy.stats()
   save()
   log('done →', outJson)
