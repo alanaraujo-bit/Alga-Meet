@@ -2,14 +2,14 @@ import { randomBytes } from 'node:crypto'
 import {
   CreateChannelBody, CreateInviteBody, CreateSpaceBody, DEFAULT_EVERYONE_PERMISSIONS, PatchChannelBody,
   PatchSpaceBody, Permission, uuidv7,
-  type Channel, type Invite, type Space, type SpaceSnapshot,
+  type Channel, type Invite, type Space, type SpaceSnapshot, type VoiceDisconnectReason,
 } from '@alga/shared'
 import { and, count, eq, gt, isNull, lt, max, or, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
-import { channelAudience, requireChannel, requireSpace, spaceMemberIds } from '../access.js'
+import { assertOutranks, channelAudience, requireActor, requireChannel, requireSpace, spaceMemberIds } from '../access.js'
 import type { Ctx } from '../app.js'
 import { isUniqueViolation, type Db } from '../db/index.js'
-import { channels, invites, roles, spaceMembers, spaces, type InviteRow, type SpaceRow } from '../db/schema.js'
+import { channels, invites, roles, spaceBans, spaceMembers, spaces, type InviteRow, type SpaceRow } from '../db/schema.js'
 import { badRequest, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
 import { exchangePresence } from '../gateway/hub.js'
 import { perMinute } from './users.js'
@@ -54,10 +54,11 @@ async function loadInvite(db: Db, code: string): Promise<{ invite: InviteRow; sp
   return row
 }
 
-async function removeMember(ctx: Ctx, spaceId: string, userId: string): Promise<void> {
+/** Leave / kick / ban: drops their voice (LiveKit too), membership and invites; fan-out stops (audiences come from the DB). */
+export async function removeMember(ctx: Ctx, spaceId: string, userId: string, reason?: VoiceDisconnectReason): Promise<void> {
   const { db, hub, voice } = ctx
   const chans = await db.select({ id: channels.id }).from(channels).where(eq(channels.spaceId, spaceId))
-  await voice.disconnect(userId, chans.map((c) => c.id))
+  await voice.disconnect(userId, chans.map((c) => c.id), reason)
   await db.delete(spaceMembers).where(and(eq(spaceMembers.spaceId, spaceId), eq(spaceMembers.userId, userId)))
   // Their invites must not keep letting people in after they leave or are removed.
   await db.delete(invites).where(and(eq(invites.spaceId, spaceId), eq(invites.inviterId, userId)))
@@ -126,14 +127,16 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
   })
 
   app.delete<{ Params: { id: string; userId: string } }>('/spaces/:id/members/:userId', async (req, reply) => {
-    const { space } = await requireSpace(db, idParam(req.params.id), req.auth.user.id, Permission.KICK_MEMBERS)
+    const actor = await requireActor(db, idParam(req.params.id), req.auth.user.id, Permission.KICK_MEMBERS)
+    const { space } = actor
     const target = idParam(req.params.userId)
     if (target === req.auth.user.id) throw badRequest('Para sair do espaço use /members/@me.')
     if (target === space.ownerId) throw forbidden('O dono do espaço não pode ser removido.')
     const [m] = await db.select({ id: spaceMembers.userId }).from(spaceMembers)
       .where(and(eq(spaceMembers.spaceId, space.id), eq(spaceMembers.userId, target)))
     if (!m) throw notFound('Membro não encontrado.')
-    await removeMember(ctx, space.id, target)
+    await assertOutranks(db, actor, target)
+    await removeMember(ctx, space.id, target, 'moderator')
     return reply.code(204).send()
   })
 
@@ -207,6 +210,9 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
     const found = await loadInvite(db, codeParam(req.params.code))
     if (!found) throw notFound('Convite inválido ou expirado.')
     const spaceId = found.space.id
+    const [banned] = await db.select({ id: spaceBans.userId }).from(spaceBans)
+      .where(and(eq(spaceBans.spaceId, spaceId), eq(spaceBans.userId, me)))
+    if (banned) throw forbidden('Você foi banido deste espaço.')
     const joined = await db.transaction(async (tx) => {
       const [added] = await tx.insert(spaceMembers).values({ spaceId, userId: me }).onConflictDoNothing().returning()
       if (!added) return false // already a member: joining is idempotent and consumes no use

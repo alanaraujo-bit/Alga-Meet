@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { Me } from './models.js'
+import { ALL_PERMISSIONS } from './permissions.js'
 
 /**
  * REST contract. All routes are prefixed with /api/v1 and use JSON.
@@ -40,6 +41,24 @@ import type { Me } from './models.js'
  * DELETE /channels/:id/messages/:mid/reactions/:emoji    -> 204
  * POST   /channels/:id/typing                            -> 204
  * POST   /channels/:id/ack         AckBody               -> 204
+ * GET    /spaces/:id/roles                               -> Role[] (any member; position order)
+ * POST   /spaces/:id/roles         CreateRoleBody        -> Role   (MANAGE_ROLES; created at position 1, just above @everyone)
+ * PATCH  /spaces/:id/roles         ReorderRolesBody      -> Role[] (MANAGE_ROLES; a role sent to an occupied position takes it)
+ * PATCH  /spaces/:id/roles/:roleId PatchRoleBody         -> Role   (MANAGE_ROLES; @everyone: permissions only)
+ * DELETE /spaces/:id/roles/:roleId                       -> 204    (MANAGE_ROLES; @everyone cannot be deleted)
+ * PUT    /spaces/:id/members/:userId/roles/:roleId       -> 204    (MANAGE_ROLES; MEMBER_UPDATE)
+ * DELETE /spaces/:id/members/:userId/roles/:roleId       -> 204    (MANAGE_ROLES; MEMBER_UPDATE)
+ * PATCH  /spaces/:id/members/:userId PatchMemberBody     -> Member (nickname: `@me` needs CHANGE_NICKNAME, others MANAGE_NICKNAMES)
+ * PATCH  /spaces/:id/members/:userId/voice VoiceModerationBody -> 204
+ *   serverMute → MUTE_MEMBERS, serverDeaf → DEAFEN_MEMBERS (persist across joins, enforced at the SFU: no microphone /
+ *   no subscribing); channelId → MOVE_MEMBERS: a voice channel of this space (VOICE_MOVE to the user) or null (disconnect,
+ *   VOICE_DISCONNECT reason 'moderator'). Move/disconnect need the user to be in voice in this space.
+ * GET    /spaces/:id/bans                                -> Ban[]  (BAN_MEMBERS)
+ * PUT    /spaces/:id/bans/:userId  BanBody               -> 204    (BAN_MEMBERS; removes the member, invites refuse them)
+ * DELETE /spaces/:id/bans/:userId                        -> 204    (BAN_MEMBERS)
+ *   Hierarchy: a role outranks the ones with a lower `position` (@everyone = 0). Except for the owner, you can only
+ *   create/edit/delete/assign/reorder roles below your highest role, grant permissions you have, and kick, ban or
+ *   rename members whose highest role is below yours. Channel permission overwrites are not implemented yet.
  * POST   /spaces/:id/invites       CreateInviteBody      -> Invite
  * GET    /invites/:code                                  -> Invite (public preview, no auth)
  * POST   /invites/:code                                  -> SpaceSnapshot (join)
@@ -162,6 +181,43 @@ export const CreateInviteBody = z.object({
   maxAgeSeconds: z.number().int().min(0).max(60 * 60 * 24 * 30).default(60 * 60 * 24 * 7),
 })
 export type CreateInviteBody = z.infer<typeof CreateInviteBody>
+
+const roleName = z.string().trim().min(1).max(100)
+const roleColor = z.string().regex(/^#[0-9a-f]{6}$/i).nullable()
+const permissionBits = z.number().int().min(0).refine((p) => (p & ~ALL_PERMISSIONS) === 0, 'Permissão desconhecida.')
+
+export const CreateRoleBody = z.object({
+  name: roleName,
+  color: roleColor.optional(),
+  permissions: permissionBits.default(0),
+})
+export type CreateRoleBody = z.infer<typeof CreateRoleBody>
+
+export const PatchRoleBody = z.object({
+  name: roleName.optional(),
+  color: roleColor.optional(),
+  permissions: permissionBits.optional(),
+})
+export type PatchRoleBody = z.infer<typeof PatchRoleBody>
+
+/** Desired positions (≥ 1) for some roles; the server renumbers the roles you may move, keeping the rest. */
+export const ReorderRolesBody = z.array(z.object({ id: z.string().uuid(), position: z.number().int().min(1).max(10_000) })).min(1).max(250)
+export type ReorderRolesBody = z.infer<typeof ReorderRolesBody>
+
+/** `null` or an empty string clears the nickname. */
+export const PatchMemberBody = z.object({ nickname: z.string().trim().max(32).nullable() })
+export type PatchMemberBody = z.infer<typeof PatchMemberBody>
+
+export const BanBody = z.object({ reason: z.string().trim().max(512).optional() })
+export type BanBody = z.infer<typeof BanBody>
+
+export const VoiceModerationBody = z.object({
+  serverMute: z.boolean().optional(),
+  serverDeaf: z.boolean().optional(),
+  /** Voice channel to move the member to, or null to disconnect them. */
+  channelId: z.string().uuid().nullable().optional(),
+})
+export type VoiceModerationBody = z.infer<typeof VoiceModerationBody>
 
 export const VoiceJoinBody = z.object({ channelId: z.string().uuid() })
 export type VoiceJoinBody = z.infer<typeof VoiceJoinBody>

@@ -10,6 +10,8 @@ import { Hub } from './gateway/hub.js'
 import { gatewayRoute } from './gateway/socket.js'
 import { authPublicRoutes, authRoutes } from './routes/auth.js'
 import { messageRoutes } from './routes/messages.js'
+import { moderationRoutes } from './routes/moderation.js'
+import { roleRoutes } from './routes/roles.js'
 import { invitePublicRoutes, spaceRoutes } from './routes/spaces.js'
 import { userRoutes } from './routes/users.js'
 import { livekitWebhookRoute, voiceRoutes } from './routes/voice.js'
@@ -100,6 +102,8 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       authRoutes(authed, ctx)
       userRoutes(authed, ctx)
       spaceRoutes(authed, ctx)
+      roleRoutes(authed, ctx)
+      moderationRoutes(authed, ctx)
       messageRoutes(authed, ctx)
       voiceRoutes(authed, ctx)
     })

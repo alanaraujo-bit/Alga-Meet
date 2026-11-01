@@ -1,6 +1,6 @@
 import { Permission, VoiceJoinBody, hasPermission, type VoiceJoinResponse } from '@alga/shared'
 import type { FastifyInstance } from 'fastify'
-import { assertDmNotBlocked, requireChannel } from '../access.js'
+import { NO_MODERATION, assertDmNotBlocked, requireChannel, voiceModeration } from '../access.js'
 import type { Ctx } from '../app.js'
 import { HttpError, badRequest, forbidden, parse } from '../errors.js'
 import { roomName } from '../voice.js'
@@ -14,13 +14,14 @@ export function voiceRoutes(app: FastifyInstance, { db, voice, config }: Ctx): v
     if (channel.type === 'text') throw badRequest('Canais de texto não têm voz.')
     await assertDmNotBlocked(db, access, me.id)
     const limit = channel.userLimit ?? 0
-    if (limit > 0 && !hasPermission(permissions, Permission.MOVE_MEMBERS)) {
+    if (limit > 0 && !hasPermission(permissions, Permission.MOVE_MEMBERS) && !voice.hasMoveTicket(me.id, channel.id)) {
       const others = voice.inChannel(channel.id).filter((s) => s.userId !== me.id).length
       if (others >= limit) throw forbidden('Este canal de voz está cheio.')
     }
     return {
       url: config.livekit.publicUrl,
-      token: await voice.mintToken(me, channel.id, permissions),
+      token: await voice.mintToken(me, channel.id, permissions,
+        channel.spaceId ? await voiceModeration(db, channel.spaceId, me.id) : NO_MODERATION),
       room: roomName(channel.id),
       bitrateKbps: channel.bitrateKbps ?? 64,
     }

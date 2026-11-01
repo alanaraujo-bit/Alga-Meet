@@ -1,11 +1,15 @@
 /**
  * Voice: LiveKit token minting and the authoritative VoiceState map.
  * Who is in a room comes only from LiveKit (webhooks + startup reconcile); clients only toggle their own flags.
+ * Moderation (server mute/deafen, role changes) is enforced at the SFU through participant permissions.
  */
 import { Permission, hasPermission, type VoiceDisconnectReason, type VoiceState } from '@alga/shared'
 import type { FastifyBaseLogger } from 'fastify'
 import { AccessToken, RoomServiceClient, TrackSource, WebhookReceiver, type WebhookEvent } from 'livekit-server-sdk'
-import { PRIVATE_CHANNEL_PERMISSIONS, channelAudience, memberPermissions, spaceMemberIds } from './access.js'
+import {
+  NO_MODERATION, PRIVATE_CHANNEL_PERMISSIONS, channelAudience, memberPermissions, spaceMemberIds, voiceModeration,
+  type VoiceModeration,
+} from './access.js'
 import { hasSession } from './auth.js'
 import type { Config } from './config.js'
 import type { Db } from './db/index.js'
@@ -26,6 +30,23 @@ const FLAGS = ['selfMute', 'selfDeaf', 'streaming', 'video'] as const
 const VOICE_TYPES = ['voice', 'dm', 'group_dm']
 /** LiveKit signs webhooks with short-lived JWTs; remembering ids this long covers their validity. */
 const WEBHOOK_DEDUPE_MS = 10 * 60_000
+/** How long a moderator move lets the user into the target channel even when it is full. */
+const MOVE_TICKET_MS = 60_000
+
+/**
+ * LiveKit grants: SPEAK → microphone + camera, STREAM → screen + its audio; server mute drops the microphone,
+ * server deafen drops subscribing. Used for the join token and for live updates (updateParticipant).
+ */
+export function voiceGrants(permissions: number, mod: VoiceModeration = NO_MODERATION) {
+  const sources: TrackSource[] = []
+  if (hasPermission(permissions, Permission.SPEAK)) {
+    if (!mod.serverMute) sources.push(TrackSource.MICROPHONE)
+    sources.push(TrackSource.CAMERA)
+  }
+  if (hasPermission(permissions, Permission.STREAM)) sources.push(TrackSource.SCREEN_SHARE, TrackSource.SCREEN_SHARE_AUDIO)
+  // The data channel would bypass SEND_MESSAGES, blocks and moderation; no feature needs it.
+  return { canSubscribe: !mod.serverDeaf, canPublish: sources.length > 0, canPublishSources: sources, canPublishData: false }
+}
 
 export class Voice {
   /** userId → state. A user is in at most one voice channel. shortcut: in-memory, single instance; rebuilt from LiveKit on boot. */
@@ -34,6 +55,8 @@ export class Voice {
   private readonly receiver: WebhookReceiver
   /** Webhook event id → expiry, in insertion (= expiry) order. */
   private readonly seenEvents = new Map<string, number>()
+  /** userId → channel a moderator moved them to (bypasses userLimit until `until`). */
+  private readonly moves = new Map<string, { channelId: string; until: number }>()
 
   constructor(
     private readonly config: Config,
@@ -50,30 +73,29 @@ export class Voice {
     return [...this.states.values()]
   }
 
+  stateOf(userId: string): VoiceState | undefined {
+    return this.states.get(userId)
+  }
+
   inChannel(channelId: string): VoiceState[] {
     return this.all().filter((s) => s.channelId === channelId)
   }
 
-  /** Access token for `ch_<channelId>`; publish sources follow SPEAK (mic, camera) and STREAM (screen + its audio). */
-  async mintToken(user: { id: string; displayName: string }, channelId: string, permissions: number): Promise<string> {
-    const sources: TrackSource[] = []
-    if (hasPermission(permissions, Permission.SPEAK)) sources.push(TrackSource.MICROPHONE, TrackSource.CAMERA)
-    if (hasPermission(permissions, Permission.STREAM)) sources.push(TrackSource.SCREEN_SHARE, TrackSource.SCREEN_SHARE_AUDIO)
+  /** Access token for `ch_<channelId>` with `voiceGrants`. */
+  async mintToken(user: { id: string; displayName: string }, channelId: string, permissions: number, mod = NO_MODERATION): Promise<string> {
     const at = new AccessToken(this.config.livekit.apiKey, this.config.livekit.apiSecret, {
       identity: user.id,
       name: user.displayName,
       ttl: 60 * 60,
     })
-    at.addGrant({
-      roomJoin: true,
-      room: roomName(channelId),
-      canSubscribe: true,
-      canPublish: sources.length > 0,
-      canPublishSources: sources,
-      // The data channel would bypass SEND_MESSAGES, blocks and moderation; no feature needs it.
-      canPublishData: false,
-    })
+    at.addGrant({ roomJoin: true, room: roomName(channelId), ...voiceGrants(permissions, mod) })
     return at.toJwt()
+  }
+
+  /** A pending moderator move into `channelId` (lets /voice/join and the join through a full channel). */
+  hasMoveTicket(userId: string, channelId: string): boolean {
+    const t = this.moves.get(userId)
+    return !!t && t.channelId === channelId && t.until > Date.now()
   }
 
   /** Verifies the LiveKit signature (JWT whose sha256 claim covers the raw body). Throws on failure. */
@@ -113,6 +135,7 @@ export class Voice {
     }
     const { row, recipientIds } = found
     const permissions = row.spaceId ? (await memberPermissions(this.db, row.spaceId, userId)).get(userId) ?? 0 : PRIVATE_CHANNEL_PERMISSIONS
+    const mod = row.spaceId ? await voiceModeration(this.db, row.spaceId, userId) : NO_MODERATION
     // Tokens live for an hour, so re-check access: a kicked or logged-out user must not linger in the room.
     const allowed = (row.spaceId ? hasPermission(permissions, Permission.CONNECT) : recipientIds.includes(userId))
       && await hasSession(this.db, userId)
@@ -126,11 +149,13 @@ export class Voice {
     if (prev?.channelId === channelId) return // duplicate delivery / reconcile of a known state
     const others = this.inChannel(channelId).length
     const limit = row.userLimit ?? 0
-    if (limit > 0 && others >= limit && !hasPermission(permissions, Permission.MOVE_MEMBERS)) {
+    const moved = this.hasMoveTicket(userId, channelId)
+    if (limit > 0 && others >= limit && !moved && !hasPermission(permissions, Permission.MOVE_MEMBERS)) {
       this.log.info({ channelId, userId }, 'voice: channel full, removing participant')
       await this.kickWith(channelId, userId, 'channel_full')
       return
     }
+    if (moved) this.moves.delete(userId)
     const wasEmpty = others === 0
     const state: VoiceState = {
       userId,
@@ -138,8 +163,8 @@ export class Voice {
       spaceId: row.spaceId,
       selfMute: prev?.selfMute ?? false,
       selfDeaf: prev?.selfDeaf ?? false,
-      serverMute: false,
-      serverDeaf: false,
+      serverMute: mod.serverMute,
+      serverDeaf: mod.serverDeaf,
       streaming: false,
       video: false,
       joinedAt,
@@ -153,6 +178,8 @@ export class Voice {
     if (ring && wasEmpty && !row.spaceId) {
       this.hub.dispatch(recipientIds.filter((id) => id !== userId), 'CALL_RING', { channelId, fromUserId: userId })
     }
+    // A token minted before the mute/deafen still carries the old grants.
+    if (mod.serverMute || mod.serverDeaf) await this.enforce(state, permissions)
   }
 
   async participantLeft(channelId: string, userId: string): Promise<void> {
@@ -178,12 +205,55 @@ export class Voice {
     this.hub.dispatch(await this.audience(state), 'VOICE_STATE_UPDATE', state)
   }
 
-  /** Disconnects a user from voice in any of `channelIds` (leave/kick), or from any channel when omitted. */
-  async disconnect(userId: string, channelIds?: string[]): Promise<void> {
+  /**
+   * Disconnects a user from voice in any of `channelIds` (leave/kick), or from any channel when omitted.
+   * With a `reason` the user also gets VOICE_DISCONNECT. Returns whether they were connected there.
+   */
+  async disconnect(userId: string, channelIds?: string[], reason?: VoiceDisconnectReason): Promise<boolean> {
     const s = this.states.get(userId)
-    if (!s || (channelIds && !channelIds.includes(s.channelId))) return
+    if (!s || (channelIds && !channelIds.includes(s.channelId))) return false
+    await this.remove(s)
+    if (reason) await this.kickWith(s.channelId, userId, reason)
+    else await this.kick(s.channelId, userId)
+    return true
+  }
+
+  /** Server mute/deafen changed for a member of `spaceId`: update their live state (if in voice there) and the SFU. */
+  async moderate(userId: string, spaceId: string, mod: VoiceModeration): Promise<void> {
+    const prev = this.states.get(userId)
+    if (prev?.spaceId !== spaceId) return
+    if (prev.serverMute === mod.serverMute && prev.serverDeaf === mod.serverDeaf) return
+    const state = { ...prev, ...mod }
+    this.states.set(userId, state)
+    this.hub.dispatch(await this.audience(state), 'VOICE_STATE_UPDATE', state)
+    await this.enforce(state)
+  }
+
+  /**
+   * Moderator move to another voice channel of the same space: VOICE_MOVE to the user, then they are dropped from
+   * the current room and may join the target (even if full) for MOVE_TICKET_MS. False if not in voice in that space.
+   */
+  async move(userId: string, spaceId: string, toChannelId: string): Promise<boolean> {
+    const s = this.states.get(userId)
+    if (s?.spaceId !== spaceId) return false
+    if (s.channelId === toChannelId) return true
+    this.moves.set(userId, { channelId: toChannelId, until: Date.now() + MOVE_TICKET_MS })
+    this.hub.dispatch([userId], 'VOICE_MOVE', { channelId: toChannelId })
     await this.remove(s)
     await this.kick(s.channelId, userId)
+    return true
+  }
+
+  /** Role/permission changes: re-apply SFU grants for members of `spaceId` in voice; drop those who lost CONNECT. */
+  async refreshSpace(spaceId: string, userIds?: string[]): Promise<void> {
+    const affected = this.all().filter((s) => s.spaceId === spaceId && (!userIds || userIds.includes(s.userId)))
+    if (!affected.length) return
+    const perms = await memberPermissions(this.db, spaceId)
+    for (const s of affected) {
+      const p = perms.get(s.userId) ?? 0
+      if (!hasPermission(p, Permission.CONNECT)) await this.disconnect(s.userId, [s.channelId], 'access_lost')
+      else await this.enforce(s, p)
+    }
   }
 
   /** Channel/space being deleted: forget its states and close the LiveKit rooms. `audience` is computed before deletion. */
@@ -235,6 +305,21 @@ export class Voice {
   private async kickWith(channelId: string, userId: string, reason: VoiceDisconnectReason): Promise<void> {
     await this.kick(channelId, userId)
     this.hub.dispatch([userId], 'VOICE_DISCONNECT', { channelId, reason })
+  }
+
+  /** Pushes `voiceGrants` to the participant and mutes an already published microphone when server-muted. */
+  private async enforce(s: VoiceState, permissions?: number): Promise<void> {
+    const room = roomName(s.channelId)
+    try {
+      await this.rooms.updateParticipant(room, s.userId, { permission: voiceGrants(permissions ?? await this.permissionsOf(s), s) })
+      if (!s.serverMute) return
+      const p = await this.rooms.getParticipant(room, s.userId)
+      for (const t of p.tracks) {
+        if (t.source === TrackSource.MICROPHONE && !t.muted) await this.rooms.mutePublishedTrack(room, s.userId, t.sid, true)
+      }
+    } catch (err) {
+      this.log.warn({ err: (err as Error).message, channelId: s.channelId, userId: s.userId }, 'voice: could not apply grants on LiveKit')
+    }
   }
 
   private async permissionsOf(s: VoiceState): Promise<number> {

@@ -1,5 +1,5 @@
 import {
-  foreignKey, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid,
+  boolean, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid,
 } from 'drizzle-orm/pg-core'
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' })
@@ -58,11 +58,23 @@ export const spaceMembers = pgTable('space_members', {
   spaceId: uuid('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   nickname: text('nickname'),
+  /** Voice moderation; persists across joins like Discord's server mute/deafen. */
+  serverMute: boolean('server_mute').notNull().default(false),
+  serverDeaf: boolean('server_deaf').notNull().default(false),
   joinedAt: ts('joined_at').notNull().defaultNow(),
 }, (t) => [
   primaryKey({ columns: [t.spaceId, t.userId] }),
   index('space_members_user_id_idx').on(t.userId),
 ])
+
+/** Banned users cannot join through invites; banning also removes the membership. */
+export const spaceBans = pgTable('space_bans', {
+  spaceId: uuid('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  reason: text('reason').notNull().default(''),
+  moderatorId: uuid('moderator_id').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.spaceId, t.userId] })])
 
 /** The @everyone role has id == space id. */
 export const roles = pgTable('roles', {

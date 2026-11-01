@@ -71,6 +71,12 @@ export interface Member {
   joinedAt: string
 }
 
+export interface Ban {
+  user: PublicUser
+  reason: string
+  createdAt: string
+}
+
 export interface Space {
   id: string
   name: string

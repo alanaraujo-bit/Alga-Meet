@@ -18,6 +18,10 @@ export const Permission = {
   MUTE_MEMBERS: 1 << 15,
   DEAFEN_MEMBERS: 1 << 16,
   MOVE_MEMBERS: 1 << 17,
+  /** Change your own nickname in the space. */
+  CHANGE_NICKNAME: 1 << 18,
+  /** Change other members' nicknames (below you in the role hierarchy). */
+  MANAGE_NICKNAMES: 1 << 19,
 } as const
 export type PermissionName = keyof typeof Permission
 
@@ -32,7 +36,8 @@ export const DEFAULT_EVERYONE_PERMISSIONS =
   Permission.ATTACH_FILES |
   Permission.CONNECT |
   Permission.SPEAK |
-  Permission.STREAM
+  Permission.STREAM |
+  Permission.CHANGE_NICKNAME
 
 export function hasPermission(granted: number, needed: number): boolean {
   if (granted & Permission.ADMINISTRATOR) return true

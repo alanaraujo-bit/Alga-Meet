@@ -61,7 +61,9 @@ export type Dispatch =
   | { t: 'MEMBER_ADD'; d: Member }
   | { t: 'MEMBER_UPDATE'; d: Member }
   | { t: 'MEMBER_REMOVE'; d: { spaceId: string; userId: string } }
+  /** Created/edited role, or a role whose position changed (one event per role). */
   | { t: 'ROLE_UPSERT'; d: Role }
+  /** Clients also drop `id` from every member's roleIds. */
   | { t: 'ROLE_DELETE'; d: { spaceId: string; id: string } }
   | { t: 'CHANNEL_CREATE'; d: Channel }
   | { t: 'CHANNEL_UPDATE'; d: Channel }
@@ -82,6 +84,13 @@ export type Dispatch =
    * disconnected by a moderator, access lost). Client: leave the room, do not auto-rejoin, show `reason`.
    */
   | { t: 'VOICE_DISCONNECT'; d: { channelId: string; reason: VoiceDisconnectReason } }
+  /**
+   * Sent only to the moved user: a moderator moved them to voice channel `channelId` (same space). The server has
+   * already dropped them from the current room (VOICE_STATE_REMOVE follows). Client: treat the LiveKit disconnect as
+   * expected, call POST /voice/join with this channelId (allowed even if it is full, for 60 s) and re-send the
+   * voice_state op with the current self flags.
+   */
+  | { t: 'VOICE_MOVE'; d: { channelId: string } }
 
 export type DispatchType = Dispatch['t']
 export type DispatchOf<T extends DispatchType> = Extract<Dispatch, { t: T }>['d']

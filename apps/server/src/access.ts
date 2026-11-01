@@ -55,6 +55,51 @@ export async function requireSpace(db: Db, spaceId: string, userId: string, need
   return { space, permissions }
 }
 
+/** A space actor for hierarchy checks: the owner outranks everyone, otherwise the highest role position counts. */
+export interface Actor extends SpaceAccess {
+  userId: string
+  isOwner: boolean
+  /** Highest role position (0 = only @everyone, Infinity = owner). */
+  top: number
+}
+
+/** Highest role position of a member (0 when they only have @everyone). */
+export async function topRole(db: Db, spaceId: string, userId: string): Promise<number> {
+  const [row] = await db.select({ top: sql<number>`coalesce(max(${roles.position}), 0)`.mapWith(Number) })
+    .from(memberRoles).innerJoin(roles, eq(roles.id, memberRoles.roleId))
+    .where(and(eq(memberRoles.spaceId, spaceId), eq(memberRoles.userId, userId)))
+  return row?.top ?? 0
+}
+
+export async function requireActor(db: Db, spaceId: string, userId: string, needed = 0): Promise<Actor> {
+  const access = await requireSpace(db, spaceId, userId, needed)
+  const isOwner = access.space.ownerId === userId
+  return { ...access, userId, isOwner, top: isOwner ? Infinity : await topRole(db, spaceId, userId) }
+}
+
+/** Roles strictly below the actor's highest role (any role for the owner). */
+export const canManageRole = (actor: Actor, role: { position: number }) => actor.isOwner || role.position < actor.top
+
+/** 403 unless the actor outranks `targetId` (never the owner; strictly higher top role otherwise). */
+export async function assertOutranks(db: Db, actor: Actor, targetId: string): Promise<void> {
+  if (targetId === actor.space.ownerId) throw forbidden('O dono do espaço não pode ser moderado.')
+  if (!actor.isOwner && (await topRole(db, actor.space.id, targetId)) >= actor.top) {
+    throw forbidden('Este membro tem um cargo igual ou superior ao seu.')
+  }
+}
+
+export interface VoiceModeration {
+  serverMute: boolean
+  serverDeaf: boolean
+}
+export const NO_MODERATION: VoiceModeration = { serverMute: false, serverDeaf: false }
+
+export async function voiceModeration(db: Db, spaceId: string, userId: string): Promise<VoiceModeration> {
+  const [row] = await db.select({ serverMute: spaceMembers.serverMute, serverDeaf: spaceMembers.serverDeaf }).from(spaceMembers)
+    .where(and(eq(spaceMembers.spaceId, spaceId), eq(spaceMembers.userId, userId)))
+  return row ?? NO_MODERATION
+}
+
 export interface ChannelAccess {
   channel: ChannelRow
   /** Private channels only. */
