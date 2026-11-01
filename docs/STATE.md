@@ -15,8 +15,8 @@
 | Frente | Escopo | Status |
 |---|---|---|
 | Backend onda 1 | `apps/server` | **feito** — ver Validado |
-| Revisão de segurança independente do backend | `docs/security/` | em andamento |
-| Desktop nativo | `apps/desktop/src/main`, `preload`, instalador NSIS, tray, hotkeys globais, captura, updater | em andamento |
+| Desktop nativo onda 1 | `apps/desktop/src/main`, `preload`, instalador | **feito** — ver Validado |
+| Correções de segurança + cargos/banimento/moderação de voz | `apps/server`, `packages/shared` (aditivo) | em andamento |
 | Motor de mídia | `apps/desktop/src/renderer/src/media`: voz (Opus/DTX/RED, RNNoise, PTT, dispositivos) + transmissão (codecs, presets, áudio do sistema) + benchmarks | em andamento |
 | Design system + telas (onda 1: shell, auth, amigos, DMs, espaços, chat) | `apps/desktop/src/renderer` (exceto `media/`) | em andamento |
 | Camada de dados do renderer | `lib/api.ts`, `lib/gateway.ts`, `store/*` | feito (Maestro), typecheck ok, sem teste de integração ainda |
@@ -24,6 +24,9 @@
 ## Validado
 - `@alga/shared`: 2 testes unitários (UUIDv7, permissões) passando.
 - Esqueleto desktop: `electron-vite build` e `typecheck` passando.
+- Revisão de segurança independente do backend (`docs/security/server-review-2026-11-01.md`): 0 crítico, 2 alto, 10 médio, 11 baixo; sem IDOR. Correções em andamento.
+- Desktop nativo: bridge `window.alga` completo; 16 testes unitários (hotkeys, bounds, badge) + 21/21 checagens e2e com Playwright no app empacotado (tray, token via DPAPI sem texto puro no disco, captura negada sem escolha do usuário, hooks globais reais de PTT). Instalador NSIS 109 MiB: instalação silenciosa 7,8 s, desinstalação 6,2 s, dados do usuário preservados por padrão.
+- Eco do áudio do sistema na transmissão: resolvido sem módulo nativo com `restrictOwnAudio: true` (tom do próprio app caiu de −56 dB para −80 dB, outros apps intactos em −24 dB). `docs/decisions/0002-screen-audio-capture.md`.
 - Backend: 47 testes vitest (PGlite em memória, REST via inject + gateway via WebSocket real) passando, conferido pelo Maestro. Smoke test com LiveKit real: webhooks `room_started/finished` e `participant_joined/left` reais recebidos e assinatura verificada; `VOICE_STATE_UPDATE/REMOVE` entregues no gateway.
 
 ## Pesquisa concluída
@@ -35,6 +38,8 @@
 Sem medições ainda. Metas iniciais (de `discord-benchmark.md`): stream 1080p60 grátis com encode por hardware; RAM ociosa ≤ 300 MB; voz ≥ paridade Opus 64–128 kbps com DTX+RED.
 
 ## Problemas conhecidos
+- Push-to-talk não funciona enquanto um jogo rodando como administrador tem o foco (limite do Windows para hooks de processo não elevado).
+- Notificação nativa, badge da barra de tarefas e iniciar com o Windows ainda não verificados visualmente.
 - **Sem E2EE de mídia.** Mídia é cifrada só até o SFU (DTLS-SRTP). Discord tem E2EE (DAVE) obrigatório desde 2026-03 → paridade necessária antes de lançamento público.
 - Strings da UI direto em pt-BR, sem framework de i18n ainda.
 - Anexos/upload de arquivos fora do escopo da primeira fatia.
@@ -46,7 +51,7 @@ Sem medições ainda. Metas iniciais (de `discord-benchmark.md`): stream 1080p60
 | O quê | Por quê | O que fazer | Sem isso |
 |---|---|---|---|
 | Certificado de assinatura de código (OV/EV ou Azure Trusted Signing) | Windows SmartScreen e confiança do updater | Contratar certificado; fornecer `CSC_LINK`/`CSC_KEY_PASSWORD` ou credenciais Azure | Instalador mostra aviso "editor desconhecido" |
-| Repositório GitHub `alanaraujo-bit/alga-meet` (privado ou público) | Canal de releases do auto-update | Autorizar criação (ou criar) | Auto-update não tem de onde baixar |
+| Repositório GitHub de releases `alanaraujo-bit/alga-meet` | Canal do auto-update. Precisa ser **público** (ou um repo público só de releases), senão o app teria que embutir um token | Autorizar criação | Auto-update não tem de onde baixar |
 | Servidor com UDP para o SFU (VPS) | Railway não expõe UDP | Escolher provedor (ver `docs/infra/cost-model.md`) e autorizar custo | Voz/tela só funcionam em rede local/dev |
 | Cotação escrita Latitude.sh São Paulo (pacote de banda) | O custo recomendado depende dela (US$ 4,9k vs 18,3k/mês a 10k CCU) | Pedir cotação antes da fase 1k CCU | Plano de custo a 1k+ CCU fica incerto |
 | Segunda máquina independente | Validar voz/tela entre dispositivos reais e NATs diferentes | Instalar o build em outro PC e entrar num canal | Só temos medições em localhost |
