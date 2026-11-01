@@ -85,6 +85,8 @@ const EnvSchema = z
     REQUIRE_BIRTHDATE: bool,
     /** Where the published Termos/Política/Diretrizes live (GET /legal links). */
     LEGAL_URL: z.url().default('https://algameet.com.br/legal'),
+    /** Bearer token for GET /metrics. Production: /metrics is off without it; dev/test: open without it. */
+    METRICS_TOKEN: z.string().min(32).optional(),
   })
   .superRefine((env, ctx) => {
     const devMode = env.ALGA_ALLOW_DEV_SECRETS || (env.NODE_ENV !== 'production' && LOOPBACK.has(env.HOST))
@@ -151,6 +153,8 @@ export interface Config {
   email: EmailConfig
   billing: BillingConfig
   legal: { requireBirthDate: boolean; url: string }
+  /** GET /metrics bearer token (src/observability.ts). */
+  metricsToken: string | undefined
 }
 
 export interface BillingConfig {
@@ -224,5 +228,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
         : {}),
     },
     legal: { requireBirthDate: e.NODE_ENV === 'production' || e.REQUIRE_BIRTHDATE, url: e.LEGAL_URL.replace(/\/+$/, '') },
+    metricsToken: e.METRICS_TOKEN,
   }
 }

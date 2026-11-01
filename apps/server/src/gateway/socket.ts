@@ -8,6 +8,8 @@ import type { Ctx } from '../app.js'
 import { isRestricted, resolveToken } from '../auth.js'
 import { safeErr } from '../errors.js'
 import { readStates, spaceMembers, users, type UserRow } from '../db/schema.js'
+import { metrics } from '../metrics.js'
+import { logUserHash } from '../observability.js'
 import { afterMeUpdate } from '../routes/users.js'
 import { meView, privateChannelsOf, publicUser, relationshipsOf, spaceSnapshots } from '../views.js'
 import { Throttle, broadcastPresence, effectiveStatus, type Conn } from './hub.js'
@@ -21,6 +23,8 @@ const IDENTIFY_TIMEOUT_MS = 10_000
 const STATE_OP_INTERVAL_MS = 1_000
 /** A client that does not read (zero TCP window) is dropped instead of buffering without bound. */
 const MAX_BUFFERED_BYTES = 1024 * 1024
+/** Close codes worth a label of their own in alga_gateway_disconnects_total (the rest count as "other"). */
+const KNOWN_CLOSES = new Set([1000, 1001, 1005, 1006, 1011, ...Object.values(GatewayClose)])
 
 const ClientFrameSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('identify'), token: z.string().min(1).max(256) }),
@@ -81,7 +85,7 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
   })
 
   app.get('/gateway', { websocket: true }, (socket: WebSocket, req) => {
-    const log = req.log
+    let log = req.log
     let conn: Conn | null = null
     let ready = false
     const backlog: string[] = []
@@ -113,12 +117,17 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
 
       if (frame.op === 'identify') {
         if (conn) return close(GatewayClose.INVALID_PAYLOAD, 'already identified')
+        const readyTimer = metrics.readyLatency.start({})
         const auth = await resolveToken(db, frame.token)
         if (!auth) return close(GatewayClose.AUTH_FAILED, 'authentication failed')
         if (isRestricted(auth.user)) return close(GatewayClose.ACCOUNT_RESTRICTED, 'account restricted')
         await ctx.privacy.recordUse(auth.user.id, req.ip, req.headers['user-agent'], 'session_use')
         if (socket.readyState !== socket.OPEN) return
-        if (hub.connections(auth.user.id) >= MAX_SOCKETS_PER_USER) return close(GatewayClose.RATE_LIMITED, 'too many connections')
+        if (hub.connections(auth.user.id) >= MAX_SOCKETS_PER_USER) {
+          metrics.rateLimited.inc({ route: 'gateway' })
+          return close(GatewayClose.RATE_LIMITED, 'too many connections')
+        }
+        log = log.child({ uid: logUserHash(config.files.secret, auth.user.id) })
         arm()
         // Registered before READY is built so nothing dispatched meanwhile is lost; it is flushed after READY.
         conn = {
@@ -135,6 +144,7 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
         const payload = await buildReady(ctx, auth.user)
         if (socket.readyState !== socket.OPEN) return
         socket.send(JSON.stringify({ op: 'dispatch', t: 'READY', d: payload }))
+        readyTimer()
         ready = true
         for (const data of backlog.splice(0)) socket.send(data)
         const status = effectiveStatus(auth.user.statusPreference, true)
@@ -172,7 +182,10 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
         windowStart = now
         frames = 0
       }
-      if (++frames > FRAME_LIMIT) return close(GatewayClose.RATE_LIMITED, 'rate limited')
+      if (++frames > FRAME_LIMIT) {
+        if (frames === FRAME_LIMIT + 1) metrics.rateLimited.inc({ route: 'gateway' })
+        return close(GatewayClose.RATE_LIMITED, 'rate limited')
+      }
       const raw = isBinary ? '' : data.toString()
       chain = chain.then(() => handle(raw)).catch((err: unknown) => {
         log.error({ err: safeErr(err) }, 'gateway frame handling failed')
@@ -180,7 +193,8 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
       })
     })
 
-    socket.on('close', () => {
+    socket.on('close', (code: number) => {
+      metrics.gatewayCloses.inc({ code: KNOWN_CLOSES.has(code) ? String(code) : 'other' })
       clearTimeout(timer)
       const c = conn
       conn = null

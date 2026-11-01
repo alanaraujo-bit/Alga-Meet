@@ -226,6 +226,7 @@ export class Privacy {
         bio: u.bio, accentColor: u.accentColor, avatarUrl: u.avatarUrl, statusPreference: u.statusPreference,
         createdAt: u.createdAt.toISOString(), birthDate: u.birthDate, birthDateSetAt: iso(u.birthDateSetAt), ageBracket: ageBracketOf(u),
         termsVersion: u.termsVersion, termsAcceptedAt: iso(u.termsAcceptedAt), plan: u.plan,
+        cosmetics: u.cosmetics, telemetryOptIn: u.telemetryOptIn, telemetryOptInAt: iso(u.telemetryOptInAt),
       },
       consents: consents.map((c) => ({ termsVersion: c.termsVersion, acceptedAt: c.acceptedAt.toISOString() })),
       sessions: sess.map((s) => ({ userAgent: s.userAgent, createdAt: s.createdAt.toISOString(), lastUsedAt: s.lastUsedAt.toISOString() })),

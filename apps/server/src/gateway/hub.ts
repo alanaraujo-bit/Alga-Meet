@@ -3,6 +3,7 @@ import { eq, inArray } from 'drizzle-orm'
 import { presenceAudience } from '../access.js'
 import type { Db } from '../db/index.js'
 import { users } from '../db/schema.js'
+import { metrics } from '../metrics.js'
 
 /** One identified gateway socket. `send` receives an already-serialized ServerFrame. */
 export interface Conn {
@@ -46,8 +47,19 @@ export class Hub {
     return this.byUser.get(userId)?.size ?? 0
   }
 
+  userCount(): number {
+    return this.byUser.size
+  }
+
+  socketCount(): number {
+    let n = 0
+    for (const set of this.byUser.values()) n += set.size
+    return n
+  }
+
   /** Sends a dispatch to every socket of every listed user. A function payload is evaluated per recipient. */
   dispatch<T extends DispatchType>(userIds: Iterable<string>, t: T, d: Payload<T>): void {
+    let frames = 0
     for (const userId of new Set(userIds)) {
       const conns = this.byUser.get(userId)
       if (!conns) continue
@@ -55,7 +67,11 @@ export class Hub {
       if (payload === undefined) continue
       const data = JSON.stringify({ op: 'dispatch', t, d: payload })
       for (const c of conns) c.send(data)
+      frames += conns.size
     }
+    if (!frames) return
+    metrics.dispatches.inc({ type: t })
+    metrics.framesSent.inc({ type: t }, frames)
   }
 
   closeSession(sessionId: string, code: number, reason: string): void {

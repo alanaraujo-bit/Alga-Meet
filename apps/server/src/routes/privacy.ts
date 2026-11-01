@@ -93,7 +93,7 @@ export function privacyRoutes(app: FastifyInstance, ctx: Ctx): void {
     if (!(await verifyPassword(user.passwordHash, body.password))) throw invalid({ password: 'Senha incorreta.' })
     // A renewing subscription would keep being charged after the account is gone.
     try {
-      await ctx.billing.cancel(user.id)
+      await ctx.billing.cancel(user.id, { final: true })
     } catch (err) {
       if (!(err instanceof HttpError && err.code === 'not_found')) throw err
     }

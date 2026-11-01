@@ -1,5 +1,5 @@
 /** Wire models shared by server and desktop. Timestamps are ISO-8601 strings. */
-import type { PlanSummary } from './billing.js'
+import type { EquippedCosmetics, PlanSummary } from './billing.js'
 import type { AgeBracket } from './trust-safety.js'
 
 
@@ -15,6 +15,11 @@ export interface PublicUser {
   /** Profile accent color (hex, e.g. "#7c9cff") or null. */
   accentColor: string | null
   bio: string
+  /**
+   * Equipped cosmetics (catalog product ids, see GET /billing/catalog). Omitted when nothing is equipped; a
+   * USER_UPDATE without it means everything was unequipped. Plan-included items are unequipped when the plan ends.
+   */
+  cosmetics?: EquippedCosmetics
 }
 
 export interface Me extends PublicUser {
@@ -32,6 +37,11 @@ export interface Me extends PublicUser {
   ageBracket?: AgeBracket
   /** The legal bundle changed since the user accepted it: show it and POST /users/@me/accept-terms. Always sent. */
   needsTermsAcceptance?: boolean
+  /**
+   * Opt-in (default false, PATCH /users/@me) to send call-quality aggregates (POST /telemetry/call-quality). Always
+   * sent by the server; optional like plan.
+   */
+  telemetryOptIn?: boolean
 }
 
 export interface Presence {

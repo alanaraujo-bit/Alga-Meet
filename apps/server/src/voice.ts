@@ -20,6 +20,7 @@ import type { Config } from './config.js'
 import type { Db } from './db/index.js'
 import { users } from './db/schema.js'
 import type { Hub } from './gateway/hub.js'
+import { metrics } from './metrics.js'
 import { loadChannel } from './views.js'
 
 const ROOM_PREFIX = 'ch_'
@@ -146,6 +147,7 @@ export class Voice {
     if (!found || !VOICE_TYPES.includes(found.row.type)) {
       // Tokens outlive deleted channels; LiveKit would recreate the room, so the participant must go.
       this.log.warn({ channelId, userId }, 'voice: participant joined a room without a matching channel, removing')
+      metrics.voiceJoins.inc({ result: 'no_channel' })
       await this.kick(channelId, userId)
       return
     }
@@ -157,6 +159,7 @@ export class Voice {
       && await hasSession(this.db, userId)
     if (!allowed) {
       this.log.warn({ channelId, userId }, 'voice: participant without access, removing from room')
+      metrics.voiceJoins.inc({ result: 'access_lost' })
       await this.kickWith(channelId, userId, 'access_lost')
       return
     }
@@ -168,6 +171,7 @@ export class Voice {
     const moved = this.hasMoveTicket(userId, channelId)
     if (limit > 0 && others >= limit && !moved && !hasPermission(permissions, Permission.MOVE_MEMBERS)) {
       this.log.info({ channelId, userId }, 'voice: channel full, removing participant')
+      metrics.voiceJoins.inc({ result: 'channel_full' })
       await this.kickWith(channelId, userId, 'channel_full')
       return
     }
@@ -186,6 +190,7 @@ export class Voice {
       joinedAt,
     }
     this.states.set(userId, state)
+    metrics.voiceJoins.inc({ result: 'joined' })
     if (prev) {
       this.hub.dispatch([...await this.audience(prev), userId], 'VOICE_STATE_REMOVE', { userId, channelId: prev.channelId })
       await this.kick(prev.channelId, userId)

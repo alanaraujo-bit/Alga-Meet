@@ -5,21 +5,22 @@
  */
 import { createHash } from 'node:crypto'
 import {
-  REMOVED_USER_ID, uuidv7,
-  type BillingCatalog, type BillingMe, type CheckoutResponse, type Entitlement, type Entitlements, type Order, type PlanId,
-  type PlanSummary, type Subscription,
+  COSMETIC_SLOTS, REMOVED_USER_ID, uuidv7,
+  type BillingCatalog, type BillingMe, type CheckoutResponse, type CosmeticSlot, type Entitlement, type Entitlements,
+  type EquippedCosmetics, type Order, type PlanId, type PlanSummary, type PutCosmeticsBody, type Subscription,
 } from '@alga/shared'
 import { and, desc, eq, inArray, isNull, lt, lte, notInArray, or } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
+import { profileAudience } from '../access.js'
 import type { Config } from '../config.js'
 import type { Db, Tx } from '../db/index.js'
 import {
   billingEvents, entitlements, orders, products, subscriptions, users,
   type OrderRow, type SubscriptionRow, type UserRow,
 } from '../db/schema.js'
-import { HttpError, conflict, forbidden, notFound, safeErr } from '../errors.js'
+import { HttpError, conflict, forbidden, invalid, notFound, safeErr } from '../errors.js'
 import type { Hub } from '../gateway/hub.js'
-import { meView } from '../views.js'
+import { meView, publicUser } from '../views.js'
 import type { Voice } from '../voice.js'
 import { CATALOG_VERSION, PLANS, PLAN_RANK, PRODUCTS, planSummary, productById } from './catalog.js'
 import { MercadoPagoProvider } from './mercadopago.js'
@@ -82,7 +83,7 @@ const orderView = (o: OrderRow): Order => ({
   createdAt: o.createdAt.toISOString(),
 })
 
-interface Change { userId: string; planChanged: boolean }
+interface Change { userId: string; planChanged: boolean; cosmeticsChanged: boolean }
 type Desired = Omit<typeof entitlements.$inferInsert, 'userId' | 'sku'>
 
 export class Billing {
@@ -188,31 +189,74 @@ export class Billing {
     return { url: page.url, reference: id, kind, provider: provider.id, sandbox: provider.sandbox }
   }
 
-  /** Stops renewals at the provider; the plan lasts until currentPeriodEnd (then the sweep expires it). Idempotent. */
-  async cancel(userId: string): Promise<Subscription> {
+  /**
+   * Stops renewals at the provider; the plan lasts until currentPeriodEnd (then the sweep expires it). Idempotent.
+   * `final` (account deletion): the provider-side subscription can never be resumed, even if already canceled here.
+   */
+  cancel(userId: string, { final = false } = {}): Promise<Subscription> {
+    return this.setRenewal(userId, false, final)
+  }
+
+  /** Undoes cancel while the paid period lasts: renewals resume at the provider, the grace period comes back. Idempotent. */
+  resume(userId: string): Promise<Subscription> {
+    return this.setRenewal(userId, true)
+  }
+
+  private async setRenewal(userId: string, renew: boolean, final = false): Promise<Subscription> {
     const now = Date.now()
     const live = await this.db.select().from(subscriptions).where(and(eq(subscriptions.userId, userId), inArray(subscriptions.status, LIVE)))
     const sub = live.filter((s) => entitledUntil(s) > now).sort((a, b) => entitledUntil(b) - entitledUntil(a))[0]
     if (!sub) throw notFound('Nenhuma assinatura ativa.')
-    if (sub.cancelAtPeriodEnd) return subscriptionView(sub)
+    if (sub.cancelAtPeriodEnd === !renew && !final) return subscriptionView(sub)
     if (sub.provider === this.provider?.id) {
       try {
-        await this.provider.cancelSubscription(sub.providerSubscriptionId)
+        if (renew) await this.provider.resumeSubscription(sub.providerSubscriptionId)
+        else await this.provider.cancelSubscription(sub.providerSubscriptionId, final)
       } catch (err) {
-        this.log.error({ err: safeErr(err), provider: sub.provider }, 'billing: provider cancel failed')
-        throw new HttpError('internal', 'Não foi possível cancelar agora. Tente novamente.', undefined, 502)
+        this.log.error({ err: safeErr(err), provider: sub.provider }, renew ? 'billing: provider resume failed' : 'billing: provider cancel failed')
+        throw new HttpError('internal', `Não foi possível ${renew ? 'retomar' : 'cancelar'} agora. Tente novamente.`, undefined, 502)
       }
     } else if (sub.provider !== 'sandbox') {
-      // Renewals would keep being charged at a provider this server cannot reach.
+      // Renewals would keep being charged (or never restart) at a provider this server cannot reach.
       throw new HttpError('internal', 'Pagamentos indisponíveis no momento.', undefined, 503)
     }
     const { row, change } = await this.db.transaction(async (tx) => {
-      const [updated] = await tx.update(subscriptions).set({ cancelAtPeriodEnd: true, updatedAt: new Date() })
+      const [updated] = await tx.update(subscriptions).set({ cancelAtPeriodEnd: !renew, updatedAt: new Date() })
         .where(eq(subscriptions.id, sub.id)).returning()
       return { row: updated!, change: await this.recompute(tx, userId, new Date(now)) }
     })
     await this.notify(change ? [change] : [])
     return subscriptionView(row)
+  }
+
+  /**
+   * PUT /users/@me/cosmetics. Runs under the user-row lock recompute takes, so an item cannot be equipped while it
+   * lapses. 400 for an unknown id or the wrong slot, 403 for an item the user does not hold right now.
+   */
+  async equip(userId: string, body: PutCosmeticsBody, now = new Date()): Promise<{ before: UserRow; after: UserRow }> {
+    return this.db.transaction(async (tx) => {
+      const [before] = await tx.select().from(users).where(eq(users.id, userId)).for('update')
+      if (!before) throw notFound()
+      const held = await tx.select({ sku: entitlements.sku, expiresAt: entitlements.expiresAt }).from(entitlements)
+        .where(and(eq(entitlements.userId, userId), eq(entitlements.kind, 'cosmetic')))
+      const owned = new Set(held.filter((e) => !e.expiresAt || e.expiresAt > now).map((e) => e.sku))
+      const next: EquippedCosmetics = { ...before.cosmetics }
+      const bad: Record<string, string> = {}
+      for (const [slot, id] of Object.entries(body) as [CosmeticSlot, string | null | undefined][]) {
+        if (id === undefined) continue
+        if (id === null) {
+          delete next[slot]
+          continue
+        }
+        const p = productById(id)
+        if (p?.kind !== 'cosmetic' || !p.cosmeticType || COSMETIC_SLOTS[p.cosmeticType] !== slot) bad[slot] = 'Item inexistente ou de outro espaço do perfil.'
+        else if (!owned.has(id)) throw forbidden('Você não tem este item.')
+        else next[slot] = id
+      }
+      if (Object.keys(bad).length) throw invalid(bad)
+      const [after] = await tx.update(users).set({ cosmetics: next }).where(eq(users.id, userId)).returning()
+      return { before, after: after! }
+    })
   }
 
   /** POST /billing/webhooks/:provider. Throws WebhookRejected (→ 401) for unauthentic requests. */
@@ -272,7 +316,12 @@ export class Billing {
     let cancelAtPeriodEnd = s.cancelAtPeriodEnd
     switch (u.status) {
       case 'active':
-        if (s.status !== 'canceled') status = 'active' // a revoked (refunded) subscription never comes back
+        // A revoked (refunded) subscription never comes back. Active at the provider = renewing (e.g. resumed, also
+        // from the payer's own account at the provider), so a cancel undone there is undone here too.
+        if (s.status !== 'canceled') {
+          status = 'active'
+          cancelAtPeriodEnd = false
+        }
         break
       case 'past_due':
         if (live) status = 'past_due'
@@ -340,7 +389,7 @@ export class Billing {
   private async recompute(tx: Tx, userId: string, now: Date): Promise<Change | null> {
     // Payment rows of purged accounts move to the "removed user" (src/privacy.ts): they never grant anything again.
     if (userId === REMOVED_USER_ID) return null
-    const [u] = await tx.select({ plan: users.plan }).from(users).where(eq(users.id, userId)).for('update')
+    const [u] = await tx.select({ plan: users.plan, cosmetics: users.cosmetics }).from(users).where(eq(users.id, userId)).for('update')
     if (!u) return null
     // Defense in depth: sandbox rows (e.g. a copied dev database) never grant anything in production.
     const counts = (provider: string) => this.config.env !== 'production' || provider !== 'sandbox'
@@ -366,24 +415,35 @@ export class Billing {
       const d = desired.get(c.sku)
       return d && d.kind === c.kind && d.source === c.source && d.sourceId === c.sourceId && iso(d.expiresAt ?? null) === iso(c.expiresAt)
     })
-    if (same && plan === u.plan) return null
+    // An equipped item the user no longer holds (plan ended, refund) comes off.
+    const equipped = Object.entries(u.cosmetics)
+    const kept = equipped.filter(([, sku]) => desired.has(sku))
+    const cosmeticsChanged = kept.length !== equipped.length
+    const planChanged = plan !== u.plan
+    if (same && !planChanged && !cosmeticsChanged) return null
     if (!same) {
       await tx.delete(entitlements).where(eq(entitlements.userId, userId))
       if (desired.size) await tx.insert(entitlements).values([...desired].map(([sku, d]) => ({ userId, sku, ...d })))
     }
-    if (plan !== u.plan) await tx.update(users).set({ plan }).where(eq(users.id, userId))
-    return { userId, planChanged: plan !== u.plan }
+    if (planChanged || cosmeticsChanged) {
+      await tx.update(users).set({ ...(planChanged ? { plan } : {}), ...(cosmeticsChanged ? { cosmetics: Object.fromEntries(kept) } : {}) })
+        .where(eq(users.id, userId))
+    }
+    return { userId, planChanged, cosmeticsChanged }
   }
 
-  /** After commit: ENTITLEMENTS_UPDATE, and on a plan change ME_UPDATE + the new stream presets at the SFU. */
+  /**
+   * After commit: ENTITLEMENTS_UPDATE; ME_UPDATE when the plan or the equipped cosmetics changed; USER_UPDATE to the
+   * profile audience when cosmetics came off; the new stream presets at the SFU on a plan change.
+   */
   private async notify(changes: Change[]): Promise<void> {
     for (const c of changes) {
       const [row] = await this.db.select().from(users).where(eq(users.id, c.userId))
       if (!row) continue
       this.hub.dispatch([c.userId], 'ENTITLEMENTS_UPDATE', await this.entitlementsOf(c.userId, row.plan))
-      if (!c.planChanged) continue
-      this.hub.dispatch([c.userId], 'ME_UPDATE', meView(row, this.config.files.maxAttachmentBytes))
-      await this.voice.setStreamPresets(c.userId, this.plan(row.plan).streamPresets)
+      if (c.planChanged || c.cosmeticsChanged) this.hub.dispatch([c.userId], 'ME_UPDATE', meView(row, this.config.files.maxAttachmentBytes))
+      if (c.cosmeticsChanged) this.hub.dispatch(await profileAudience(this.db, c.userId), 'USER_UPDATE', publicUser(row))
+      if (c.planChanged) await this.voice.setStreamPresets(c.userId, this.plan(row.plan).streamPresets)
     }
   }
 

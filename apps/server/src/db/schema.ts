@@ -1,7 +1,7 @@
-import { ACCOUNT_ACTION_REASONS, REPORT_REASONS } from '@alga/shared'
+import { ACCOUNT_ACTION_REASONS, REPORT_REASONS, type EquippedCosmetics } from '@alga/shared'
 import { sql } from 'drizzle-orm'
 import {
-  boolean, date, foreignKey, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid,
+  boolean, date, foreignKey, index, integer, jsonb, pgTable, primaryKey, real, text, timestamp, uniqueIndex, uuid,
 } from 'drizzle-orm/pg-core'
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' })
@@ -42,6 +42,11 @@ export const users = pgTable('users', {
   deletionRequestedAt: ts('deletion_requested_at'),
   deletionPurgeAfter: ts('deletion_purge_after'),
   deletionMessages: text('deletion_messages', { enum: ['anonymize', 'delete'] }),
+  /** Equipped cosmetics by slot (PublicUser.cosmetics): owned or plan-included SKUs only (Billing.equip; recompute unequips). */
+  cosmetics: jsonb('cosmetics').$type<EquippedCosmetics>().notNull().default({}),
+  /** Call-quality telemetry opt-in (Me.telemetryOptIn) and when it was given (LGPD art. 8 §2: proof of consent). */
+  telemetryOptIn: boolean('telemetry_opt_in').notNull().default(false),
+  telemetryOptInAt: ts('telemetry_opt_in_at'),
 }, (t) => [
   // An address belongs to at most one verified account; unverified accounts may claim a taken one.
   uniqueIndex('users_verified_email_key').on(t.email).where(sql`${t.emailVerifiedAt} is not null`),
@@ -477,3 +482,35 @@ export type ReportRow = typeof reports.$inferSelect
 export type AccountActionRow = typeof accountActions.$inferSelect
 export type AppealRow = typeof appeals.$inferSelect
 export type QuarantinedFileRow = typeof quarantinedFiles.$inferSelect
+
+// ---- observability (src/telemetry.ts) ------------------------------------------------------------------------------
+
+/**
+ * Opt-in call-quality aggregates (CallQualityReport). No FK, no IP, no room, no time of day (only `day`), random v4
+ * ids (a UUIDv7 would carry the time); `user_hash` is an HMAC whose salt rotates daily and is never stored. Purged
+ * after CALL_QUALITY_RETENTION_DAYS by Telemetry.sweep.
+ */
+export const callQualityReports = pgTable('call_quality_reports', {
+  id: uuid('id').primaryKey(),
+  day: date('day', { mode: 'string' }).notNull(),
+  userHash: text('user_hash').notNull(),
+  sessionDurationS: integer('session_duration_s').notNull(),
+  joinMs: integer('join_ms'),
+  reconnects: integer('reconnects').notNull(),
+  reconnectFailed: boolean('reconnect_failed').notNull(),
+  rttAvgMs: real('rtt_avg_ms'),
+  rttP95Ms: real('rtt_p95_ms'),
+  jitterMs: real('jitter_ms'),
+  packetLossPct: real('packet_loss_pct'),
+  concealmentPct: real('concealment_pct'),
+  audioCodec: text('audio_codec'),
+  videoCodec: text('video_codec'),
+  encoderHardware: boolean('encoder_hardware'),
+  streamFps: text('stream_fps'),
+  streamResolution: text('stream_resolution'),
+  os: text('os').notNull(),
+  osVersion: text('os_version').notNull(),
+  appVersion: text('app_version').notNull(),
+  cpuVendor: text('cpu_vendor').notNull(),
+  gpuVendor: text('gpu_vendor').notNull(),
+}, (t) => [index('call_quality_reports_day_idx').on(t.day)])

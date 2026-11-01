@@ -40,6 +40,31 @@ export interface PlanSummary extends PlanFeatures {
 
 export type CosmeticType = 'avatar_decoration' | 'profile_theme' | 'profile_effect' | 'nameplate'
 
+/** Profile slot of each cosmetic type: one equipped item per slot (PublicUser.cosmetics, PUT /users/@me/cosmetics). */
+export const COSMETIC_SLOTS = {
+  avatar_decoration: 'avatarDecoration',
+  profile_theme: 'profileTheme',
+  profile_effect: 'profileEffect',
+  nameplate: 'nameplate',
+} as const satisfies Record<CosmeticType, string>
+export type CosmeticSlot = (typeof COSMETIC_SLOTS)[CosmeticType]
+
+/** Equipped cosmetic product ids (catalog SKUs) by slot. A missing slot = nothing equipped there. */
+export type EquippedCosmetics = Partial<Record<CosmeticSlot, string>>
+
+const equipSlot = z.string().trim().min(1).max(64).nullable().optional()
+/**
+ * PUT /users/@me/cosmetics: per slot, a product id to equip (owned, or included in the current plan) or null to
+ * unequip; slots left out keep their item. Unknown slots are a 400.
+ */
+export const PutCosmeticsBody = z.strictObject({
+  avatarDecoration: equipSlot,
+  profileTheme: equipSlot,
+  profileEffect: equipSlot,
+  nameplate: equipSlot,
+}) satisfies z.ZodType<Partial<Record<CosmeticSlot, string | null>>>
+export type PutCosmeticsBody = z.infer<typeof PutCosmeticsBody>
+
 export interface Product {
   /** Stable SKU from the server catalog (apps/server/src/billing/catalog.ts). */
   id: string

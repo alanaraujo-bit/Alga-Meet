@@ -37,6 +37,10 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  *   Sessions expire after 30 days without use or 90 days after login (then 401).
  * GET    /users/@me                                      -> Me
  * PATCH  /users/@me                PatchMeBody           -> Me
+ * PUT    /users/@me/cosmetics      PutCosmeticsBody      -> Me (per slot: equip a cosmetic you own or your plan includes
+ *                                                          (Entitlement with kind 'cosmetic'), or null to unequip; 403
+ *                                                          not owned, 400 `fields.<slot>` unknown id or wrong slot;
+ *                                                          ME_UPDATE + USER_UPDATE with PublicUser.cosmetics; 10/min)
  * GET    /users/:id                                      -> PublicUser
  * GET    /relationships                                  -> Relationship[]
  * POST   /relationships            FriendRequestBody     -> Relationship   (send request by username)
@@ -121,6 +125,9 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  *   payments disabled on this server. `sandbox: true` = test provider (dev/test only), nothing is charged.
  * POST   /billing/subscription/cancel                    -> Subscription (renewals stop now, the plan lasts until
  *                                                          currentPeriodEnd; idempotent; 404 without an active one)
+ * POST   /billing/subscription/resume                    -> Subscription (undoes cancel while the period is still
+ *                                                          paid: cancelAtPeriodEnd false, renewals resume at the
+ *                                                          provider; idempotent; 404 without an active one; 10/min)
  * POST   /billing/webhooks/:provider (provider-signed)   -> 200 (server-to-server; 401 bad signature, 404 unknown
  *                                                          provider; repeated events are acknowledged and ignored)
  * GET    /billing/sandbox/checkout/:reference?sig=&outcome=approve|decline -> HTML (sandbox provider only: the fake
@@ -158,7 +165,13 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  * GET    /admin/quarantine                               -> QuarantinedFile[]
  * PATCH  /admin/quarantine/:id     PatchQuarantineBody   -> QuarantinedFile
  * GET    /admin/access-logs?userId=|username=&from=&to=&limit= -> AccessLogEntry[] (admin role only)
- * GET    /health                                         -> { ok: true, version }
+ * POST   /telemetry/call-quality   CallQualityReport     -> 204 (telemetry.ts; 403 unless Me.telemetryOptIn; 20/h;
+ *                                                          400 for any unknown field)
+ * GET    /health                                         -> { ok: true, version } (liveness: the process answers)
+ * GET    /ready                                          -> { ok, checks: { database, livekit } } (200 when both are
+ *                                                          'ok', else 503; ops/monitoring, not for clients)
+ * GET    /metrics (root, not /api/v1)                    -> Prometheus text (Bearer METRICS_TOKEN; off in production
+ *                                                          without it; docs/infra/observability.md)
  */
 
 export type ApiErrorCode =
@@ -246,6 +259,8 @@ export const PatchMeBody = z.object({
   accentColor: z.string().regex(/^#[0-9a-f]{6}$/i).nullable().optional(),
   avatarUrl: httpsUrl.nullable().optional(),
   statusPreference: z.enum(['online', 'idle', 'dnd', 'invisible']).optional(),
+  /** Consent to send call-quality aggregates (Me.telemetryOptIn). Off unless the user turns it on. */
+  telemetryOptIn: z.boolean().optional(),
 })
 export type PatchMeBody = z.infer<typeof PatchMeBody>
 

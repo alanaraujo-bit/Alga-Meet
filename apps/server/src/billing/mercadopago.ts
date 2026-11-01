@@ -116,9 +116,18 @@ export class MercadoPagoProvider implements PaymentProvider {
     return { url: pref.init_point }
   }
 
-  async cancelSubscription(providerSubscriptionId: string | null): Promise<void> {
+  /**
+   * A user's cancel pauses the preapproval (no charges; `paused` can go back to `authorized`, `cancelled` cannot);
+   * account deletion cancels it for good. Both map to 'ended' on the way back (mapPreapprovalStatus).
+   */
+  async cancelSubscription(providerSubscriptionId: string | null, final = false): Promise<void> {
     if (!providerSubscriptionId) return
-    await this.call('PUT', `/preapproval/${encodeURIComponent(providerSubscriptionId)}`, { status: 'cancelled' })
+    await this.call('PUT', `/preapproval/${encodeURIComponent(providerSubscriptionId)}`, { status: final ? 'cancelled' : 'paused' })
+  }
+
+  async resumeSubscription(providerSubscriptionId: string | null): Promise<void> {
+    if (!providerSubscriptionId) return
+    await this.call('PUT', `/preapproval/${encodeURIComponent(providerSubscriptionId)}`, { status: 'authorized' })
   }
 
   async refund(providerPaymentId: string): Promise<void> {

@@ -18,6 +18,8 @@ export const publicUser = (u: UserRow): PublicUser => ({
   avatarUrl: u.avatarUrl,
   accentColor: u.accentColor,
   bio: u.bio,
+  // Omitted when empty: member lists in READY stay small.
+  ...(Object.keys(u.cosmetics).length ? { cosmetics: { ...u.cosmetics } } : {}),
 })
 
 /** `defaultAttachmentBytes` = config.files.maxAttachmentBytes (the free plan's cap). */
@@ -30,6 +32,7 @@ export const meView = (u: UserRow, defaultAttachmentBytes: number): Me => ({
   plan: planSummary(u.plan, defaultAttachmentBytes),
   ageBracket: ageBracketOf(u),
   needsTermsAcceptance: u.termsVersion !== TERMS_VERSION,
+  telemetryOptIn: u.telemetryOptIn,
 })
 
 export const spaceView = (s: SpaceRow): Space => ({

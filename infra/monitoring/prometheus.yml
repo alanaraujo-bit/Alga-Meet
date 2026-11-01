@@ -1,0 +1,32 @@
+# Prometheus for Alga Meet — NOT deployed (docs/infra/observability.md §5). Runs on the SFU VM next to
+# infra/livekit/docker-compose.prod.yaml, with host networking, listening on 127.0.0.1:9090 only.
+# Replace api.<DOMAIN>; put the API's METRICS_TOKEN (same value as in Railway) in ./metrics_token (chmod 600).
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    env: production
+
+rule_files:
+  - /etc/prometheus/alerts.yaml
+
+scrape_configs:
+  # The API on Railway: GET https://api.<DOMAIN>/metrics with the bearer token (the route is off without one).
+  - job_name: alga-api
+    scheme: https
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/metrics_token
+    static_configs:
+      - targets: ['api.<DOMAIN>']
+
+  # LiveKit's own metrics: add `prometheus_port: 6789` to livekit.prod.yaml and keep 6789 closed in the VM firewall.
+  - job_name: livekit
+    static_configs:
+      - targets: ['127.0.0.1:6789']
+
+  # The VM itself (CPU, bandwidth: what the SFU actually costs).
+  - job_name: node
+    static_configs:
+      - targets: ['127.0.0.1:9100']

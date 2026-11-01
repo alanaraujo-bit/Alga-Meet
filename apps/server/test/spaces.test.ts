@@ -195,6 +195,34 @@ describe('invite management', () => {
     expect((await list(outsider.token, space.id)).status).toBe(403)
   })
 
+  it('INVITE_CREATE / INVITE_DELETE go to MANAGE_SPACE members and the creator only', async () => {
+    const { owner, member, space } = await spaceWithMember()
+    const other = await register(s.app)
+    await api(s.app, 'POST', `/invites/${(await create(owner.token, space.id)).code}`, { token: other.token })
+    const [ogw, mgw, xgw] = await Promise.all([connect(s.port, owner.token), connect(s.port, member.token), connect(s.port, other.token)])
+
+    const inv = await create(member.token, space.id)
+    expect(await ogw.waitFor('INVITE_CREATE', (d) => d.code === inv.code)).toMatchObject({ inviterId: member.user.id, space: { id: space.id } })
+    await mgw.waitFor('INVITE_CREATE', (d) => d.code === inv.code)
+    const byOwner = await create(owner.token, space.id)
+    await ogw.waitFor('INVITE_CREATE', (d) => d.code === byOwner.code)
+
+    expect((await revoke(owner.token, inv.code)).status).toBe(204)
+    await mgw.waitFor('INVITE_DELETE', (d) => d.code === inv.code && d.spaceId === space.id)
+    await ogw.waitFor('INVITE_DELETE', (d) => d.code === inv.code)
+
+    // Leaving takes the creator's invites along; the managers hear about it.
+    const second = await create(member.token, space.id)
+    expect((await api(s.app, 'DELETE', `/spaces/${space.id}/members/@me`, { token: member.token })).status).toBe(204)
+    await ogw.waitFor('INVITE_DELETE', (d) => d.code === second.code)
+    await xgw.expectNone('INVITE_CREATE')
+    await xgw.expectNone('INVITE_DELETE')
+    expect(mgw.events.some((e) => e.t === 'INVITE_CREATE' && e.d.code === byOwner.code)).toBe(false)
+    ogw.close()
+    mgw.close()
+    xgw.close()
+  })
+
   it('revoke: the creator or MANAGE_SPACE; others get 403, outsiders and unknown codes 404', async () => {
     const { owner, member, space } = await spaceWithMember()
     const outsider = await register(s.app)

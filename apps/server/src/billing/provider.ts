@@ -63,8 +63,13 @@ export interface PaymentProvider {
   readonly sandbox: boolean
   /** Hosted payment page. `providerSubscriptionId` when the provider creates the subscription up front. */
   createCheckout(input: CheckoutInput): Promise<{ url: string; providerSubscriptionId?: string }>
-  /** Stops renewals now; the paid period is honored by Billing. */
-  cancelSubscription(providerSubscriptionId: string | null): Promise<void>
+  /**
+   * Stops renewals now; the paid period is honored by Billing. Resumable with resumeSubscription unless `final`
+   * (account deletion: nothing may ever charge again).
+   */
+  cancelSubscription(providerSubscriptionId: string | null, final?: boolean): Promise<void>
+  /** Turns renewals back on for a subscription stopped with a non-final cancelSubscription. */
+  resumeSubscription(providerSubscriptionId: string | null): Promise<void>
   /** Asks for a refund; the result arrives as a webhook (order → refunded). */
   refund(providerPaymentId: string): Promise<void>
   /** Verifies the signature and returns the normalized updates. Throws WebhookRejected when not authentic. */
@@ -146,6 +151,8 @@ export class SandboxProvider implements PaymentProvider {
   }
 
   async cancelSubscription(): Promise<void> {}
+
+  async resumeSubscription(): Promise<void> {}
 
   async refund(): Promise<void> {}
 

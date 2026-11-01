@@ -1,5 +1,5 @@
 import {
-  FriendRequestBody, OpenDmBody, PatchMeBody, PutRelationshipBody, uuidv7,
+  FriendRequestBody, OpenDmBody, PatchMeBody, PutCosmeticsBody, PutRelationshipBody, uuidv7,
   type Channel, type Me, type PublicUser, type Relationship,
 } from '@alga/shared'
 import { and, eq, inArray, ne, sql } from 'drizzle-orm'
@@ -108,8 +108,11 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
       if (taken) throw conflict('Nome de usuário já em uso.', { username: 'Nome de usuário já em uso.' })
     }
     let after: UserRow | undefined
+    // LGPD art. 8 §2: when the telemetry consent was given (cleared when withdrawn).
+    const consent = body.telemetryOptIn === undefined || body.telemetryOptIn === before.telemetryOptIn
+      ? {} : { telemetryOptInAt: body.telemetryOptIn ? new Date() : null }
     try {
-      ;[after] = await db.update(users).set(body).where(eq(users.id, before.id)).returning()
+      ;[after] = await db.update(users).set({ ...body, ...consent }).where(eq(users.id, before.id)).returning()
     } catch (err) {
       if (isUniqueViolation(err)) throw conflict('Nome de usuário já em uso.', { username: 'Nome de usuário já em uso.' })
       throw err
@@ -117,6 +120,13 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
     if (after!.avatarUrl !== before.avatarUrl) await swapImageKeys(ctx, 'avatars', before.id, before.avatarUrl, after!.avatarUrl)
     await afterMeUpdate(ctx, before, after!)
     return meView(after!, ctx.config.files.maxAttachmentBytes)
+  })
+
+  // Equip/unequip per slot (Billing.equip checks ownership); fans out like PATCH /users/@me.
+  app.put('/users/@me/cosmetics', { config: perMinute(10) }, async (req): Promise<Me> => {
+    const { before, after } = await ctx.billing.equip(req.auth.user.id, parse(PutCosmeticsBody, req.body))
+    await afterMeUpdate(ctx, before, after)
+    return meView(after, ctx.config.files.maxAttachmentBytes)
   })
 
   app.get<{ Params: { id: string } }>('/users/:id', async (req): Promise<PublicUser> =>

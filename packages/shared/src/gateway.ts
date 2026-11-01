@@ -1,5 +1,5 @@
 import type {
-  Channel, Me, Member, Message, Presence, PublicUser, ReadState, Relationship,
+  Channel, Invite, Me, Member, Message, Presence, PublicUser, ReadState, Relationship,
   Role, Space, SpaceSnapshot, StatusPreference, VoiceDisconnectReason, VoiceState,
 } from './models.js'
 import type { Entitlements } from './billing.js'
@@ -99,6 +99,13 @@ export type Dispatch =
    * a cancellation reaching its end, expiry, refund). ME_UPDATE with the new Me.plan follows when the plan changed.
    */
   | { t: 'ENTITLEMENTS_UPDATE'; d: Entitlements }
+  /** New invite. Sent to members with MANAGE_SPACE and to its creator (the people GET /spaces/:id/invites shows it to). */
+  | { t: 'INVITE_CREATE'; d: Invite }
+  /**
+   * Invite revoked (DELETE /invites/:code) or removed with its creator (leave/kick/ban). Same audience as
+   * INVITE_CREATE. Invites that expire or run out of uses are not announced: drop them by expiresAt/maxUses.
+   */
+  | { t: 'INVITE_DELETE'; d: { code: string; spaceId: string } }
 
 export type DispatchType = Dispatch['t']
 export type DispatchOf<T extends DispatchType> = Extract<Dispatch, { t: T }>['d']

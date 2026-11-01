@@ -31,7 +31,7 @@ Ver `.env.example` (copie para `.env`; é carregado automaticamente). Validaçã
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_URL_STYLE` (`virtual` | `path`), `EMAIL_DRIVER` (`console` | `resend`),
 `ALGA_ALLOW_CONSOLE_EMAIL`, `EMAIL_OUTBOX_DIR`, `EMAIL_FROM`, `RESEND_API_KEY`, `EMAIL_LINK_URL`, `BILLING_PROVIDER`
 (`none` | `sandbox` | `mercadopago`), `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `MP_API_URL`, `BILLING_RETURN_URL`,
-`REQUIRE_BIRTHDATE`, `LEGAL_URL`.
+`REQUIRE_BIRTHDATE`, `LEGAL_URL`, `METRICS_TOKEN`.
 
 Falha fechada:
 - **Sem `NODE_ENV` o servidor é produção**: exige `DATABASE_URL`, `CORS_ORIGINS`, `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET`
@@ -45,6 +45,8 @@ Falha fechada:
   ou `test` **e** `HOST` loopback, ou com `ALGA_ALLOW_DEV_SECRETS=1` (ex. teste em LAN com `HOST=0.0.0.0`).
 - **Cadastro em produção** exige `birthDate` e `termsVersion` (`GET /legal`); fora de produção só com
   `REQUIRE_BIRTHDATE=1` (até o desktop mandar os campos, o cadastro sem eles só gera `warn` no log).
+- **Métricas**: `GET /metrics` exige `Authorization: Bearer <METRICS_TOKEN>` (≥ 32 caracteres) quando o token existe;
+  **em produção sem token a rota não existe** (404). Em dev/test sem token fica aberta.
 - `TRUST_PROXY`: `false` (padrão), IPs/CIDRs do proxy (`10.0.0.0/8,100.64.0.0/10`) ou número de saltos (`1`; só é
   seguro se a API não for alcançável sem o proxy). `true` é recusado: confiaria em qualquer `X-Forwarded-For`.
 
@@ -54,6 +56,9 @@ Falha fechada:
 |---|---|
 | `src/index.ts` | `listen`, `.env`, `--dev`, shutdown gracioso (SIGINT/SIGTERM, 10 s), reconcile de voz com o LiveKit |
 | `src/app.ts` | `buildApp(config)`: Fastify, CORS, rate limit global, websocket, logger sem segredos, contextos público/autenticado |
+| `src/metrics.ts` | registro Prometheus sem dependência (counter/gauge/histogram, formato texto 0.0.4) e todos os instrumentos do processo |
+| `src/observability.ts` | `/health` (liveness), `/ready` (banco + LiveKit), `/metrics` (bearer), hook `onResponse` (métricas HTTP + a linha `request completed` com `reqId`/`uid`/`route`), `logUserHash` |
+| `src/telemetry.ts` | telemetria de qualidade de chamada opt-in: hash do usuário com sal diário em memória, só o dia, histogramas, expurgo de 30 dias |
 | `src/config.ts` | env → `Config` (guardas de produção acima) |
 | `src/db/` | schema Drizzle, driver (pg/PGlite), migrator, detecção de unique violation |
 | `src/errors.ts` | `HttpError`, formato `ApiError`, zod → `fields`, `idParam`, `safeErr`/`safeUrl` para logs |
@@ -73,7 +78,7 @@ Falha fechada:
 | `src/privacy.ts` | registros de acesso (Marco Civil art. 15), exclusão de conta (carência + expurgo), exportação (zip + link assinado por e-mail), job de retenção |
 | `src/zip.ts` | escritor de ZIP mínimo (deflate, sem zip64) para a exportação |
 | `scripts/grant-staff.ts` | único jeito de dar/tirar `staff_role` (`npx tsx scripts/grant-staff.ts <username> <admin\|moderator\|none>`; com PGlite, pare o servidor antes) |
-| `src/routes/` | `auth` (inclui verificação de e-mail e redefinição de senha), `users` (perfil, relacionamentos, DMs), `spaces` (espaços, membros, canais, convites, listar/revogar convites), `roles` (cargos, apelidos), `moderation` (bans, voz), `messages` (inclui envio multipart), `files` (download assinado, avatares/ícones), `voice`, `billing`, `privacy` (idade, aceite, exclusão, exportação, `/legal`), `reports` (denúncias, medidas da própria conta, recursos), `admin` (equipe, auditado) |
+| `src/routes/` | `auth` (inclui verificação de e-mail e redefinição de senha), `users` (perfil, relacionamentos, DMs), `spaces` (espaços, membros, canais, convites, listar/revogar convites), `roles` (cargos, apelidos), `moderation` (bans, voz), `messages` (inclui envio multipart), `files` (download assinado, avatares/ícones), `voice`, `billing`, `privacy` (idade, aceite, exclusão, exportação, `/legal`), `reports` (denúncias, medidas da própria conta, recursos), `admin` (equipe, auditado), `telemetry` (relatório de qualidade de chamada) |
 
 ## Regras principais
 
@@ -162,6 +167,9 @@ Falha fechada:
   referencia: uma queda no meio do caminho também é limpa.
 - **Convites**: `GET /spaces/:id/invites` lista os utilizáveis (com `MANAGE_SPACE` todos; sem, só os seus);
   `DELETE /invites/:code` revoga (quem criou ou `MANAGE_SPACE`; fora do espaço = 404, como código inexistente).
+  `INVITE_CREATE` (o `Invite`) e `INVITE_DELETE {code, spaceId}` vão para quem a lista mostraria: membros com
+  `MANAGE_SPACE` + o criador. `INVITE_DELETE` sai na revogação e quando o criador sai/é expulso/banido (os convites
+  dele vão junto); convite que expira ou esgota os usos não é anunciado.
 - **Pagamentos e direitos** (`src/billing/`; estratégia em `docs/business/monetization.md`; contrato em
   `packages/shared/src/billing.ts`):
   - Catálogo em `catalog.ts` (`CATALOG_VERSION`), copiado para `products` a cada subida (SKU removido fica inativo).
@@ -179,6 +187,17 @@ Falha fechada:
     (`cancel_at_period_end`) termina no fim do período. Em produção linhas `sandbox` nunca concedem nada.
   - Job a cada minuto (`Billing.sweep`): expira assinaturas vencidas e checkouts pendentes há 24 h.
   - Cancelamento: `POST /billing/subscription/cancel` para a renovação no provedor e marca `cancel_at_period_end`.
+    **Retomar**: `POST /billing/subscription/resume` desfaz enquanto o período pago não acabou (renovação volta no
+    provedor, `cancelAtPeriodEnd: false`, a carência de 3 dias volta; idempotente; 404 sem assinatura viva). No
+    Mercado Pago o cancelamento do usuário **pausa** a preapproval (`paused`, retomável com `authorized`); a exclusão
+    de conta cancela de vez (`cancelled`). Um webhook que re-busca `authorized` também desfaz o cancelamento (o
+    pagador pode pausar/retomar pela conta dele no MP).
+  - **Cosméticos equipados** (`users.cosmetics`, `PublicUser.cosmetics`): `PUT /users/@me/cosmetics` equipa por
+    espaço do perfil (`COSMETIC_SLOTS`: `avatarDecoration`, `profileTheme`, `profileEffect`, `nameplate`, derivados de
+    `cosmeticType` do catálogo) só itens com direito vivo (comprado ou incluído no plano), sob o mesmo lock do usuário
+    que o `recompute`; `null` desequipa, espaço omitido fica como está. Fan-out `ME_UPDATE` + `USER_UPDATE`. Quando o
+    `recompute` tira um direito (plano acabou, reembolso), o item sai do perfil na mesma transação e o `USER_UPDATE`
+    vai para a audiência do perfil. `PublicUser.cosmetics` só aparece quando há algo equipado.
   - **Imposição (D11)**: o token LiveKit leva o atributo `alga.stream_presets` (sem `canUpdateOwnMetadata`, o
     cliente não muda); `VoiceJoinResponse.streamPresets` traz o mesmo. O motor de mídia deve limitar a camada topo
     a um preset (`STREAM_PRESETS`: lado curto ≤ `height`, fps ≤ `fps`, bitrate ≤ `maxBitrateKbps`) e reagir a
@@ -232,18 +251,29 @@ Falha fechada:
 - **Rate limit** (chave = usuário autenticado, ou IP em rotas públicas): teto global 200/min; `register`/`login`
   10/min/IP + 10 logins falhos/15 min por conta; mensagens 10/10 s; reações 10/5 s; `PATCH /users/@me`, pedidos de
   amizade, DMs, `POST /invites/:code` e `/voice/join` 10/min; `verify-email` e `password-reset/confirm` 10/min/IP;
-  `password-reset/request` 5/15 min/IP; reenvio da verificação 3/15 min; e-mails 3/h por endereço e fluxo; preview de convite 30/min/IP; espaços 10/h; convites
+  `password-reset/request` 5/15 min/IP; reenvio da verificação 3/15 min; e-mails 3/h por endereço e fluxo; preview de convite 30/min/IP; equipar cosméticos 10/min; retomar/cancelar assinatura 10/min; relatórios de qualidade de chamada 20/h; espaços 10/h; convites
   20/h; troca de senha 5/15 min; 30 arquivos anexados/10 min por usuário; avatar/ícone 5/min; downloads de
   arquivo/avatar/ícone 1200/min/IP (uma página de chat carrega muitos de uma vez); denúncias 10/h; recursos 10/h/IP;
-  `DELETE /users/@me` 5/15 min; exportação 1/24 h (no banco); data de nascimento 5/min. Webhook do LiveKit e `/health`
-  sem limite.
+  `DELETE /users/@me` 5/15 min; exportação 1/24 h (no banco); data de nascimento 5/min. Webhook do LiveKit, `/health` e
+  `/ready` sem limite (`/metrics` fica no teto global por IP).
 - **Gateway**: `identify` em até 10 s; 120 frames/60 s por socket e 10 sockets por usuário (senão 4008);
   `presence`/`voice_state` no máximo 1 fan-out/s por usuário (o último valor vence); cliente que não lê (buffer >
   1 MiB) é derrubado. `voice_state` sem mudança não emite; `streaming`/`video` exigem `STREAM`/`SPEAK`.
 - Tokens LiveKit sem `canPublishData`. Webhooks repetidos (mesmo `id`) são ignorados por 10 min.
 - Logs: sem corpo, sem `authorization`, sem parâmetros SQL nem `detail` do Postgres, código de convite redigido.
+  Uma linha `request completed` por requisição (`reqId`, `uid` = HMAC do id com `FILES_SECRET`, `route` = template,
+  `method`, `statusCode`, `durationMs`); sondas e telemetria em `debug`.
+- **Observabilidade** (`docs/infra/observability.md`: métricas, SLOs, painéis, alertas em `infra/monitoring/`):
+  `/health` = liveness (healthcheck do Railway, sem mudança); `/ready` = `select 1` + `GET /` no LiveKit (2 s cada),
+  503 se algum falhar; `/metrics` = Prometheus (HTTP por template de rota e classe de status, gateway, fan-out, READY,
+  voz, tokens, webhooks, banco por `op`, rate limit, e-mail, pagamentos, memória, event loop).
+- **Telemetria de chamada** (`POST /telemetry/call-quality`, contrato em `packages/shared/src/telemetry.ts`): só com
+  `Me.telemetryOptIn` (padrão `false`, `PATCH /users/@me`; `telemetry_opt_in_at` registra o consentimento). Schema
+  estrito de agregados (enums e números, nada de texto livre, sala ou IP), 20/h. Guarda o dia (não a hora), id v4
+  aleatório e `user_hash` com sal aleatório trocado todo dia e nunca gravado; expurgo aos 30 dias; vira histogramas
+  `alga_call_*`.
 
-## Testes (`test/`, 153 casos)
+## Testes (`test/`, 163 casos)
 
 `npm test` roda em PGlite; `npm run test:pg` roda os mesmos casos num PostgreSQL 18 real (`test/pg-setup.ts`: um
 cluster UTF8 descartável por execução, um banco por `startServer`). Os dois passam.
@@ -270,7 +300,16 @@ vencida, corpo adulterado, provedor não configurado), idempotência, eventos fo
 cancelamento no fim do período → expiração pelo job (com `ENTITLEMENTS_UPDATE`/`ME_UPDATE`), carência, recompute
 (reembolso, cosmético próprio × coleção do plano), teto de anexo por plano, atributo de presets no token e mute de
 tela acima do plano, sandbox recusado em produção, e o adaptador Mercado Pago contra uma API simulada (`x-signature`,
-re-busca, `past_due`, cancelamento, compra avulsa). `spaces.test.ts` inclui listar/revogar convites (authz).
+re-busca, `past_due`, cancelamento, compra avulsa). `spaces.test.ts` inclui listar/revogar convites (authz) e `INVITE_CREATE`/`INVITE_DELETE` (audiência: gestores + criador,
+saída do criador). `billing.test.ts` também cobre retomar (idempotente, carência volta, 404 depois do fim), cosméticos
+(só itens com direito, espaço errado/desconhecido, `USER_UPDATE` e perfis com `cosmetics`, desequipar; itens do plano
+saem no fim do plano e o comprado fica; reembolso tira) e, no Mercado Pago simulado, `paused` no cancelamento,
+`authorized` no retomar, pausa/retomada pela conta do pagador e `cancelled` na exclusão de conta.
+`observability.test.ts` (6): formato de exposição (escape, histogramas cumulativos), `uid` dos logs, acesso ao
+`/metrics` (aberto em test, bearer com token, 404 em produção sem token), `/health` × `/ready` (banco ok, LiveKit
+fechado → 503, LiveKit falso → 200), métricas de HTTP/gateway/banco (driver certo nas duas suítes)/voz/webhooks/rate
+limit/e-mail/pagamentos/processo, e a telemetria (403 sem opt-in, schema estrito, linha só com o dia e hash diário,
+métricas, expurgo de 30 dias, retirada do consentimento, 20/h).
 `privacy.test.ts` (9): idade no cadastro (< 16 sem gravar nada, 16 hoje, 18, datas inválidas, sem data em dev,
 `REQUIRE_BIRTHDATE` e produção), declaração única e < 16 → suspensão + 4010 + exclusão segurada por recurso aceito,
 16–17 (DM só com amigos sem revelar idade, sem compra), aceite e novo aceite com histórico, registros de acesso (login,
@@ -310,8 +349,14 @@ na sala com `livekit-client` e publica o microfone; o dono chama `PATCH /spaces/
   comuns é pequena (escrita à mão); HIBP k-anon não é consultado (exigiria rede na hora do cadastro).
 - As cotas de e-mail por endereço também ficam em memória (mesma ressalva do Redis acima).
 - Contadores de menção não diminuem quando a mensagem é apagada.
+- **Telemetria de chamada**: a Política de Privacidade publicada ainda diz "não há telemetria" — precisa ser revista
+  antes de o desktop mostrar o opt-in. Regras de alerta sem `promtool` (YAML validado, PromQL não). `/ready` não é
+  sondado de fora (só o Prometheus na VM do SFU).
 - **Mercado Pago nunca rodou contra a API real** (sem credenciais): lista do que falta conferir em
-  `docs/business/monetization.md` §8. Sem reembolso self-service (CDC art. 49): hoje é estorno manual no painel →
+  `docs/business/monetization.md` §8, mais o retomar: conferir que `paused` não cobra e que `authorized` volta a
+  cobrar no `next_payment_date` original, sem cobrança imediata (falta anotar no §8). Uma preapproval pausada pelo
+  cancelamento fica pausada no MP depois que a assinatura expira aqui (não cobra; se o pagador a retomar pelo MP, o
+  webhook reativa a assinatura antiga). Sem reembolso self-service (CDC art. 49): hoje é estorno manual no painel →
   webhook revoga. Sem Pix na assinatura (só cartão recorrente). USD não é cobrado (MP é só BRL).
 - O mute de tela acima do plano usa as dimensões/bitrates que o SDK do cliente declara ao publicar: um cliente
   modificado pode declarar menos (medição real exigiria estatísticas do SFU). Mudança de plano no meio de uma

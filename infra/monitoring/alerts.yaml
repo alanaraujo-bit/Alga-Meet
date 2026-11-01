@@ -1,0 +1,226 @@
+# Prometheus alerting rules for Alga Meet — NOT deployed. Loaded by infra/monitoring/prometheus.yml; SLOs, metric
+# meanings and thresholds are explained in docs/infra/observability.md (§2 SLOs, §4 alerts). Check before deploying:
+#   docker run --rm -v "$PWD:/w" --entrypoint promtool prom/prometheus:v3.5.0 check rules /w/alerts.yaml
+# severity: page = act now (phone); ticket = look within a working day.
+groups:
+  # ---- SLO building blocks: API error ratio (5xx / all, ops routes excluded) over the burn-rate windows ----------
+  - name: alga-recording
+    rules:
+      - record: alga:api_error_ratio:rate5m
+        expr: |
+          sum(rate(alga_http_requests_total{job="alga-api",status_class="5xx",route!~"/metrics|(/api/v1)?/(health|ready)"}[5m]))
+          / sum(rate(alga_http_requests_total{job="alga-api",route!~"/metrics|(/api/v1)?/(health|ready)"}[5m]))
+      - record: alga:api_error_ratio:rate30m
+        expr: |
+          sum(rate(alga_http_requests_total{job="alga-api",status_class="5xx",route!~"/metrics|(/api/v1)?/(health|ready)"}[30m]))
+          / sum(rate(alga_http_requests_total{job="alga-api",route!~"/metrics|(/api/v1)?/(health|ready)"}[30m]))
+      - record: alga:api_error_ratio:rate1h
+        expr: |
+          sum(rate(alga_http_requests_total{job="alga-api",status_class="5xx",route!~"/metrics|(/api/v1)?/(health|ready)"}[1h]))
+          / sum(rate(alga_http_requests_total{job="alga-api",route!~"/metrics|(/api/v1)?/(health|ready)"}[1h]))
+      - record: alga:api_error_ratio:rate6h
+        expr: |
+          sum(rate(alga_http_requests_total{job="alga-api",status_class="5xx",route!~"/metrics|(/api/v1)?/(health|ready)"}[6h]))
+          / sum(rate(alga_http_requests_total{job="alga-api",route!~"/metrics|(/api/v1)?/(health|ready)"}[6h]))
+      - record: alga:voice_join_success:ratio30m
+        expr: |
+          sum(increase(alga_voice_joins_total{job="alga-api",result="joined"}[30m]))
+          / sum(increase(alga_voice_tokens_issued_total{job="alga-api"}[30m]))
+      - record: alga:call_reconnect_success:ratio1h
+        expr: |
+          sum(increase(alga_call_reconnects_sum{job="alga-api"}[1h]))
+          / (sum(increase(alga_call_reconnects_sum{job="alga-api"}[1h])) + sum(increase(alga_call_reconnect_failures_total{job="alga-api"}[1h])))
+
+  # ---- API -------------------------------------------------------------------------------------------------------
+  - name: alga-api
+    rules:
+      - alert: AlgaApiDown
+        expr: up{job="alga-api"} == 0
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          summary: API inalcançável pelo Prometheus
+          description: "Sem coleta de {{ $labels.instance }} há 2 min: API fora do ar, DNS/TLS, ou METRICS_TOKEN diferente do Railway."
+      # SLO 99,5 % (orçamento 0,5 %): queima 14,4× = orçamento do mês em ~2 dias.
+      - alert: AlgaApiErrorBudgetFastBurn
+        expr: alga:api_error_ratio:rate1h > (14.4 * 0.005) and alga:api_error_ratio:rate5m > (14.4 * 0.005)
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          summary: API com muitos 5xx (queima rápida do SLO)
+          description: "Taxa de 5xx em 1 h: {{ $value | humanizePercentage }}. Ver logs \"unhandled error\" e alga_db_query_errors_total."
+      - alert: AlgaApiErrorBudgetSlowBurn
+        expr: alga:api_error_ratio:rate6h > (6 * 0.005) and alga:api_error_ratio:rate30m > (6 * 0.005)
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: API com 5xx acima do orçamento (queima lenta do SLO)
+          description: "Taxa de 5xx em 6 h: {{ $value | humanizePercentage }}."
+      # Downloads, avatars, icons and exports stream bytes: their duration is the client's bandwidth, not ours.
+      - alert: AlgaApiLatencyHigh
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(alga_http_request_duration_seconds_bucket{job="alga-api",method="GET",route!~"/metrics|(/api/v1)?/(health|ready)|/api/v1/(files|avatars|icons|exports)/.*"}[5m]))) > 0.5
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: GETs da API lentos (p95 > 500 ms)
+          description: "p95: {{ $value | humanizeDuration }}. Comparar com alga_db_query_duration_seconds e nodejs_eventloop_lag_seconds."
+      - alert: AlgaRateLimitSpike
+        expr: sum by (route) (rate(alga_rate_limited_total{job="alga-api"}[10m])) * 60 > 30
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Muitas recusas por rate limit em {{ $labels.route }}"
+          description: "{{ $value | humanize }}/min por 10 min: abuso, ou um cliente em laço de retentativa."
+
+  # ---- gateway ---------------------------------------------------------------------------------------------------
+  - name: alga-gateway
+    rules:
+      - alert: AlgaGatewayReadySlow
+        expr: histogram_quantile(0.95, sum by (le) (rate(alga_gateway_ready_seconds_bucket{job="alga-api"}[10m]))) > 1
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: READY do gateway lento (p95 > 1 s, SLO)
+          description: "p95 identify→READY: {{ $value | humanizeDuration }}. Snapshot grande (espaços com muitos membros) ou banco lento."
+      # A deploy restarts the process (gauge back to 0) and clients reconnect within seconds; 5 min filters that out.
+      - alert: AlgaGatewayMassDisconnect
+        expr: alga_gateway_connections{job="alga-api"} < 0.5 * (alga_gateway_connections{job="alga-api"} offset 10m) and (alga_gateway_connections{job="alga-api"} offset 10m) > 20
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: Metade das conexões do gateway sumiu
+          description: "Ver alga_gateway_disconnects_total por código (4002 heartbeat, 4004 sessão, 4008 limite, 1006 rede)."
+
+  # ---- database and process --------------------------------------------------------------------------------------
+  - name: alga-runtime
+    rules:
+      - alert: AlgaDbSlow
+        expr: histogram_quantile(0.95, sum by (le) (rate(alga_db_query_duration_seconds_bucket{job="alga-api"}[5m]))) > 0.1
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: Consultas ao banco lentas (p95 > 100 ms)
+          description: "p95: {{ $value | humanizeDuration }}. Railway: CPU/IO do Postgres, conexões (pool = 10)."
+      # Unique violations are expected now and then (races resolved by the code); a sustained rate is not.
+      - alert: AlgaDbErrors
+        expr: sum(rate(alga_db_query_errors_total{job="alga-api"}[5m])) > 1
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: Consultas ao banco falhando
+          description: "{{ $value | humanize }}/s por 5 min. Banco fora do ar? Ver /ready e o painel do Railway."
+      - alert: AlgaEventLoopLag
+        expr: nodejs_eventloop_lag_seconds{job="alga-api",stat="p99"} > 0.1
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: Event loop da API travando (p99 > 100 ms)
+          description: "p99: {{ $value | humanizeDuration }}. CPU no limite do Railway, re-encode de imagens (sharp) ou exportações."
+      # Adjust to the Railway instance size (Hobby: up to 8 GB; the beta runs on far less).
+      - alert: AlgaMemoryHigh
+        expr: process_resident_memory_bytes{job="alga-api"} > 1.5e9
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: Memória da API alta
+          description: "RSS {{ $value | humanize1024 }}B por 15 min. Comparar nodejs_heap_used_bytes (vazamento JS) e nodejs_external_memory_bytes (Buffers)."
+
+  # ---- voice -----------------------------------------------------------------------------------------------------
+  - name: alga-voice
+    rules:
+      - alert: AlgaLivekitDown
+        expr: up{job="livekit"} == 0
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          summary: SFU (LiveKit) sem coleta
+          description: "LiveKit em {{ $labels.instance }} não responde há 2 min: ninguém entra em voz."
+      # SLO 95 %. Approximation: a token not followed by participant_joined (user gave up, retried) also counts as a miss.
+      - alert: AlgaVoiceJoinSuccessLow
+        expr: alga:voice_join_success:ratio30m < 0.9 and sum(increase(alga_voice_tokens_issued_total{job="alga-api"}[30m])) > 20
+        for: 15m
+        labels: { severity: page }
+        annotations:
+          summary: Entradas em voz falhando
+          description: "Só {{ $value | humanizePercentage }} dos tokens viraram participant_joined em 30 min. TURN/UDP bloqueado, SFU sobrecarregado ou webhook falhando."
+      # Wrong webhook key or the API rejecting LiveKit: voice states go stale for everyone.
+      - alert: AlgaLivekitWebhookFailing
+        expr: sum(increase(alga_livekit_webhook_failures_total{job="alga-api"}[15m])) > 5
+        labels: { severity: page }
+        annotations:
+          summary: Webhooks do LiveKit falhando
+          description: "{{ $value | humanize }} em 15 min (assinatura = par de chaves diferente entre SFU e API; handler = erro na API)."
+
+  # ---- call quality (opt-in telemetry; needs volume to mean anything) --------------------------------------------
+  - name: alga-call-quality
+    rules:
+      - alert: AlgaReconnectSuccessLow
+        expr: |
+          alga:call_reconnect_success:ratio1h < 0.95
+          and (sum(increase(alga_call_reconnects_sum{job="alga-api"}[1h])) + sum(increase(alga_call_reconnect_failures_total{job="alga-api"}[1h]))) > 10
+        for: 30m
+        labels: { severity: ticket }
+        annotations:
+          summary: Reconexões de voz falhando (SLO 99 %)
+          description: "Sucesso das reconexões em 1 h: {{ $value | humanizePercentage }}."
+      - alert: AlgaCallRttHigh
+        expr: |
+          histogram_quantile(0.75, sum by (le) (rate(alga_call_rtt_p95_seconds_bucket{job="alga-api"}[1h]))) > 0.2
+          and sum(increase(alga_call_rtt_p95_seconds_count{job="alga-api"}[1h])) > 20
+        for: 30m
+        labels: { severity: ticket }
+        annotations:
+          summary: RTT até o SFU alto para muita gente
+          description: "Um quarto das sessões tem RTT p95 acima de {{ $value | humanizeDuration }}. Rota/peering do provedor da VM."
+      - alert: AlgaCallPacketLossHigh
+        expr: |
+          histogram_quantile(0.75, sum by (le) (rate(alga_call_packet_loss_percent_bucket{job="alga-api"}[1h]))) > 5
+          and sum(increase(alga_call_packet_loss_percent_count{job="alga-api"}[1h])) > 20
+        for: 30m
+        labels: { severity: ticket }
+        annotations:
+          summary: Perda de pacotes alta nas chamadas
+          description: "Um quarto das sessões perde mais de {{ $value | humanize }} % do áudio recebido."
+
+  # ---- money and e-mail ------------------------------------------------------------------------------------------
+  - name: alga-business
+    rules:
+      - alert: AlgaBillingWebhooksFailing
+        expr: sum(increase(alga_billing_webhooks_total{job="alga-api",outcome=~"rejected|error"}[30m])) > 3
+        labels: { severity: page }
+        annotations:
+          summary: Webhooks de pagamento recusados ou com erro
+          description: "Pagamentos podem não estar sendo concedidos. MP_WEBHOOK_SECRET trocado no painel? Ver log \"billing webhook rejected\"."
+      - alert: AlgaEmailFailing
+        expr: sum(increase(alga_email_failures_total{job="alga-api"}[30m])) > 5
+        labels: { severity: ticket }
+        annotations:
+          summary: E-mails não saindo
+          description: "{{ $value | humanize }} falhas em 30 min (Resend fora, domínio não verificado, cota). Ver log \"e-mail not sent\"."
+
+  # ---- SFU host (node_exporter) ----------------------------------------------------------------------------------
+  - name: sfu-host
+    rules:
+      - alert: SfuCpuHigh
+        expr: 1 - avg(rate(node_cpu_seconds_total{job="node",mode="idle"}[5m])) > 0.85
+        for: 10m
+        labels: { severity: page }
+        annotations:
+          summary: CPU do SFU acima de 85 %
+          description: "Uso: {{ $value | humanizePercentage }}. Com SFU sem margem a voz engasga para todos: hora de outro nó (cost-model, fase 2)."
+      # Set to ~80 % of the VM's link; the bandwidth bill also follows this (docs/infra/cost-model.md).
+      - alert: SfuEgressHigh
+        expr: sum(rate(node_network_transmit_bytes_total{job="node",device!~"lo|docker.*|veth.*|br-.*"}[5m])) * 8 > 800e6
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: Saída de rede do SFU acima de 800 Mbit/s
+          description: "{{ $value | humanize }}bit/s por 15 min."
+      - alert: SfuDiskAlmostFull
+        expr: node_filesystem_avail_bytes{job="node",mountpoint="/"} / node_filesystem_size_bytes{job="node",mountpoint="/"} < 0.1
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: Disco da VM do SFU com menos de 10 % livre
+          description: "Prometheus (retenção 30 d / 5 GB) e logs do Docker são os suspeitos de sempre."

@@ -8,11 +8,12 @@ import type { FastifyInstance } from 'fastify'
 import { TokenVerifier, type RoomServiceClient } from 'livekit-server-sdk'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { GRACE_MS } from '../src/billing/billing.js'
+import { productById } from '../src/billing/catalog.js'
 import { MercadoPagoProvider, mapPaymentStatus, mapPreapprovalStatus, parseReference } from '../src/billing/mercadopago.js'
 import { SANDBOX_SIGNATURE_HEADER, SandboxProvider, WebhookRejected, sandboxSignature } from '../src/billing/provider.js'
 import { loadConfig } from '../src/config.js'
 import { billingEvents, subscriptions } from '../src/db/schema.js'
-import { api, connect, postWebhook, register, startServer, type TestServer } from './helpers.js'
+import { api, befriend, connect, postWebhook, register, startServer, type TestServer } from './helpers.js'
 
 let s: TestServer
 const MAX = 64 * 1024 // free attachment cap for this server; Plus gets 100 MiB
@@ -203,6 +204,29 @@ describe('entitlements lifecycle', () => {
     gw.close()
   })
 
+  it('resume undoes a cancel while the period is paid: renewals and the grace period come back', async () => {
+    const periodEnd = new Date(Date.now() + 10 * DAY)
+    const u = await subscribed(periodEnd)
+    const resume = () => api<Subscription>(s.app, 'POST', '/billing/subscription/resume', { token: u.token })
+    expect((await resume()).body).toMatchObject({ status: 'active', cancelAtPeriodEnd: false }) // nothing to undo
+    await api(s.app, 'POST', '/billing/subscription/cancel', { token: u.token })
+    const gw = await connect(s.port, u.token)
+    const res = await resume()
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({ status: 'active', cancelAtPeriodEnd: false, currentPeriodEnd: periodEnd.toISOString() })
+    const graceEnd = new Date(periodEnd.getTime() + GRACE_MS).toISOString()
+    await gw.waitFor('ENTITLEMENTS_UPDATE', (d) => d.items.some((i) => i.sku === 'plan:plus' && i.expiresAt === graceEnd))
+    expect((await resume()).body.cancelAtPeriodEnd).toBe(false) // idempotent
+    // Renewing again, so the grace period applies past the end.
+    await s.app.ctx.billing.sweep(new Date(periodEnd.getTime() + 1000))
+    expect(await planOf(u.token)).toBe('plus')
+    await s.app.ctx.billing.sweep(new Date(periodEnd.getTime() + GRACE_MS + 1000))
+    expect(await planOf(u.token)).toBe('free')
+    expect((await resume()).status).toBe(404) // over: nothing to resume, subscribe again instead
+    expect((await api(s.app, 'POST', '/billing/subscription/resume', { token: (await register(s.app)).token })).status).toBe(404)
+    gw.close()
+  })
+
   it('auto-renewing subscriptions get a grace period past the end; abandoned checkouts expire after 24 h', async () => {
     const periodEnd = new Date(Date.now() + DAY)
     const u = await subscribed(periodEnd)
@@ -232,6 +256,71 @@ describe('entitlements lifecycle', () => {
     const other = (await checkout(u.token, 'deco_folha_de_alga')).body
     await sandboxHook(s.app, orderEvent(other.reference, 'failed'))
     expect((await billingMe(u.token)).orders.find((o) => o.id === other.reference)!.status).toBe('canceled')
+  })
+})
+
+describe('cosmetics', () => {
+  const equip = (token: string, body: object) => api<Me>(s.app, 'PUT', '/users/@me/cosmetics', { token, body })
+  async function buy(token: string, productId: string) {
+    const o = (await checkout(token, productId)).body
+    const paid = orderEvent(o.reference, 'paid', { amountCents: productById(productId)!.priceBrlCents, currency: 'BRL', providerPaymentId: `pay_${o.reference}` })
+    expect(await sandboxHook(s.app, paid)).toBe(200)
+    return o.reference
+  }
+
+  it('equips owned items per slot, refuses the rest; PublicUser.cosmetics goes out with USER_UPDATE and every profile', async () => {
+    const u = await register(s.app)
+    const friend = await register(s.app)
+    await befriend(s.app, u, friend)
+    const fgw = await connect(s.port, friend.token)
+    expect((await api<Me>(s.app, 'GET', '/users/@me', { token: u.token })).body.cosmetics).toBeUndefined()
+    expect((await equip(u.token, { avatarDecoration: 'deco_coral' })).status).toBe(403) // not owned
+    expect((await equip(u.token, { profileTheme: 'theme_plus_mare' })).status).toBe(403) // Plus only
+    expect((await equip(u.token, { avatarDecoration: 'nope' })).body.error.fields).toHaveProperty('avatarDecoration')
+    expect((await equip(u.token, { avatarDecoration: 'theme_noite_paulistana' })).status).toBe(400) // wrong slot
+    expect((await equip(u.token, { avatarDecoration: 'plus_monthly' })).status).toBe(400) // not a cosmetic
+    expect((await equip(u.token, { halo: 'deco_coral' })).status).toBe(400) // unknown slot
+
+    await buy(u.token, 'deco_coral')
+    await buy(u.token, 'effect_bioluminescencia')
+    const res = await equip(u.token, { avatarDecoration: 'deco_coral', profileEffect: 'effect_bioluminescencia' })
+    expect(res.status).toBe(200)
+    expect(res.body.cosmetics).toEqual({ avatarDecoration: 'deco_coral', profileEffect: 'effect_bioluminescencia' })
+    await fgw.waitFor('USER_UPDATE', (d) => d.id === u.user.id && d.cosmetics?.avatarDecoration === 'deco_coral')
+    expect((await api(s.app, 'GET', `/users/${u.user.id}`, { token: friend.token })).body.cosmetics).toEqual(res.body.cosmetics)
+    const rels = (await api(s.app, 'GET', '/relationships', { token: friend.token })).body as { user: { id: string; cosmetics?: unknown } }[]
+    expect(rels.find((r) => r.user.id === u.user.id)!.user.cosmetics).toEqual(res.body.cosmetics)
+
+    // Omitted slots keep their item; null unequips; an empty set leaves the field out.
+    expect((await equip(u.token, { profileEffect: null })).body.cosmetics).toEqual({ avatarDecoration: 'deco_coral' })
+    expect((await equip(u.token, {})).body.cosmetics).toEqual({ avatarDecoration: 'deco_coral' })
+    expect((await equip(u.token, { avatarDecoration: null })).body.cosmetics).toBeUndefined()
+    await fgw.waitFor('USER_UPDATE', (d) => d.id === u.user.id && d.cosmetics === undefined)
+    fgw.close()
+  })
+
+  it('plan-included items come off when the plan ends (owned ones stay), refunded ones when refunded', async () => {
+    const periodEnd = new Date(Date.now() + 5 * DAY)
+    const u = await subscribed(periodEnd)
+    const friend = await register(s.app)
+    await befriend(s.app, u, friend)
+    const owned = await buy(u.token, 'deco_folha_de_alga')
+    const all = { avatarDecoration: 'deco_folha_de_alga', profileTheme: 'theme_plus_mare', nameplate: 'nameplate_plus_correnteza' }
+    expect((await equip(u.token, all)).body.cosmetics).toEqual(all)
+    const gw = await connect(s.port, u.token)
+    const fgw = await connect(s.port, friend.token)
+    await api(s.app, 'POST', '/billing/subscription/cancel', { token: u.token })
+    await s.app.ctx.billing.sweep(new Date(periodEnd.getTime() + 1000))
+    const onlyOwned = { avatarDecoration: 'deco_folha_de_alga' }
+    await fgw.waitFor('USER_UPDATE', (d) => d.id === u.user.id && JSON.stringify(d.cosmetics) === JSON.stringify(onlyOwned))
+    await gw.waitFor('ME_UPDATE', (d) => d.plan?.id === 'free' && JSON.stringify(d.cosmetics) === JSON.stringify(onlyOwned))
+    expect((await equip(u.token, { profileTheme: 'theme_plus_mare' })).status).toBe(403) // lapsed with the plan
+
+    await sandboxHook(s.app, orderEvent(owned, 'refunded'))
+    await fgw.waitFor('USER_UPDATE', (d) => d.id === u.user.id && d.cosmetics === undefined)
+    expect((await api<Me>(s.app, 'GET', '/users/@me', { token: u.token })).body.cosmetics).toBeUndefined()
+    gw.close()
+    fgw.close()
   })
 })
 
@@ -406,13 +495,28 @@ describe('mercado pago adapter', () => {
       expect((await hook('subscription_authorized_payment', 'ap1')).statusCode).toBe(200)
       expect((await api<BillingMe>(m.app, 'GET', '/billing/me', { token: u.token })).body.subscription).toMatchObject({ status: 'past_due', currentPeriodEnd: next })
 
-      // Cancel: PUT /preapproval/pa1 {status: cancelled}; the cancelled preapproval keeps the paid period.
+      // Cancel: PUT /preapproval/pa1 {status: paused} (resumable; 'cancelled' is not); the paid period is kept.
       const cancel = await api<Subscription>(m.app, 'POST', '/billing/subscription/cancel', { token: u.token })
       expect(cancel.body.cancelAtPeriodEnd).toBe(true)
       expect(calls).toContain('PUT /preapproval/pa1')
+      expect(store.get('/preapproval/pa1')!.status).toBe('paused')
       expect((await hook('subscription_preapproval', 'pa1')).statusCode).toBe(200)
       expect((await api<BillingMe>(m.app, 'GET', '/billing/me', { token: u.token })).body.subscription).toMatchObject({ cancelAtPeriodEnd: true, currentPeriodEnd: next })
       expect((await api<Me>(m.app, 'GET', '/users/@me', { token: u.token })).body.plan!.id).toBe('plus')
+
+      // Resume: PUT {status: authorized}; the re-fetched preapproval confirms renewals are on.
+      const resumed = await api<Subscription>(m.app, 'POST', '/billing/subscription/resume', { token: u.token })
+      expect(resumed.body.cancelAtPeriodEnd).toBe(false)
+      expect(store.get('/preapproval/pa1')!.status).toBe('authorized')
+      expect((await hook('subscription_preapproval', 'pa1')).statusCode).toBe(200)
+      expect((await api<BillingMe>(m.app, 'GET', '/billing/me', { token: u.token })).body.subscription).toMatchObject({ status: 'active', cancelAtPeriodEnd: false, currentPeriodEnd: next })
+      // Paused from the payer's own MP account, then resumed there: the webhooks follow it both ways.
+      store.set('/preapproval/pa1', { ...store.get('/preapproval/pa1'), status: 'paused', last_modified: new Date(Date.now() + 2000).toISOString() })
+      await hook('subscription_preapproval', 'pa1')
+      expect((await api<BillingMe>(m.app, 'GET', '/billing/me', { token: u.token })).body.subscription!.cancelAtPeriodEnd).toBe(true)
+      store.set('/preapproval/pa1', { ...store.get('/preapproval/pa1'), status: 'authorized', last_modified: new Date(Date.now() + 3000).toISOString() })
+      await hook('subscription_preapproval', 'pa1')
+      expect((await api<BillingMe>(m.app, 'GET', '/billing/me', { token: u.token })).body.subscription!.cancelAtPeriodEnd).toBe(false)
 
       // One-time purchase: Checkout Pro preference, then a payment notification re-fetched from /v1/payments.
       const order = await api<CheckoutResponse>(m.app, 'POST', '/billing/checkout', { token: u.token, body: { productId: 'deco_coral' } })
@@ -425,6 +529,10 @@ describe('mercado pago adapter', () => {
       const me = (await api<BillingMe>(m.app, 'GET', '/billing/me', { token: u.token })).body
       expect(me.orders[0]).toMatchObject({ id: order.body.reference, status: 'paid', sandbox: false })
       expect(me.items.map((i) => i.sku)).toContain('deco_coral')
+
+      // Account deletion cancels the preapproval for good (never resumable).
+      expect((await api(m.app, 'DELETE', '/users/@me', { token: u.token, body: { password: u.password } })).status).toBe(202)
+      expect(store.get('/preapproval/pa1')!.status).toBe('cancelled')
     } finally {
       await m.close()
       vi.unstubAllGlobals()

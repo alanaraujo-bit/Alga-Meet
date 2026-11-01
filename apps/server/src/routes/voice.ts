@@ -4,6 +4,7 @@ import { NO_MODERATION, assertDmNotBlocked, requireChannel, voiceModeration } fr
 import type { Ctx } from '../app.js'
 import { HttpError, badRequest, forbidden, parse } from '../errors.js'
 import { PLANS } from '../billing/catalog.js'
+import { metrics } from '../metrics.js'
 import { roomName } from '../voice.js'
 
 export function voiceRoutes(app: FastifyInstance, { db, voice, config }: Ctx): void {
@@ -20,16 +21,24 @@ export function voiceRoutes(app: FastifyInstance, { db, voice, config }: Ctx): v
       if (others >= limit) throw forbidden('Este canal de voz está cheio.')
     }
     const streamPresets = [...PLANS[me.plan].streamPresets]
+    const token = await voice.mintToken(me, channel.id, permissions,
+      channel.spaceId ? await voiceModeration(db, channel.spaceId, me.id) : NO_MODERATION, streamPresets)
+    metrics.voiceTokens.inc({ kind: channel.spaceId ? 'space' : 'private' })
     return {
       url: config.livekit.publicUrl,
-      token: await voice.mintToken(me, channel.id, permissions,
-        channel.spaceId ? await voiceModeration(db, channel.spaceId, me.id) : NO_MODERATION, streamPresets),
+      token,
       room: roomName(channel.id),
       bitrateKbps: channel.bitrateKbps ?? 64,
       streamPresets,
     }
   })
 }
+
+/** LiveKit's webhook event names (metric label values; anything else counts as "other"). */
+const LIVEKIT_EVENTS = new Set([
+  'room_started', 'room_finished', 'participant_joined', 'participant_left', 'participant_connection_aborted',
+  'track_published', 'track_unpublished', 'egress_started', 'egress_updated', 'egress_ended', 'ingress_started', 'ingress_ended',
+])
 
 /** LiveKit → server. Encapsulated so its raw-body content-type parser does not leak to other routes. */
 export async function livekitWebhookRoute(app: FastifyInstance, { voice }: Ctx): Promise<void> {
@@ -44,11 +53,20 @@ export async function livekitWebhookRoute(app: FastifyInstance, { voice }: Ctx):
       try {
         event = await voice.receive(req.body, req.headers.authorization)
       } catch (err) {
+        metrics.livekitWebhookFailures.inc({ reason: 'signature' })
         req.log.warn({ reason: (err as Error).message }, 'livekit webhook rejected')
         throw new HttpError('unauthorized', 'Assinatura do webhook inválida.')
       }
       req.log.info({ event: event.event, room: event.room?.name, participant: event.participant?.identity }, 'livekit webhook')
-      await voice.handleEvent(event)
+      const stop = metrics.livekitWebhookDuration.start({ event: LIVEKIT_EVENTS.has(event.event) ? event.event : 'other' })
+      try {
+        await voice.handleEvent(event)
+      } catch (err) {
+        metrics.livekitWebhookFailures.inc({ reason: 'handler' })
+        throw err
+      } finally {
+        stop()
+      }
       return { ok: true }
     })
   })

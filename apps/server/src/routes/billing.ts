@@ -5,6 +5,7 @@ import { requireVerifiedEmail } from '../auth.js'
 import { ageBracketOf } from '../legal.js'
 import { WebhookRejected } from '../billing/provider.js'
 import { HttpError, forbidden, idParam, parse } from '../errors.js'
+import { metrics } from '../metrics.js'
 import { perMinute } from './users.js'
 
 /** Catalog, provider webhooks (encapsulated raw-body parser) and the sandbox's fake payment page. */
@@ -17,16 +18,23 @@ export async function billingPublicRoutes(app: FastifyInstance, { billing }: Ctx
     hook.addContentTypeParser('application/json', { parseAs: 'string', bodyLimit: 64 * 1024 }, (_req, body, done) => done(null, body))
     // Server-to-server and signature-checked; generous ceiling per IP because providers retry in bursts.
     hook.post<{ Params: { provider: string } }>('/billing/webhooks/:provider', { config: perMinute(600) }, async (req) => {
+      const provider = ['sandbox', 'mercadopago'].includes(req.params.provider) ? req.params.provider : 'other'
+      let outcome = 'error'
       try {
-        await billing.handleWebhook(req.params.provider, {
+        const { duplicate } = await billing.handleWebhook(req.params.provider, {
           rawBody: typeof req.body === 'string' ? req.body : '',
           headers: req.headers,
           query: req.query as Record<string, unknown>,
         })
+        outcome = duplicate ? 'duplicate' : 'applied'
       } catch (err) {
+        if (err instanceof HttpError && err.statusCode === 404) outcome = 'unknown_provider'
         if (!(err instanceof WebhookRejected)) throw err
+        outcome = 'rejected'
         req.log.warn({ provider: req.params.provider, reason: err.message }, 'billing webhook rejected')
         throw new HttpError('unauthorized', 'Assinatura do webhook inválida.')
+      } finally {
+        metrics.billingWebhooks.inc({ provider, outcome })
       }
       return { ok: true }
     })
@@ -62,4 +70,5 @@ export function billingRoutes(app: FastifyInstance, { billing, config }: Ctx): v
   })
 
   app.post('/billing/subscription/cancel', { config: perMinute(10) }, async (req): Promise<Subscription> => billing.cancel(req.auth.user.id))
+  app.post('/billing/subscription/resume', { config: perMinute(10) }, async (req): Promise<Subscription> => billing.resume(req.auth.user.id))
 }

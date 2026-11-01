@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import type { FastifyBaseLogger } from 'fastify'
 import type { EmailConfig } from './config.js'
 import { safeErr } from './errors.js'
+import { metrics } from './metrics.js'
 
 export type EmailKind = 'verify_email' | 'account_exists' | 'password_reset'
   | 'enforcement' | 'appeal_decision' | 'account_deletion' | 'data_export'
@@ -126,6 +127,12 @@ export class Mailer {
 
   /** Fire-and-forget: a request never waits for, or fails because of, the provider. Failures are logged. */
   send(msg: EmailMessage): void {
-    void this.sender.send(msg).catch((err: unknown) => this.log.error({ err: safeErr(err), kind: msg.kind }, 'e-mail not sent'))
+    void this.sender.send(msg).then(
+      () => metrics.emailsSent.inc({ kind: msg.kind }),
+      (err: unknown) => {
+        metrics.emailFailures.inc({ kind: msg.kind })
+        this.log.error({ err: safeErr(err), kind: msg.kind }, 'e-mail not sent')
+      },
+    )
   }
 }

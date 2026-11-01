@@ -55,6 +55,12 @@ async function loadInvite(db: Db, code: string): Promise<{ invite: InviteRow; sp
   return row
 }
 
+/** Who sees an invite in GET /spaces/:id/invites, hence gets INVITE_CREATE / INVITE_DELETE: MANAGE_SPACE members + its creator. */
+async function inviteAudience(db: Db, spaceId: string, inviterId?: string): Promise<string[]> {
+  const managers = [...await memberPermissions(db, spaceId)].filter(([, p]) => hasPermission(p, Permission.MANAGE_SPACE)).map(([id]) => id)
+  return inviterId ? [...managers, inviterId] : managers
+}
+
 /** Leave / kick / ban: drops their voice (LiveKit too), membership and invites; fan-out stops (audiences come from the DB). */
 export async function removeMember(ctx: Ctx, spaceId: string, userId: string, reason?: VoiceDisconnectReason): Promise<void> {
   const { db, hub, voice } = ctx
@@ -62,9 +68,13 @@ export async function removeMember(ctx: Ctx, spaceId: string, userId: string, re
   await voice.disconnect(userId, chans.map((c) => c.id), reason)
   await db.delete(spaceMembers).where(and(eq(spaceMembers.spaceId, spaceId), eq(spaceMembers.userId, userId)))
   // Their invites must not keep letting people in after they leave or are removed.
-  await db.delete(invites).where(and(eq(invites.spaceId, spaceId), eq(invites.inviterId, userId)))
+  const gone = await db.delete(invites).where(and(eq(invites.spaceId, spaceId), eq(invites.inviterId, userId))).returning({ code: invites.code })
   hub.dispatch(await spaceMemberIds(db, spaceId), 'MEMBER_REMOVE', { spaceId, userId })
   hub.dispatch([userId], 'SPACE_DELETE', { id: spaceId })
+  if (gone.length) {
+    const managers = await inviteAudience(db, spaceId)
+    for (const { code } of gone) hub.dispatch(managers, 'INVITE_DELETE', { code, spaceId })
+  }
 }
 
 /** Deletes a space for everyone (owner, staff removal, account purge): cascade, icon, SPACE_DELETE, voice rooms. */
@@ -219,7 +229,9 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
           code: inviteCode(), spaceId: space.id, inviterId: req.auth.user.id, maxUses: body.maxUses, expiresAt,
         }).returning()
         reply.code(201)
-        return await inviteView(db, row!, space)
+        const invite = await inviteView(db, row!, space)
+        hub.dispatch(await inviteAudience(db, space.id, row!.inviterId), 'INVITE_CREATE', invite)
+        return invite
       } catch (err) {
         if (!isUniqueViolation(err) || attempt >= 3) throw err
       }
@@ -245,7 +257,9 @@ export function spaceRoutes(app: FastifyInstance, ctx: Ctx): void {
     if (found.invite.inviterId !== me && !hasPermission(perms, Permission.MANAGE_SPACE)) {
       throw forbidden('Só quem criou o convite ou quem gerencia o espaço pode revogá-lo.')
     }
-    await db.delete(invites).where(eq(invites.code, found.invite.code))
+    const [gone] = await db.delete(invites).where(eq(invites.code, found.invite.code)).returning({ code: invites.code })
+    // Only the request that actually deleted it announces it (two concurrent revokes → one event).
+    if (gone) hub.dispatch(await inviteAudience(db, found.space.id, found.invite.inviterId), 'INVITE_DELETE', { code: gone.code, spaceId: found.space.id })
     return reply.code(204).send()
   })
 
