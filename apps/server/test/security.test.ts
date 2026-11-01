@@ -427,6 +427,40 @@ describe('B2/B3/B6', () => {
     expect(row!.type).toBe('blocked')
   })
 
+  // The reviewer's race, with real concurrency (meaningful under `npm run test:pg`; PGlite serializes everything).
+  const relRow = async (from: string, to: string) => (await s.app.ctx.db.select({ t: relationships.type }).from(relationships)
+    .where(and(eq(relationships.userId, from), eq(relationships.targetId, to))))[0]?.t
+  const PAIRS = 20
+
+  it('B2: a friend request racing a block never leaves the blocked user with a pending request', async () => {
+    const pairs = await Promise.all(Array.from({ length: PAIRS }, async () => [await register(s.app), await register(s.app)] as const))
+    const results = await Promise.all(pairs.map(([a, b]) => Promise.all([
+      api(s.app, 'POST', '/relationships', { token: a.token, body: { username: b.user.username } }),
+      api(s.app, 'PUT', `/relationships/${a.user.id}`, { token: b.token, body: { type: 'blocked' } }),
+    ])))
+    for (const [req, block] of results) {
+      expect([200, 403]).toContain(req.status)
+      expect(block.status).toBe(200)
+    }
+    for (const [a, b] of pairs) {
+      expect(await relRow(b.user.id, a.user.id)).toBe('blocked')
+      expect(await relRow(a.user.id, b.user.id)).toBeUndefined()
+    }
+  })
+
+  it('B2: simultaneous requests from both sides end as friends, without deadlocks', async () => {
+    const pairs = await Promise.all(Array.from({ length: PAIRS }, async () => [await register(s.app), await register(s.app)] as const))
+    const results = await Promise.all(pairs.map(([a, b]) => Promise.all([
+      api(s.app, 'POST', '/relationships', { token: a.token, body: { username: b.user.username } }),
+      api(s.app, 'POST', '/relationships', { token: b.token, body: { username: a.user.username } }),
+    ])))
+    for (const r of results.flat()) expect(r.status).toBe(200)
+    for (const [a, b] of pairs) {
+      expect(await relRow(a.user.id, b.user.id)).toBe('friend')
+      expect(await relRow(b.user.id, a.user.id)).toBe('friend')
+    }
+  })
+
   it('B3: logged errors drop query params / pg detail, and invite codes are redacted from URLs', () => {
     const cause = Object.assign(new Error('duplicate key value violates unique constraint "users_email_key"'), {
       code: '23505', detail: 'Key (email)=(victim@example.com) already exists.',

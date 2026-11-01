@@ -2,11 +2,11 @@ import {
   FriendRequestBody, OpenDmBody, PatchMeBody, PutRelationshipBody, uuidv7,
   type Channel, type Me, type PublicUser, type Relationship,
 } from '@alga/shared'
-import { and, eq, inArray, ne } from 'drizzle-orm'
+import { and, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { isBlockedBetween, isFriend, profileAudience, requireChannel, sharesSpace } from '../access.js'
 import type { Ctx } from '../app.js'
-import { isUniqueViolation, type Db } from '../db/index.js'
+import { isUniqueViolation, type Db, type Tx } from '../db/index.js'
 import { channelRecipients, channels, relationships, users, type UserRow } from '../db/schema.js'
 import { badRequest, conflict, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
 import { broadcastPresence, exchangePresence } from '../gateway/hub.js'
@@ -30,14 +30,26 @@ export async function afterMeUpdate(ctx: Ctx, before: UserRow, after: UserRow): 
   }
 }
 
-async function relOf(db: Db, userId: string, targetId: string): Promise<RelType | undefined> {
+async function relOf(db: Db | Tx, userId: string, targetId: string): Promise<RelType | undefined> {
   const [r] = await db.select({ type: relationships.type }).from(relationships)
     .where(and(eq(relationships.userId, userId), eq(relationships.targetId, targetId)))
   return r?.type
 }
 
+/**
+ * Runs a relationship change between two users with both directions read inside one transaction holding a lock on
+ * the pair, so concurrent requests/blocks/accepts are serialized (B2). Row locks cannot do this: the rows may not exist
+ * yet, and two opposite requests would lock them in opposite order and deadlock.
+ */
+async function withPair<T>(db: Db, me: string, other: string, fn: (tx: Tx, mine: RelType | undefined, theirs: RelType | undefined) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${[me, other].sort().join(':')}, 0))`)
+    return fn(tx, await relOf(tx, me, other), await relOf(tx, other, me))
+  })
+}
+
 /** Upsert; only a block may replace a block (unblocking is a DELETE), so a racing request cannot undo one. */
-export async function setRel(db: Db, userId: string, targetId: string, type: RelType): Promise<void> {
+export async function setRel(db: Db | Tx, userId: string, targetId: string, type: RelType): Promise<void> {
   await db.insert(relationships).values({ userId, targetId, type, since: new Date() }).onConflictDoUpdate({
     target: [relationships.userId, relationships.targetId],
     set: { type, since: new Date() },
@@ -45,7 +57,7 @@ export async function setRel(db: Db, userId: string, targetId: string, type: Rel
   })
 }
 
-async function delRel(db: Db, userId: string, targetId: string): Promise<void> {
+async function delRel(db: Db | Tx, userId: string, targetId: string): Promise<void> {
   await db.delete(relationships).where(and(eq(relationships.userId, userId), eq(relationships.targetId, targetId)))
 }
 
@@ -99,17 +111,20 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
     const [target] = await db.select().from(users).where(eq(users.username, username))
     if (!target) throw invalid({ username: 'Usuário não encontrado.' })
     if (target.id === me) throw invalid({ username: 'Você não pode adicionar a si mesmo.' })
-    const [mine, theirs] = await Promise.all([relOf(db, me, target.id), relOf(db, target.id, me)])
-    // Do not reveal that the target blocked us.
-    if (theirs === 'blocked') throw forbidden('Não foi possível enviar o pedido de amizade.')
-    if (mine === 'blocked') throw badRequest('Desbloqueie este usuário antes de enviar um pedido.')
-    if (mine === 'friend') throw conflict('Vocês já são amigos.')
-    if (mine === 'outgoing') return (await relationshipsOf(db, me, target.id))[0]!
-    const accepting = mine === 'incoming'
-    await db.transaction(async (tx) => {
+    const outcome = await withPair(db, me, target.id, async (tx, mine, theirs) => {
+      // Do not reveal that the target blocked us.
+      if (theirs === 'blocked') throw forbidden('Não foi possível enviar o pedido de amizade.')
+      if (mine === 'blocked') throw badRequest('Desbloqueie este usuário antes de enviar um pedido.')
+      if (mine === 'friend') throw conflict('Vocês já são amigos.')
+      if (mine === 'outgoing') return 'pending'
+      // A request toward someone who already asked us is an accept.
+      const accepting = mine === 'incoming'
       await setRel(tx, me, target.id, accepting ? 'friend' : 'outgoing')
       await setRel(tx, target.id, me, accepting ? 'friend' : 'incoming')
+      return accepting ? 'accepted' : 'requested'
     })
+    if (outcome === 'pending') return (await relationshipsOf(db, me, target.id))[0]!
+    const accepting = outcome === 'accepted'
     await publishRel(ctx, target.id, me)
     if (accepting) await exchangePresence(db, hub, me, [target.id])
     return publishRel(ctx, me, target.id)
@@ -120,25 +135,27 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
     const me = req.auth.user.id
     const target = await userById(db, idParam(req.params.userId))
     if (target.id === me) throw badRequest('Operação inválida com você mesmo.')
-    const [mine, theirs] = await Promise.all([relOf(db, me, target.id), relOf(db, target.id, me)])
 
     if (type === 'friend') {
-      if (mine === 'friend') return (await relationshipsOf(db, me, target.id))[0]!
-      if (mine !== 'incoming') throw badRequest('Não há pedido de amizade pendente deste usuário.')
-      await db.transaction(async (tx) => {
+      const changed = await withPair(db, me, target.id, async (tx, mine) => {
+        if (mine === 'friend') return false
+        if (mine !== 'incoming') throw badRequest('Não há pedido de amizade pendente deste usuário.')
         await setRel(tx, me, target.id, 'friend')
         await setRel(tx, target.id, me, 'friend')
+        return true
       })
+      if (!changed) return (await relationshipsOf(db, me, target.id))[0]!
       await publishRel(ctx, target.id, me)
       await exchangePresence(db, hub, me, [target.id])
       return publishRel(ctx, me, target.id)
     }
 
     // block: my row becomes 'blocked'; their friend/request row toward me disappears (their own block stays).
-    const dropTheirs = theirs !== undefined && theirs !== 'blocked'
-    await db.transaction(async (tx) => {
+    const dropTheirs = await withPair(db, me, target.id, async (tx, _mine, theirs) => {
       await setRel(tx, me, target.id, 'blocked')
-      if (dropTheirs) await delRel(tx, target.id, me)
+      const drop = theirs !== undefined && theirs !== 'blocked'
+      if (drop) await delRel(tx, target.id, me)
+      return drop
     })
     if (dropTheirs) hub.dispatch([target.id], 'RELATIONSHIP_REMOVE', { userId: me })
     return publishRel(ctx, me, target.id)
@@ -147,13 +164,13 @@ export function userRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.delete<{ Params: { userId: string } }>('/relationships/:userId', async (req, reply) => {
     const me = req.auth.user.id
     const targetId = idParam(req.params.userId)
-    const [mine, theirs] = await Promise.all([relOf(db, me, targetId), relOf(db, targetId, me)])
-    if (!mine) throw notFound('Relacionamento não encontrado.')
-    // remove friend / decline / cancel → both rows go; unblock → only mine (their block, if any, stays).
-    const dropTheirs = theirs !== undefined && theirs !== 'blocked' && mine !== 'blocked'
-    await db.transaction(async (tx) => {
+    const dropTheirs = await withPair(db, me, targetId, async (tx, mine, theirs) => {
+      if (!mine) throw notFound('Relacionamento não encontrado.')
+      // remove friend / decline / cancel → both rows go; unblock → only mine (their block, if any, stays).
+      const drop = theirs !== undefined && theirs !== 'blocked' && mine !== 'blocked'
       await delRel(tx, me, targetId)
-      if (dropTheirs) await delRel(tx, targetId, me)
+      if (drop) await delRel(tx, targetId, me)
+      return drop
     })
     hub.dispatch([me], 'RELATIONSHIP_REMOVE', { userId: targetId })
     if (dropTheirs) hub.dispatch([targetId], 'RELATIONSHIP_REMOVE', { userId: me })
