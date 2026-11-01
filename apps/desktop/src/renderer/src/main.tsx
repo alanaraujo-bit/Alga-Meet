@@ -1,16 +1,22 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 
-function Boot() {
-  return (
-    <div style={{ height: '100vh', display: 'grid', placeItems: 'center', background: '#0c0d10', color: '#e6e8ec', font: '500 14px system-ui' }}>
-      Alga Meet {window.alga?.config.version} — {window.alga?.config.profile}
-    </div>
-  )
-}
+// Dev-only media bench (unpackaged builds): index.html?url=…&token=…#media-lab
+const MediaLab = lazy(() => import('./media/MediaLab').then((m) => ({ default: m.MediaLab })))
+const mediaLab = location.hash === '#media-lab' && !window.alga?.config?.isPackaged
+// The app (and its global styles) is its own chunk so the media lab keeps a clean page.
+const App = lazy(() => import('./features/app/App').then((m) => ({ default: m.App })))
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <Boot />
-  </StrictMode>,
+  mediaLab ? (
+    <Suspense>
+      <MediaLab />
+    </Suspense>
+  ) : (
+    <StrictMode>
+      <Suspense fallback={<div style={{ height: '100vh', background: '#080b0c' }} />}>
+        <App />
+      </Suspense>
+    </StrictMode>
+  ),
 )

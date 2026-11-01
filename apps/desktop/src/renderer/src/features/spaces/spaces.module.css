@@ -1,0 +1,158 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.createSpace {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-4);
+}
+.spacePreview {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  color: var(--text-primary);
+  font: var(--type-title-sm);
+}
+.createSpace .spacePreview {
+  margin-top: 22px;
+}
+.spacePreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.footerHint {
+  margin-right: auto;
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+}
+.link {
+  color: var(--accent);
+  font-weight: var(--w-medium);
+}
+.link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.preview {
+  min-height: 76px;
+}
+.previewHint {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 76px;
+  justify-content: center;
+  color: var(--text-tertiary);
+}
+.inviteCard {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-lg);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  animation: rise var(--dur-pop) var(--ease-out-quart);
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.inviteText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.inviteText strong {
+  color: var(--text-primary);
+  font: var(--type-ui-lg);
+  font-weight: var(--w-semibold);
+}
+.inviteText span {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.already {
+  color: var(--accent) !important;
+}
+
+.typeCards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.typeCard {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  text-align: left;
+}
+.typeCard:hover {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.typeCard[aria-checked='true'] {
+  background: color-mix(in srgb, var(--bg-raised), white 4%);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.typeCard strong {
+  display: block;
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-semibold);
+}
+.typeIcon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+}
+.typeBody {
+  display: block;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.radio {
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  box-shadow: inset 0 0 0 1.5px var(--border-strong);
+}
+.typeCard[aria-checked='true'] .radio {
+  box-shadow: inset 0 0 0 4.5px var(--accent);
+}
+
+.expiry {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.expiryLabel {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}

@@ -1,0 +1,99 @@
+import { MessageCircle, Plus } from 'lucide-react'
+import { useMemo } from 'react'
+import { useData } from '@/store/data'
+import { homeBadge, spaceUnread } from '@/store/selectors'
+import { useUi } from '@/store/ui'
+import { Badge, contextMenuHandler, Icon, MenuButton, Tooltip } from '@/ui'
+import { initials } from '@/ui/Avatar'
+import { spaceMenu } from '../spaces/spaceMenu'
+import { t } from '../app/strings'
+import s from './shell.module.css'
+
+export function SpaceRail() {
+  const view = useUi((st) => st.view)
+  const order = useData((st) => st.spaceOrder)
+  const relationships = useData((st) => st.relationships)
+  const channels = useData((st) => st.channels)
+  const readStates = useData((st) => st.readStates)
+  const home = useMemo(() => homeBadge({ channels, readStates, relationships }), [channels, readStates, relationships])
+
+  return (
+    <nav className={s.rail} aria-label="Espaços">
+      <div className={s.railScroll}>
+        <div className={s.railItem}>
+          <span className={`${s.pill} ${view.kind !== 'space' ? s.pillActive : ''}`} />
+          <Tooltip content={t.rail.home} side="right">
+            <button
+              type="button"
+              className={`${s.spaceBtn} ${s.homeBtn}`}
+              aria-current={view.kind !== 'space' ? 'page' : undefined}
+              aria-label={t.rail.home}
+              onClick={() => useUi.getState().go({ kind: 'home' })}
+            >
+              <Icon icon={MessageCircle} size={20} />
+              {home > 0 && (
+                <span className={s.railBadge}>
+                  <Badge count={home} />
+                </span>
+              )}
+            </button>
+          </Tooltip>
+        </div>
+        {order.length > 0 && <span className={s.railSep} />}
+        {order.map((id) => (
+          <SpaceIcon key={id} spaceId={id} active={view.kind === 'space' && view.spaceId === id} />
+        ))}
+        <div className={s.railItem}>
+          <MenuButton
+            side="right"
+            align="start"
+            label={t.rail.addSpace}
+            items={() => [
+              { label: t.rail.createSpace, icon: Plus, onSelect: () => useUi.getState().openModal({ kind: 'createSpace' }) },
+              { label: t.rail.joinSpace, icon: MessageCircle, onSelect: () => useUi.getState().openModal({ kind: 'joinSpace' }) },
+            ]}
+          >
+            <button type="button" className={`${s.spaceBtn} ${s.addBtn}`} aria-label={t.rail.addSpace}>
+              <Icon icon={Plus} size={20} />
+            </button>
+          </MenuButton>
+        </div>
+      </div>
+    </nav>
+  )
+}
+
+function SpaceIcon({ spaceId, active }: { spaceId: string; active: boolean }) {
+  const space = useData((st) => st.spaces[spaceId])
+  const channels = useData((st) => st.channels)
+  const readStates = useData((st) => st.readStates)
+  const { unread, mentions } = useMemo(() => spaceUnread({ channels, readStates }, spaceId), [channels, readStates, spaceId])
+  if (!space) return null
+  const open = () => {
+    const ui = useUi.getState()
+    ui.go({ kind: 'space', spaceId, channelId: ui.lastChannelBySpace[spaceId] ?? null })
+  }
+  const label = mentions > 0 ? `${space.name}, ${t.rail.mentions(mentions)}` : space.name
+  return (
+    <div className={s.railItem}>
+      <span className={`${s.pill} ${active ? s.pillActive : unread ? s.pillUnread : ''}`} />
+      <Tooltip content={space.name} side="right">
+        <button
+          type="button"
+          className={s.spaceBtn}
+          aria-current={active ? 'page' : undefined}
+          aria-label={label}
+          onClick={open}
+          onContextMenu={contextMenuHandler(() => spaceMenu(spaceId), space.name)}
+        >
+          {space.iconUrl ? <img src={space.iconUrl} alt="" draggable={false} /> : initials(space.name)}
+          {mentions > 0 && (
+            <span className={s.railBadge}>
+              <Badge count={mentions} />
+            </span>
+          )}
+        </button>
+      </Tooltip>
+    </div>
+  )
+}

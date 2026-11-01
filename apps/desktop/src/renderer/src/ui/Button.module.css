@@ -62,11 +62,11 @@
   box-shadow: inset 0 0 0 1px var(--border-default);
 }
 .secondary:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--bg-raised), white 5%);
+  background: color-mix(in srgb, var(--bg-raised), white 5%);
   box-shadow: inset 0 0 0 1px var(--border-strong);
 }
 .secondary:active:not(:disabled) {
-  background: color-mix(in oklch, var(--bg-raised), white 8%);
+  background: color-mix(in srgb, var(--bg-raised), white 8%);
 }
 
 .ghost {

@@ -1,0 +1,52 @@
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-6);
+  flex: 1;
+  min-height: 0;
+  padding: var(--s-8);
+  overflow: auto;
+}
+.count {
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+}
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s-4);
+  max-width: 860px;
+}
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  width: 180px;
+  height: 148px;
+  border-radius: var(--r-lg);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.name {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1_5);
+  max-width: 160px;
+  color: var(--text-secondary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.name svg {
+  color: var(--danger);
+}
+.controls {
+  display: flex;
+  gap: var(--s-2);
+}
