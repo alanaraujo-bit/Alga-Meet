@@ -23,3 +23,7 @@ docs/references/**/*.gif
 
 # Generated test credentials for the screenshot script (apps/desktop/scripts/screenshot.mjs).
 apps/desktop/scripts/.shots-users*.json
+docs/references/**/*.webm
+docs/references/**/*.mp4
+docs/references/**/*.json
+docs/references/**/_*.mjs
