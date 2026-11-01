@@ -1,22 +1,33 @@
-import { AlertCircle } from 'lucide-react'
+import { MIN_PASSWORD_LENGTH } from '@alga/shared'
+import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useState, type FormEvent } from 'react'
 import { ApiRequestError } from '@/lib/api'
 import { errorText, fieldErrors } from '@/lib/errors'
+import { parseEmailToken } from '@/lib/files'
+import { confirmPasswordReset, requestPasswordReset } from '@/store/actions'
 import { useSession } from '@/store/session'
 import { Button, Icon, TextField } from '@/ui'
 import { EASE_OUT_QUART } from '@/ui/motion'
 import { LogoMark } from '../app/Logo'
+import { StrengthMeter, strengthHint } from './PasswordStrength'
 import { t } from './strings'
 import s from './auth.module.css'
 
-type Mode = 'login' | 'register'
-type Errors = Partial<Record<'login' | 'password' | 'email' | 'username' | 'displayName', string>>
+type Mode = 'login' | 'register' | 'forgot' | 'reset'
+type Errors = Partial<Record<'login' | 'password' | 'email' | 'username' | 'displayName' | 'token', string>>
 
 const USERNAME = /^[a-z0-9_.]{2,32}$/
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function AuthScreen() {
   const [mode, setMode] = useState<Mode>('login')
+  // Carries context between steps: the e-mail a reset link went to, or "senha trocada" back on the login.
+  const [note, setNote] = useState<{ sentTo?: string; resetDone?: boolean }>({})
+  const go = (m: Mode, n: typeof note = {}) => {
+    setNote(n)
+    setMode(m)
+  }
   return (
     <main className={s.screen}>
       <AnimatePresence mode="wait" initial={false}>
@@ -30,7 +41,10 @@ export function AuthScreen() {
           <div className={s.mark}>
             <LogoMark size={28} />
           </div>
-          {mode === 'login' ? <LoginForm onSwitch={() => setMode('register')} /> : <RegisterForm onSwitch={() => setMode('login')} />}
+          {mode === 'login' && <LoginForm resetDone={!!note.resetDone} onSwitch={() => go('register')} onForgot={() => go('forgot')} />}
+          {mode === 'register' && <RegisterForm onSwitch={() => go('login')} />}
+          {mode === 'forgot' && <ForgotForm onSent={(email) => go('reset', { sentTo: email })} onHaveCode={() => go('reset')} onBack={() => go('login')} />}
+          {mode === 'reset' && <ResetForm sentTo={note.sentTo} onDone={() => go('login', { resetDone: true })} onResend={() => go('forgot')} onBack={() => go('login')} />}
         </motion.div>
       </AnimatePresence>
       <p className={s.version}>v{window.alga?.config.version}</p>
@@ -38,7 +52,7 @@ export function AuthScreen() {
   )
 }
 
-function useSubmit(run: () => Promise<void>, onFields: (f: Errors) => void) {
+function useSubmit(run: () => Promise<void>, onFields: (f: Errors) => void, unauthorized: () => string = () => t.errors.invalidCredentials) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const submit = async () => {
@@ -46,21 +60,13 @@ function useSubmit(run: () => Promise<void>, onFields: (f: Errors) => void) {
     setError(null)
     try {
       await run()
+      setBusy(false)
     } catch (e) {
-      const f = fieldErrors(e, {
-        email: t.errors.email,
-        username: t.errors.username,
-        password: t.errors.passwordShort,
-        login: t.errors.required,
-      }) as Errors
+      // `password` keeps the server's own words: besides length it refuses common/leaked and personal passwords.
+      const f = fieldErrors(e, { email: t.errors.email, username: t.errors.username, login: t.errors.required }) as Errors
+      if (e instanceof ApiRequestError && e.code === 'conflict' && !f.username) f.username = t.errors.conflict
       onFields(f)
-      if (Object.keys(f).length === 0) {
-        setError(
-          e instanceof ApiRequestError && e.code === 'unauthorized' ? t.errors.invalidCredentials
-          : e instanceof ApiRequestError && e.code === 'conflict' ? t.errors.conflict
-          : errorText(e),
-        )
-      }
+      if (Object.keys(f).length === 0) setError(e instanceof ApiRequestError && e.code === 'unauthorized' ? unauthorized() : errorText(e))
       setBusy(false)
     }
   }
@@ -77,11 +83,25 @@ function FormAlert({ text }: { text: string | null }) {
   )
 }
 
-function LoginForm({ onSwitch }: { onSwitch: () => void }) {
+function FormNote({ text }: { text: string }) {
+  return (
+    <div className={s.success} role="status">
+      <Icon icon={CheckCircle2} size={14} />
+      <span>{text}</span>
+    </div>
+  )
+}
+
+function LoginForm({ resetDone, onSwitch, onForgot }: { resetDone: boolean; onSwitch: () => void; onForgot: () => void }) {
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<Errors>({})
-  const { busy, error, submit } = useSubmit(() => useSession.getState().login({ login: login.trim(), password }), setErrors)
+  // E-mail login only works once the e-mail is confirmed: say so instead of a bare "incorrect".
+  const { busy, error, submit } = useSubmit(
+    () => useSession.getState().login({ login: login.trim(), password }),
+    setErrors,
+    () => (login.includes('@') ? t.errors.invalidEmailLogin : t.errors.invalidCredentials),
+  )
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -97,6 +117,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
       <h1 className={s.title}>{t.login.title}</h1>
       <p className={s.subtitle}>{t.login.subtitle}</p>
       <form className={s.form} onSubmit={onSubmit} noValidate>
+        {resetDone && <FormNote text={t.login.resetDone} />}
         <TextField
           label={t.login.login}
           name="login"
@@ -109,18 +130,23 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             setErrors((x) => ({ ...x, login: undefined }))
           }}
         />
-        <TextField
-          label={t.login.password}
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          error={errors.password}
-          onChange={(e) => {
-            setPassword(e.target.value)
-            setErrors((x) => ({ ...x, password: undefined }))
-          }}
-        />
+        <div className={s.labelRow}>
+          <TextField
+            label={t.login.password}
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            error={errors.password}
+            onChange={(e) => {
+              setPassword(e.target.value)
+              setErrors((x) => ({ ...x, password: undefined }))
+            }}
+          />
+          <button type="button" className={s.forgot} onClick={onForgot}>
+            {t.login.forgot}
+          </button>
+        </div>
         <FormAlert text={error} />
         <Button type="submit" variant="primary" size="lg" full loading={busy} className={s.submit}>
           {t.login.submit}
@@ -158,15 +184,16 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
       setErrors((x) => ({ ...x, [k]: undefined }))
     },
   })
+  const personal = [v.username, v.email.split('@')[0] ?? '']
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     const next: Errors = {}
     if (!v.email.trim()) next.email = t.errors.required
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email.trim())) next.email = t.errors.email
+    else if (!EMAIL.test(v.email.trim())) next.email = t.errors.email
     if (!v.username.trim()) next.username = t.errors.required
     else if (!USERNAME.test(v.username.trim().toLowerCase())) next.username = t.errors.username
-    if (v.password.length < 8) next.password = t.errors.passwordShort
+    if (v.password.length < MIN_PASSWORD_LENGTH) next.password = t.errors.passwordShort
     setErrors(next)
     if (Object.keys(next).length === 0) void submit()
   }
@@ -191,7 +218,8 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
             setErrors((x) => ({ ...x, username: undefined }))
           }}
         />
-        <TextField label={t.register.password} type="password" autoComplete="new-password" hint={t.register.passwordHint} {...field('password')} />
+        <TextField label={t.register.password} type="password" autoComplete="new-password" hint={v.password ? strengthHint(v.password, personal) : t.register.passwordHint} {...field('password')} />
+        <StrengthMeter password={v.password} personal={personal} />
         <FormAlert text={error} />
         <Button type="submit" variant="primary" size="lg" full loading={busy} className={s.submit}>
           {t.register.submit}
@@ -201,6 +229,118 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
         {t.register.switch}{' '}
         <button type="button" className={s.link} onClick={onSwitch}>
           {t.register.switchAction}
+        </button>
+      </p>
+    </>
+  )
+}
+
+function ForgotForm({ onSent, onHaveCode, onBack }: { onSent: (email: string) => void; onHaveCode: () => void; onBack: () => void }) {
+  const [email, setEmail] = useState('')
+  const [errors, setErrors] = useState<Errors>({})
+  const { busy, error, submit } = useSubmit(async () => {
+    await requestPasswordReset(email.trim())
+    onSent(email.trim())
+  }, setErrors)
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    const bad = !email.trim() ? t.errors.required : !EMAIL.test(email.trim()) ? t.errors.email : undefined
+    setErrors({ email: bad })
+    if (!bad) void submit()
+  }
+  return (
+    <>
+      <h1 className={s.title}>{t.forgot.title}</h1>
+      <p className={s.subtitle}>{t.forgot.subtitle}</p>
+      <form className={s.form} onSubmit={onSubmit} noValidate>
+        <TextField
+          label={t.forgot.email}
+          type="email"
+          autoComplete="email"
+          autoFocus
+          value={email}
+          error={errors.email}
+          onChange={(e) => {
+            setEmail(e.target.value)
+            setErrors({})
+          }}
+        />
+        <FormAlert text={error} />
+        <Button type="submit" variant="primary" size="lg" full loading={busy} className={s.submit}>
+          {t.forgot.submit}
+        </Button>
+      </form>
+      <p className={`${s.switch} ${s.links}`}>
+        <button type="button" className={s.link} onClick={onBack}>
+          {t.forgot.back}
+        </button>
+        <button type="button" className={s.link} onClick={onHaveCode}>
+          {t.forgot.haveCode}
+        </button>
+      </p>
+    </>
+  )
+}
+
+function ResetForm({ sentTo, onDone, onResend, onBack }: { sentTo?: string; onDone: () => void; onResend: () => void; onBack: () => void }) {
+  const [token, setToken] = useState('')
+  const [password, setPassword] = useState('')
+  const [errors, setErrors] = useState<Errors>({})
+  const { busy, error, submit } = useSubmit(async () => {
+    await confirmPasswordReset(parseEmailToken(token), password)
+    onDone()
+  }, setErrors)
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    const next: Errors = {}
+    if (!parseEmailToken(token)) next.token = t.errors.token
+    if (password.length < MIN_PASSWORD_LENGTH) next.password = t.errors.passwordShort
+    setErrors(next)
+    if (Object.keys(next).length === 0) void submit()
+  }
+  return (
+    <>
+      <h1 className={s.title}>{t.reset.title}</h1>
+      <p className={s.subtitle}>{t.reset.subtitle}</p>
+      <form className={s.form} onSubmit={onSubmit} noValidate>
+        {sentTo && <FormNote text={t.reset.sent(sentTo)} />}
+        <TextField
+          label={t.reset.token}
+          placeholder={t.reset.tokenPlaceholder}
+          autoComplete="one-time-code"
+          spellCheck={false}
+          autoFocus
+          value={token}
+          error={errors.token}
+          onChange={(e) => {
+            setToken(e.target.value)
+            setErrors((x) => ({ ...x, token: undefined }))
+          }}
+        />
+        <TextField
+          label={t.reset.password}
+          type="password"
+          autoComplete="new-password"
+          value={password}
+          error={errors.password}
+          hint={password ? strengthHint(password) : t.register.passwordHint}
+          onChange={(e) => {
+            setPassword(e.target.value)
+            setErrors((x) => ({ ...x, password: undefined }))
+          }}
+        />
+        <StrengthMeter password={password} />
+        <FormAlert text={error} />
+        <Button type="submit" variant="primary" size="lg" full loading={busy} className={s.submit}>
+          {t.reset.submit}
+        </Button>
+      </form>
+      <p className={`${s.switch} ${s.links}`}>
+        <button type="button" className={s.link} onClick={onBack}>
+          {t.forgot.back}
+        </button>
+        <button type="button" className={s.link} onClick={onResend}>
+          {t.reset.resend}
         </button>
       </p>
     </>

@@ -97,3 +97,86 @@
   color: var(--text-disabled);
   font: var(--type-meta);
 }
+
+/* ── Verification dialog and strip ── */
+.dialogForm {
+  display: grid;
+  gap: var(--s-3);
+}
+.dialogNote {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-wrap: pretty;
+}
+.strip {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  width: 100%;
+  margin-bottom: var(--s-2);
+  padding: var(--s-2);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.03);
+  text-align: left;
+}
+.strip:hover {
+  background: var(--state-hover);
+}
+.stripIcon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+}
+.stripText {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.stripTitle {
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+}
+.stripBody {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.labelRow {
+  position: relative;
+}
+.forgot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.forgot:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.success {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--success-tint);
+  color: var(--text-primary);
+  font: var(--type-ui);
+}
+.success svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--success);
+}
+.links {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
