@@ -3,7 +3,8 @@
 > Fonte de verdade. Só entra como "Validado" o que tem evidência (teste, medição, screenshot). Atualizado: 2026-11-01.
 
 ## Versão executável
-- Dev: `npm install && npm run dev` (ver `README.md`). Multiusuário local: `npm run dev -- --profiles=bob`.
+- Dev: `npm install && npm run dev` (ver `README.md`). Multiusuário local: `npm run dev -- --profiles=bob` — abre duas janelas; crie uma conta em cada, adicione como amigo, crie um espaço, convide, entre no canal de voz e transmita a tela.
+- Funciona só nesta máquina/rede local até o deploy (API no Railway + SFU em VPS) — ver Bloqueios humanos.
 - Instalador: `npm run dist:win` → `apps/desktop/release/`.
 
 ## Implementado
@@ -17,7 +18,8 @@
 | Backend onda 1 | `apps/server` | **feito** — ver Validado |
 | Desktop nativo onda 1 | `apps/desktop/src/main`, `preload`, instalador | **feito** — ver Validado |
 | Backend onda 2 (segurança + cargos/banimento/moderação) | `apps/server`, `packages/shared` | **feito** — ver Validado |
-| UI onda 2 (chamada, transmissão, configurações, correções da crítica) | `apps/desktop/src/renderer` (exceto `media/`) | em andamento |
+| UI onda 2 (chamada, transmissão, configurações, correções da crítica) | `apps/desktop/src/renderer` | **feito** — ver Validado |
+| Mídia onda 2 (vazamento de memória, pedidos da UI, rede degradada) | `media/` | em andamento |
 | Motor de mídia onda 1 | `apps/desktop/src/renderer/src/media` | **feito** — ver Validado e Qualidade |
 | Backend onda 3 (anexos/avatares, testes em Postgres real, pacote de deploy) | `apps/server`, `infra/server` | em andamento |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
@@ -32,6 +34,7 @@
 - Desktop nativo: bridge `window.alga` completo; 16 testes unitários (hotkeys, bounds, badge) + 21/21 checagens e2e com Playwright no app empacotado (tray, token via DPAPI sem texto puro no disco, captura negada sem escolha do usuário, hooks globais reais de PTT). Instalador NSIS 109 MiB: instalação silenciosa 7,8 s, desinstalação 6,2 s, dados do usuário preservados por padrão.
 - Eco do áudio do sistema na transmissão: resolvido sem módulo nativo com `restrictOwnAudio: true` (tom do próprio app caiu de −56 dB para −80 dB, outros apps intactos em −24 dB). `docs/decisions/0002-screen-audio-capture.md`.
 - UI onda 1: design system (`docs/design/design-system.md`) + 20 componentes; telas de auth, onboarding (2 passos até criar/entrar em espaço), amigos, DMs, espaços, convites, chat completo (agrupamento, edição, respostas, reações, digitação, não lidas, reenvio em falha), banner de reconexão, Ctrl+K. Cada tela capturada no app real com dados criados pela API real (`docs/screenshots/2026-11-01-*-vN.png`, histórico de versões preservado). 18 testes unitários novos.
+- UI onda 2: palco de chamada com brilho de fala real, "Agora" (onde as pessoas estão), painel de voz, seletor de transmissão, assistir sob demanda/foco/tela cheia/stats, chamadas em DM com toque, moderação por tile, configurações completas (conta, voz e vídeo, atalhos, notificações, aparência, inicialização, avançado), emoji picker, autocomplete de @menção. Capturas de **duas instâncias reais na mesma sala LiveKit** (`docs/screenshots/2026-11-01-voice-stage-v5.png`, `stream-watching-v3.png`, `screen-picker-v3.png`, `settings-voice-v3.png`…). 57 testes no desktop. Maestro conferiu as capturas e abriu o app integrado nesta máquina (LiveKit + API + 2 janelas, perfis padrão e `bob`).
 - Backend: 47 testes vitest (PGlite em memória, REST via inject + gateway via WebSocket real) passando, conferido pelo Maestro. Smoke test com LiveKit real: webhooks `room_started/finished` e `participant_joined/left` reais recebidos e assinatura verificada; `VOICE_STATE_UPDATE/REMOVE` entregues no gateway.
 
 ## Pesquisa concluída
