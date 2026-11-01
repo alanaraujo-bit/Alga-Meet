@@ -93,3 +93,7 @@
 .caps {
   color: var(--warning);
 }
+.input:disabled {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}

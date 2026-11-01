@@ -1,3 +1,4 @@
+import { MIN_PASSWORD_LENGTH } from '@alga/shared'
 import type { HotkeyAction } from '../../../../shared/bridge'
 
 export const t = {
@@ -32,7 +33,7 @@ export const t = {
     password: 'Senha',
     currentPassword: 'Senha atual',
     newPassword: 'Nova senha',
-    newPasswordHint: 'Pelo menos 8 caracteres. As outras sessões são encerradas.',
+    newPasswordHint: `Pelo menos ${MIN_PASSWORD_LENGTH} caracteres. As outras sessões são encerradas.`,
     changePassword: 'Trocar senha',
     passwordChanged: 'Senha trocada. As outras sessões foram encerradas.',
     passwordError: 'Não foi possível trocar a senha.',
@@ -41,12 +42,38 @@ export const t = {
     thisDevice: 'Este dispositivo',
     lastUsed: (d: string) => `Último uso ${d}`,
     revoke: 'Encerrar',
-    revokeOthers: 'Encerrar todas as outras',
     revoked: 'Sessão encerrada.',
     revokedOthers: 'As outras sessões foram encerradas.',
     sessionsError: 'Não foi possível carregar as sessões.',
     logout: 'Sair da conta',
     logoutBody: 'Sai deste dispositivo. Suas conversas continuam na conta.',
+    photo: 'Foto do perfil',
+    avatarSaved: 'Foto atualizada.',
+    avatarRemoved: 'Foto removida.',
+    email: 'E-mail',
+    emailVerified: 'Confirmado',
+    emailUnverified: 'Não confirmado: convites, um segundo espaço e mensagens para quem não é amigo ficam bloqueados.',
+    verify: 'Confirmar e-mail',
+    signOutOthers: 'Sair de todas as outras sessões',
+    otherDevices: 'Outros dispositivos',
+    signOutOthersBody: (n: number) => `Encerra ${n === 1 ? 'a outra sessão' : `as outras ${n} sessões`} agora. Este dispositivo continua conectado.`,
+    onlyThis: 'Só este dispositivo está conectado.',
+  },
+  image: {
+    upload: 'Enviar imagem',
+    change: 'Trocar imagem',
+    remove: 'Remover',
+    hint: 'PNG, JPEG, WebP ou GIF, até 8 MB. GIFs vão como estão, para manter a animação.',
+    type: 'Use uma imagem PNG, JPEG, WebP ou GIF.',
+    tooBig: 'Essa imagem passa de 8 MB.',
+    error: 'Não foi possível enviar a imagem.',
+    decodeError: 'Não conseguimos abrir essa imagem.',
+    cropTitle: 'Enquadrar imagem',
+    cropBody: 'Arraste para posicionar. Use o controle, a roda do mouse ou + e − para aproximar.',
+    cropArea: 'Área de recorte. Setas movem a imagem, + e − aproximam.',
+    zoom: 'Zoom',
+    apply: 'Aplicar',
+    cancel: 'Cancelar',
   },
 
   voice: {

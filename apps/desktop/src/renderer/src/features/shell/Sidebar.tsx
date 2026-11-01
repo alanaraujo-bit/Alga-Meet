@@ -9,6 +9,7 @@ import { useUi } from '@/store/ui'
 import { Avatar, Badge, contextMenuHandler, Fronds, Icon, IconButton, MenuButton, ScrollArea, toast, Tooltip, useSpeakingGlow } from '@/ui'
 import { leaveGroupDm, markSpaceRead } from '@/store/actions'
 import { errorText } from '@/lib/errors'
+import { VerifyStrip } from '../auth/VerifyEmail'
 import { spaceMenu } from '../spaces/spaceMenu'
 import { LiveNow } from '../voice/LiveNow'
 import { roomLevelNow, useLevelGetter } from '../voice/levels'
@@ -44,6 +45,7 @@ function HomeSidebar() {
         </button>
       </div>
       <ScrollArea className={s.list}>
+        <VerifyStrip />
         <LiveNow />
         <button
           type="button"

@@ -1,0 +1,237 @@
+/* Space settings: built on settings.module.css (frame, groups, rows); only what is specific lives here. */
+.tile {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--r-xl);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font: var(--type-title);
+}
+.tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.inline {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-2);
+}
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+.empty {
+  padding: var(--s-3) 0;
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+}
+
+/* ── People rows (members, bans) ── */
+.personRow,
+.memberRow {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: 48px;
+  padding: var(--s-1_5) var(--s-2);
+  margin: 0 calc(var(--s-2) * -1);
+  border-radius: var(--r-md);
+}
+.personRow:hover,
+.memberRow:hover {
+  background: var(--state-hover);
+}
+.memberList,
+.roleList {
+  display: grid;
+  gap: 1px;
+  margin-top: var(--s-2);
+  list-style: none;
+}
+.personText {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.personName {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-1_5);
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+  white-space: nowrap;
+}
+.handle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.personSub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.crown {
+  display: inline-flex;
+  align-self: center;
+  color: var(--warning);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+}
+.roleChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.roleDotSm {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+}
+.chipRemove {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-right: -4px;
+  border-radius: var(--r-full);
+  color: var(--text-tertiary);
+}
+.chipRemove:hover {
+  background: var(--state-selected);
+  color: var(--text-primary);
+}
+.addChip {
+  padding: 0 6px;
+  color: var(--text-tertiary);
+}
+.addChip:hover,
+.addChip[aria-expanded='true'] {
+  background: var(--state-selected);
+  color: var(--text-primary);
+}
+
+/* ── Roles ── */
+.roleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 44px;
+  padding: 0 var(--s-2);
+  margin: 0 calc(var(--s-2) * -1);
+  border-radius: var(--r-md);
+}
+.roleRow:hover {
+  background: var(--state-hover);
+}
+.roleDot {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-full);
+}
+.roleMain {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: var(--s-2);
+  min-width: 0;
+  height: 100%;
+  padding: 12px 0;
+  text-align: left;
+}
+.roleName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-semibold);
+}
+.roleMeta {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.chip {
+  flex-shrink: 0;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-secondary);
+  font: var(--type-badge);
+  line-height: 18px;
+}
+.lock {
+  display: inline-flex;
+  color: var(--text-tertiary);
+}
+.roleMove {
+  display: flex;
+  gap: 2px;
+}
+.chev {
+  color: var(--text-tertiary);
+}
+.editorHead {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: var(--s-2) 0 0 calc(var(--s-2) * -1);
+}
+.editorTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font: var(--type-title-sm);
+  letter-spacing: var(--track-title);
+}
+.notice {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font: var(--type-ui);
+}
+.swatchNone {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--border-strong);
+}
+.swatchNone[aria-checked='true'] {
+  box-shadow: inset 0 0 0 1.5px var(--border-strong), 0 0 0 2px var(--bg-content), 0 0 0 4px var(--text-primary);
+}
+
+/* ── Invites ── */
+.inviteLink {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: var(--w-regular);
+  user-select: text;
+}

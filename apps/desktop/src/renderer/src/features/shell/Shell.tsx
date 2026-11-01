@@ -12,6 +12,8 @@ import { FriendsView } from '../friends/FriendsView'
 import { Onboarding, useNeedsOnboarding } from '../onboarding/Onboarding'
 import { SettingsOverlay } from '../settings/SettingsOverlay'
 import { SpaceModals } from '../spaces/SpaceModals'
+import { SpaceSettingsOverlay } from '../spaceSettings/SpaceSettings'
+import { VerifyEmailDialog } from '../auth/VerifyEmail'
 import { QuickSwitcher } from '../switcher/QuickSwitcher'
 import { CallStage } from '../voice/CallStage'
 import { IncomingCall } from '../voice/IncomingCall'
@@ -59,6 +61,8 @@ export function Shell() {
       <ScreenPicker />
       <IncomingCall />
       <SettingsOverlay />
+      <SpaceSettingsOverlay />
+      <VerifyEmailDialog />
     </motion.div>
   )
 }

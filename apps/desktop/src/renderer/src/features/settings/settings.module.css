@@ -107,6 +107,13 @@
 .group + .group {
   border-top: 1px solid var(--border-subtle);
 }
+.groupHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: 28px;
+}
 .groupTitle {
   color: var(--text-primary);
   font: var(--type-ui-lg);
@@ -159,11 +166,6 @@
 }
 
 /* ── Account ── */
-.profile {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
-  gap: var(--s-5);
-}
 .profileFields {
   display: grid;
   gap: var(--s-4);
@@ -200,6 +202,10 @@
   width: 24px;
   height: 24px;
   border-radius: var(--r-full);
+}
+.swatch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .swatch[aria-checked='true'] {
   box-shadow: 0 0 0 2px var(--bg-content), 0 0 0 4px var(--text-primary);
@@ -344,4 +350,82 @@
   color: var(--accent);
   font: var(--type-meta);
   font-weight: var(--w-medium);
+}
+
+/* ── Image picker (avatar, space icon) ── */
+.imagePicker {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+.pickerPreview {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 80px;
+  height: 80px;
+  overflow: hidden;
+  border-radius: var(--r-full);
+}
+.pickerRounded {
+  border-radius: var(--r-xl);
+}
+.pickerPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pickerBody {
+  display: grid;
+  gap: var(--s-1_5);
+  min-width: 0;
+}
+.pickerActions {
+  display: flex;
+  gap: var(--s-2);
+}
+.crop {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-4);
+}
+.cropView {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: var(--bg-app);
+  cursor: grab;
+  touch-action: none;
+}
+.cropView:active {
+  cursor: grabbing;
+}
+.cropView:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cropView img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  user-select: none;
+  pointer-events: none;
+}
+/* The cut-out: the viewport is the final square; what the circle (or rounded tile) will not show is dimmed. */
+.cropMask {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-full);
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+.cropMaskRounded {
+  border-radius: 22%;
+}
+.cropZoom {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--text-tertiary);
 }

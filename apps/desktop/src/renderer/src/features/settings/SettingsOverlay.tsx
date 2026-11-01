@@ -1,20 +1,23 @@
 import type { Session } from '@alga/shared'
 import { Bell, Keyboard, LogOut, Mic, Monitor, Palette, Power, User, Wrench, X, type LucideIcon } from 'lucide-react'
-import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { AnimatePresence } from 'motion/react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
 import type { HotkeyAction, UpdateStatus } from '../../../../shared/bridge'
 import { media, useMedia, type ProcessingMode } from '@/media'
 import { errorText, fieldErrors } from '@/lib/errors'
-import { changePassword, listSessions, patchMe, revokeOtherSessions, revokeSession } from '@/store/actions'
+import { changePassword, listSessions, patchMe, removeAvatar, revokeOtherSessions, revokeSession, uploadAvatar } from '@/store/actions'
 import { useData } from '@/store/data'
 import { useSession } from '@/store/session'
 import { useUi } from '@/store/ui'
-import { Avatar, Button, Icon, IconButton, Kbd, SegmentedControl, Spinner, Switch, TextField, toast } from '@/ui'
-import { focusables } from '@/ui/floating'
-import { EASE_IN, EASE_OUT_QUART } from '@/ui/motion'
+import { Avatar, Button, IconButton, Kbd, SegmentedControl, Spinner, Switch, TextField, toast } from '@/ui'
+import { MIN_PASSWORD_LENGTH } from '@alga/shared'
+import { StrengthMeter, strengthHint } from '../auth/PasswordStrength'
+import { openVerifyEmail } from '../auth/VerifyEmail'
+import { Group, Row, SettingsFrame } from './Frame'
 import { HOTKEY_ACTIONS, loadBindings, saveBindings, type SavedBinding } from './hotkeys'
+import { ImagePicker } from './ImagePicker'
 import { closeSettings, openSettings, useSettings, type SettingsSection } from './store'
 import { t } from './strings'
 import s from './settings.module.css'
@@ -52,116 +55,24 @@ export function SettingsOverlay() {
 }
 
 function Panel({ section }: { section: SettingsSection }) {
-  const root = useRef<HTMLDivElement>(null)
-  const content = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const returnTo = document.activeElement as HTMLElement | null
-    root.current?.querySelector<HTMLElement>('[aria-current="page"]')?.focus()
-    const onKey = (e: KeyboardEvent) => {
-      // Menus, popovers and modals inside close first (they stop propagation on their own Esc).
-      if (e.key === 'Escape' && !document.querySelector('[role="menu"], [role="dialog"]:not([data-settings])')) {
-        e.preventDefault()
-        closeSettings()
-      } else if (e.key === 'Tab' && root.current) {
-        const f = focusables(root.current)
-        const i = f.indexOf(document.activeElement as HTMLElement)
-        if (e.shiftKey && i <= 0) {
-          e.preventDefault()
-          f[f.length - 1]?.focus()
-        } else if (!e.shiftKey && i === f.length - 1) {
-          e.preventDefault()
-          f[0]?.focus()
-        }
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      if (returnTo?.isConnected) returnTo.focus()
-    }
-  }, [])
-  useEffect(() => {
-    // Braces matter: Chromium's scrollTo now returns a Promise, which React would take for a cleanup.
-    content.current?.scrollTo({ top: 0 })
-  }, [section])
-
   return (
-    <motion.div
-      ref={root}
-      className={s.root}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t.title}
-      data-settings
-      initial={{ opacity: 0, scale: 0.985 }}
-      animate={{ opacity: 1, scale: 1, transition: { duration: 0.22, ease: EASE_OUT_QUART } }}
-      exit={{ opacity: 0, scale: 0.99, transition: { duration: 0.14, ease: EASE_IN } }}
+    <SettingsFrame
+      label={t.title}
+      navTitle={t.title}
+      nav={NAV.map((g) => ({ group: g.group, items: g.items.map((it) => ({ ...it, label: t.nav[it.id] })) }))}
+      section={section}
+      onSelect={openSettings}
+      onClose={closeSettings}
+      closeLabel={t.close}
     >
-      <nav className={s.nav} aria-label={t.title}>
-        <div className={s.navInner}>
-          <h1 className={s.navTitle}>{t.title}</h1>
-          {NAV.map((g) => (
-            <div key={g.group} className={s.navGroup}>
-              <div className={s.navGroupLabel}>{g.group}</div>
-              {g.items.map((it) => (
-                <button key={it.id} type="button" className={s.navItem} aria-current={section === it.id ? 'page' : undefined} onClick={() => openSettings(it.id)}>
-                  <Icon icon={it.icon} size={16} />
-                  {t.nav[it.id]}
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-      </nav>
-      <div ref={content} className={s.content}>
-        <div className={s.contentInner}>
-          <header className={s.header}>
-            <h2 className={s.title}>{t.nav[section]}</h2>
-            <span className={s.close}>
-              <IconButton icon={X} label={t.close} shortcut="Esc" size="lg" onClick={closeSettings} />
-              <Kbd>Esc</Kbd>
-            </span>
-          </header>
-          {section === 'account' && <Account />}
-          {section === 'voice' && <Voice />}
-          {section === 'hotkeys' && <Hotkeys />}
-          {section === 'notifications' && <Notifications />}
-          {section === 'appearance' && <Appearance />}
-          {section === 'startup' && <Startup />}
-          {section === 'advanced' && <Advanced />}
-        </div>
-      </div>
-    </motion.div>
-  )
-}
-
-// ── Layout helpers ─────────────────────────────────────────────
-
-function Group({ title, description, children }: { title?: string; description?: ReactNode; children: ReactNode }) {
-  return (
-    <section className={s.group}>
-      {title && <h3 className={s.groupTitle}>{title}</h3>}
-      {description && <p className={s.groupDesc}>{description}</p>}
-      <div className={s.rows}>{children}</div>
-    </section>
-  )
-}
-
-function Row({ label, hint, children, htmlFor }: { label: ReactNode; hint?: ReactNode; children?: ReactNode; htmlFor?: string }) {
-  return (
-    <div className={s.row}>
-      <div className={s.rowText}>
-        {htmlFor ? (
-          <label htmlFor={htmlFor} className={s.rowLabel}>
-            {label}
-          </label>
-        ) : (
-          <span className={s.rowLabel}>{label}</span>
-        )}
-        {hint && <span className={s.rowHint}>{hint}</span>}
-      </div>
-      {children && <div className={s.rowControl}>{children}</div>}
-    </div>
+      {section === 'account' && <Account />}
+      {section === 'voice' && <Voice />}
+      {section === 'hotkeys' && <Hotkeys />}
+      {section === 'notifications' && <Notifications />}
+      {section === 'appearance' && <Appearance />}
+      {section === 'startup' && <Startup />}
+      {section === 'advanced' && <Advanced />}
+    </SettingsFrame>
   )
 }
 
@@ -174,6 +85,8 @@ function Account() {
   const [form, setForm] = useState(() => ({ displayName: me?.displayName ?? '', username: me?.username ?? '', bio: me?.bio ?? '', accentColor: me?.accentColor ?? null }))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
+  // Changing the password ends the other sessions: the list below reloads.
+  const [sessionsKey, setSessionsKey] = useState(0)
   if (!me) return null
   const dirty = form.displayName !== me.displayName || form.username !== me.username || form.bio !== me.bio || form.accentColor !== me.accentColor
   const reset = () => {
@@ -205,11 +118,15 @@ function Account() {
   return (
     <>
       <Group title={t.account.profile}>
-        <form className={s.profile} onSubmit={save}>
-          <div className={s.profilePreview}>
-            <Avatar user={{ ...me, displayName: form.displayName || me.displayName, accentColor: form.accentColor }} size={64} decorative />
-          </div>
+        <form onSubmit={save}>
           <div className={s.profileFields}>
+            <ImagePicker
+              shape="circle"
+              hasImage={!!me.avatarUrl}
+              preview={<Avatar user={{ ...me, displayName: form.displayName || me.displayName, accentColor: form.accentColor }} size={80} decorative />}
+              onUpload={(file, name) => uploadAvatar(file, name).then(() => toast.success(t.account.avatarSaved))}
+              onRemove={() => removeAvatar().then(() => toast.success(t.account.avatarRemoved))}
+            />
             <TextField label={t.account.displayName} value={form.displayName} maxLength={32} error={errors.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} />
             <TextField label={t.account.username} value={form.username} maxLength={32} spellCheck={false} error={errors.username} hint={t.account.usernameHint} onChange={(e) => setForm({ ...form, username: e.target.value })} />
             <label className={s.textareaField}>
@@ -240,8 +157,17 @@ function Account() {
           </div>
         </form>
       </Group>
-      <PasswordForm />
-      <Sessions />
+      <Group title={t.account.email}>
+        <Row label={me.email} hint={me.emailVerified === false ? t.account.emailUnverified : t.account.emailVerified}>
+          {me.emailVerified === false && (
+            <Button size="sm" variant="primary" onClick={openVerifyEmail}>
+              {t.account.verify}
+            </Button>
+          )}
+        </Row>
+      </Group>
+      <PasswordForm onChanged={() => setSessionsKey((k) => k + 1)} />
+      <Sessions key={sessionsKey} />
       <Group>
         <Row label={t.account.logout} hint={t.account.logoutBody}>
           <Button variant="danger" icon={LogOut} onClick={() => void useSession.getState().logout()}>
@@ -253,14 +179,16 @@ function Account() {
   )
 }
 
-function PasswordForm() {
+function PasswordForm({ onChanged }: { onChanged: () => void }) {
+  const me = useData((st) => st.me)
   const [cur, setCur] = useState('')
   const [next, setNext] = useState('')
   const [busy, setBusy] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const personal = [me?.username ?? '', me?.email.split('@')[0] ?? '']
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    if (next.length < 8) return setErrors({ newPassword: t.account.newPasswordHint })
+    if (next.length < MIN_PASSWORD_LENGTH) return setErrors({ newPassword: t.account.newPasswordHint })
     setBusy(true)
     setErrors({})
     try {
@@ -268,6 +196,7 @@ function PasswordForm() {
       setCur('')
       setNext('')
       toast.success(t.account.passwordChanged)
+      onChanged()
     } catch (err) {
       const f = fieldErrors(err)
       setErrors(Object.keys(f).length ? f : { currentPassword: errorText(err, t.account.passwordError) })
@@ -279,7 +208,16 @@ function PasswordForm() {
     <Group title={t.account.password}>
       <form className={s.password} onSubmit={submit}>
         <TextField label={t.account.currentPassword} type="password" autoComplete="current-password" value={cur} error={errors.currentPassword} onChange={(e) => setCur(e.target.value)} />
-        <TextField label={t.account.newPassword} type="password" autoComplete="new-password" value={next} error={errors.newPassword} hint={t.account.newPasswordHint} onChange={(e) => setNext(e.target.value)} />
+        <TextField
+          label={t.account.newPassword}
+          type="password"
+          autoComplete="new-password"
+          value={next}
+          error={errors.newPassword}
+          hint={next ? strengthHint(next, personal) : t.account.newPasswordHint}
+          onChange={(e) => setNext(e.target.value)}
+        />
+        <StrengthMeter password={next} personal={personal} />
         <div className={s.formActions}>
           <Button type="submit" loading={busy} disabled={!cur || !next}>
             {t.account.changePassword}
@@ -301,6 +239,7 @@ function deviceName(ua: string): string {
 function Sessions() {
   const [list, setList] = useState<Session[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [signingOut, setSigningOut] = useState(false)
   const load = () => {
     setError(null)
     listSessions()
@@ -341,24 +280,27 @@ function Sessions() {
               )}
             </Row>
           ))}
-          {others > 1 && (
-            <div className={s.formActions}>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() =>
-                  void revokeOtherSessions()
-                    .then(() => {
-                      setList((l) => l?.filter((y) => y.current) ?? null)
-                      toast.success(t.account.revokedOthers)
-                    })
-                    .catch((e: unknown) => toast.error(errorText(e)))
-                }
-              >
-                {t.account.revokeOthers}
-              </Button>
-            </div>
-          )}
+          <Row label={t.account.otherDevices} hint={others ? t.account.signOutOthersBody(others) : t.account.onlyThis}>
+            <Button
+              variant="danger"
+              size="sm"
+              icon={LogOut}
+              disabled={!others}
+              loading={signingOut}
+              onClick={() => {
+                setSigningOut(true)
+                revokeOtherSessions()
+                  .then(() => {
+                    setList((l) => l?.filter((y) => y.current) ?? null)
+                    toast.success(t.account.revokedOthers)
+                  })
+                  .catch((e: unknown) => toast.error(errorText(e)))
+                  .finally(() => setSigningOut(false))
+              }}
+            >
+              {t.account.signOutOthers}
+            </Button>
+          </Row>
         </>
       )}
     </Group>

@@ -1,11 +1,14 @@
 import { Permission } from '@alga/shared'
-import { CheckCheck, Hash, LogOut, UserPlus, Volume2 } from 'lucide-react'
+import { CheckCheck, Hash, LogOut, Settings, UserPlus, Volume2 } from 'lucide-react'
 import { markSpaceRead } from '@/store/actions'
 import { useData } from '@/store/data'
 import { can, spacePermissions } from '@/store/selectors'
 import { useUi } from '@/store/ui'
 import type { MenuEntry } from '@/ui'
 import { t } from '../shell/strings'
+import { actorFor, visibleSections } from '../spaceSettings/permissions'
+import { openSpaceSettings } from '../spaceSettings/SpaceSettings'
+import { t as tss } from '../spaceSettings/strings'
 
 /** Same entries for the rail context menu and the sidebar header dropdown. */
 export function spaceMenu(spaceId: string): MenuEntry[] {
@@ -22,6 +25,7 @@ export function spaceMenu(spaceId: string): MenuEntry[] {
       { label: t.space.createVoice, icon: Volume2, onSelect: () => ui.openModal({ kind: 'createChannel', spaceId, type: 'voice' }) },
     )
   }
+  if (visibleSections(actorFor(d, spaceId)).length) items.push({ label: tss.open, icon: Settings, onSelect: () => openSpaceSettings(spaceId) })
   if (items.length) items.push({ kind: 'separator' })
   items.push({ label: t.space.markRead, icon: CheckCheck, onSelect: () => markSpaceRead(spaceId) })
   // The owner cannot leave (the server forbids it); deleting a space is a settings-wave action.

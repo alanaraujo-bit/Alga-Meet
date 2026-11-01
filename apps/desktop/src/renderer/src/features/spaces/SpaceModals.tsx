@@ -10,6 +10,8 @@ import { useData } from '@/store/data'
 import { useUi, type ModalState } from '@/store/ui'
 import { Button, Icon, Modal, SegmentedControl, Spinner, TextField, toast } from '@/ui'
 import { initials } from '@/ui/Avatar'
+import { needsVerification, openVerifyEmail } from '../auth/VerifyEmail'
+import { t as ta } from '../auth/strings'
 import { finishOnboarding } from '../onboarding/Onboarding'
 import { t as ts } from '../shell/strings'
 import { t } from './strings'
@@ -41,10 +43,12 @@ function CreateSpaceModal({ open, onClose }: { open: boolean; onClose: () => voi
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [gated, setGated] = useState(false)
   useEffect(() => {
     if (open) {
       setName('')
       setError(null)
+      setGated(false)
     }
   }, [open])
   const fallback = t.create.placeholder(me?.displayName ?? 'você')
@@ -60,6 +64,7 @@ function CreateSpaceModal({ open, onClose }: { open: boolean; onClose: () => voi
       useUi.getState().go({ kind: 'space', spaceId: sp.id, channelId: first?.id ?? null })
       toast.success(t.create.created(sp.name), { action: { label: ts.space.invite, run: () => useUi.getState().openModal({ kind: 'invite', spaceId: sp.id }) } })
     } catch (err) {
+      setGated(needsVerification(err))
       setError(fieldErrors(err).name ?? errorText(err, t.error))
     } finally {
       setBusy(false)
@@ -91,6 +96,11 @@ function CreateSpaceModal({ open, onClose }: { open: boolean; onClose: () => voi
         </span>
         <div style={{ flex: 1 }}>
           <TextField label={t.create.name} value={name} placeholder={fallback} maxLength={100} error={error} onChange={(e) => setName(e.target.value)} autoFocus />
+          {gated && (
+            <Button size="sm" variant="secondary" className={s.verifyBtn} onClick={openVerifyEmail}>
+              {ta.verify.action}
+            </Button>
+          )}
         </div>
       </form>
     </Modal>
@@ -292,7 +302,7 @@ type Expiry = keyof typeof EXPIRY
 function InviteModal({ open, onClose, spaceId }: { open: boolean; onClose: () => void; spaceId: string }) {
   const space = useData((st) => st.spaces[spaceId])
   const [expiry, setExpiry] = useState<Expiry>('d7')
-  const [state, setState] = useState<{ invite?: Invite; error?: string; loading: boolean }>({ loading: true })
+  const [state, setState] = useState<{ invite?: Invite; error?: string; gated?: boolean; loading: boolean }>({ loading: true })
   const [copied, setCopied] = useState(false)
   const [attempt, setAttempt] = useState(0)
 
@@ -302,7 +312,7 @@ function InviteModal({ open, onClose, spaceId }: { open: boolean; onClose: () =>
     setState({ loading: true })
     createInvite(spaceId, EXPIRY[expiry]).then(
       (invite) => live && setState({ invite, loading: false }),
-      (e: unknown) => live && setState({ error: errorText(e, t.invite.error), loading: false }),
+      (e: unknown) => live && setState({ error: errorText(e, t.invite.error), gated: needsVerification(e), loading: false }),
     )
     return () => {
       live = false
@@ -325,7 +335,11 @@ function InviteModal({ open, onClose, spaceId }: { open: boolean; onClose: () =>
         error={state.error}
         onFocus={(e) => e.currentTarget.select()}
         trailing={
-          state.error ? (
+          state.gated ? (
+            <Button size="sm" variant="primary" onClick={openVerifyEmail}>
+              {ta.verify.action}
+            </Button>
+          ) : state.error ? (
             <Button size="sm" onClick={() => setAttempt((n) => n + 1)}>
               {t.invite.retry}
             </Button>

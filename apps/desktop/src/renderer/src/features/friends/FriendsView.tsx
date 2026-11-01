@@ -13,6 +13,7 @@ import { Avatar, Button, contextMenuHandler, EmptyState, Icon, IconButton, MenuB
 import { finishOnboarding } from '../onboarding/Onboarding'
 import sh from '../shell/shell.module.css'
 import { t } from './strings'
+import { toastError } from '../auth/VerifyEmail'
 import s from './friends.module.css'
 
 export function FriendsView() {
@@ -115,7 +116,7 @@ async function message(userId: string) {
     const ch = await openDm([userId])
     useUi.getState().go({ kind: 'dm', channelId: ch.id })
   } catch (e) {
-    toast.error(errorText(e, t.error))
+    toastError(e, t.error)
   }
 }
 
