@@ -48,6 +48,11 @@ export default defineRailway(() => {
       S3_REGION: preserve(),
       S3_ACCESS_KEY_ID: preserve(),
       S3_SECRET_ACCESS_KEY: preserve(),
+      // Transactional e-mail (verification, password reset). Production refuses to start without a real driver.
+      EMAIL_DRIVER: 'resend',
+      RESEND_API_KEY: preserve(),
+      EMAIL_FROM: 'Alga Meet <nao-responda@algameet.com.br>', // TODO(owner): verified sending domain
+      EMAIL_LINK_URL: 'algameet://auth',
     },
   })
 
