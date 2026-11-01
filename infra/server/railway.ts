@@ -18,7 +18,7 @@ export default defineRailway(() => {
   const uploads = bucket('uploads', { region: 'iad' })
 
   const api = service('api', {
-    source: github('OWNER/alga-meet', { branch: 'main' }), // TODO(owner): real GitHub repo
+    source: github('alanaraujo-bit/Alga-Meet', { branch: 'main' }),
     // Built with infra/server/Dockerfile from the repo root; migrations run at startup.
     healthcheck: '/api/v1/health',
     healthcheckTimeout: 60,

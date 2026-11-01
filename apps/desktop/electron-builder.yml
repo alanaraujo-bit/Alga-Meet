@@ -82,5 +82,5 @@ nsis:
 publish:
   provider: github
   owner: alanaraujo-bit
-  repo: alga-meet
+  repo: Alga-Meet
   releaseType: release
