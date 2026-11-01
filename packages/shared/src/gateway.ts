@@ -10,6 +10,9 @@ import type {
  * 3. Client sends { op: 'heartbeat' } every READY.heartbeatIntervalMs; server answers { op: 'heartbeat_ack' }.
  *    Server closes with 4002 if no heartbeat arrives for 2 intervals.
  * 4. On reconnect the client identifies again and receives a fresh READY (no resume yet).
+ * Limits: identify within 10 s; at most 120 frames per 60 s and 10 identified sockets per user (else 4008, back off
+ * before reconnecting). `presence` / `voice_state` fan out at most once per second per user: frames sent faster
+ * collapse into the latest value, so always send the full current state. A client that stops reading is dropped.
  */
 
 export const GatewayClose = {
@@ -17,6 +20,8 @@ export const GatewayClose = {
   HEARTBEAT_TIMEOUT: 4002,
   INVALID_PAYLOAD: 4003,
   SESSION_REVOKED: 4004,
+  /** Too many frames or too many sockets for this user. */
+  RATE_LIMITED: 4008,
 } as const
 
 export type ClientFrame =

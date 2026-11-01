@@ -42,6 +42,10 @@ export class Hub {
     return this.byUser.has(userId)
   }
 
+  connections(userId: string): number {
+    return this.byUser.get(userId)?.size ?? 0
+  }
+
   /** Sends a dispatch to every socket of every listed user. A function payload is evaluated per recipient. */
   dispatch<T extends DispatchType>(userIds: Iterable<string>, t: T, d: Payload<T>): void {
     for (const userId of new Set(userIds)) {
@@ -91,5 +95,38 @@ export async function exchangePresence(db: Db, hub: Hub, a: string, bs: string[]
   for (const b of bs) {
     const s = statusOf(b)
     if (s !== 'offline') hub.dispatch([a], 'PRESENCE_UPDATE', { userId: b, status: s })
+  }
+}
+
+/** Trailing throttle: `fn` runs at most once per `ms` per key; calls in between collapse into the latest one. */
+export class Throttle {
+  private readonly slots = new Map<string, { last: number; timer?: NodeJS.Timeout; next?: () => Promise<void> }>()
+
+  constructor(private readonly ms: number, private readonly onError: (err: unknown) => void) {}
+
+  run(key: string, fn: () => Promise<void>): Promise<void> | undefined {
+    const now = Date.now()
+    let slot = this.slots.get(key)
+    if (!slot || (!slot.timer && now - slot.last >= this.ms)) {
+      this.slots.set(key, { last: now })
+      return fn()
+    }
+    slot.next = fn
+    slot.timer ??= setTimeout(() => {
+      const next = slot!.next!
+      // Re-arms the window: the slot is replaced, so a call right after this one waits again.
+      this.slots.set(key, { last: Date.now() })
+      next().catch(this.onError)
+    }, slot.last + this.ms - now)
+    return undefined
+  }
+
+  /** Drops idle slots (call periodically) and pending timers (on shutdown). */
+  prune(all = false): void {
+    const cutoff = Date.now() - this.ms
+    for (const [k, s] of this.slots) {
+      if (all) clearTimeout(s.timer)
+      if (all || (!s.timer && s.last < cutoff)) this.slots.delete(k)
+    }
   }
 }

@@ -9,7 +9,17 @@ import { resolveToken } from '../auth.js'
 import { readStates, spaceMembers, users, type UserRow } from '../db/schema.js'
 import { afterMeUpdate } from '../routes/users.js'
 import { meView, privateChannelsOf, publicUser, relationshipsOf, spaceSnapshots } from '../views.js'
-import { broadcastPresence, effectiveStatus, type Conn } from './hub.js'
+import { Throttle, broadcastPresence, effectiveStatus, type Conn } from './hub.js'
+
+/** Discord's gateway figure. Also bounds the per-socket frame queue (each frame ≤ 16 KiB). */
+const FRAME_LIMIT = 120
+const FRAME_WINDOW_MS = 60_000
+const MAX_SOCKETS_PER_USER = 10
+const IDENTIFY_TIMEOUT_MS = 10_000
+/** presence / voice_state fan-out per user (latest value wins). */
+const STATE_OP_INTERVAL_MS = 1_000
+/** A client that does not read (zero TCP window) is dropped instead of buffering without bound. */
+const MAX_BUFFERED_BYTES = 1024 * 1024
 
 const ClientFrameSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('identify'), token: z.string().min(1).max(256) }),
@@ -61,6 +71,13 @@ export async function buildReady(ctx: Ctx, user: UserRow): Promise<ReadyPayload>
 
 export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
   const { db, hub, voice, config } = ctx
+  const stateOps = new Throttle(STATE_OP_INTERVAL_MS, (err) => ctx.log.error({ err }, 'gateway state op failed'))
+  const prune = setInterval(() => stateOps.prune(), 60_000)
+  prune.unref()
+  app.addHook('onClose', async () => {
+    clearInterval(prune)
+    stateOps.prune(true)
+  })
 
   app.get('/gateway', { websocket: true }, (socket: WebSocket, req) => {
     const log = req.log
@@ -69,16 +86,18 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
     const backlog: string[] = []
     let timer: NodeJS.Timeout | undefined
     let chain = Promise.resolve()
+    let windowStart = Date.now()
+    let frames = 0
 
     const close = (code: number, reason: string) => {
       if (socket.readyState === socket.OPEN || socket.readyState === socket.CONNECTING) socket.close(code, reason)
     }
     // No frame (identify or heartbeat) for two intervals → the connection is considered dead.
-    const arm = () => {
+    const arm = (ms = config.heartbeatIntervalMs * 2) => {
       clearTimeout(timer)
-      timer = setTimeout(() => close(GatewayClose.HEARTBEAT_TIMEOUT, 'heartbeat timeout'), config.heartbeatIntervalMs * 2)
+      timer = setTimeout(() => close(GatewayClose.HEARTBEAT_TIMEOUT, 'heartbeat timeout'), ms)
     }
-    arm()
+    arm(Math.min(IDENTIFY_TIMEOUT_MS, config.heartbeatIntervalMs * 2))
 
     const handle = async (raw: string) => {
       let json: unknown
@@ -90,18 +109,23 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
       const parsed = ClientFrameSchema.safeParse(json)
       if (!parsed.success) return close(GatewayClose.INVALID_PAYLOAD, 'invalid frame')
       const frame = parsed.data
-      arm()
 
       if (frame.op === 'identify') {
         if (conn) return close(GatewayClose.INVALID_PAYLOAD, 'already identified')
         const auth = await resolveToken(db, frame.token)
         if (!auth) return close(GatewayClose.AUTH_FAILED, 'authentication failed')
         if (socket.readyState !== socket.OPEN) return
+        if (hub.connections(auth.user.id) >= MAX_SOCKETS_PER_USER) return close(GatewayClose.RATE_LIMITED, 'too many connections')
+        arm()
         // Registered before READY is built so nothing dispatched meanwhile is lost; it is flushed after READY.
         conn = {
           userId: auth.user.id,
           sessionId: auth.sessionId,
-          send: (data) => (ready ? socket.send(data) : backlog.push(data)),
+          send: (data) => {
+            if (!ready) return void backlog.push(data)
+            if (socket.bufferedAmount > MAX_BUFFERED_BYTES) return socket.terminate()
+            socket.send(data)
+          },
           close,
         }
         const cameOnline = hub.add(conn)
@@ -116,27 +140,36 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
       }
 
       if (!conn) return close(GatewayClose.INVALID_PAYLOAD, 'identify first')
+      arm()
+      const userId = conn.userId
 
       switch (frame.op) {
         case 'heartbeat':
           socket.send(JSON.stringify({ op: 'heartbeat_ack' }))
           break
-        case 'presence': {
-          const [before] = await db.select().from(users).where(eq(users.id, conn.userId))
-          if (!before || before.statusPreference === frame.status) break
-          const [after] = await db.update(users).set({ statusPreference: frame.status }).where(eq(users.id, conn.userId)).returning()
-          await afterMeUpdate(ctx, before, after!)
-          break
-        }
-        case 'voice_state':
-          await voice.updateSelf(conn.userId, {
-            selfMute: frame.selfMute, selfDeaf: frame.selfDeaf, streaming: frame.streaming, video: frame.video,
+        case 'presence':
+          await stateOps.run(`presence:${userId}`, async () => {
+            const [before] = await db.select().from(users).where(eq(users.id, userId))
+            if (!before || before.statusPreference === frame.status) return
+            const [after] = await db.update(users).set({ statusPreference: frame.status }).where(eq(users.id, userId)).returning()
+            await afterMeUpdate(ctx, before, after!)
           })
+          break
+        case 'voice_state':
+          await stateOps.run(`voice:${userId}`, () => voice.updateSelf(userId, {
+            selfMute: frame.selfMute, selfDeaf: frame.selfDeaf, streaming: frame.streaming, video: frame.video,
+          }))
           break
       }
     }
 
     socket.on('message', (data, isBinary) => {
+      const now = Date.now()
+      if (now - windowStart >= FRAME_WINDOW_MS) {
+        windowStart = now
+        frames = 0
+      }
+      if (++frames > FRAME_LIMIT) return close(GatewayClose.RATE_LIMITED, 'rate limited')
       const raw = isBinary ? '' : data.toString()
       chain = chain.then(() => handle(raw)).catch((err: unknown) => {
         log.error({ err }, 'gateway frame handling failed')

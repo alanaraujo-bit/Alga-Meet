@@ -21,6 +21,7 @@ export function channelIdOfRoom(room: string): string | null {
 }
 
 export type SelfFlags = Pick<VoiceState, 'selfMute' | 'selfDeaf' | 'streaming' | 'video'>
+const FLAGS = ['selfMute', 'selfDeaf', 'streaming', 'video'] as const
 
 export class Voice {
   /** userId → state. A user is in at most one voice channel. shortcut: in-memory, single instance; rebuilt from LiveKit on boot. */
@@ -146,6 +147,7 @@ export class Voice {
     const prev = this.states.get(userId)
     if (!prev) return
     const state = { ...prev, ...flags }
+    if (FLAGS.every((k) => state[k] === prev[k])) return
     this.states.set(userId, state)
     this.hub.dispatch(await this.audience(state), 'VOICE_STATE_UPDATE', state)
   }

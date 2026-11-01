@@ -2,13 +2,33 @@
  * Regression tests for docs/security/server-review-2026-11-01.md (one describe per finding).
  * Each test reproduces the reviewer's PoC and asserts the fixed behaviour.
  */
+import { GatewayClose, type Invite, type SpaceSnapshot } from '@alga/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { loadConfig } from '../src/config.js'
-import { api, freshIp, register, startServer, type TestServer } from './helpers.js'
+import { api, connect, freshIp, openGateway, postWebhook, register, startServer, type TestServer } from './helpers.js'
 
 let s: TestServer
 beforeAll(async () => { s = await startServer() })
 afterAll(async () => { await s.close() })
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** Space owned by `owner` with every other token joined through an invite. */
+async function spaceWith(owner: string, ...others: string[]) {
+  const space = (await api<SpaceSnapshot>(s.app, 'POST', '/spaces', { token: owner, body: { name: 'sec' } })).body
+  const invite = (await api<Invite>(s.app, 'POST', `/spaces/${space.id}/invites`, { token: owner, body: {} })).body
+  for (const t of others) expect((await api(s.app, 'POST', `/invites/${invite.code}`, { token: t })).status).toBe(200)
+  return {
+    space, invite,
+    voice: space.channels.find((c) => c.type === 'voice')!,
+    text: space.channels.find((c) => c.type === 'text')!,
+  }
+}
+
+let evSeq = 0
+const lkEvent = (event: string, channelId: string, identity: string) => ({
+  event, id: `SEC_${++evSeq}`, room: { name: `ch_${channelId}` }, participant: { identity },
+})
 
 const PROD = { NODE_ENV: 'production', DATABASE_URL: 'postgres://u:p@db:5432/alga', CORS_ORIGINS: 'null,file://' }
 const REAL_SECRET = 'a-real-production-secret-0123456789abcdef'
@@ -108,4 +128,55 @@ describe('M10/A2 write routes are rate limited per user', () => {
     const b = await register(s.app)
     expect((await api(s.app, 'GET', '/users/@me', { token: b.token })).status).toBe(200)
   })
+})
+
+describe('A2/M3 gateway throttling and limits', () => {
+  it('presence spam collapses to at most one fan-out per second and the flooder is closed with 4008', async () => {
+    const [a, b] = [await register(s.app), await register(s.app)]
+    await spaceWith(a.token, b.token)
+    const ga = await connect(s.port, a.token)
+    const gb = await connect(s.port, b.token)
+    for (let i = 0; i < 200; i++) ga.send({ op: 'presence', status: i % 2 ? 'online' : 'dnd' })
+    expect((await ga.closed).code).toBe(GatewayClose.RATE_LIMITED)
+    await sleep(1500)
+    const n = gb.events.filter((e) => e.t === 'PRESENCE_UPDATE' && e.d.userId === a.user.id).length
+    expect(n).toBeLessThanOrEqual(3)
+    gb.close()
+  })
+
+  it('voice_state: unchanged flags send nothing, bursts collapse to the latest value', async () => {
+    const [a, b] = [await register(s.app), await register(s.app)]
+    const { voice } = await spaceWith(a.token, b.token)
+    const ga = await connect(s.port, a.token)
+    const gb = await connect(s.port, b.token)
+    await postWebhook(s.app, s.config, lkEvent('participant_joined', voice.id, a.user.id))
+    await gb.waitFor('VOICE_STATE_UPDATE', (v) => v.userId === a.user.id)
+    gb.events.length = 0
+    ga.send({ op: 'voice_state', selfMute: false, selfDeaf: false, streaming: false, video: false })
+    await gb.expectNone('VOICE_STATE_UPDATE', () => true, 1200)
+    for (let i = 0; i < 10; i++) ga.send({ op: 'voice_state', selfMute: i % 2 === 0, selfDeaf: false, streaming: false, video: false })
+    await sleep(1500)
+    const updates = gb.events.filter((e) => e.t === 'VOICE_STATE_UPDATE')
+    expect(updates.length).toBeLessThanOrEqual(2)
+    expect(updates.at(-1)!.d).toMatchObject({ selfMute: false }) // i = 9 → the last frame wins
+    ga.close()
+    gb.close()
+  })
+
+  it('caps sockets per user', async () => {
+    const a = await register(s.app)
+    const socks = []
+    for (let i = 0; i < 10; i++) socks.push(await connect(s.port, a.token))
+    const extra = await openGateway(s.port)
+    extra.send({ op: 'identify', token: a.token })
+    expect((await extra.closed).code).toBe(GatewayClose.RATE_LIMITED)
+    for (const g of socks) g.close()
+  })
+
+  it('unidentified sockets are dropped after 10 s even with a long heartbeat interval', async () => {
+    const idle = await openGateway(s.port)
+    const started = Date.now()
+    expect((await idle.closed).code).toBe(GatewayClose.HEARTBEAT_TIMEOUT)
+    expect(Date.now() - started).toBeLessThan(12_000)
+  }, 15_000)
 })
