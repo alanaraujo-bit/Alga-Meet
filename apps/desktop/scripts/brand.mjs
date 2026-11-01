@@ -5,6 +5,7 @@
 //   build/icon.ico                     app/installer icon, 16..256 px
 //   build/runtime/icon.png             256 px (notifications, dev window icon)
 //   build/runtime/tray-<state>[@Nx].png idle/connected/muted at 16/20/24/32/40 px
+//   build/runtime/tray-breathe-<n>[@Nx].png connected with shorter bars: the tray "breathing" frames while in voice
 //   build/installer-sidebar.bmp        164x314 NSIS welcome/finish sidebar
 //   build/installer-header.bmp         150x57 NSIS page header
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -124,6 +125,14 @@ const TRAY = {
   connected: '#4fce74',
   muted: '#f75d59',
 }
+// Bar height scale per breathing frame (src/main/tray.ts plays connected, 1, 2, 1 at 250 ms): subtle, unlike the
+// in-app Fronds (0.55).
+const BREATHE = { 'breathe-1': 0.85, 'breathe-2': 0.7 }
+/** The small master with each bar shortened to `s` of its height around its own center (caps stay round). */
+const breathe = (master, s) =>
+  master.replace(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g, (_, x, y, w, h) =>
+    `<rect x="${x}" y="${+y + (h * (1 - s)) / 2}" width="${w}" height="${h * s}"`,
+  )
 const TRAY_SIZES = [
   [16, ''],
   [20, '@1.25x'],
@@ -148,6 +157,10 @@ app.whenReady().then(async () => {
   for (const [state, color] of Object.entries(TRAY))
     for (const [size, suffix] of TRAY_SIZES)
       writeFileSync(join(build, 'runtime', `tray-${state}${suffix}.png`), (await raster(tray(color, size), size)).png)
+  const breathing = (s, size) => withMark(svg('tray.svg'), breathe(small(size), s)).replace('{{COLOR}}', TRAY.connected)
+  for (const [frame, s] of Object.entries(BREATHE))
+    for (const [size, suffix] of TRAY_SIZES)
+      writeFileSync(join(build, 'runtime', `tray-${frame}${suffix}.png`), (await raster(breathing(s, size), size)).png)
 
   const sidebar = await raster(withMark(svg('installer-sidebar.svg'), mark), 164, 314)
   const header = await raster(withMark(svg('installer-header.svg'), mark), 150, 57)
@@ -161,12 +174,14 @@ app.whenReady().then(async () => {
     const both = (html) => `<span class="dark">${html}</span><span class="light">${html}</span>`
     const smalls = await Promise.all([16, 20, 24, 32].map((s) => raster(small(s), s)))
     const trays = await Promise.all(Object.values(TRAY).flatMap((c) => [16, 20, 24, 32].map((s) => raster(tray(c, s), s))))
+    const breaths = await Promise.all(Object.values(BREATHE).flatMap((b) => [16, 20, 24, 32].map((s) => raster(breathing(b, s), s))))
     const html = `<body style="margin:0;padding:12px;background:#2b2f36">
       <style>img{margin:5px;vertical-align:middle;image-rendering:pixelated} span{display:inline-block;padding:4px} .dark{background:#202020} .light{background:#f3f3f3} div{margin-bottom:6px}</style>
       <div>${both(imgs(iconImages.filter((i) => i.w <= 64)))}</div>
       <div>${imgs(smalls, 8)}${imgs([iconImages.at(-1)])}</div>
       <div>${both(imgs(trays))}</div>
       <div>${both(imgs(trays.filter((t) => t.w === 16), 8))}</div>
+      <div>${both(imgs(breaths))} ${both(imgs(breaths.filter((t) => t.w === 16), 8))}</div>
       <div>${imgs([sidebar])} <span>${imgs([header])}</span></div></body>`
     const p = new BrowserWindow({ show: false, width: 1500, height: 1250 })
     await p.loadURL(`data:text/html;base64,${Buffer.from(html).toString('base64')}`)
