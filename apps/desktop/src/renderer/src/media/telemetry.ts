@@ -129,7 +129,7 @@ async function environment(): Promise<Environment> {
     // no WebGL: unknown
   }
   const version = /^\d{1,4}\.\d{1,4}\.\d{1,6}(-[0-9a-z.]{1,16})?$/.test(cfg?.version ?? '') ? cfg!.version : '0.0.0'
-  return { os, osVersion: pv && /^\d{1,5}(\.\d{1,6}){0,3}$/.test(pv) ? pv : '0', appVersion: version, cpuVendor: 'unknown', gpuVendor: gpuVendorOf(renderer) }
+  return { os, osVersion: pv && /^\d{1,5}(\.\d{1,6}){0,3}$/.test(pv) ? pv : '0', appVersion: version, cpuVendor: cfg?.cpuVendor ?? 'unknown', gpuVendor: gpuVendorOf(renderer) }
 }
 
 const SEND_TIMEOUT_MS = 5000

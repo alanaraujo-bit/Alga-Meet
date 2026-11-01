@@ -1,4 +1,5 @@
 import './chromium-flags'
+import { cpus } from 'node:os'
 import { join } from 'node:path'
 import { app, ipcMain, shell } from 'electron'
 import type { AppConfig } from '../shared/bridge'
@@ -26,6 +27,15 @@ app.setAppUserModelId('com.alga.meet') // must match electron-builder appId (toa
 
 const apiUrl = process.env.ALGA_API_URL ?? import.meta.env.MAIN_VITE_API_URL ?? 'http://localhost:4000'
 
+function cpuVendorOf(model: string): AppConfig['cpuVendor'] {
+  if (!model) return 'unknown'
+  if (/intel/i.test(model)) return 'intel'
+  if (/amd|ryzen|epyc/i.test(model)) return 'amd'
+  if (/apple/i.test(model)) return 'apple'
+  if (/qualcomm|snapdragon/i.test(model)) return 'qualcomm'
+  return 'other'
+}
+
 const config: AppConfig = {
   apiUrl,
   gatewayUrl: apiUrl.replace(/^http/, 'ws') + '/gateway',
@@ -33,6 +43,7 @@ const config: AppConfig = {
   profile,
   platform: process.platform,
   isPackaged: app.isPackaged,
+  cpuVendor: cpuVendorOf(cpus()[0]?.model ?? ''),
 }
 
 // Dev only, opt-in: route algameet:// to this checkout (and profile). Packaged builds are registered by the

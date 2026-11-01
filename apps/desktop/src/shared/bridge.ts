@@ -16,6 +16,8 @@ export interface AppConfig {
   profile: string
   platform: NodeJS.Platform
   isPackaged: boolean
+  /** Coarse CPU vendor class for opt-in call-quality telemetry (never the model string). */
+  cpuVendor: 'intel' | 'amd' | 'apple' | 'qualcomm' | 'other' | 'unknown'
 }
 
 export interface CaptureSource {
