@@ -32,3 +32,14 @@ export function messageTime(d: Date, now = new Date()): string {
 
 export const clock = (d: Date): string => time.format(d)
 export const fullDate = (d: Date): string => full.format(d)
+
+/** "agora", "há 5 min", "há 3 h", "há 2 dias". */
+export function ago(iso: string, now = Date.now()): string {
+  const min = Math.max(0, Math.floor((now - Date.parse(iso)) / 60_000))
+  if (min < 1) return 'agora'
+  if (min < 60) return `há ${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `há ${h} h`
+  const d = Math.floor(h / 24)
+  return `há ${d} ${d === 1 ? 'dia' : 'dias'}`
+}

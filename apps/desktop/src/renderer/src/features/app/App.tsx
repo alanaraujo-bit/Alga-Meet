@@ -8,6 +8,7 @@ import { useUi } from '@/store/ui'
 import { MenuHost, ToastHost, toast } from '@/ui'
 import { AuthScreen } from '../auth/AuthScreen'
 import { applySavedHotkeys } from '../settings/hotkeys'
+import { startZoomKeys } from '../settings/zoom'
 import { Shell } from '../shell/Shell'
 import { AccountGate, needsGate } from '../trust/Gate'
 import { RestrictedScreen } from '../trust/Restricted'
@@ -31,6 +32,7 @@ export function App() {
   }, [])
   // Signed in or not: links are held until the screen that uses them exists.
   useEffect(() => startDeepLinks(), [])
+  useEffect(() => startZoomKeys(), [])
 
   // Media engine notices (device unplugged, fallback to standard noise suppression…) surface as toasts; the ones
   // about your stream go on your tile while the call is on screen.

@@ -117,8 +117,9 @@
   --h-call: 40px;
 
   /* ── Layout ───────────────────────────────────────────── */
-  --titlebar-h: 40px;
-  --caption-w: 140px; /* native caption-button overlay on the right */
+  /* The native caption buttons (40 × ~140 device px) ignore UI zoom; --zoom comes from features/settings/zoom.ts. */
+  --titlebar-h: calc(40px / var(--zoom, 1));
+  --caption-w: calc(140px / var(--zoom, 1)); /* native caption-button overlay on the right */
   --rail-w: 64px;
   --sidebar-w: 248px;
   --members-w: 240px;

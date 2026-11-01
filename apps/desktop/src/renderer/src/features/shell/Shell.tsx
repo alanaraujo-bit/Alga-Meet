@@ -16,7 +16,7 @@ import { useSettings } from '../settings/store'
 import { SpaceModals } from '../spaces/SpaceModals'
 import { useSpaceSettings } from '../spaceSettings/store'
 import { VerifyEmailDialog } from '../auth/VerifyEmail'
-import { probeStaff, useStaff } from '../staff/store'
+import { closeStaff, useStaff } from '../staff/store'
 import { QuickSwitcher } from '../switcher/QuickSwitcher'
 import { useDeletionCanceledNotice } from '../trust/Gate'
 import { ReportHost } from '../trust/Report'
@@ -59,7 +59,8 @@ export function Shell() {
   useEffect(() => startBilling(), [])
   useInviteLink()
   useDeletionCanceledNotice()
-  useEffect(() => void probeStaff(), [])
+  // Signing out closes the panel, so the next account never starts with it open.
+  useEffect(() => closeStaff, [])
   const staffPanel = useLatch(useStaff((st) => st.open))
   const idle = useIdle()
   const settingsOpen = useSettings((st) => st.section !== null)

@@ -1,4 +1,4 @@
-import { computePermissions, hasPermission, type Channel, type PresenceStatus, type PublicUser, type VoiceState } from '@alga/shared'
+import { computePermissions, hasPermission, Permission, type Channel, type PresenceStatus, type PublicUser, type VoiceState } from '@alga/shared'
 import { isUnread, type DataState } from './data'
 
 /** Pure derivations over the normalized store. Components wrap them with useData + useShallow. */
@@ -97,6 +97,11 @@ export function spacePermissions(s: Pick<S, 'me' | 'spaces' | 'members' | 'roles
   })
 }
 export const can = (perms: number, needed: number) => hasPermission(perms, needed)
+
+/** Same rule as the server's DELETE: your own message, or MANAGE_MESSAGES in the space (owner/admin included). DMs: only your own. */
+export function canDeleteMessage(s: Pick<S, 'me' | 'spaces' | 'members' | 'roles'>, authorId: string, spaceId: string | null): boolean {
+  return authorId === s.me?.id || (!!spaceId && can(spacePermissions(s, spaceId), Permission.MANAGE_MESSAGES))
+}
 
 /** Role color of a member's highest colored role (null = default text color). */
 export function roleColor(s: Pick<S, 'members' | 'roles'>, spaceId: string, userId: string): string | null {

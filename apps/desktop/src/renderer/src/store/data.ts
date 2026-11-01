@@ -71,6 +71,11 @@ const omit = <T>(rec: Record<string, T>, key: string): Record<string, T> => {
   return rest
 }
 const emptyList = (): MessageList => ({ ids: [], byId: {}, hasMoreBefore: true, loading: false })
+/**
+ * Message authors as users: READY only lists people I still share a space/DM/relationship with, so someone banned
+ * or gone would be "Usuário desconhecido" in old history. Fresher copies in `users` win.
+ */
+const authorsOf = (msgs: Message[]): Record<string, PublicUser> => Object.fromEntries(msgs.map((m) => [m.author.id, m.author]))
 
 function mergeMessages(list: MessageList, msgs: Message[]): MessageList {
   const map = { ...list.byId }
@@ -119,7 +124,8 @@ export const useData = create<DataState>()((set, get) => ({
     set((s) => {
       const list = mergeMessages(s.messages[channelId] ?? emptyList(), msgs)
       if (opts?.hasMoreBefore !== undefined) list.hasMoreBefore = opts.hasMoreBefore
-      return { messages: { ...s.messages, [channelId]: list } }
+      const users = msgs.some((m) => !s.users[m.author.id]) ? { ...authorsOf(msgs), ...s.users } : s.users
+      return { messages: { ...s.messages, [channelId]: list }, users }
     }),
 
   removeMessage: (channelId, id) =>
@@ -134,15 +140,23 @@ export const useData = create<DataState>()((set, get) => ({
     switch (ev.t) {
       case 'READY': {
         const r = ev.d
-        const users: Record<string, PublicUser> = byId(r.users)
         const members: DataState['members'] = {}
         const roles: DataState['roles'] = {}
         const channels: Record<string, Channel> = byId(r.privateChannels)
+        for (const sp of r.spaces) Object.assign(channels, byId(sp.channels))
+        // READY has no messages: keep loaded history only where nothing was missed while offline.
+        const messages = Object.fromEntries(
+          Object.entries(s.messages).filter(([cid, list]) => {
+            const last = channels[cid]?.lastMessageId
+            const newest = list.ids.findLast((id) => list.byId[id]?.nonce !== id)
+            return !!channels[cid] && (!last || (!!newest && newest >= last))
+          }),
+        )
+        const users: Record<string, PublicUser> = { ...authorsOf(Object.values(messages).flatMap((l) => Object.values(l.byId))), ...byId(r.users) }
         for (const sp of r.spaces) {
           members[sp.id] = Object.fromEntries(sp.members.map((m) => [m.user.id, m]))
           roles[sp.id] = byId(sp.roles)
           for (const m of sp.members) users[m.user.id] = m.user
-          Object.assign(channels, byId(sp.channels))
         }
         for (const rel of r.relationships) users[rel.user.id] = rel.user
         users[r.user.id] = r.user
@@ -158,14 +172,7 @@ export const useData = create<DataState>()((set, get) => ({
           relationships: Object.fromEntries(r.relationships.map((x) => [x.user.id, x])),
           voiceStates: Object.fromEntries(r.voiceStates.map((v) => [v.userId, v])),
           readStates: Object.fromEntries(r.readStates.map((x) => [x.channelId, x])),
-          // READY has no messages: keep loaded history only where nothing was missed while offline.
-          messages: Object.fromEntries(
-            Object.entries(s.messages).filter(([cid, list]) => {
-              const last = channels[cid]?.lastMessageId
-              const newest = list.ids.findLast((id) => list.byId[id]?.nonce !== id)
-              return !!channels[cid] && (!last || (!!newest && newest >= last))
-            }),
-          ),
+          messages,
           typing: {},
         })
         return

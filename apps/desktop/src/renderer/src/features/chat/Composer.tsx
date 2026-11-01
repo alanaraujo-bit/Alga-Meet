@@ -68,6 +68,8 @@ export function Composer({
   const offline = useSession((st) => st.gateway === 'reconnecting')
   const candidates = useCandidates(channelId, spaceId)
   const picked = useRef(new Map<string, string>())
+  /** Caret to restore once an insertion (mention, emoji) is committed to the DOM. */
+  const caret = useRef<number | null>(null)
   const [mention, setMention] = useState<{ start: number; query: string; index: number } | null>(null)
   const [emojiAt, setEmojiAt] = useState<HTMLElement | null>(null)
   const files = useTray((st) => st.byChannel[channelId]) ?? NO_FILES
@@ -99,6 +101,16 @@ export function Composer({
     el.style.height = 'auto'
     el.style.height = `${Math.min(el.scrollHeight, Math.round(window.innerHeight * 0.4))}px`
   }, [value])
+
+  // Same commit as the new value, before the next keystroke: a frame later, keys typed in between land at the end.
+  useLayoutEffect(() => {
+    const el = ref.current
+    const at = caret.current
+    if (!el || at === null) return
+    caret.current = null
+    el.focus()
+    el.setSelectionRange(at, at)
+  })
 
   // Focus the composer when a reply starts.
   useEffect(() => {
@@ -132,28 +144,21 @@ export function Composer({
   const pick = (c: Candidate) => {
     const el = ref.current
     if (!el || !mention) return
-    const caret = el.selectionStart
     const insert = `@${c.name} `
-    const next = value.slice(0, mention.start) + insert + value.slice(caret)
+    const next = value.slice(0, mention.start) + insert + value.slice(el.selectionStart)
     picked.current.set(c.name, c.user.id)
+    caret.current = mention.start + insert.length
     setValue(next)
     setMention(null)
-    requestAnimationFrame(() => {
-      el.focus()
-      el.setSelectionRange(mention.start + insert.length, mention.start + insert.length)
-    })
   }
 
   const insertEmoji = (emoji: string) => {
     const el = ref.current
     const at = el?.selectionStart ?? value.length
     const end = el?.selectionEnd ?? value.length
+    caret.current = at + emoji.length
     setValue(value.slice(0, at) + emoji + value.slice(end))
     setEmojiAt(null)
-    requestAnimationFrame(() => {
-      el?.focus()
-      el?.setSelectionRange(at + emoji.length, at + emoji.length)
-    })
   }
 
   /** Re-read the "@query" right before the caret (typing, clicking). */

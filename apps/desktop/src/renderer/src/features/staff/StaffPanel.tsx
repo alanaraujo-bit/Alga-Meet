@@ -6,13 +6,12 @@ import { createPortal } from 'react-dom'
 import { api, ApiRequestError } from '@/lib/api'
 import { errorText } from '@/lib/errors'
 import { formatBytes } from '@/lib/files'
-import { clock } from '@/lib/format'
+import { ago, clock } from '@/lib/format'
 import { useData } from '@/store/data'
 import { Avatar, Button, EmptyState, Icon, IconButton, Kbd, Modal, SegmentedControl, Spinner, Tabs } from '@/ui'
 import { EASE_IN, EASE_OUT_QUART } from '@/ui/motion'
 import { cap, longDate, longDateTime, REASON, RULE } from '../trust/strings'
 import {
-  ago,
   APPEAL_KEYS,
   decisionBody,
   keyFor,

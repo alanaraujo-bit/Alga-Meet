@@ -153,6 +153,15 @@ export const t = {
     textSizeHint: (px: string) => `Mensagens em ${px} px${px === '15' ? ', o padrão' : ''}. Menus e listas ficam como estão.`,
     reduceMotion: 'Reduzir animações',
     reduceMotionHint: 'Tira os movimentos de transição. O brilho de quem fala vira liga e desliga.',
+    zoom: 'Zoom da interface',
+    zoomIn: 'Aumentar o zoom',
+    zoomOut: 'Diminuir o zoom',
+    zoomReset: 'Voltar para 100 %',
+    zoomMin: 'Já está no mínimo (80 %)',
+    zoomMax: 'Já está no máximo (150 %)',
+    zoomHint: 'Tudo maior ou menor: texto, ícones e espaços. Atalhos: Ctrl + =, Ctrl + - e Ctrl + 0.',
+    trayAnimation: 'Animar ícone da bandeja durante chamadas',
+    trayAnimationHint: 'O ícone pulsa enquanto você está em voz com microfone e áudio ligados. Fica parado se o Windows pede menos animação.',
   },
 
   startup: {

@@ -1,5 +1,5 @@
 import type { Session } from '@alga/shared'
-import { Bell, ChevronsUpDown, CreditCard, Gem, Keyboard, LogOut, Mic, Monitor, Palette, Power, Shield, User, Wrench, X, type LucideIcon } from 'lucide-react'
+import { Bell, ChevronsUpDown, CreditCard, Gem, Keyboard, LogOut, Mic, Minus, Monitor, Palette, Plus, Power, Shield, User, Wrench, X, type LucideIcon } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -7,11 +7,12 @@ import { useShallow } from 'zustand/react/shallow'
 import type { HotkeyAction, UpdateStatus } from '../../../../shared/bridge'
 import { media, useMedia, type ProcessingMode } from '@/media'
 import { errorText, fieldErrors } from '@/lib/errors'
+import { ago } from '@/lib/format'
 import { changePassword, listSessions, patchMe, removeAvatar, revokeOtherSessions, revokeSession, uploadAvatar } from '@/store/actions'
 import { useData } from '@/store/data'
 import { useSession } from '@/store/session'
 import { useUi, type TextSize } from '@/store/ui'
-import { Avatar, Button, Icon, IconButton, Kbd, MenuButton, SegmentedControl, Spinner, Switch, TextField, toast } from '@/ui'
+import { Avatar, Button, Icon, IconButton, Kbd, MenuButton, SegmentedControl, Spinner, Switch, TextField, toast, Tooltip } from '@/ui'
 import { MIN_PASSWORD_LENGTH } from '@alga/shared'
 import { StrengthMeter, strengthHint } from '../auth/PasswordStrength'
 import { openVerifyEmail } from '../auth/VerifyEmail'
@@ -22,7 +23,8 @@ import { Group, Row, SettingsFrame } from './Frame'
 import { HOTKEY_ACTIONS, loadBindings, saveBindings, type SavedBinding } from './hotkeys'
 import { defaultDeviceName } from './devices'
 import { ImagePicker } from './ImagePicker'
-import { sessionDevice } from './sessions'
+import { sessionLabel } from './sessions'
+import { setZoom, stepZoom, useZoom, ZOOM_STEPS } from './zoom'
 import { closeSettings, openSettings, useSettings, type SettingsSection } from './store'
 import { t } from './strings'
 import s from './settings.module.css'
@@ -277,11 +279,11 @@ function Sessions() {
               key={x.id}
               label={
                 <>
-                  {sessionDevice(x.userAgent)}
+                  {sessionLabel(x)}
                   {x.current && <span className={s.chip}>{t.account.thisDevice}</span>}
                 </>
               }
-              hint={x.current ? t.account.sessionNow(at(x.createdAt)) : t.account.sessionUsed(at(x.createdAt), at(x.lastUsedAt))}
+              hint={x.current ? t.account.sessionNow(at(x.createdAt)) : t.account.sessionUsed(at(x.createdAt), ago(x.lastUsedAt))}
             >
               {!x.current && (
                 <Button
@@ -593,8 +595,27 @@ const TEXT_SIZES: TextSize[] = ['14', '15', '16', '17']
 function Appearance() {
   const ui = useUi(useShallow((st) => ({ density: st.density, avatars: st.compactAvatars, text: st.textSize, reduced: st.reducedMotion })))
   const set = useUi.getState().setPref
+  const zoom = useZoom((st) => st.factor)
+  const app = window.alga?.app
+  const [trayAnim, setTrayAnim] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (app?.getTrayAnimation) void app.getTrayAnimation().then(setTrayAnim)
+  }, [app])
   return (
     <Group>
+      {zoom !== null && (
+        <Row label={t.appearance.zoom} hint={t.appearance.zoomHint}>
+          <div className={s.stepper} role="group" aria-label={t.appearance.zoom}>
+            <IconButton icon={Minus} label={t.appearance.zoomOut} shortcut="Ctrl -" disabledReason={zoom <= ZOOM_STEPS[0] ? t.appearance.zoomMin : undefined} onClick={() => setZoom(stepZoom(zoom, -1))} />
+            <Tooltip content={t.appearance.zoomReset} shortcut="Ctrl 0">
+              <button type="button" className={`${s.stepperValue} tnum`} aria-live="polite" onClick={() => setZoom(1)}>
+                {Math.round(zoom * 100)} %
+              </button>
+            </Tooltip>
+            <IconButton icon={Plus} label={t.appearance.zoomIn} shortcut="Ctrl =" disabledReason={zoom >= ZOOM_STEPS.at(-1)! ? t.appearance.zoomMax : undefined} onClick={() => setZoom(stepZoom(zoom, 1))} />
+          </div>
+        </Row>
+      )}
       <Row label={t.appearance.textSize} hint={t.appearance.textSizeHint(ui.text)}>
         <SegmentedControl label={t.appearance.textSize} value={ui.text} onChange={(v) => set('textSize', v)} items={TEXT_SIZES.map((v) => ({ value: v, label: v }))} />
       </Row>
@@ -617,6 +638,15 @@ function Appearance() {
       <Row label={t.appearance.reduceMotion} hint={t.appearance.reduceMotionHint}>
         <Switch checked={ui.reduced} label={t.appearance.reduceMotion} onChange={(v) => set('reducedMotion', v)} />
       </Row>
+      {app?.setTrayAnimation && trayAnim !== null && (
+        <Row label={t.appearance.trayAnimation} hint={t.appearance.trayAnimationHint}>
+          <Switch
+            checked={trayAnim}
+            label={t.appearance.trayAnimation}
+            onChange={(v) => void app.setTrayAnimation(v).then(() => setTrayAnim(v), (e: unknown) => toast.error(errorText(e)))}
+          />
+        </Row>
+      )}
     </Group>
   )
 }

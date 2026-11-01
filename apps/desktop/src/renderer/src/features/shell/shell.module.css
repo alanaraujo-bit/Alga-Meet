@@ -474,12 +474,14 @@
   min-width: 0;
   min-height: 0;
 }
+/* One line normally; in a narrow (zoomed) window the actions wrap below instead of overlapping. */
 .header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-3);
+  gap: var(--s-1) var(--s-3);
   flex-shrink: 0;
-  height: var(--header-h);
+  min-height: var(--header-h);
   padding: 0 var(--s-3) 0 var(--s-4);
   box-shadow: inset 0 -1px 0 var(--border-subtle);
 }
@@ -498,6 +500,7 @@
   color: var(--text-tertiary);
 }
 .headerTopic {
+  flex: 1 1 0; /* fills the line and truncates; never pushes the actions to a second line */
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -516,6 +519,12 @@
   align-items: center;
   gap: var(--s-0_5);
   margin-left: auto;
+}
+/* Header tabs scroll sideways rather than spill under the next item. */
+.header [role='tablist'] {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 /* ── Member list ──────────────────────────── */

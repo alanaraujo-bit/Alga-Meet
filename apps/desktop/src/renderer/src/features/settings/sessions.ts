@@ -1,3 +1,7 @@
+/** The server's labels ("Alga Meet 0.1.0 · Windows 11", from X-Alga-Client), else what the user agent tells us. */
+export const sessionLabel = (x: { client?: string | null; os?: string | null; userAgent: string }): string =>
+  [x.client, x.os].filter(Boolean).join(' · ') || sessionDevice(x.userAgent)
+
 /**
  * What a session's user agent tells us (the server stores only that, plus when it started and was last used):
  * "Alga Meet 0.1.0 · Windows", "Chrome 140 · macOS". Windows 10 and 11 send the same frozen "Windows NT 10.0".

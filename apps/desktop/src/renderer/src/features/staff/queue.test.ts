@@ -1,6 +1,7 @@
 import { REMOVED_USER_ID } from '@alga/shared'
 import { describe, expect, it } from 'vitest'
-import { ago, decisionBody, keyFor, readTarget, REPORT_KEYS, step, tierOf, unavailable } from './queue'
+import { ago } from '../../lib/format'
+import { decisionBody, keyFor, readTarget, REPORT_KEYS, step, tierOf, unavailable } from './queue'
 
 const author = {
   id: 'u1',

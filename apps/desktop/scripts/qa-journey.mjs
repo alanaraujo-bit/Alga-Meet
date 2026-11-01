@@ -21,7 +21,8 @@ import { basename, join } from 'node:path'
 import { _electron as electron } from 'playwright'
 import * as Q from './qa-stack.mjs'
 
-const OUT = join(Q.repo, 'docs', 'qa', '2026-11-01')
+// QA_OUT: re-runs keep their screenshots apart from the report's evidence.
+const OUT = process.env.QA_OUT ?? join(Q.repo, 'docs', 'qa', '2026-11-01')
 const STATE = join(Q.WORK, 'state.json')
 const RESULTS = join(Q.WORK, 'results.json')
 const CONSOLE = join(Q.WORK, 'console.jsonl')
@@ -848,7 +849,10 @@ step(4, 'Espaço: criar, convite (link + deep link), cargos (Mod com MANAGE_MESS
     await m.click({ button: 'right' })
     await sleep(300)
     const inMenu = await p.getByRole('menuitem', { name: 'Excluir' }).count()
-    await p.keyboard.press('Escape')
+    // Escape on the menu itself (the page keyboard can miss it when the window is not focused), then wait it out.
+    const menu = p.getByRole('menu').first()
+    await menu.press('Escape').catch(() => p.keyboard.press('Escape'))
+    await menu.waitFor({ state: 'detached', timeout: 3000 }).catch(() => undefined)
     return { inToolbar, inMenu, id: await m.getAttribute('data-message-id') }
   }
   await check('B (cargo Mod, Gerenciar mensagens) apaga a mensagem de A pelo app', async () => {
@@ -863,8 +867,11 @@ step(4, 'Espaço: criar, convite (link + deep link), cargos (Mod com MANAGE_MESS
     const m = msg('B', 'Regra 1: nada de spoiler')
     await m.hover()
     await m.getByRole('button', { name: 'Excluir' }).click()
-    await pb.getByRole('dialog', { name: 'Excluir mensagem?' }).getByRole('button', { name: 'Excluir' }).click()
+    const dlg = pb.getByRole('dialog', { name: 'Excluir mensagem?' })
+    await dlg.getByText(`A mensagem de ${U.A.displayName} será apagada`).waitFor({ timeout: 5000 })
+    await dlg.getByRole('button', { name: 'Excluir' }).click()
     await msg('A', 'Regra 1: nada de spoiler').waitFor({ state: 'detached', timeout: 10_000 })
+    return `barra: ${r.inToolbar}, menu: ${r.inMenu}; o diálogo nomeia ${U.A.displayName}`
   })
   await check('A (dono do espaço) apaga a mensagem de C pelo app', async () => {
     await composer('C').fill('spam spam spam do Caio')
@@ -875,6 +882,7 @@ step(4, 'Espaço: criar, convite (link + deep link), cargos (Mod com MANAGE_MESS
       const del = await api(await tokenOf('A'), 'DELETE', `/channels/${state.geralId}/messages/${r.id}`)
       throw new Error(`nem o dono vê "Excluir" na mensagem de outra pessoa (barra: ${r.inToolbar}, menu: ${r.inMenu}); DELETE pela API com a sessão de A → ${del.status}`)
     }
+    return `barra: ${r.inToolbar}, menu: ${r.inMenu}`
   })
   await check('C (sem cargo) não tem "Excluir" na mensagem de A e a API recusa (403)', async () => {
     const m = msg('C', 'Bem-vindos ao Clube QA!')

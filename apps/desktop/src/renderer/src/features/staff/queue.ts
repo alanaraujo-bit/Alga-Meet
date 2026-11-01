@@ -122,16 +122,5 @@ export function decisionBody(d: Decision, opts: { days?: SuspendDays; note?: str
   return { status: 'resolved', action: d, until, note }
 }
 
-/** "agora", "há 5 min", "há 3 h", "há 2 dias". */
-export function ago(iso: string, now = Date.now()): string {
-  const min = Math.max(0, Math.floor((now - Date.parse(iso)) / 60_000))
-  if (min < 1) return 'agora'
-  if (min < 60) return `há ${min} min`
-  const h = Math.floor(min / 60)
-  if (h < 24) return `há ${h} h`
-  const d = Math.floor(h / 24)
-  return `há ${d} ${d === 1 ? 'dia' : 'dias'}`
-}
-
 /** Next/previous index for ↑↓ / j k, clamped (no wrap: the end of a queue is a place). */
 export const step = (i: number, n: number, dir: 1 | -1): number => (n === 0 ? -1 : Math.min(n - 1, Math.max(0, i + dir)))

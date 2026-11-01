@@ -11,7 +11,8 @@
   display: flex;
   align-items: center;
   gap: var(--s-1_5);
-  width: 200px;
+  flex: 0 1 200px; /* gives way to "Adicionar amigo" in a narrow (zoomed) window */
+  min-width: 120px;
   height: 28px;
   margin-right: var(--s-2);
   padding: 0 var(--s-2);
@@ -24,6 +25,7 @@
 }
 .filter input {
   flex: 1;
+  width: 0; /* no intrinsic ~20ch width, so the filter can shrink */
   min-width: 0;
   border: 0;
   background: none;

@@ -10,7 +10,8 @@
   position: relative;
   z-index: var(--z-titlebar);
   display: grid;
-  grid-template-columns: 1fr minmax(0, 420px) 1fr;
+  /* The brand keeps its width; in a narrow (zoomed) window the search shrinks instead of covering it. */
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, 420px) 1fr;
   align-items: center;
   height: var(--titlebar-h);
   padding-left: var(--s-4);

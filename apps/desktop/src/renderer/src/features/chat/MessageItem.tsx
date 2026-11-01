@@ -8,7 +8,7 @@ import { clock, fullDate } from '@/lib/format'
 import { toPlainText } from '@/lib/markdown'
 import { deleteMessage, discardSend, editMessage, react, retrySend } from '@/store/actions'
 import { useData } from '@/store/data'
-import { displayName, presenceOf, roleColor } from '@/store/selectors'
+import { canDeleteMessage, displayName, presenceOf, roleColor } from '@/store/selectors'
 import { useUi } from '@/store/ui'
 import { Avatar, Button, contextMenuHandler, Icon, IconButton, Kbd, MenuButton, Modal, Tooltip, toast, type MenuEntry } from '@/ui'
 import { PersonPopover } from '../shell/MemberList'
@@ -60,6 +60,7 @@ export const MessageItem = memo(function MessageItem({
   onJump: (messageId: string) => void
 }) {
   const mine = m.author.id === meId
+  const canDelete = useData((st) => canDeleteMessage(st, m.author.id, spaceId))
   const pending = m.nonce === m.id
   const name = useData((st) => authorName(m.author.id, (id) => displayName(st, id, spaceId)))
   const color = useData((st) => (spaceId && !isRemovedAuthor(m.author.id) ? roleColor(st, spaceId, m.author.id) : null))
@@ -92,6 +93,8 @@ export const MessageItem = memo(function MessageItem({
         { label: t.actions.edit, icon: Pencil, onSelect: () => useUi.getState().setEditing(m.channelId, m.id) },
         { label: t.actions.delete, icon: Trash2, danger: true, onSelect: () => requestDelete(m) },
       )
+    } else if (canDelete) {
+      items.push({ kind: 'group', label: t.actions.moderation }, { label: t.actions.delete, icon: Trash2, danger: true, onSelect: () => requestDelete(m) })
     }
     items.push(...messageReportEntries(m))
     return items
@@ -199,7 +202,7 @@ export const MessageItem = memo(function MessageItem({
           <span className={s.toolSep} />
           <IconButton icon={CornerUpLeft} label={t.actions.reply} onClick={() => useUi.getState().setReplyTo(m.channelId, m.id)} />
           {mine && <IconButton icon={Pencil} label={t.actions.edit} onClick={() => useUi.getState().setEditing(m.channelId, m.id)} />}
-          {mine && <IconButton icon={Trash2} label={t.actions.delete} className={s.toolDanger} onClick={(e) => requestDelete(m, e.shiftKey)} />}
+          {canDelete && <IconButton icon={Trash2} label={t.actions.delete} className={s.toolDanger} onClick={(e) => requestDelete(m, e.shiftKey)} />}
           <MenuButton items={menu} align="end" label={t.actions.more}>
             <IconButton icon={MoreHorizontal} label={t.actions.more} />
           </MenuButton>
@@ -305,6 +308,7 @@ function InlineEditor({ message: m }: { message: Message }) {
 
 export function DeleteConfirm() {
   const target = useDeleteConfirm((st) => st.target)
+  const meId = useData((st) => st.me?.id)
   const [shown, setShown] = useState<Message | null>(null)
   useEffect(() => {
     if (target) setShown(target)
@@ -316,7 +320,7 @@ export function DeleteConfirm() {
       open={!!target}
       onClose={close}
       title={t.deleteTitle}
-      description={t.deleteBody}
+      description={m && m.author.id !== meId ? t.deleteBodyOf(authorName(m.author.id, () => m.author.displayName)) : t.deleteBody}
       footer={
         <>
           <Button variant="ghost" onClick={close}>
