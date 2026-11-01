@@ -64,6 +64,13 @@
       "when": 1793529417769,
       "tag": "0008_e2ee",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793531689794,
+      "tag": "0009_session_client",
+      "breakpoints": true
     }
   ]
 }

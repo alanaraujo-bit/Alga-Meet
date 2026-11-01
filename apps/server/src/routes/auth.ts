@@ -9,6 +9,7 @@ import {
   consumeEmailToken, createSession, hasSession, hashPassword, issueEmailToken, peekEmailToken, verifyPassword,
 } from '../auth.js'
 import { isUniqueViolation } from '../db/index.js'
+import { algaClientHeader, sessionDevice } from '../devices.js'
 import { consentRecords, emailTokens, sessions, users, type UserRow } from '../db/schema.js'
 import { accountExistsMail, passwordResetMail, verifyEmailMail } from '../email-templates.js'
 import { HttpError, conflict, idParam, invalid, notFound, parse, safeErr } from '../errors.js'
@@ -99,7 +100,7 @@ export function authPublicRoutes(app: FastifyInstance, ctx: Ctx): void {
       if (isUniqueViolation(err)) throw usernameTaken()
       throw err
     }
-    const { token } = await createSession(db, user!.id, req.headers['user-agent'] ?? '')
+    const { token } = await createSession(db, user!.id, req.headers['user-agent'] ?? '', algaClientHeader(req.headers['x-alga-client']))
     await ctx.privacy.recordUse(user!.id, req.ip, req.headers['user-agent'], 'login')
     sendVerification(ctx, user!)
     reply.code(201)
@@ -127,7 +128,7 @@ export function authPublicRoutes(app: FastifyInstance, ctx: Ctx): void {
     if (restriction) throw restrictedError(restriction)
     const canceled = user.deletionPurgeAfter !== null
     if (canceled) await ctx.privacy.cancelDeletion(user)
-    const { token } = await createSession(db, user.id, req.headers['user-agent'] ?? '')
+    const { token } = await createSession(db, user.id, req.headers['user-agent'] ?? '', algaClientHeader(req.headers['x-alga-client']))
     await ctx.privacy.recordUse(user.id, req.ip, req.headers['user-agent'], 'login')
     return { token, user: meView(user, ctx.config.files.maxAttachmentBytes), ...(canceled ? { deletionCanceled: true } : {}) }
   })
@@ -228,6 +229,7 @@ export function authRoutes(app: FastifyInstance, ctx: Ctx): void {
       createdAt: s.createdAt.toISOString(),
       lastUsedAt: s.lastUsedAt.toISOString(),
       current: s.id === req.auth.sessionId,
+      ...sessionDevice(s.userAgent, s.clientInfo),
     }))
   })
 

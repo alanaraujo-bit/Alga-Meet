@@ -119,7 +119,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   await app.register(cors, {
     origin: config.corsOrigins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Authorization', 'Content-Type'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'X-Alga-Client'],
     maxAge: 600,
   })
   // Every route gets this ceiling unless it sets its own `config.rateLimit` (which inherits the key below).

@@ -7,6 +7,10 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
 /**
  * REST contract. All routes are prefixed with /api/v1 and use JSON.
  * Auth: `Authorization: Bearer <session token>` (opaque; the server stores only its SHA-256 hash).
+ * Client: the desktop sends `X-Alga-Client: <app version>; <os version>` (e.g. `0.1.0; Windows 11`; AppConfig.version and
+ *   AppConfig.osVersion) on every request. Optional; at most 96 characters, version `1.2.3[-tag]`, OS letters, digits,
+ *   space and `._()-` (anything else is ignored, never an error). Stored with the session at login and refreshed when
+ *   the session is used, it labels Session.client / Session.os.
  * Errors: { error: { code: ApiErrorCode, message: string, fields?: Record<string,string> } }
  *
  * POST   /auth/register            RegisterBody          -> AuthResponse
@@ -31,7 +35,7 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  *                                                          session (gateway 4004) and verifies the e-mail)
  * POST   /auth/logout                                    -> 204
  * POST   /auth/password            ChangePasswordBody    -> 204 (revokes every other session)
- * GET    /auth/sessions                                  -> Session[]
+ * GET    /auth/sessions                                  -> Session[] (most recently used first; client/os labels)
  * DELETE /auth/sessions                                  -> 204 (revoke all except the current one)
  * DELETE /auth/sessions/:id                              -> 204
  *   Sessions expire after 30 days without use or 90 days after login (then 401).

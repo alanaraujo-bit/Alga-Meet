@@ -33,6 +33,7 @@ export const meView = (u: UserRow, defaultAttachmentBytes: number): Me => ({
   ageBracket: ageBracketOf(u),
   needsTermsAcceptance: u.termsVersion !== TERMS_VERSION,
   telemetryOptIn: u.telemetryOptIn,
+  staffRole: u.staffRole ?? null,
 })
 
 export const spaceView = (s: SpaceRow): Space => ({

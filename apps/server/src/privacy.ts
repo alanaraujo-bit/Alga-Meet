@@ -312,7 +312,7 @@ export class Privacy {
         cosmetics: u.cosmetics, telemetryOptIn: u.telemetryOptIn, telemetryOptInAt: iso(u.telemetryOptInAt),
       },
       consents: consents.map((c) => ({ termsVersion: c.termsVersion, acceptedAt: c.acceptedAt.toISOString() })),
-      sessions: sess.map((s) => ({ userAgent: s.userAgent, createdAt: s.createdAt.toISOString(), lastUsedAt: s.lastUsedAt.toISOString() })),
+      sessions: sess.map((s) => ({ userAgent: s.userAgent, clientInfo: s.clientInfo, createdAt: s.createdAt.toISOString(), lastUsedAt: s.lastUsedAt.toISOString() })),
       relationships: rels.map(({ r, username }) => ({ userId: r.targetId, username, type: r.type, since: r.since.toISOString() })),
       spaces: memberships.map(({ m, s }) => ({
         id: s.id, name: s.name, owner: s.ownerId === userId, nickname: m.nickname, joinedAt: m.joinedAt.toISOString(),

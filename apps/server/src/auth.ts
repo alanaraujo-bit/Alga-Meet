@@ -4,6 +4,7 @@ import { uuidv7 } from '@alga/shared'
 import { and, eq, gt, lte, or } from 'drizzle-orm'
 import type { FastifyRequest } from 'fastify'
 import type { Db } from './db/index.js'
+import { algaClientHeader } from './devices.js'
 import type { Hub } from './gateway/hub.js'
 import type { Voice } from './voice.js'
 import { emailTokens, sessions, users, type UserRow } from './db/schema.js'
@@ -27,11 +28,14 @@ export async function verifyPassword(stored: string | undefined, password: strin
 
 export const sha256Hex = (token: string) => createHash('sha256').update(token).digest('hex')
 
-/** Creates a session and returns the opaque token (32 random bytes, base64url). Only its SHA-256 is stored. */
-export async function createSession(db: Db, userId: string, userAgent: string): Promise<{ token: string; sessionId: string }> {
+/**
+ * Creates a session and returns the opaque token (32 random bytes, base64url). Only its SHA-256 is stored.
+ * `clientInfo`: algaClientHeader() of the request's X-Alga-Client.
+ */
+export async function createSession(db: Db, userId: string, userAgent: string, clientInfo: string | null = null): Promise<{ token: string; sessionId: string }> {
   const token = randomBytes(32).toString('base64url')
   const sessionId = uuidv7()
-  await db.insert(sessions).values({ id: sessionId, userId, tokenHash: sha256Hex(token), userAgent: userAgent.slice(0, 512) })
+  await db.insert(sessions).values({ id: sessionId, userId, tokenHash: sha256Hex(token), userAgent: userAgent.slice(0, 512), clientInfo })
   return { token, sessionId }
 }
 
@@ -51,11 +55,14 @@ const DAY_MS = 24 * 60 * 60 * 1000
 export const SESSION_IDLE_MS = 30 * DAY_MS
 export const SESSION_MAX_AGE_MS = 90 * DAY_MS
 
-/** Resolves a bearer token to its session + user, or null (expired ones are deleted). Touches lastUsedAt at most once a minute. */
-export async function resolveToken(db: Db, token: string): Promise<AuthContext | null> {
+/**
+ * Resolves a bearer token to its session + user, or null (expired ones are deleted). Touches lastUsedAt at most once a
+ * minute, and then also stores a changed `clientInfo` (algaClientHeader of X-Alga-Client: the app was updated).
+ */
+export async function resolveToken(db: Db, token: string, clientInfo: string | null = null): Promise<AuthContext | null> {
   if (!token || token.length > 128) return null
   const [row] = await db
-    .select({ user: users, sessionId: sessions.id, createdAt: sessions.createdAt, lastUsedAt: sessions.lastUsedAt })
+    .select({ user: users, sessionId: sessions.id, createdAt: sessions.createdAt, lastUsedAt: sessions.lastUsedAt, clientInfo: sessions.clientInfo })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
     .where(eq(sessions.tokenHash, sha256Hex(token)))
@@ -67,7 +74,8 @@ export async function resolveToken(db: Db, token: string): Promise<AuthContext |
     return null
   }
   if (now - row.lastUsedAt.getTime() > TOUCH_INTERVAL_MS) {
-    await db.update(sessions).set({ lastUsedAt: new Date() }).where(eq(sessions.id, row.sessionId))
+    const changed = clientInfo && clientInfo !== row.clientInfo ? { clientInfo } : {}
+    await db.update(sessions).set({ lastUsedAt: new Date(), ...changed }).where(eq(sessions.id, row.sessionId))
   }
   return { user: row.user, sessionId: row.sessionId }
 }
@@ -83,7 +91,7 @@ export function bearerToken(req: FastifyRequest): string | null {
 export function authenticate(db: Db) {
   return async (req: FastifyRequest) => {
     const token = bearerToken(req)
-    const auth = token ? await resolveToken(db, token) : null
+    const auth = token ? await resolveToken(db, token, algaClientHeader(req.headers['x-alga-client'])) : null
     if (!auth) throw new HttpError('unauthorized', 'Sessão inválida ou expirada.')
     req.auth = auth
   }

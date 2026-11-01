@@ -1,6 +1,6 @@
 /** Wire models shared by server and desktop. Timestamps are ISO-8601 strings. */
 import type { EquippedCosmetics, PlanSummary } from './billing.js'
-import type { AgeBracket } from './trust-safety.js'
+import type { AgeBracket, StaffRole } from './trust-safety.js'
 
 
 export type PresenceStatus = 'online' | 'idle' | 'dnd' | 'offline'
@@ -42,6 +42,8 @@ export interface Me extends PublicUser {
    * sent by the server; optional like plan.
    */
   telemetryOptIn?: boolean
+  /** Trust & safety role (granted only by apps/server/scripts/grant-staff.ts): show the admin UI. Always sent; null for everyone else. */
+  staffRole?: StaffRole | null
 }
 
 export interface Presence {
@@ -191,4 +193,11 @@ export interface Session {
   createdAt: string
   lastUsedAt: string
   current: boolean
+  /**
+   * Coarse labels to tell sessions apart, from the X-Alga-Client header (see api.ts) or else the User-Agent; null when
+   * unknown. `client` e.g. "Alga Meet 0.1.0" or "Chrome", `os` e.g. "Windows 11" (just "Windows" from a User-Agent).
+   * No location on purpose: the server does no IP geolocation. Always sent by the server; optional like Me.plan.
+   */
+  client?: string | null
+  os?: string | null
 }

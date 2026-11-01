@@ -1,6 +1,9 @@
 import { GatewayClose, type Session } from '@alga/shared'
+import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { sessions, users } from '../src/db/schema.js'
+import { algaClientHeader, sessionDevice } from '../src/devices.js'
+import { setStaffRole } from '../src/trust-safety.js'
 import { api, connect, freshIp, openGateway, register, startServer, type TestServer } from './helpers.js'
 
 let s: TestServer
@@ -100,6 +103,49 @@ describe('auth', () => {
     expect((await api(s.app, 'GET', '/users/@me', { token: first.token })).status).toBe(401)
   })
 
+  it('labels sessions with the X-Alga-Client header, else coarse User-Agent tokens, and refreshes the label on use', async () => {
+    const ELECTRON_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Alga Meet/0.1.0 Chrome/142.0.0.0 Electron/45.2.1 Safari/537.36'
+    const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36'
+    const first = await register(s.app)
+    const login = (headers: Record<string, string>) =>
+      api(s.app, 'POST', '/auth/login', { ip: freshIp(), headers, body: { login: first.user.username, password: first.password } })
+    const desk = await login({ 'user-agent': ELECTRON_UA, 'x-alga-client': '0.1.0; Windows 11' })
+    const web = await login({ 'user-agent': CHROME_UA, 'x-alga-client': '0.1.0; <script>' }) // invalid: ignored, never an error
+    expect([desk.status, web.status]).toEqual([200, 200])
+    const list = async () => (await api<Session[]>(s.app, 'GET', '/auth/sessions', { token: first.token })).body
+    const labels = (l: Session[]) => l.map((x) => [x.client, x.os])
+    // register() goes through inject's default User-Agent ("lightMyRequest"): nothing recognizable.
+    expect(labels(await list())).toEqual(expect.arrayContaining([['Alga Meet 0.1.0', 'Windows 11'], ['Chrome', 'Windows'], [null, null]]))
+    expect((await list()).every((x) => !('approxLocation' in x) && typeof x.lastUsedAt === 'string')).toBe(true)
+
+    // The app was updated: the next touch of lastUsedAt (at most once a minute) stores the new header.
+    await s.app.ctx.db.update(sessions).set({ lastUsedAt: new Date(Date.now() - 5 * 60_000) }).where(eq(sessions.userId, first.user.id))
+    const me = await api(s.app, 'GET', '/users/@me', { token: desk.body.token, headers: { 'x-alga-client': '0.2.0-beta.1; Windows 11' } })
+    expect(me.status).toBe(200)
+    expect(labels(await list())).toContainEqual(['Alga Meet 0.2.0-beta.1', 'Windows 11'])
+  })
+
+  it('parses X-Alga-Client strictly and keeps User-Agent labels coarse', () => {
+    expect(algaClientHeader('0.1.0; Windows 11')).toBe('0.1.0; Windows 11')
+    expect(algaClientHeader('  1.2.3-rc.1 ;  Windows 10 (ARM64) ')).toBe('1.2.3-rc.1; Windows 10 (ARM64)')
+    for (const bad of [undefined, ['0.1.0; Windows 11'], '', '0.1.0', 'v0.1.0; Windows', '0.1.0; ', '0.1.0; Win;dows', '0.1.0; Windows\u0000',
+      `0.1.0; ${'W'.repeat(49)}`, `0.1.0;${' '.repeat(90)}Windows`]) expect(algaClientHeader(bad)).toBeNull()
+    expect(sessionDevice('', null)).toEqual({ client: null, os: null })
+    expect(sessionDevice('Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/142.0 Mobile Safari/537.36', null)).toEqual({ client: 'Chrome', os: 'Android' })
+    expect(sessionDevice('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1', null))
+      .toEqual({ client: 'Safari', os: 'iOS' })
+    expect(sessionDevice('Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0', null)).toEqual({ client: 'Firefox', os: 'macOS' })
+    expect(sessionDevice('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/142.0 Safari/537.36 Edg/142.0', '0.3.0; Windows 11'))
+      .toEqual({ client: 'Alga Meet 0.3.0', os: 'Windows 11' })
+  })
+
+  it('tells staff apart in Me.staffRole (null for everyone else)', async () => {
+    const u = await register(s.app)
+    expect(u.user.staffRole).toBeNull()
+    await setStaffRole(s.app.ctx.db, u.user.username, 'moderator')
+    expect((await api(s.app, 'GET', '/users/@me', { token: u.token })).body.staffRole).toBe('moderator')
+  })
+
   it('cannot revoke another user\'s session', async () => {
     const a = await register(s.app)
     const b = await register(s.app)
@@ -169,10 +215,11 @@ describe('health', () => {
     for (const origin of ['http://localhost:5173', 'null', 'file://']) {
       const r = await s.app.inject({
         method: 'OPTIONS', url: '/api/v1/users/@me',
-        headers: { origin, 'access-control-request-method': 'GET', 'access-control-request-headers': 'authorization' },
+        headers: { origin, 'access-control-request-method': 'GET', 'access-control-request-headers': 'authorization,x-alga-client' },
       })
       expect(r.statusCode).toBe(204)
       expect(r.headers['access-control-allow-origin']).toBe(origin)
+      expect(String(r.headers['access-control-allow-headers']).toLowerCase()).toContain('x-alga-client')
     }
     const evil = await s.app.inject({
       method: 'OPTIONS', url: '/api/v1/users/@me',

@@ -72,6 +72,8 @@ export const sessions = pgTable('sessions', {
   /** SHA-256 (hex) of the opaque bearer token; the token itself is never stored. */
   tokenHash: text('token_hash').notNull(),
   userAgent: text('user_agent').notNull().default(''),
+  /** Validated X-Alga-Client header ("<app version>; <os>"), refreshed when the session is used; null if never sent. */
+  clientInfo: text('client_info'),
   createdAt: ts('created_at').notNull().defaultNow(),
   lastUsedAt: ts('last_used_at').notNull().defaultNow(),
 }, (t) => [
