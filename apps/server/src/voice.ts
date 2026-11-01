@@ -2,10 +2,10 @@
  * Voice: LiveKit token minting and the authoritative VoiceState map.
  * Who is in a room comes only from LiveKit (webhooks + startup reconcile); clients only toggle their own flags.
  */
-import { Permission, hasPermission, type VoiceState } from '@alga/shared'
+import { Permission, hasPermission, type VoiceDisconnectReason, type VoiceState } from '@alga/shared'
 import type { FastifyBaseLogger } from 'fastify'
 import { AccessToken, RoomServiceClient, TrackSource, WebhookReceiver, type WebhookEvent } from 'livekit-server-sdk'
-import { channelAudience, memberPermissions, spaceMemberIds } from './access.js'
+import { PRIVATE_CHANNEL_PERMISSIONS, channelAudience, memberPermissions, spaceMemberIds } from './access.js'
 import { hasSession } from './auth.js'
 import type { Config } from './config.js'
 import type { Db } from './db/index.js'
@@ -23,12 +23,17 @@ export function channelIdOfRoom(room: string): string | null {
 
 export type SelfFlags = Pick<VoiceState, 'selfMute' | 'selfDeaf' | 'streaming' | 'video'>
 const FLAGS = ['selfMute', 'selfDeaf', 'streaming', 'video'] as const
+const VOICE_TYPES = ['voice', 'dm', 'group_dm']
+/** LiveKit signs webhooks with short-lived JWTs; remembering ids this long covers their validity. */
+const WEBHOOK_DEDUPE_MS = 10 * 60_000
 
 export class Voice {
   /** userId → state. A user is in at most one voice channel. shortcut: in-memory, single instance; rebuilt from LiveKit on boot. */
   private readonly states = new Map<string, VoiceState>()
   private readonly rooms: RoomServiceClient
   private readonly receiver: WebhookReceiver
+  /** Webhook event id → expiry, in insertion (= expiry) order. */
+  private readonly seenEvents = new Map<string, number>()
 
   constructor(
     private readonly config: Config,
@@ -65,7 +70,8 @@ export class Voice {
       canSubscribe: true,
       canPublish: sources.length > 0,
       canPublishSources: sources,
-      canPublishData: true,
+      // The data channel would bypass SEND_MESSAGES, blocks and moderation; no feature needs it.
+      canPublishData: false,
     })
     return at.toJwt()
   }
@@ -76,6 +82,7 @@ export class Voice {
   }
 
   async handleEvent(ev: WebhookEvent): Promise<void> {
+    if (this.isReplay(ev.id)) return
     const channelId = ev.room ? channelIdOfRoom(ev.room.name) : null
     if (!channelId) return
     const identity = ev.participant?.identity ?? ''
@@ -98,27 +105,33 @@ export class Voice {
   async participantJoined(channelId: string, userId: string, joinedAt: string, ring: boolean): Promise<void> {
     if (!UUID_RE.test(userId)) return
     const found = await loadChannel(this.db, channelId)
-    if (!found || !['voice', 'dm', 'group_dm'].includes(found.row.type)) {
-      this.log.warn({ channelId, userId }, 'voice: participant joined a room without a matching channel')
-      return
-    }
-    const { row, recipientIds } = found
-    // Tokens live for an hour, so re-check access: a kicked or logged-out user must not linger in the room.
-    const allowed = (row.spaceId
-      ? hasPermission((await memberPermissions(this.db, row.spaceId, userId)).get(userId) ?? 0, Permission.CONNECT)
-      : recipientIds.includes(userId)) && await hasSession(this.db, userId)
-    if (!allowed) {
-      this.log.warn({ channelId, userId }, 'voice: participant without access, removing from room')
+    if (!found || !VOICE_TYPES.includes(found.row.type)) {
+      // Tokens outlive deleted channels; LiveKit would recreate the room, so the participant must go.
+      this.log.warn({ channelId, userId }, 'voice: participant joined a room without a matching channel, removing')
       await this.kick(channelId, userId)
       return
     }
+    const { row, recipientIds } = found
+    const permissions = row.spaceId ? (await memberPermissions(this.db, row.spaceId, userId)).get(userId) ?? 0 : PRIVATE_CHANNEL_PERMISSIONS
+    // Tokens live for an hour, so re-check access: a kicked or logged-out user must not linger in the room.
+    const allowed = (row.spaceId ? hasPermission(permissions, Permission.CONNECT) : recipientIds.includes(userId))
+      && await hasSession(this.db, userId)
+    if (!allowed) {
+      this.log.warn({ channelId, userId }, 'voice: participant without access, removing from room')
+      await this.kickWith(channelId, userId, 'access_lost')
+      return
+    }
+    // No await from here until states.set: concurrent joins cannot both take the last free slot.
     const prev = this.states.get(userId)
     if (prev?.channelId === channelId) return // duplicate delivery / reconcile of a known state
-    if (prev) {
-      await this.remove(prev)
-      await this.kick(prev.channelId, userId)
+    const others = this.inChannel(channelId).length
+    const limit = row.userLimit ?? 0
+    if (limit > 0 && others >= limit && !hasPermission(permissions, Permission.MOVE_MEMBERS)) {
+      this.log.info({ channelId, userId }, 'voice: channel full, removing participant')
+      await this.kickWith(channelId, userId, 'channel_full')
+      return
     }
-    const wasEmpty = this.inChannel(channelId).length === 0
+    const wasEmpty = others === 0
     const state: VoiceState = {
       userId,
       channelId,
@@ -132,6 +145,10 @@ export class Voice {
       joinedAt,
     }
     this.states.set(userId, state)
+    if (prev) {
+      this.hub.dispatch([...await this.audience(prev), userId], 'VOICE_STATE_REMOVE', { userId, channelId: prev.channelId })
+      await this.kick(prev.channelId, userId)
+    }
     this.hub.dispatch(await this.audience(state), 'VOICE_STATE_UPDATE', state)
     if (ring && wasEmpty && !row.spaceId) {
       this.hub.dispatch(recipientIds.filter((id) => id !== userId), 'CALL_RING', { channelId, fromUserId: userId })
@@ -143,11 +160,19 @@ export class Voice {
     if (prev?.channelId === channelId) await this.remove(prev)
   }
 
-  /** Gateway op `voice_state`: merges the user's own flags. Ignored when not in voice. */
+  /** Gateway op `voice_state`: merges the user's own flags (streaming needs STREAM, video SPEAK). Ignored when not in voice. */
   async updateSelf(userId: string, flags: SelfFlags): Promise<void> {
+    const current = this.states.get(userId)
+    if (!current) return
+    const permissions = await this.permissionsOf(current)
     const prev = this.states.get(userId)
     if (!prev) return
-    const state = { ...prev, ...flags }
+    const state = {
+      ...prev,
+      ...flags,
+      streaming: flags.streaming && hasPermission(permissions, Permission.STREAM),
+      video: flags.video && hasPermission(permissions, Permission.SPEAK),
+    }
     if (FLAGS.every((k) => state[k] === prev[k])) return
     this.states.set(userId, state)
     this.hub.dispatch(await this.audience(state), 'VOICE_STATE_UPDATE', state)
@@ -204,6 +229,28 @@ export class Voice {
     await this.rooms.removeParticipant(roomName(channelId), userId).catch((err: unknown) => {
       this.log.warn({ err: (err as Error).message, channelId, userId }, 'voice: could not remove participant from LiveKit')
     })
+  }
+
+  /** Removes from the SFU and tells the user why (they never got a VoiceState for this room). */
+  private async kickWith(channelId: string, userId: string, reason: VoiceDisconnectReason): Promise<void> {
+    await this.kick(channelId, userId)
+    this.hub.dispatch([userId], 'VOICE_DISCONNECT', { channelId, reason })
+  }
+
+  private async permissionsOf(s: VoiceState): Promise<number> {
+    return s.spaceId ? (await memberPermissions(this.db, s.spaceId, s.userId)).get(s.userId) ?? 0 : PRIVATE_CHANNEL_PERMISSIONS
+  }
+
+  private isReplay(id: string): boolean {
+    const now = Date.now()
+    for (const [k, exp] of this.seenEvents) {
+      if (exp > now) break
+      this.seenEvents.delete(k)
+    }
+    if (!id) return false
+    if (this.seenEvents.has(id)) return true
+    this.seenEvents.set(id, now + WEBHOOK_DEDUPE_MS)
+    return false
   }
 
   private audience(s: VoiceState): Promise<string[]> {

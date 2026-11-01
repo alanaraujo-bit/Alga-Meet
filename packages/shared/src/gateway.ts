@@ -1,6 +1,6 @@
 import type {
   Channel, Me, Member, Message, Presence, PublicUser, ReadState, Relationship,
-  Role, Space, SpaceSnapshot, StatusPreference, VoiceState,
+  Role, Space, SpaceSnapshot, StatusPreference, VoiceDisconnectReason, VoiceState,
 } from './models.js'
 
 /**
@@ -77,6 +77,11 @@ export type Dispatch =
   | { t: 'VOICE_STATE_REMOVE'; d: { userId: string; channelId: string } }
   /** Incoming DM call. */
   | { t: 'CALL_RING'; d: { channelId: string; fromUserId: string } }
+  /**
+   * Sent only to the affected user: the server removed them from the LiveKit room of `channelId` (channel full,
+   * disconnected by a moderator, access lost). Client: leave the room, do not auto-rejoin, show `reason`.
+   */
+  | { t: 'VOICE_DISCONNECT'; d: { channelId: string; reason: VoiceDisconnectReason } }
 
 export type DispatchType = Dispatch['t']
 export type DispatchOf<T extends DispatchType> = Extract<Dispatch, { t: T }>['d']

@@ -2,11 +2,12 @@
  * Regression tests for docs/security/server-review-2026-11-01.md (one describe per finding).
  * Each test reproduces the reviewer's PoC and asserts the fixed behaviour.
  */
-import { GatewayClose, type Invite, type SpaceSnapshot } from '@alga/shared'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { DEFAULT_EVERYONE_PERMISSIONS, GatewayClose, Permission, type Invite, type SpaceSnapshot, type VoiceJoinResponse } from '@alga/shared'
+import { TokenVerifier } from 'livekit-server-sdk'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { loadConfig } from '../src/config.js'
-import { sessions } from '../src/db/schema.js'
+import { roles, sessions } from '../src/db/schema.js'
 import { api, connect, freshIp, openGateway, postWebhook, register, startServer, type TestServer } from './helpers.js'
 
 let s: TestServer
@@ -31,6 +32,15 @@ let evSeq = 0
 const lkEvent = (event: string, channelId: string, identity: string) => ({
   event, id: `SEC_${++evSeq}`, room: { name: `ch_${channelId}` }, participant: { identity },
 })
+
+/** Records LiveKit RoomService calls instead of hitting the (absent) SFU. */
+function spyRooms() {
+  const rooms = (s.app.ctx.voice as unknown as { rooms: Record<string, (...a: unknown[]) => Promise<unknown>> }).rooms
+  return {
+    remove: vi.spyOn(rooms, 'removeParticipant' as never).mockResolvedValue(undefined as never),
+    restore: () => vi.restoreAllMocks(),
+  }
+}
 
 const PROD = { NODE_ENV: 'production', DATABASE_URL: 'postgres://u:p@db:5432/alga', CORS_ORIGINS: 'null,file://' }
 const REAL_SECRET = 'a-real-production-secret-0123456789abcdef'
@@ -230,5 +240,78 @@ describe('M2 sessions expire and can all be revoked', () => {
     await postWebhook(s.app, s.config, lkEvent('participant_joined', voice.id, b.user.id))
     expect(s.app.ctx.voice.inChannel(voice.id)).toEqual([])
     ga.close()
+  })
+})
+
+describe('M4/B1/B7/B8/B9 voice', () => {
+  it('M4: userLimit is enforced when the participant actually joins, not only when the token is minted', async () => {
+    const [a, b, c] = [await register(s.app), await register(s.app), await register(s.app)]
+    const { voice } = await spaceWith(a.token, b.token, c.token)
+    await api(s.app, 'PATCH', `/channels/${voice.id}`, { token: a.token, body: { userLimit: 1 } })
+    // Both tokens are minted while the room is still empty (the TOCTOU window).
+    expect((await api(s.app, 'POST', '/voice/join', { token: b.token, body: { channelId: voice.id } })).status).toBe(200)
+    expect((await api(s.app, 'POST', '/voice/join', { token: c.token, body: { channelId: voice.id } })).status).toBe(200)
+    const gc = await connect(s.port, c.token)
+    const spy = spyRooms()
+    try {
+      await Promise.all([b, c].map((u) => postWebhook(s.app, s.config, lkEvent('participant_joined', voice.id, u.user.id))))
+      expect(s.app.ctx.voice.inChannel(voice.id)).toHaveLength(1)
+      const [loser] = [b, c].filter((u) => !s.app.ctx.voice.inChannel(voice.id).some((v) => v.userId === u.user.id))
+      expect(spy.remove).toHaveBeenCalledWith(`ch_${voice.id}`, loser!.user.id)
+      if (loser === c) expect(await gc.waitFor('VOICE_DISCONNECT')).toEqual({ channelId: voice.id, reason: 'channel_full' })
+      // MOVE_MEMBERS (the owner) bypasses the limit.
+      await postWebhook(s.app, s.config, lkEvent('participant_joined', voice.id, a.user.id))
+      expect(s.app.ctx.voice.inChannel(voice.id)).toHaveLength(2)
+    } finally {
+      spy.restore()
+      gc.close()
+    }
+  })
+
+  it('B1: a participant re-entering the room of a deleted channel is removed from the SFU', async () => {
+    const [a, b] = [await register(s.app), await register(s.app)]
+    const { voice } = await spaceWith(a.token, b.token)
+    expect((await api(s.app, 'DELETE', `/channels/${voice.id}`, { token: a.token })).status).toBe(204)
+    const spy = spyRooms()
+    try {
+      await postWebhook(s.app, s.config, lkEvent('participant_joined', voice.id, b.user.id))
+      expect(spy.remove).toHaveBeenCalledWith(`ch_${voice.id}`, b.user.id)
+    } finally {
+      spy.restore()
+    }
+  })
+
+  it('B7: voice tokens cannot publish on the data channel', async () => {
+    const [a] = [await register(s.app)]
+    const { voice } = await spaceWith(a.token)
+    const res = await api<VoiceJoinResponse>(s.app, 'POST', '/voice/join', { token: a.token, body: { channelId: voice.id } })
+    const claims = await new TokenVerifier(s.config.livekit.apiKey, s.config.livekit.apiSecret).verify(res.body.token)
+    expect(claims.video!.canPublishData).toBe(false)
+  })
+
+  it('B8: streaming/video flags need STREAM/SPEAK', async () => {
+    const [a, b] = [await register(s.app), await register(s.app)]
+    const { voice, space } = await spaceWith(a.token, b.token)
+    await s.app.ctx.db.update(roles).set({ permissions: DEFAULT_EVERYONE_PERMISSIONS & ~(Permission.STREAM | Permission.SPEAK) }).where(eq(roles.id, space.id))
+    const ga = await connect(s.port, a.token)
+    const gb = await connect(s.port, b.token)
+    await postWebhook(s.app, s.config, lkEvent('participant_joined', voice.id, b.user.id))
+    await ga.waitFor('VOICE_STATE_UPDATE', (v) => v.userId === b.user.id)
+    gb.send({ op: 'voice_state', selfMute: true, selfDeaf: false, streaming: true, video: true })
+    const st = await ga.waitFor('VOICE_STATE_UPDATE', (v) => v.userId === b.user.id && v.selfMute)
+    expect(st).toMatchObject({ streaming: false, video: false })
+    ga.close()
+    gb.close()
+  })
+
+  it('B9: a replayed webhook (same event id) is ignored', async () => {
+    const [a] = [await register(s.app)]
+    const { voice } = await spaceWith(a.token)
+    const left = lkEvent('participant_left', voice.id, a.user.id)
+    await postWebhook(s.app, s.config, lkEvent('participant_joined', voice.id, a.user.id))
+    await postWebhook(s.app, s.config, left)
+    await postWebhook(s.app, s.config, lkEvent('participant_joined', voice.id, a.user.id))
+    expect((await postWebhook(s.app, s.config, left)).status).toBe(200)
+    expect(s.app.ctx.voice.inChannel(voice.id).map((v) => v.userId)).toEqual([a.user.id])
   })
 })

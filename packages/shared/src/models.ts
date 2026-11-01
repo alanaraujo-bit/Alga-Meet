@@ -142,6 +142,9 @@ export interface VoiceState {
   joinedAt: string
 }
 
+/** Why the server removed a user from a voice room (VOICE_DISCONNECT). */
+export type VoiceDisconnectReason = 'channel_full' | 'moderator' | 'access_lost'
+
 export interface ReadState {
   channelId: string
   lastReadMessageId: string | null
