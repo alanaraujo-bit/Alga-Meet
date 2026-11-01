@@ -46,7 +46,7 @@
 | QA independente da jornada completa (92b4596) | `docs/qa/2026-11-01-report.md` | **feito**: 100 verificações, **87 passaram, 13 falharam (6 bugs)**. Passaram inteiros: contas, amizade/bloqueio, voz (incl. queda do SFU), configurações, T&S. Bugs: BUG-02 (Alto) transmissão de janela pequena trava o espectador (HEVC cai para NullVideoDecoder e o H.264 reserva não entra — 6/6); BUG-01 (Alto) moderador/dono sem "Excluir" em mensagem alheia; BUG-03 espectador em "Original" preso em 640×360@30; BUG-04 "Usuário desconhecido" após reabrir; BUG-05 menção embaralha texto; BUG-06 403 no console |
 | Correções do QA na UI (BUG-01/04/05/06) | renderer | em andamento |
 | Correções do QA na mídia (BUG-02/03) junto com a negociação de codec da E2EE 1b | `media/` | em andamento |
-| Pequenos: `Me.staffRole`, sessões com dispositivo, zoom da UI, bandeja animada | server, `src/main` | em andamento |
+| Pequenos (564be84..aee9dce; 178 testes servidor, 30 nativos) | server, `src/main` | **feito** — `Me.staffRole`, sessões com `client`/`os` via cabeçalho `X-Alga-Client`, zoom da UI 0,8–1,5 no bridge, bandeja "respirando" em voz (~0,19 ms/quadro, para quando mudo/ocioso/movimento reduzido). Renderer ligando na onda de correções |
 | Servidor: cosméticos equipáveis/públicos, eventos de convite, retomar renovação, observabilidade | `apps/server` | **feito** — ver Validado |
 | Design system + telas onda 1 | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Crítica de design independente | `docs/design/critique-2026-11-01.md` | **feito**: nota 5/10 vs Linear (tela de chamada ausente, layout clone do Discord, excesso de vermelho e bordas) → corrigindo na UI onda 2 |
