@@ -4,6 +4,7 @@ import rateLimit from '@fastify/rate-limit'
 import websocket from '@fastify/websocket'
 import { E2EE_MAX_FRAME_BYTES } from '@alga/shared'
 import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance } from 'fastify'
+import { Activity } from './activity/activity.js'
 import { authenticate, isRestricted, type AuthContext } from './auth.js'
 import { Billing } from './billing/billing.js'
 import { maxPlanAttachmentBytes } from './billing/catalog.js'
@@ -12,16 +13,19 @@ import { openDatabase, type Db } from './db/index.js'
 import { E2ee } from './e2ee.js'
 import { Mailer, createEmailSender } from './email.js'
 import { HttpError, installErrorHandling, safeUrl } from './errors.js'
+import { Events } from './events/events.js'
 import { Files } from './files.js'
 import { Hub } from './gateway/hub.js'
 import { gatewayRoute } from './gateway/socket.js'
 import { metrics } from './metrics.js'
 import { RateLimitStore, installObservability, logUserHash, routeOf } from './observability.js'
 import { Privacy } from './privacy.js'
+import { activityPublicRoutes, activityRoutes, shopFunnelHook } from './routes/activity.js'
 import { adminRoutes } from './routes/admin.js'
 import { authPublicRoutes, authRoutes } from './routes/auth.js'
 import { billingPublicRoutes, billingRoutes } from './routes/billing.js'
 import { e2eeRoutes } from './routes/e2ee.js'
+import { eventRoutes } from './routes/events.js'
 import { filePublicRoutes, fileRoutes } from './routes/files.js'
 import { messageRoutes } from './routes/messages.js'
 import { moderationRoutes } from './routes/moderation.js'
@@ -50,6 +54,8 @@ export interface Ctx {
   trust: TrustSafety
   privacy: Privacy
   telemetry: Telemetry
+  events: Events
+  activity: Activity
   log: FastifyBaseLogger
 }
 
@@ -91,12 +97,16 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   const ctx = { config, db: database.db, hub, voice, e2ee, files, mail, billing, telemetry: new Telemetry(database.db, app.log), log: app.log } as Ctx
   ctx.trust = new TrustSafety(ctx)
   ctx.privacy = new Privacy(ctx)
+  ctx.events = new Events(ctx)
+  ctx.activity = new Activity(ctx)
+  voice.onSessionEnd = (s, leftAt) => ctx.activity.recordSession(s, leftAt)
   app.decorate('ctx', ctx)
   files.start()
   billing.start()
   ctx.trust.start()
   ctx.privacy.start()
   ctx.telemetry.start()
+  ctx.activity.start()
   app.log.info({ provider: config.billing.provider }, 'billing ready')
   if (config.email.autoVerify) app.log.warn('staging: auto-verifying e-mails')
 
@@ -106,6 +116,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     hub.closeAll(1001, 'server shutting down')
   })
   app.addHook('onClose', async () => {
+    await ctx.activity.stop()
     await ctx.telemetry.stop()
     await ctx.privacy.stop()
     await ctx.trust.stop()
@@ -151,6 +162,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
 
   // /health, /ready (root and /api/v1), /metrics and the per-request metrics/log hook.
   installObservability(app, ctx)
+  app.addHook('onResponse', shopFunnelHook)
   gatewayRoute(app, ctx)
 
   await app.register(async (api) => {
@@ -161,6 +173,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     await billingPublicRoutes(api, ctx)
     privacyPublicRoutes(api, ctx)
     reportPublicRoutes(api, ctx)
+    await api.register(async (pub) => activityPublicRoutes(pub, ctx))
 
     await api.register(async (authed) => {
       authed.addHook('onRequest', authenticate(ctx.db))
@@ -183,6 +196,8 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       privacyRoutes(authed, ctx)
       reportRoutes(authed, ctx)
       telemetryRoutes(authed, ctx)
+      eventRoutes(authed, ctx)
+      activityRoutes(authed, ctx)
       await authed.register(async (admin) => adminRoutes(admin, ctx))
     })
   }, { prefix: '/api/v1' })

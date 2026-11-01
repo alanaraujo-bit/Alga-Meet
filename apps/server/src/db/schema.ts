@@ -409,12 +409,18 @@ export type GiftRow = typeof gifts.$inferSelect
 
 // ---- trust & safety, privacy (src/trust-safety.ts, src/privacy.ts) -------------------------------------------------
 
-/** Every acceptance of the legal bundle (proof of what was accepted and when). */
+/**
+ * Every acceptance of the legal bundle, and every opt-in consent (LGPD art. 8: proof of what was accepted and when).
+ * purpose 'terms': `terms_version` is the legal bundle. 'activity_email': `terms_version` is the consent text version
+ * (src/activity/email.ts) and `withdrawn_at` is set when it is turned off (a new row for each new opt-in).
+ */
 export const consentRecords = pgTable('consent_records', {
   id: uuid('id').primaryKey(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   termsVersion: text('terms_version').notNull(),
   acceptedAt: ts('accepted_at').notNull().defaultNow(),
+  purpose: text('purpose', { enum: ['terms', 'activity_email'] }).notNull().default('terms'),
+  withdrawnAt: ts('withdrawn_at'),
 }, (t) => [index('consent_records_user_id_idx').on(t.userId)])
 
 /**
@@ -635,3 +641,161 @@ export const keyPackages = pgTable('key_packages', {
 ])
 
 export type DeviceKeyRow = typeof deviceKeys.$inferSelect
+
+// ---- retention (src/events/, src/activity/; docs/retention/server.md) ----------------------------------------------
+
+/** Space events (EventView). A weekly one repeats at the wall time of starts_local (America/Sao_Paulo). */
+export const events = pgTable('events', {
+  id: uuid('id').primaryKey(),
+  spaceId: uuid('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+  channelId: uuid('channel_id').references(() => channels.id, { onDelete: 'set null' }),
+  creatorId: uuid('creator_id').references(() => users.id, { onDelete: 'set null' }),
+  title: text('title').notNull(),
+  description: text('description').notNull().default(''),
+  template: text('template', { enum: ['game_night', 'sunday_cinema', 'study'] }),
+  /** 'YYYY-MM-DDTHH:MM' wall time of the first occurrence. */
+  startsLocal: text('starts_local').notNull(),
+  /** The first occurrence as an instant (derived from starts_local). */
+  startsAt: ts('starts_at').notNull(),
+  durationMinutes: integer('duration_minutes').notNull(),
+  weekly: boolean('weekly').notNull().default(false),
+  /** Kept when the Casa ends; shown only while it is lit. */
+  cover: text('cover', { enum: ['hora_azul', 'game', 'cinema', 'study'] }),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+}, (t) => [index('events_space_id_idx').on(t.spaceId), index('events_starts_at_idx').on(t.startsAt)])
+
+/** One answer per member per event, for every occurrence. */
+export const eventRsvps = pgTable('event_rsvps', {
+  eventId: uuid('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  status: text('status', { enum: ['going', 'maybe', 'not_going'] }).notNull(),
+  /** Asked for the 2 h e-mail on this event. */
+  emailReminder: boolean('email_reminder').notNull().default(false),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.eventId, t.userId] }), index('event_rsvps_user_id_idx').on(t.userId)])
+
+/** Sent reminders. The primary key is the claim: whoever inserts the row sends, so each goes out once per occurrence. */
+export const eventReminders = pgTable('event_reminders', {
+  eventId: uuid('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  occurrenceAt: ts('occurrence_at').notNull(),
+  kind: text('kind', { enum: ['app', 'email'] }).notNull(),
+  sentAt: ts('sent_at').notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.eventId, t.occurrenceAt, t.kind] }), index('event_reminders_sent_at_idx').on(t.sentAt)])
+
+/**
+ * Raw voice sessions from the LiveKit webhooks (D7), written when the session ends. Kept 35 days. No FK on channel or
+ * space: a deleted channel's time still counts in the recap of the people who were there.
+ */
+export const voiceSessions = pgTable('voice_sessions', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  channelId: uuid('channel_id').notNull(),
+  /** null = a DM / group DM call. */
+  spaceId: uuid('space_id'),
+  joinedAt: ts('joined_at').notNull(),
+  leftAt: ts('left_at').notNull(),
+}, (t) => [
+  index('voice_sessions_joined_at_idx').on(t.joinedAt),
+  index('voice_sessions_user_left_idx').on(t.userId, t.leftAt),
+  index('voice_sessions_channel_idx').on(t.channelId, t.joinedAt),
+])
+
+/** Per user and BRT day: bits of ACTIVITY_FLAGS (src/activity/activity.ts). Kept 90 days; never kept for metrics opt-outs. */
+export const activityDays = pgTable('activity_days', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  day: date('day', { mode: 'string' }).notNull(),
+  flags: integer('flags').notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.userId, t.day] }), index('activity_days_day_idx').on(t.day)])
+
+/** Nightly product metrics, no ids. value null = hidden (fewer than 10 people). */
+export const metricDaily = pgTable('metric_daily', {
+  day: date('day', { mode: 'string' }).notNull(),
+  metric: text('metric').notNull(),
+  value: integer('value'),
+}, (t) => [primaryKey({ columns: [t.day, t.metric] })])
+
+/** Retention by signup day (BRT): cohort size and users counted per metric (d1, d7, d30, activated_24h); null = hidden. */
+export const metricCohorts = pgTable('metric_cohorts', {
+  cohortDay: date('cohort_day', { mode: 'string' }).notNull(),
+  metric: text('metric').notNull(),
+  size: integer('size'),
+  value: integer('value'),
+}, (t) => [primaryKey({ columns: [t.cohortDay, t.metric] })])
+
+/** Weekly voice minutes per user and channel (week = its Monday, BRT), the recap's source. Kept 12 weeks. */
+export const voiceWeekly = pgTable('voice_weekly', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  week: date('week', { mode: 'string' }).notNull(),
+  channelId: uuid('channel_id').notNull(),
+  spaceId: uuid('space_id'),
+  minutes: integer('minutes').notNull(),
+  /** Days with 30+ minutes in this channel. */
+  nights: integer('nights').notNull(),
+}, (t) => [primaryKey({ columns: [t.userId, t.week, t.channelId] }), index('voice_weekly_week_idx').on(t.week)])
+
+export interface StoredRecap {
+  voiceMinutes: number
+  nights: number
+  topChannel?: { channelId: string; spaceId: string }
+  events: { eventId: string; spaceId: string; title: string; startsAt: string }[]
+  /** Who you were with the most, best first (up to 10; the 3 shown are picked at read time). Copresence lives only here. */
+  people: string[]
+}
+
+/** The weekly recap as computed Monday 10:00 BRT. Kept 12 weeks. */
+export const weeklyRecaps = pgTable('weekly_recaps', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  week: date('week', { mode: 'string' }).notNull(),
+  data: jsonb('data').$type<StoredRecap>().notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.userId, t.week] }), index('weekly_recaps_week_idx').on(t.week)])
+
+/** "Semanas juntos" per space (WeeksTogether). No row = on, 0 weeks. */
+export const spaceStreaks = pgTable('space_streaks', {
+  spaceId: uuid('space_id').primaryKey().references(() => spaces.id, { onDelete: 'cascade' }),
+  enabled: boolean('enabled').notNull().default(true),
+  weeks: integer('weeks').notNull().default(0),
+  /** Counted weeks since the last automatic pause (or the start); a pause needs WEEKS_TOGETHER_PAUSE_EVERY of them. */
+  sincePause: integer('since_pause').notNull().default(0),
+  lastWeek: date('last_week', { mode: 'string' }),
+})
+
+/** ActivitySettings, plus what the activity e-mail needs. No row = the defaults. */
+export const activitySettings = pgTable('activity_settings', {
+  userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  showInOthersRecap: boolean('show_in_others_recap').notNull().default(true),
+  metricsOptOut: boolean('metrics_opt_out').notNull().default(false),
+  /** Mirror of the open activity_email consent_records row. */
+  activityEmail: boolean('activity_email').notNull().default(false),
+  /** First authenticated use of the day (BRT): "inactive for 7+ days" and "until you come back". */
+  lastSeenAt: ts('last_seen_at'),
+  /** Activity e-mails since lastSeenAt: at ACTIVITY_EMAIL_MAX_IN_60_DAYS they stop until the user is back. */
+  emailsSinceSeen: integer('emails_since_seen').notNull().default(0),
+})
+
+/** Activity e-mails sent (the 7-day gap and the 60-day cap). Kept 60 days. */
+export const activityEmails = pgTable('activity_emails', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  reason: text('reason', { enum: ['event', 'friend_call'] }).notNull(),
+  sentAt: ts('sent_at').notNull().defaultNow(),
+}, (t) => [index('activity_emails_user_sent_idx').on(t.userId, t.sentAt)])
+
+/** "Avisar" choices for the "entrou na voz" notice (VoiceNotifyScope.notify); no row = automatic. */
+export const voiceNotifyPrefs = pgTable('voice_notify_prefs', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  scopeId: uuid('scope_id').notNull(),
+  kind: text('kind', { enum: ['space', 'dm'] }).notNull(),
+  notify: boolean('notify').notNull(),
+}, (t) => [primaryKey({ columns: [t.userId, t.scopeId] })])
+
+/** Claims of the periodic jobs (one row per job and period): a period runs once, across restarts and workers. */
+export const jobRuns = pgTable('job_runs', {
+  job: text('job').notNull(),
+  period: text('period').notNull(),
+  startedAt: ts('started_at').notNull().defaultNow(),
+  finishedAt: ts('finished_at'),
+}, (t) => [primaryKey({ columns: [t.job, t.period] })])
+
+export type EventRow = typeof events.$inferSelect

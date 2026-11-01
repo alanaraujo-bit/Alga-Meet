@@ -17,6 +17,7 @@ import { metrics } from './metrics.js'
 export type EmailKind = 'verify_email' | 'account_exists' | 'password_reset'
   | 'enforcement' | 'appeal_decision' | 'account_deletion' | 'data_export'
   | 'receipt' | 'gift'
+  | 'event_reminder' | 'activity'
 
 export interface EmailMessage {
   to: string

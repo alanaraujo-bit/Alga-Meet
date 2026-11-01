@@ -15,9 +15,10 @@ import { channelAudience, profileAudience, spaceMemberIds } from './access.js'
 import type { Ctx } from './app.js'
 import { revokeAllSessions, sha256Hex } from './auth.js'
 import {
-  accessLogs, accountActions, appeals, attachments, channelRecipients, channels, consentRecords, dataExports,
-  deletedAccounts, memberRoles, messages, orders, reactions, relationships, reports, roles, sessions, spaceMembers,
-  spaces, subscriptions, users, type DataExportRow, type UserRow,
+  accessLogs, accountActions, activityDays, activityEmails, activitySettings, appeals, attachments, channelRecipients, channels,
+  consentRecords, dataExports, deletedAccounts, eventRsvps, events, memberRoles, messages, orders, reactions, relationships,
+  reports, roles, sessions, spaceMembers, spaces, subscriptions, users, voiceNotifyPrefs, voiceSessions, voiceWeekly, weeklyRecaps,
+  type DataExportRow, type UserRow,
 } from './db/schema.js'
 import { accountDeletedMail, dataExportMail, deletionCanceledMail, deletionScheduledMail } from './email-templates.js'
 import { Quota } from './email.js'
@@ -55,7 +56,10 @@ dados.json traz, em JSON:
   mesma data do link desta exportação e só funciona enquanto você ainda tiver acesso ao canal;
 - reactions, billing (assinaturas e pedidos; nunca dados de cartão);
 - accessLogs: registros de acesso dos últimos 6 meses (Marco Civil, art. 15);
-- moderation: medidas aplicadas à sua conta, seus recursos e as denúncias que você fez.
+- moderation: medidas aplicadas à sua conta, seus recursos e as denúncias que você fez;
+- retention: eventos que você criou, suas respostas (Vou/Talvez/Não), suas configurações de atividade, seus dias de
+  uso (últimos 90 dias), suas sessões de voz (últimos 35 dias), seus minutos por semana e seus resumos semanais
+  (sem a lista de pessoas, que é dado de terceiros), os e-mails de atividade enviados e suas escolhas de aviso.
 
 Não incluímos denúncias feitas contra você nem quem as fez (direitos de terceiros). Dúvidas: encarregado de dados,
 na Política de Privacidade.
@@ -77,6 +81,8 @@ export class Privacy {
    * (REST or gateway). A failure is logged, never fails the request.
    */
   async recordUse(userId: string, ip: string, userAgent: string | undefined, event: 'login' | 'session_use' | 'export_download', now = new Date()): Promise<void> {
+    // Package D: last seen and the "opened" bit (src/activity/activity.ts; once per user and BRT day).
+    if (event !== 'export_download') await this.ctx.activity.seen(userId, now)
     const day = now.toISOString().slice(0, 10)
     const userAgentSha256 = sha256Hex(userAgent ?? '')
     const key = `${userId}|${ip}|${userAgentSha256}`
@@ -311,7 +317,7 @@ export class Privacy {
         termsVersion: u.termsVersion, termsAcceptedAt: iso(u.termsAcceptedAt), plan: u.plan,
         cosmetics: u.cosmetics, telemetryOptIn: u.telemetryOptIn, telemetryOptInAt: iso(u.telemetryOptInAt),
       },
-      consents: consents.map((c) => ({ termsVersion: c.termsVersion, acceptedAt: c.acceptedAt.toISOString() })),
+      consents: consents.map((c) => ({ purpose: c.purpose, termsVersion: c.termsVersion, acceptedAt: c.acceptedAt.toISOString(), withdrawnAt: iso(c.withdrawnAt) })),
       sessions: sess.map((s) => ({ userAgent: s.userAgent, clientInfo: s.clientInfo, createdAt: s.createdAt.toISOString(), lastUsedAt: s.lastUsedAt.toISOString() })),
       relationships: rels.map(({ r, username }) => ({ userId: r.targetId, username, type: r.type, since: r.since.toISOString() })),
       spaces: memberships.map(({ m, s }) => ({
@@ -338,6 +344,36 @@ export class Privacy {
         reportsMade: myReports.map((r) => ({ targetType: r.targetType, targetId: r.targetId, reason: r.reason, status: r.status, createdAt: r.createdAt.toISOString() })),
         falseReports: u.falseReports,
       },
+      retention: await this.collectRetention(userId),
+    }
+  }
+
+  /** Package D data (docs/retention/server.md). Recaps go without `people`: who others were with is not yours to take. */
+  private async collectRetention(userId: string): Promise<Record<string, unknown>> {
+    const { db } = this.ctx
+    const iso = (d: Date) => d.toISOString()
+    const [created, rsvps, settings, days, voice, weekly, recaps, mails, notify] = await Promise.all([
+      db.select().from(events).where(eq(events.creatorId, userId)),
+      db.select().from(eventRsvps).where(eq(eventRsvps.userId, userId)),
+      db.select().from(activitySettings).where(eq(activitySettings.userId, userId)),
+      db.select().from(activityDays).where(eq(activityDays.userId, userId)).orderBy(asc(activityDays.day)),
+      db.select().from(voiceSessions).where(eq(voiceSessions.userId, userId)).orderBy(asc(voiceSessions.joinedAt)),
+      db.select().from(voiceWeekly).where(eq(voiceWeekly.userId, userId)),
+      db.select().from(weeklyRecaps).where(eq(weeklyRecaps.userId, userId)),
+      db.select().from(activityEmails).where(eq(activityEmails.userId, userId)),
+      db.select().from(voiceNotifyPrefs).where(eq(voiceNotifyPrefs.userId, userId)),
+    ])
+    const s = settings[0]
+    return {
+      eventsCreated: created.map((e) => ({ id: e.id, spaceId: e.spaceId, title: e.title, description: e.description, startsLocal: e.startsLocal, durationMinutes: e.durationMinutes, weekly: e.weekly, createdAt: iso(e.createdAt) })),
+      rsvps: rsvps.map((r) => ({ eventId: r.eventId, status: r.status, emailReminder: r.emailReminder, updatedAt: iso(r.updatedAt) })),
+      settings: s ? { showInOthersRecap: s.showInOthersRecap, metricsOptOut: s.metricsOptOut, activityEmail: s.activityEmail, lastSeenAt: s.lastSeenAt?.toISOString() ?? null } : null,
+      activityDays: days.map((d) => ({ day: d.day, opened: !!(d.flags & 1), messaged: !!(d.flags & 2), voice3min: !!(d.flags & 4), voiceWithSomeone: !!(d.flags & 8) })),
+      voiceSessions: voice.map((v) => ({ channelId: v.channelId, spaceId: v.spaceId, joinedAt: iso(v.joinedAt), leftAt: iso(v.leftAt) })),
+      voiceWeekly: weekly.map((w) => ({ week: w.week, channelId: w.channelId, spaceId: w.spaceId, minutes: w.minutes, nights: w.nights })),
+      weeklyRecaps: recaps.map((r) => ({ week: r.week, voiceMinutes: r.data.voiceMinutes, nights: r.data.nights, topChannel: r.data.topChannel ?? null, events: r.data.events })),
+      activityEmails: mails.map((m) => ({ reason: m.reason, sentAt: iso(m.sentAt) })),
+      voiceNotify: notify.map((n) => ({ scopeId: n.scopeId, kind: n.kind, notify: n.notify })),
     }
   }
 

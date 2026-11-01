@@ -151,8 +151,9 @@ export type Dispatch =
   | { t: 'EVENT_UPDATE'; d: SpaceEvent }
   | { t: 'EVENT_DELETE'; d: { id: string; spaceId: string } }
   /**
-   * Someone's answer changed; status null = removed (DELETE /events/:id/rsvp). Same audience. A member leaving the space
-   * drops out of the counts silently (the next EVENT_UPDATE / fetch has them).
+   * Someone's answer changed; status null = removed (DELETE /events/:id/rsvp). Same audience, except that 'not_going'
+   * reaches only its author (the others get null, like no answer). A member leaving the space drops out of the counts
+   * silently (the next EVENT_UPDATE / fetch has them).
    */
   | { t: 'EVENT_RSVP_UPDATE'; d: { eventId: string; spaceId: string; userId: string; status: RsvpStatus | null; going: number; maybe: number } }
   /**

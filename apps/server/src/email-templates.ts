@@ -159,3 +159,33 @@ export function giftReceivedMail(senderUsername: string | null): Content {
   ]
   return { subject: 'Você recebeu um presente no Alga Meet', text: text(lines), html: html(lines.map(esc)) }
 }
+
+// ---- retention (src/events/, src/activity/; growth-plan §4.3) -------------------------------------------------------
+// No user-chosen text (event titles, space names, display names): only the time and fixed copy.
+
+/** Asked for on that event (EventView.emailReminder), to a verified address. `time` = 'HH:MM' in Brasília time. */
+export function eventReminderMail(time: string): Content {
+  const lines = [
+    `Lembrete: o evento que você marcou começa às ${time} (horário de Brasília).`,
+    'Abra o Alga Meet para entrar na sala quando começar.',
+    'Você recebe este e-mail porque pediu o lembrete por e-mail neste evento. Para não receber mais, desmarque a opção no evento.',
+  ]
+  return { subject: `Seu evento começa às ${time}`, text: text(lines), html: html(lines) }
+}
+
+/**
+ * Activity e-mail (consent only, adults only, at most 1 per 7 days and 4 per 60): a concrete reason, never a streak,
+ * a count or pressure. `unsubscribe` is the one-click link.
+ */
+export function activityMail(reason: 'event' | 'friend_call', unsubscribe: string): Content {
+  const what = reason === 'event'
+    ? 'Tem evento marcado em um dos seus espaços no Alga Meet nos próximos dias.'
+    : 'Um amigo chamou você numa chamada no Alga Meet enquanto você estava fora.'
+  const why = 'Você recebe este e-mail porque ativou os e-mails de atividade. Mandamos no máximo um por semana, e paramos depois de quatro até você voltar.'
+  const out = `Para não receber mais, é só um clique: ${unsubscribe}`
+  return {
+    subject: reason === 'event' ? 'Tem evento marcado no seu espaço' : 'Um amigo chamou você no Alga Meet',
+    text: text([what, why, out]),
+    html: html([what, why, `<a href="${esc(unsubscribe)}" style="color:#5b6166">Não quero mais esses e-mails</a> (um clique, sem login).`]),
+  }
+}

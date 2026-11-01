@@ -180,6 +180,9 @@ export const metrics = {
   emailFailures: r.counter('alga_email_failures_total', 'E-mails the provider refused or that errored, by kind.'),
   billingWebhooks: r.counter('alga_billing_webhooks_total', 'Payment webhooks by provider and outcome (applied | duplicate | rejected | unknown_provider | error).'),
 
+  // Shop funnel (src/routes/activity.ts): no user, labels clamped to fixed sets.
+  shopFunnel: r.counter('alga_shop_funnel_total', 'Shop funnel by step (shop_open | try_on | checkout | gift_checkout) and product_type (plan | cosmetic | bundle | space_upgrade | none | other).'),
+
   // Call quality (src/telemetry.ts; opt-in reports from the desktop).
   callReports: r.counter('alga_call_quality_reports_total', 'Call-quality reports received, by OS.'),
   callJoin: r.histogram('alga_call_join_seconds', 'Client-measured voice join time.', [0.25, 0.5, 1, 2, 3, 5, 10, 20]),
