@@ -1,18 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Tray state: the small master for the size, a transparent ring cut from its corner, and the state dot.
+       Dot 32 / cut 44 at (224, 224): at 16 px a 4 px dot in the 4 x 4 corner, a clear pixel row under the right bar. -->
   <defs>
-    <linearGradient id="t-bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1e252d"/>
-      <stop offset="1" stop-color="#0e1115"/>
-    </linearGradient>
     <mask id="t-cut">
       <rect width="256" height="256" fill="#fff"/>
-      <circle cx="200" cy="200" r="{{CUT}}" fill="#000"/>
+      <circle cx="224" cy="224" r="44" fill="#000"/>
     </mask>
   </defs>
-  <g mask="url(#t-cut)">
-    <rect x="0" y="0" width="256" height="256" rx="52" fill="url(#t-bg)"/>
-    <path d="M54 210 L128 44 L202 210" fill="none" stroke="#f2f6f8" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M82 158 H174" fill="none" stroke="#4ddcdc" stroke-width="30" stroke-linecap="round"/>
-  </g>
-  <circle cx="200" cy="200" r="{{DOT}}" fill="{{COLOR}}"/>
+  <g mask="url(#t-cut)"><!--MARK x=0 y=0 size=256--></g>
+  <circle cx="224" cy="224" r="32" fill="{{COLOR}}"/>
 </svg>

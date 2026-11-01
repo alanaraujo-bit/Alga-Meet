@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Small master, 24 px grid (taskbar at 100%). The canonical geometry at u = 3: bars 3 wide, 3 apart, 9/15/9 tall.
+       The 15 px group sits half a pixel left (margins 4/5) so every vertical edge lands on a whole pixel. -->
+  <defs>
+    <linearGradient id="s-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e252d"/>
+      <stop offset="1" stop-color="#0e1115"/>
+    </linearGradient>
+  </defs>
+  <rect width="24" height="24" rx="5" fill="url(#s-bg)"/>
+  <g fill="#4ddcdc">
+    <rect x="4" y="7.5" width="3" height="9" rx="1.5"/>
+    <rect x="10" y="4.5" width="3" height="15" rx="1.5"/>
+    <rect x="16" y="7.5" width="3" height="9" rx="1.5"/>
+  </g>
+</svg>

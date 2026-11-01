@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+  <!-- Small master, 20 px grid (20, and 40 at 2x). 3 px bars, 2 px gaps: an odd-width group cannot be centered on 20,
+       so it sits half a pixel left (margins 3/4) to keep every vertical edge on a whole pixel. Heights 7.8/13/7.8 (3/5/3);
+       the round caps are antialiased anyway, so heights need no snapping. -->
+  <defs>
+    <linearGradient id="s-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e252d"/>
+      <stop offset="1" stop-color="#0e1115"/>
+    </linearGradient>
+  </defs>
+  <rect width="20" height="20" rx="4" fill="url(#s-bg)"/>
+  <g fill="#4ddcdc">
+    <rect x="3" y="6.1" width="3" height="7.8" rx="1.5"/>
+    <rect x="8" y="3.5" width="3" height="13" rx="1.5"/>
+    <rect x="13" y="6.1" width="3" height="7.8" rx="1.5"/>
+  </g>
+</svg>

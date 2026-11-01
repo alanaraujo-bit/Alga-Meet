@@ -17,7 +17,7 @@
     <circle cx="-8" cy="330" r="150" stroke-opacity="0.07"/>
     <circle cx="-8" cy="330" r="190" stroke-opacity="0.04"/>
   </g>
-  <!--MARK x=22 y=34 size=44-->
+  <!--MARK x=22 y=34 size=48-->
   <text x="22" y="112" font-family="Segoe UI Variable Display, Segoe UI, sans-serif" font-weight="600" font-size="19" letter-spacing="-0.2" fill="#eef3f5">Alga Meet</text>
   <text x="22" y="131" font-family="Segoe UI Variable Text, Segoe UI, sans-serif" font-size="10.5" fill="#8b96a1">Voz, tela e comunidades.</text>
 </svg>

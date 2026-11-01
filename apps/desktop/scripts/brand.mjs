@@ -14,6 +14,8 @@ import { app, BrowserWindow } from 'electron'
 
 const build = join(dirname(fileURLToPath(import.meta.url)), '..', 'build')
 const svg = (name) => readFileSync(join(build, 'brand', name), 'utf8')
+// Small sizes are hand-hinted: one master per pixel grid, only ever scaled by whole factors (32 = 16 x2, 40 = 20 x2).
+const small = (size) => svg(`mark-${[24, 20, 16].find((g) => size % g === 0)}.svg`)
 const previewIdx = process.argv.indexOf('--preview')
 const previewPath = previewIdx > 0 ? process.argv[previewIdx + 1] : null
 
@@ -134,24 +136,18 @@ app.whenReady().then(async () => {
   win = new BrowserWindow({ show: false, width: 400, height: 400 })
   await win.loadURL('about:blank')
   const mark = svg('mark.svg')
-  const small = svg('mark-small.svg')
   mkdirSync(join(build, 'runtime'), { recursive: true })
 
   const iconImages = []
-  for (const s of [16, 20, 24, 32]) iconImages.push(await raster(small, s))
+  for (const s of [16, 20, 24, 32]) iconImages.push(await raster(small(s), s))
   for (const s of [40, 48, 64, 128, 256]) iconImages.push(await raster(mark, s))
   writeFileSync(join(build, 'icon.ico'), ico(iconImages))
   writeFileSync(join(build, 'runtime', 'icon.png'), iconImages.at(-1).png)
 
-  const tray = {}
-  for (const [state, color] of Object.entries(TRAY)) {
-    const src = color
-      ? svg('tray.svg').replace('{{CUT}}', '78').replace('{{DOT}}', '54').replace('{{COLOR}}', color)
-      : small
-    tray[state] = src
+  const tray = (color, size) => (color ? withMark(svg('tray.svg'), small(size)).replace('{{COLOR}}', color) : small(size))
+  for (const [state, color] of Object.entries(TRAY))
     for (const [size, suffix] of TRAY_SIZES)
-      writeFileSync(join(build, 'runtime', `tray-${state}${suffix}.png`), (await raster(src, size)).png)
-  }
+      writeFileSync(join(build, 'runtime', `tray-${state}${suffix}.png`), (await raster(tray(color, size), size)).png)
 
   const sidebar = await raster(withMark(svg('installer-sidebar.svg'), mark), 164, 314)
   const header = await raster(withMark(svg('installer-header.svg'), mark), 150, 57)
@@ -159,18 +155,20 @@ app.whenReady().then(async () => {
   writeFileSync(join(build, 'installer-header.bmp'), bmp24(header))
 
   if (previewPath) {
-    // Contact sheet for design review: icon sizes at 1:1 and 8x, tray states, installer art.
-    const imgs = (list) => list.map((b) => `<img src="data:image/png;base64,${b.toString('base64')}">`).join('')
-    const big = await Promise.all([raster(small, 16), raster(small, 32), raster(mark, 256)])
-    const trays = await Promise.all(Object.values(tray).flatMap((src) => [raster(src, 16), raster(src, 32)]))
-    const html = `<body style="margin:0;padding:16px;background:#2b2f36;font:12px sans-serif;color:#ccc">
-      <style>img{margin:6px;vertical-align:middle;image-rendering:pixelated} .x8 img{width:128px;height:128px} .light{background:#f3f3f3;display:inline-block}</style>
-      <div>${imgs(iconImages.map((i) => i.png))}</div>
-      <div class="x8">${imgs([big[0].png, big[1].png])}<img src="data:image/png;base64,${big[2].png.toString('base64')}" style="width:256px;height:256px;image-rendering:auto"></div>
-      <div>${imgs(trays.map((t) => t.png))} <span class="light">${imgs(trays.map((t) => t.png))}</span></div>
-      <div class="x8">${imgs([trays[0].png, trays[2].png, trays[4].png])}</div>
-      <div>${imgs([sidebar.png])} <span style="display:inline-block;border:1px solid #888">${imgs([header.png])}</span></div></body>`
-    const p = new BrowserWindow({ show: false, width: 900, height: 1250 })
+    // Contact sheet for design review, on Windows 11 dark (#202020) and light (#f3f3f3) taskbar colors:
+    // every icon size at 1:1, the small masters at 8x, tray states at 1:1 and 8x, installer art.
+    const imgs = (list, zoom = 1) => list.map((i) => `<img src="data:image/png;base64,${i.png.toString('base64')}" width="${i.w * zoom}">`).join('')
+    const both = (html) => `<span class="dark">${html}</span><span class="light">${html}</span>`
+    const smalls = await Promise.all([16, 20, 24, 32].map((s) => raster(small(s), s)))
+    const trays = await Promise.all(Object.values(TRAY).flatMap((c) => [16, 20, 24, 32].map((s) => raster(tray(c, s), s))))
+    const html = `<body style="margin:0;padding:12px;background:#2b2f36">
+      <style>img{margin:5px;vertical-align:middle;image-rendering:pixelated} span{display:inline-block;padding:4px} .dark{background:#202020} .light{background:#f3f3f3} div{margin-bottom:6px}</style>
+      <div>${both(imgs(iconImages.filter((i) => i.w <= 64)))}</div>
+      <div>${imgs(smalls, 8)}${imgs([iconImages.at(-1)])}</div>
+      <div>${both(imgs(trays))}</div>
+      <div>${both(imgs(trays.filter((t) => t.w === 16), 8))}</div>
+      <div>${imgs([sidebar])} <span>${imgs([header])}</span></div></body>`
+    const p = new BrowserWindow({ show: false, width: 1500, height: 1250 })
     await p.loadURL(`data:text/html;base64,${Buffer.from(html).toString('base64')}`)
     await new Promise((r) => setTimeout(r, 300))
     writeFileSync(previewPath, (await p.webContents.capturePage()).toPNG())
