@@ -2,6 +2,9 @@
 
 > Fonte de verdade. Só entra como "Validado" o que tem evidência (teste, medição, screenshot). Atualizado: 2026-11-01.
 
+## Staging (Railway, criado 2026-11-01 com aprovação do dono)
+API pública `https://api-staging-b3ea.up.railway.app` + Postgres + bucket — ver `docs/infra/staging.md`. Funciona: contas, social, espaços, mensagens, gateway. **Não funciona ainda: voz/tela (sem SFU com UDP), e-mail real, pagamentos.**
+
 ## Versão executável
 - Dev: `npm install && npm run dev` (ver `README.md`). Multiusuário local: `npm run dev -- --profiles=bob` — abre duas janelas; crie uma conta em cada, adicione como amigo, crie um espaço, convide, entre no canal de voz e transmita a tela.
 - Funciona só nesta máquina/rede local até o deploy (API no Railway + SFU em VPS) — ver Bloqueios humanos.
@@ -139,7 +142,7 @@ Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não d
 |---|---|---|---|
 | Certificado de assinatura de código (OV/EV ou Azure Trusted Signing) | Windows SmartScreen e confiança do updater | Contratar certificado; fornecer `CSC_LINK`/`CSC_KEY_PASSWORD` ou credenciais Azure | Instalador mostra aviso "editor desconhecido" |
 | Repositório GitHub de releases `alanaraujo-bit/alga-meet` | Canal do auto-update. Precisa ser **público** (ou um repo público só de releases), senão o app teria que embutir um token | Autorizar criação | Auto-update não tem de onde baixar |
-| Deploy de teste: API+Postgres no Railway (~US$ 9–21/mês no beta) + domínio | Testar entre PCs diferentes | Autorizar criação no Railway; comprar/definir domínio | Só funciona nesta máquina |
+| Domínio próprio (ex. `algameet.com.br`) | URLs estáveis, e-mail, links de convite | Comprar domínio e apontar DNS | Staging fica em `*.up.railway.app` |
 | Servidor com UDP para o SFU: VM São Paulo (Vultr ~US$ 40–80/mês + banda) **ou** LiveKit Cloud plano grátis | Railway não expõe UDP | Criar conta Vultr (ou LiveKit Cloud) e autorizar custo | Voz/tela só funcionam em rede local/dev |
 | Conta Resend + domínio de envio verificado (DKIM/SPF/DMARC) | E-mails de verificação e reset em produção | Criar conta, configurar DNS (ver `docs/infra/deploy.md`) | Produção não sobe sem provedor de e-mail |
 | **Cadastro no sistema Nidus da Polícia Federal (prazo ~meados de dez/2026)** + pessoa credenciada + contato de apoio psicológico | ECA Digital: notificação de crimes contra crianças (Portaria MJSP 1.312) | Cadastrar a empresa, nomear responsáveis (ver `docs/trust-safety/csam-process.md`) | Descumprimento legal no lançamento |
