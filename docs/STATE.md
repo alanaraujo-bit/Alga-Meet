@@ -17,7 +17,8 @@
 | Backend | `apps/server`: auth, amigos, DMs, espaços, canais, mensagens, convites, gateway, voz (tokens + webhooks) | em andamento |
 | Desktop nativo | `apps/desktop/src/main`, `preload`, instalador NSIS, tray, hotkeys globais, captura, updater | em andamento |
 | Motor de mídia | `apps/desktop/src/renderer/src/media`: voz (Opus/DTX/RED, RNNoise, PTT, dispositivos) + transmissão (codecs, presets, áudio do sistema) + benchmarks | em andamento |
-| Design system + telas | `apps/desktop/src/renderer` | aguardando estudo do Linear |
+| Design system + telas (onda 1: shell, auth, amigos, DMs, espaços, chat) | `apps/desktop/src/renderer` (exceto `media/`) | em andamento |
+| Camada de dados do renderer | `lib/api.ts`, `lib/gateway.ts`, `store/*` | feito (Maestro), typecheck ok, sem teste de integração ainda |
 
 ## Validado
 - `@alga/shared`: 2 testes unitários (UUIDv7, permissões) passando.
@@ -25,7 +26,8 @@
 
 ## Pesquisa concluída
 - `docs/research/discord-benchmark.md` — barra a superar (fatos/medições/relatos separados). Medido: Discord ocioso na bandeja = 6 processos, ~808 MB de memória privada.
-- Em andamento: `docs/research/linear-design-study.md`, `docs/infra/cost-model.md`.
+- `docs/research/linear-design-study.md` — princípios + tokens propostos; identidade "Bioluminescência" (acento teal-ciano H≈195°, brilho de fala segue o nível de áudio). Capturas de referência ficam só locais (`docs/references/`, fora do git por direitos autorais).
+- `docs/infra/cost-model.md` — Railway sem UDP (confirmado); ~US$ 0,93k–1,98k/mês por 1k CCU com SFU em São Paulo; provedores por GB inviabilizam stream grátis. Decisões D11–D13 em `ARCHITECTURE.md`.
 
 ## Qualidade (voz / transmissão / interface / desempenho)
 Sem medições ainda. Metas iniciais (de `discord-benchmark.md`): stream 1080p60 grátis com encode por hardware; RAM ociosa ≤ 300 MB; voz ≥ paridade Opus 64–128 kbps com DTX+RED.
@@ -41,6 +43,7 @@ Sem medições ainda. Metas iniciais (de `discord-benchmark.md`): stream 1080p60
 | Certificado de assinatura de código (OV/EV ou Azure Trusted Signing) | Windows SmartScreen e confiança do updater | Contratar certificado; fornecer `CSC_LINK`/`CSC_KEY_PASSWORD` ou credenciais Azure | Instalador mostra aviso "editor desconhecido" |
 | Repositório GitHub `alanaraujo-bit/alga-meet` (privado ou público) | Canal de releases do auto-update | Autorizar criação (ou criar) | Auto-update não tem de onde baixar |
 | Servidor com UDP para o SFU (VPS) | Railway não expõe UDP | Escolher provedor (ver `docs/infra/cost-model.md`) e autorizar custo | Voz/tela só funcionam em rede local/dev |
+| Cotação escrita Latitude.sh São Paulo (pacote de banda) | O custo recomendado depende dela (US$ 4,9k vs 18,3k/mês a 10k CCU) | Pedir cotação antes da fase 1k CCU | Plano de custo a 1k+ CCU fica incerto |
 | Segunda máquina independente | Validar voz/tela entre dispositivos reais e NATs diferentes | Instalar o build em outro PC e entrar num canal | Só temos medições em localhost |
 
 ## Próximos passos

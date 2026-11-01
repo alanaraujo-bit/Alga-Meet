@@ -31,6 +31,9 @@
 | D8 | IDs **UUIDv7** | Ordenáveis por tempo (paginação de mensagens por id), sem coordenação. | Snowflake (precisa worker id). |
 | D9 | Monorepo **npm workspaces** | Sem surpresas com electron-builder (pnpm exige hoisting). | pnpm. |
 | D10 | UI: **React 19 + CSS próprio com tokens** (CSS variables), `motion` para animações com física, `lucide-react` para ícones, **Inter Variable** empacotada | Design system próprio, sem biblioteca de componentes genérica. | Tailwind/shadcn (estética genérica, pedido explícito para evitar). |
+| D11 | **Tiers de transmissão (proposta, validar no beta):** grátis = **1080p30 e 720p60**; assinatura = 1080p60, 1440p60, 4K30 | Grátis já supera o Discord grátis (720p30). Custo: mix "tudo liberado" custa ~2,1× o mix freemium em egress de vídeo (`docs/infra/cost-model.md` §3.3); 1080p30 grátis fica no meio (~+25–30%) e o simulcast faz espectadores em miniatura puxarem camadas baixas. | Tudo grátis (inviável por GB); 720p30 grátis (sem diferencial). |
+| D12 | **Voz igual para todos:** padrão 64 kbps mono Opus + DTX + RED; admins do espaço podem subir até 128 kbps sem pagar | Voz é a proposta central; fala satura perto de 48–64 kbps, então o custo médio quase não muda. Nunca degradar voz grátis para forçar conversão. | Bitrate de voz como benefício pago (Discord). |
+| D13 | **Infra de mídia por fase:** dev local → beta com 1 VM em São Paulo (Vultr) → 1k CCU com 2× bare metal São Paulo (Latitude.sh) → colocation com IX.br em 100k | Usuários no Brasil: SFU fora de SP = +110–300 ms. Provedores cobrando por GB (AWS/GCP/LiveKit Cloud) inviabilizam transmissão grátis. Ver `docs/infra/cost-model.md`. | LiveKit Cloud/AWS (US$ 22k+/mês a 1k CCU). |
 
 ## Pastas
 
