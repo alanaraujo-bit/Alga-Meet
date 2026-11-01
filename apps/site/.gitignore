@@ -1,3 +1,6 @@
 dist/
 .astro/
 .lighthouse/
+
+.vercel
+.env*

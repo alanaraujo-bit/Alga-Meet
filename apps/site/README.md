@@ -100,9 +100,19 @@ https://github.com/alanaraujo-bit/Alga-Meet/releases/latest/download/AlgaMeet-Se
 ## O que ainda depende do dono
 
 - **Assinatura digital do instalador.** Sem ela, o SmartScreen avisa. O texto ao lado do botão já diz isso.
-- **Domínio e hospedagem.** Falta definir `PUBLIC_SITE_URL`. O `dist/` é estático e serve em qualquer CDN.
+- **Domínio.** Hospedagem já no Vercel (ver "Publicar"); falta o domínio próprio. Ao ligar o domínio, troque `PUBLIC_SITE_URL` e publique de novo.
 - **Áudio de verdade (opcional).** As vozes da sala são sintetizadas. Se quiser vozes ou trilha reais, mande os arquivos com direito de uso; o roteiro é `src/data/conversation.ts`.
 - **Jogo com direito de uso (opcional).** A lente usa um jogo gerado por nós. Uma gravação real com licença trocaria só a fonte da textura.
 - **Plus v2 e Casa.** Preço e benefícios aparecem como "em validação" e "em breve"; falta aprovar o texto.
 - **Números** (`src/data/facts.ts`): a voz de 46 ms foi medida em rede local. Quando houver a medição pela internet (SFU em São Paulo), troque o número e a nota.
 - **Regravar mídias** se a cena mudar: `tier-media.mjs` e `game-stills.mjs` refazem os vídeos e as fotos dos níveis B e C a partir do WebGL atual.
+
+## Publicar (Vercel)
+
+No ar em https://alga-meet.vercel.app (projeto `alga-meet`, time `aionixdev`). Publicação estática, sem build no Vercel (evita instalar o monorepo lá):
+
+```bash
+PUBLIC_SITE_URL=https://alga-meet.vercel.app npm run build -w apps/site
+cd apps/site && rm -rf .vercel/output && mkdir -p .vercel/output && cp -r dist .vercel/output/static && echo '{"version":3}' > .vercel/output/config.json
+vercel deploy --prebuilt --prod --yes
+```
