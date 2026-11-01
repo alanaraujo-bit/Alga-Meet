@@ -12,3 +12,9 @@ apps/server/data/
 coverage/
 test-results/
 playwright-report/
+
+# Third-party reference captures (Linear etc.) stay local: copyrighted, reference-only.
+docs/references/**/*.png
+docs/references/**/*.jpg
+docs/references/**/*.webp
+docs/references/**/*.gif
