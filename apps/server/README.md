@@ -15,6 +15,9 @@ npm run build -w apps/server && NODE_ENV=development node apps/server/dist/index
 npm run db:generate -w apps/server  # nova migração após mudar src/db/schema.ts
 ```
 
+Deploy (não feito; precisa de aprovação do dono): imagem em `infra/server/Dockerfile` (build a partir da raiz do
+monorepo), IaC do Railway em `infra/server/railway.ts`, passo a passo em `docs/infra/deploy.md`.
+
 Migrações (`drizzle/`) são aplicadas automaticamente na subida. Sem `DATABASE_URL` o banco é PGlite em
 `apps/server/data/pglite` (ignorado pelo git); com `DATABASE_URL` usa Postgres 16+ via `node-postgres` (mesmo SQL).
 
