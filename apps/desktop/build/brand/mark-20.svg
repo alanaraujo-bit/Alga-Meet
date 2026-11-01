@@ -4,12 +4,16 @@
        the round caps are antialiased anyway, so heights need no snapping. -->
   <defs>
     <linearGradient id="s-bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1e252d"/>
-      <stop offset="1" stop-color="#0e1115"/>
+      <stop offset="0" stop-color="#22232a"/>
+      <stop offset="1" stop-color="#0f1013"/>
+    </linearGradient>
+    <linearGradient id="s-bar" x1="10" y1="3.5" x2="10" y2="16.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#a5a8fb"/>
     </linearGradient>
   </defs>
   <rect width="20" height="20" rx="4" fill="url(#s-bg)"/>
-  <g fill="#4ddcdc">
+  <g fill="url(#s-bar)">
     <rect x="3" y="6.1" width="3" height="7.8" rx="1.5"/>
     <rect x="8" y="3.5" width="3" height="13" rx="1.5"/>
     <rect x="13" y="6.1" width="3" height="7.8" rx="1.5"/>

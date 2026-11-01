@@ -1,19 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <!-- Large master (40 px and up). u = 28: bars 28 wide, 28 apart, 84/140/84 tall (3/5/3), group 140 x 140 centered. -->
+  <!-- Large master (40 px and up). u = 28: bars 28 wide, 28 apart, 84/140/84 tall (3/5/3), group 140 x 140 centered.
+       Marca v2 (Direção B): near-black tile, bars lit white at the top fading into the soft indigo, one shared gradient. -->
   <defs>
     <linearGradient id="m-bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1c232b"/>
-      <stop offset="1" stop-color="#0b0e12"/>
+      <stop offset="0" stop-color="#202128"/>
+      <stop offset="1" stop-color="#0b0b0d"/>
     </linearGradient>
-    <radialGradient id="m-glow" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#21c9ca" stop-opacity="0.26"/>
-      <stop offset="1" stop-color="#21c9ca" stop-opacity="0"/>
+    <radialGradient id="m-glow" cx="0.5" cy="0.32" r="0.6">
+      <stop offset="0" stop-color="#8b8ef7" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#8b8ef7" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="m-bar" x1="128" y1="58" x2="128" y2="198" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#9a9df9"/>
+    </linearGradient>
   </defs>
   <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#m-bg)"/>
   <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#m-glow)"/>
-  <rect x="9" y="9" width="238" height="238" rx="55" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="2"/>
-  <g fill="#4ddcdc">
+  <rect x="9" y="9" width="238" height="238" rx="55" fill="none" stroke="#ffffff" stroke-opacity="0.09" stroke-width="2"/>
+  <g fill="url(#m-bar)">
     <rect x="58" y="86" width="28" height="84" rx="14"/>
     <rect x="114" y="58" width="28" height="140" rx="14"/>
     <rect x="170" y="86" width="28" height="84" rx="14"/>

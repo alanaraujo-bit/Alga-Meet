@@ -122,8 +122,8 @@ function bmp24({ w, h, rgba }) {
 
 const TRAY = {
   idle: null,
-  connected: '#4fce74',
-  muted: '#f75d59',
+  connected: '#61c28e',
+  muted: '#e66e68',
 }
 // Bar height scale per breathing frame (src/main/tray.ts plays connected, 1, 2, 1 at 250 ms): subtle, unlike the
 // in-app Fronds (0.55).

@@ -1,4 +1,4 @@
-# build/ — ícones, arte do instalador e marca v1
+# build/ — ícones, arte do instalador e marca v2
 
 Tudo aqui é gerado a partir dos SVGs em `brand/` por `scripts/brand.mjs`, que usa o Chromium do próprio Electron para rasterizar, sem dependências extras:
 
@@ -19,7 +19,7 @@ Os arquivos gerados são versionados, então `npm run dist` nunca precisa rodar 
 | `installer-header.bmp` | 150×57, 24 bits. Cabeçalho das páginas internas do instalador. |
 | `installer.nsh` | Hooks NSIS: modo por usuário forçado, página de boas-vindas, pergunta sobre dados pessoais na desinstalação. Salvo em UTF-8 **com BOM**. |
 
-## Marca v1: as frondes
+## Marca v2: as frondes (Direção B · Índigo suave)
 
 **Conceito.** Três barras de voz, que também são três frondes de alga crescendo de um eixo comum. É o mesmo glifo que, dentro do app, mostra quem está falando (`Fronds`). Parado, ele é o logo. Em voz, as barras seguem o envelope de quem fala. A marca é a própria voz, uma só em todos os lugares: barra de tarefas, bandeja, instalador, notificação, title bar, login e splash.
 
@@ -44,27 +44,27 @@ Só as bordas verticais precisam de pixel inteiro. As pontas são redondas e sem
 
 **Cores.**
 
-- **Barras:** acento "Bioluminescência" `#4ddcdc` (OKLCH 0.82 0.12 195; ver `docs/research/linear-design-study.md` §17.1). No app, `var(--accent)`, ou `currentColor` com `mono`.
-- **Tile:** quadrado arredondado em "água profunda", gradiente vertical `#1c232b → #0b0e12` (neutro H≈230° da identidade).
-  - Em 40 px e acima, o tile tem 8/256 de respiro, raio 56/256, um brilho radial teal (`#21c9ca` a 26 % no centro) sob as barras e um filete interno branco a 8 %.
-  - Em 16, 20 e 24 px, o tile ocupa o quadrado inteiro, sem brilho nem filete. O gradiente sobe um pouco (`#1e252d → #0e1115`) para a borda aparecer na barra de tarefas escura.
-- **Barra de tarefas:** na escura, as barras teal leem sozinhas e o tile quase some. Na clara, o tile escuro dá o contraste.
+- **Barras:** acesas em branco no topo, descendo para o índigo suave: um gradiente vertical só para o grupo (`#ffffff → #9a9df9` no master grande, `#ffffff → #a5a8fb` nos pequenos, `userSpaceOnUse` do topo da barra central à base dela, então as laterais mostram a fatia do meio). No app, `LogoMark` = `Fronds brand` (mesmo gradiente em CSS); `mono` = `currentColor`. Ver `docs/design/design-system.md` (Direção B).
+- **Tile:** quadrado arredondado quase preto, gradiente vertical `#202128 → #0b0b0d` (os neutros da Direção B).
+  - Em 40 px e acima, o tile tem 8/256 de respiro, raio 56/256, uma luz radial índigo (`#8b8ef7` a 16 %, centrada um pouco acima do meio) e um filete interno branco a 9 %.
+  - Em 16, 20 e 24 px, o tile ocupa o quadrado inteiro, sem luz nem filete. O gradiente sobe um pouco (`#22232a → #0f1013`) para a borda aparecer na barra de tarefas escura.
+- **Barra de tarefas:** na escura, as barras claras leem sozinhas e o tile quase some. Na clara, o tile escuro dá o contraste.
 
 **Bandeja.** `tray.svg` recebe o master do tamanho e soma o estado:
 
 - `idle` = marca pura;
-- `connected` = ponto `#4fce74` (online);
-- `muted` = ponto `#f75d59` (perigo/mudo). Vale para microfone silenciado ou áudio desativado.
+- `connected` = ponto `#61c28e` (online, `--online`);
+- `muted` = ponto `#e66e68` (perigo/mudo, `--danger`). Vale para microfone silenciado ou áudio desativado.
 
 O ponto fica no canto inferior direito, centro (224, 224) e raio 32 na grade 256. Um anel transparente de raio 44 é recortado do tile para destacar o ponto sobre qualquer cor de barra de tarefas. Em 16 px, o ponto tem 4 px e ocupa o canto 4 × 4. Sobra uma linha de pixel inteira entre ele e a barra da direita, e o mesmo vale em 20, 24, 32 e 40 px. O ponto nunca encosta nas barras.
 
-**Badge da barra de tarefas** (menções): desenhado em pixels no main (`src/main/badge.ts`). Círculo `--danger` `#f75d59` com dígitos brancos, de 1 até "9+". Pendente: o main ainda pinta `#e5484d`.
+**Badge da barra de tarefas** (menções): desenhado em pixels no main (`src/main/badge.ts`). Círculo vermelho com dígitos brancos (na Direção B o alvo é `--danger-fill` `#c04444`), de 1 até "9+". Pendente: o main ainda pinta `#e5484d`.
 
 **Instalador.**
 
-- Lateral: gradiente escuro, com arcos concêntricos teal quase invisíveis saindo do canto inferior, como a voz se espalhando. Leva a marca em 48 px, "Alga Meet" (Segoe UI Variable Display 600) e "Voz, tela e comunidades.".
+- Lateral: gradiente escuro, com arcos concêntricos índigo quase invisíveis saindo do canto inferior, como a voz se espalhando. Leva a marca em 48 px, "Alga Meet" (Segoe UI Variable Display 600) e "Voz, tela e comunidades.".
 - Cabeçalho: branco, com a marca à direita, para combinar com o cabeçalho nativo do NSIS.
 
 **No app.** `LogoMark` (`src/renderer/src/features/app/Logo.tsx`) renderiza o próprio `Fronds` (`src/renderer/src/ui/Fronds.tsx`), em `span`s HTML. O Chromium encaixa essas caixas no pixel do dispositivo, então as barras ficam nítidas e iguais também a 125 % e 150 %. Com `breathing`, as três barras respiram em `scaleY` 0,55 → 1 (1,6 s, atraso de 0,2 s entre elas). Parado, é exatamente a geometria acima.
 
-Status: **v1**. Ao mudar a marca, edite os SVGs, regenere e revise com `--preview` em 8x, nas barras de tarefas escura e clara, e no app em 100 %, 125 % e 150 %.
+Status: **v2** (Direção B). Ao mudar a marca, edite os SVGs, regenere e revise com `--preview` em 8x, nas barras de tarefas escura e clara, e no app em 100 %, 125 % e 150 %.
