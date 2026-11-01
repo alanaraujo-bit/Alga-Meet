@@ -20,7 +20,7 @@
 | Backend onda 2 (segurança + cargos/banimento/moderação) | `apps/server`, `packages/shared` | **feito** — ver Validado |
 | UI onda 2 (chamada, transmissão, configurações, correções da crítica) | `apps/desktop/src/renderer` | **feito** — ver Validado |
 | Mídia onda 2 (vazamento, unmute, rede degradada) | `media/` | **feito** — ver Qualidade |
-| Mídia onda 3 (gating por plano, 720p60, palco: grade/destaque/mini-player/toque, congelamento em 3 Mbit/s, DTX ao reentrar) | `media/`, `features/voice` | em andamento |
+| Mídia onda 3 (gating por plano, 720p60, palco, congelamento, DTX, telemetria) | `media/`, `features/voice` | **feito** — ver Qualidade |
 | Desempenho da UI (virtualização, bundle, tamanhos de janela, ociosidade) | `features/chat`, config Vite | em andamento |
 | Motor de mídia onda 1 | `apps/desktop/src/renderer/src/media` | **feito** — ver Validado e Qualidade |
 | Backend onda 3 (anexos/avatares, Postgres real, pacote de deploy) | `apps/server`, `infra/` | **feito** — ver Validado |
@@ -91,6 +91,8 @@ Medições [MEDIDO] em `docs/benchmarks/media-baseline.md` — **localhost, duas
 
 **Vazamento de memória corrigido:** transceivers do Chromium mantinham encoders vivos após parar a transmissão. Crescimento por ciclo: padrão 20,3 → 1,7 MB, VP9 172 → 0,1 MB (tolerância ≤ 2 MB/ciclo; resíduo ~1,3 MB/ciclo no processo de GPU com HEVC). Também corrigido: HEVC não engatava em janelas menores que o preset (caía para VP8 descartado pelo SFU). Unmute pós-moderação volta em ~1,06 s.
 
+**Gating por plano (verificado ponta a ponta com billing sandbox):** grátis oferece 720p30/720p60/1080p30 e mostra 1080p60 bloqueado; upgrade durante a live libera em 302 ms (espectador em 1080p em 420 ms); downgrade re-limita em 93 ms sem mute do servidor. 720p60: 51 fps a ~2,8 % CPU. **Congelamento com uplink de 3 Mbit/s:** antes 7/12 execuções com congelamento > 2 s (pior 4,6 s); depois 0/12 (pior 1,2 s) — o espectador desce de camada sozinho. **DTX:** ~1 em 32 entradas volta sem DTX (causa no LiveKit 1.13.11; cliente detecta e republica o mic). Palco: grades equilibradas 3/5/7, transmissão assistida em destaque, mini-player arrastável, toque de chamada sintetizado (nunca ouvido por humano).
+
 Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não decodifica HEVC (backup **ainda não exercitado**); H.264 por hardware não engata no Electron 45 (sempre OpenH264). Decisão em `docs/decisions/0001-media-engine.md`.
 
 ## Problemas conhecidos
@@ -132,7 +134,7 @@ Codec de tela: HEVC por GPU quando disponível, H.264 de backup para quem não d
 ## Próximos passos (fila do Maestro, em ordem)
 1. **Aguardando agentes:** mídia onda 3, desempenho da UI e Trust & Safety/LGPD no servidor.
 2. **UI onda 6:** equipar cosméticos (`PUT /users/@me/cosmetics`) e renderizar cosméticos dos outros (`PublicUser.cosmetics` via `USER_UPDATE`), `INVITE_CREATE/DELETE` na lista de convites (tirar o polling), botão "retomar renovação", interruptor de telemetria (`PATCH telemetryOptIn`), "Denunciar" no menu das mensagens, painel de staff.
-3. **Mídia onda 3:** `ScreenPicker` bloquear presets fora de `VoiceJoinResponse.streamPresets` (dica Alga Plus → `openSettings('plan')`), re-limitar camada publicada quando o plano muda em chamada, preset `720p60` (grátis), apelidos no `CallStage.tsx:167` (`displayName(st, id, spaceId)`), grade de 3 tiles, destaque da transmissão, mini-player ao sair do palco, som de toque. Depois: **E2EE** (paridade com DAVE do Discord) — desenho + protótipo.
+3. **Pendências de mídia/servidor:** servidor só checa o preset da transmissão na publicação (downgrade no meio da live depende do cliente) → reavaliar faixas ativas quando `ENTITLEMENTS_UPDATE`; timeout de camada de tela menor na config do LiveKit; repetir o caso DTX num LiveKit mais novo; expor classe de CPU (intel/amd/outra) no bridge para a telemetria; montar o mini-player no `Shell.tsx` (hoje dentro de `IncomingCall`); toasts sobrepõem o botão Desconectar do dock.
 4. **Depois do agente de desempenho:** "Denunciar" no menu de contexto das mensagens (`features/chat`). Painel de staff (hoje só API), visualizador seguro de quarentena.
 5. **E2EE de mídia** (paridade com DAVE): desenho + protótipo com LiveKit insertable streams; distribuição de chaves sem o servidor conhecer a chave.
 6. **Deploy de teste** quando o dono aprovar (Railway + SFU) → teste real entre máquinas e comparação com Discord na mesma rede.
