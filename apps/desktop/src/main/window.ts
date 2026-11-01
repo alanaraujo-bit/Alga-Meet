@@ -24,8 +24,17 @@ export function setQuitting(): void {
   quitting = true
 }
 
+/**
+ * Launched by Playwright (`--remote-debugging-port=0`) or with ALGA_AUTOMATION=1: test, screenshot and perf runs
+ * must never cover the owner's screen. Windows open off-screen, inactive, out of the taskbar; CDP screenshots of the
+ * renderer still work.
+ */
+// Playwright's loader strips its flags from process.argv, so read Chromium's own command line.
+export const automation = app.commandLine.getSwitchValue('remote-debugging-port') === '0' || process.env.ALGA_AUTOMATION === '1'
+
 export function showMainWindow(): void {
   if (!win) return
+  if (automation) return win.showInactive()
   if (win.isMinimized()) win.restore()
   if (pendingMaximize) {
     pendingMaximize = false
@@ -36,7 +45,7 @@ export function showMainWindow(): void {
 }
 
 function saveBounds(): void {
-  if (!win || win.isDestroyed()) return
+  if (automation || !win || win.isDestroyed()) return
   updateSettings({ window: { ...win.getNormalBounds(), maximized: pendingMaximize || win.isMaximized() } })
 }
 
@@ -61,6 +70,7 @@ export function createMainWindow(title: string, startHidden: boolean): BrowserWi
   )
   win = new BrowserWindow({
     ...bounds,
+    ...(automation && { x: -32000, y: -32000, skipTaskbar: true }),
     minWidth: MIN_SIZE.width,
     minHeight: MIN_SIZE.height,
     show: false,
@@ -80,7 +90,7 @@ export function createMainWindow(title: string, startHidden: boolean): BrowserWi
       zoomFactor: getSettings().zoomFactor,
     },
   })
-  pendingMaximize = saved?.maximized === true
+  pendingMaximize = !automation && saved?.maximized === true
 
   win.once('ready-to-show', () => {
     if (!startHidden) showMainWindow()
@@ -88,6 +98,7 @@ export function createMainWindow(title: string, startHidden: boolean): BrowserWi
 
   let saveTimer: NodeJS.Timeout | undefined
   const scheduleSave = () => {
+    if (automation) return // never persist the off-screen position
     clearTimeout(saveTimer)
     saveTimer = setTimeout(saveBounds, 500)
   }
