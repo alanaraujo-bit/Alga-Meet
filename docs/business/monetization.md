@@ -9,7 +9,7 @@
 
 | # | Decisão | Recomendação |
 |---|---|---|
-| 1 | Planos | **Grátis** + **Alga Plus** (individual). Sem plano de comunidade no lançamento (§2.3). |
+| 1 | Planos | **Grátis** + **Alga Plus** (individual). Sem plano de comunidade no lançamento (§2.3). **Substituído:** a Casa (compra do grupo, `growth-plan.md` §2.3) foi adotada. |
 | 2 | Preço do Plus | **R$ 14,90/mês** ou **R$ 149/ano** (2 meses de desconto). Global depois: US$ 4,99/mês ou US$ 49,90/ano. |
 | 3 | Cosméticos | Loja enxuta, **R$ 5,90–12,90 por item**, posse permanente. O Plus inclui uma coleção enquanto dura. |
 | 4 | Provedor no Brasil | **Mercado Pago**: cartão recorrente para o Plus e Pix + cartão para cosméticos. Stripe ou Paddle só na fase global (§5). |
@@ -58,6 +58,10 @@
 
 ### 2.3 Plano de comunidade ("impulso de espaço"): não lançar agora
 
+> **Substituído (2026-11-01):** o lead adotou a **Casa** (`docs/business/growth-plan.md` §2.3): vaquinha do grupo, só
+> perks de custo ≈ 0, sem renovação nem níveis. O Cinema (stream premium para o espaço) segue desligado até o pacote
+> de banda. Implementada no servidor (`apps/server/src/billing/casa.ts`). O texto abaixo fica como histórico.
+
 Motivos:
 1. Os benefícios de comunidade do Discord são bitrate de voz e stream para o servidor inteiro. A voz já é grátis aqui (D12). Liberar stream premium para todos de um espaço faz o custo crescer com os **não pagantes** do espaço, não com quem paga. Isso dá um custo imprevisível.
 2. "Pague para destravar sua comunidade" contradiz o princípio 4.
@@ -74,7 +78,8 @@ Princípios:
 - **Venda avulsa e/ou inclusão no Plus.** Itens avulsos ficam para sempre. A Coleção Plus vale enquanto assinar. Não há desconto de membro (evita a dinâmica do Nitro).
 - **Reembolso em 7 dias** (CDC art. 49, §6).
 
-Catálogo inicial (`apps/server/src/billing/catalog.ts`, versão 1):
+Catálogo inicial (`apps/server/src/billing/catalog.ts`, versão 1; **aposentado no catálogo v2**, que traz a Coleção 01
+"Hora Azul" de `growth-plan.md` §3; quem tiver um item v1 continua com ele):
 
 | SKU | Tipo | Preço |
 |---|---|---|
@@ -209,7 +214,7 @@ Fontes acessadas em 2026-11-01:
 
 ## 7. Motor de direitos (implementado em `apps/server/src/billing/`)
 
-- **Catálogo versionado** (`catalog.ts`, `CATALOG_VERSION = 1`), espelhado na tabela `products` a cada subida.
+- **Catálogo versionado** (`catalog.ts`, `CATALOG_VERSION = 2`), espelhado na tabela `products` a cada subida.
 - **Tabelas:**
   - `subscriptions`: pending → active/past_due → canceled/expired, com `cancel_at_period_end`.
   - `orders`: pending → paid → refunded; pending → canceled/expired.
@@ -242,6 +247,11 @@ O adaptador (`mercadopago.ts`) foi escrito pela documentação pública e testad
 4. Se as cobranças recorrentes carregam o `external_reference` da preapproval. Isso afeta o mapeamento estorno → revogação pelo tópico `payment`.
 5. O `next_payment_date` logo após `authorized`: a 1ª cobrança sai ~1 h depois [FATO]. Concedemos já no `authorized`. Se a 1ª cobrança falhar, o usuário fica no máximo ~3 dias de carência.
 6. Se a retentativa da notificação mantém o mesmo `id`. Não é crítico: o estado é re-buscado.
-7. Pix em assinatura e Pix Automático.
+7. Pix em assinatura e Pix Automático. Busca na doc do MP (2026-11-01): nenhuma menção a Pix Automático no
+   `/preapproval`; o Plus no Pix é pagamento único (`plus_*_once`).
+10. Reembolso: `POST /v1/payments/{id}/refunds` com corpo vazio = total e `X-Render-In-Process-Refunds: true` (Pix em
+    contingência responde 201 `in_process` em vez de 400) estão na doc (2026-11-01); falta rodar em sandbox, junto com
+    a preferência só com Pix dos presentes (`payment_methods.excluded_payment_types`; "Dinheiro em conta" não pode ser
+    excluído) e o `payment.id` do `authorized_payment` como id da 1ª cobrança.
 8. Se `back_url` precisa ser https. Exigimos https por segurança.
 9. Tópicos a assinar no painel: `payment`, `subscription_preapproval` e `subscription_authorized_payment`, com URL `https://<api>/api/v1/billing/webhooks/mercadopago`.
