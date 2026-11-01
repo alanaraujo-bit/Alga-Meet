@@ -1,8 +1,8 @@
 # 0001 — Motor de mídia: voz e transmissão de tela
 
-- Status: **aceita** (2026-11-01)
+- Status: **aceita** (2026-11-01; revisada no mesmo dia: memória, janelas com HEVC, server mute, rede degradada)
 - Escopo: `apps/desktop/src/renderer/src/media/**`, `apps/desktop/src/main/chromium-flags.ts`
-- Evidência: `docs/benchmarks/media-baseline.md` (+ `media-baseline.json`), gerada por `apps/desktop/scripts/media-lab.mjs`
+- Evidência: `docs/benchmarks/media-baseline.md` (+ `media-baseline.json`, `media-memory.json`), gerada por `apps/desktop/scripts/media-lab.mjs`; rede degradada em `docs/benchmarks/media-network.md` (`apps/desktop/scripts/media-net.mjs` + `scripts/netem/udp-impair.mjs`)
 
 ## Contexto
 
@@ -18,7 +18,7 @@ A UI usa apenas `media` (controlador) e `useMedia` (store zustand somente leitur
 
 - **Bitrate por canal** vindo do servidor (`VoiceJoinResponse.bitrateKbps`). Padrão de **64 kbps**, que já é generoso para fala mono. O Discord limita servidores sem boost a 96 kbps.
 - **DTX** ligado: em silêncio cai para 4,8 pacotes/s e 0,1 kbps [MEDIDO]. Num canal com 10 pessoas e uma falando, quase não se gasta banda.
-- **RED** ligado (cada pacote leva o quadro anterior). **FEC in-band** (`useinbandfec=1`) ligado. Os dois ficam negociados no SDP [MEDIDO]. O ganho sob perda ainda é **PENDENTE** (localhost tem 0 % de perda).
+- **RED** ligado (cada pacote leva o quadro anterior). **FEC in-band** (`useinbandfec=1`) ligado. Os dois ficam negociados no SDP [MEDIDO]. **Mantidos depois de medir sob perda** (proxy UDP local, `media-network.md` §2): a 10 % de perda a ocultação é 0,4–1,0 % com RED+FEC, 0,7–1,2 % só com RED, 6,0 % só com FEC e 6,3 % sem nada; a 5 %, 0,1–0,7 % contra 3,0 % sem proteção. O RED dobra a banda da fala (38 → 76 kbps); o FEC não muda a banda nem o jitter buffer de forma mensurável. Com RTT de 50 a 300 ms ± 30 ms e até 10 % de perda, a ocultação fica ≤ 0,5 % (§1). `join({ red: false })` só para diagnóstico.
 - **Mono:** a resposta do SFU não tem `stereo=1`, então o encoder é mono [MEDIDO]. O áudio de tela é a exceção: estéreo, sem DTX, `musicHighQualityStereo`.
 - `adaptiveStream` (resolução segue o `<video>`, pausa o que está oculto) e `dynacast` (o publicador para camadas que ninguém consome) ligados.
 - **Latência medida A→B pelo SFU local:** 46 ms (Desligado), 53 ms (Padrão) e 62 ms (RNNoise), com p95 ≤ 65 ms. Entrada no canal em 132 ms (mediana).
@@ -59,9 +59,10 @@ Medido com captura real a 1080p60:
 | VP9 / AV1 (SVC) | Encoders de software (libvpx/libaom) não seguram 1080p: presos em 360p/720p a 0–4 fps. A RTX 3070 não tem encoder AV1. | Rejeitados por ora. **PENDENTE:** AV1 por hardware (RTX 40 / Arc / RDNA3) |
 
 - **Automático** (`pickCodec`): `mediaCapabilities.encodingInfo({type:'webrtc'}).powerEfficient` de H.265 → `h265`; senão `h264`. Nesta máquina o probe bateu com o encoder realmente usado. Escolha manual continua possível (`setScreenDefaults({ codec })`).
-- Com HEVC, o LiveKit publica **H.264 como backup codec**. O SFU muda para ele por espectador que não decodifica HEVC. Esse caminho não foi exercitado aqui (todos decodificavam HEVC): **PENDENTE**.
+- Com HEVC, o LiveKit publica **H.264 como backup codec**. Exercitado com um espectador sem decodificação HEVC (`--disable-features=PlatformHEVCDecoderSupport`): recebe o H.264 em 5 de 5 transmissões seguidas, de janelas e da tela [MEDIDO, `media-baseline.md` §4.4]. Com **só duas camadas** de simulcast o SFU não entregava nada a esse espectador (inclusive no preset 720p30 antigo); por isso a escada sempre tem 3 camadas (abaixo).
+- **Janela menor que o preset** (o caso comum: jogo ou app em janela): o `getDisplayMedia` com `max` maior que a janela entrega quadros no tamanho real dentro de um buffer do tamanho pedido, e `getSettings()` informa o tamanho pedido. O LiveKit calculava as camadas por esse tamanho falso (camadas com largura ímpar, ex. 853×480) e o **NVENC HEVC não iniciava**: o WebRTC trocava o envio para **VP8 em silêncio**, o SFU descartava ("could not find codec") e todo mundo via só o backup H.264 de uma camada [MEDIDO]. Agora o motor lê o primeiro quadro real e, se for menor, captura de novo no tamanho real (par); custa ~170 ms no início (441 ms contra 270 ms da tela). Resultado: HEVC por hardware em janelas 1280×720, 1440×810, 1600×900 e na tela [MEDIDO]. **Ainda falha** quando o tamanho real gera camada de largura ímpar (ex. janela 1366×705 → 1364×704 → camada 341×176): cai no backup H.264, que continua entregando vídeo. **PENDENTE:** recorte para múltiplos de 8 sem cópia.
 - Custo do HEVC: +~165 MB privados no processo de GPU (264–268 MB contra 98–103 MB com H.264; 3 sessões NVENC, uma por camada de simulcast) [MEDIDO].
-- **Simulcast** em toda transmissão: 360p15 (0,4 Mbps) + 720p30 (1,7 Mbps) + camada alta. Quem tem pouca banda ou janela pequena não derruba a qualidade de quem assiste em tela cheia.
+- **Simulcast** em toda transmissão: 360p15 (0,4 Mbps) + 720p30 (1,7 Mbps) + camada alta. Quem tem pouca banda ou janela pequena não derruba a qualidade de quem assiste em tela cheia. Quando a fonte é menor que o preset e a escada não cabe (camada acima de 80 % do lado curto da fonte), as camadas viram **¼ e ½ da fonte** (ex. janela 720p: 180p15 + 360p30 + 720p), com bitrate proporcional à área (`simulcastFor`, testada).
 
 ### 6. Presets e o que oferecer
 
@@ -97,7 +98,15 @@ O teto de software (1080p30) é conservador de propósito: o OpenH264 segurou 10
 - Se o LiveKit desistir: a captura é parada **antes** de qualquer nova tentativa (nunca fica mic aberto). Depois há reentrada com backoff de 1, 2, 5, 10 e 20 s, usando `refresh()` para token novo, exceto em motivos terminais (removido, sala encerrada, sessão duplicada).
 - Em `power.onResume` e no evento `online`, o motor verifica se o transporte ainda recebe bytes (par ICE nomeado, 4 s). Se não recebe, reentra.
 
-### 10. Flags do Chromium
+### 10. Parar a transmissão libera os encoders
+
+O `unpublishTrack` do LiveKit só deixa os transceivers **inativos**. O Chromium mantém os *send streams* e todos os encoders deles (3 camadas + backup) até a conexão fechar. Era o "crescimento de memória" medido: **+19,5 MB por transmissão no caminho padrão, +38,8 MB com H.264, +76 MB com VP8 e +165 MB com VP9** no renderer [MEDIDO, 20/20/6/6 ciclos]. Agora `stopScreenShare` **para** os transceivers da transmissão e renegocia. O Chromium reaproveita as m-lines paradas na próxima transmissão, e numa m-line reaproveitada o SFU (1.13.11) responde a ordem padrão de codecs quando está regredindo alguém para o backup: a transmissão seguinte saía em VP8 e ninguém recebia [MEDIDO]. Por isso cada m-line liberada é ocupada na hora por um transceiver inerte (`inactive`, sem faixa e sem encoder) e as transmissões seguintes ganham m-lines novas. Números depois da correção em `media-baseline.md` §4.
+
+### 11. Server mute
+
+O moderador muta pelo SFU (`updateParticipant` tira `microphone` de `canPublishSources`); o SFU despublica o microfone e o LiveKit para a faixa. O motor reage a `ParticipantPermissionsChanged`: fecha a captura (`self.serverMuted = true`) e, quando a permissão volta, **republica sozinho** (mutado se o usuário estiver auto-mutado, como no `join`). Entrar já server-mutado não tenta publicar (antes: aviso falso "Microfone indisponível"). Antes da correção o participante ficava mudo até reentrar [MEDIDO, `media-baseline.md` §4.5].
+
+### 12. Flags do Chromium
 
 **Nenhuma.** O que precisamos já vem ligado no Chromium 156: HEVC HW encode, decodificação D3D11 e captura de tela a ~52 fps. `PlatformH264CbpEncoding` foi medida e não mudou nada (H.264 continua OpenH264). As flags do harness (oclusão/backgrounding) ficam só no script do lab. `chromium-flags.ts` registra o que foi avaliado.
 
@@ -107,9 +116,11 @@ O teto de software (1080p30) é conservador de propósito: o OpenH264 segurou 10
 - Com ~200 MB ociosos e ~370 MB em chamada, a meta "≤ 1/3 do Discord ocioso" (≤ 300 MB) está cumprida no ocioso.
 - Depende de mudar a CSP para a Supressão avançada funcionar em produção.
 - Dívidas medidas que ficam:
-  - Crescimento de memória do renderer em sessões de tela repetidas (VP8/VP9/AV1).
+  - Janelas cujo tamanho real gera camada ímpar ainda caem no backup H.264 (§5).
+  - Com a subida limitada a 3 Mbit/s, a troca de camada da tela congelou o espectador por 3,7–4,5 s; sob RTT 150 ms + 2 % de perda o 1080p60 caiu para 360p15 no espectador (`media-network.md` §3, n=1).
+  - Sair e entrar na mesma sala sem pausa às vezes volta com o microfone sem DTX (`media-network.md` §2).
   - 1440p60 e 60 fps reais sem fonte adequada aqui.
-  - Rede real, perda e máquinas independentes (lista completa em `media-baseline.md` §3).
+  - Rede real (NAT/TURN/Wi-Fi) e máquinas independentes; perda, atraso e quedas já medidos com proxy local (`media-network.md`).
 
 ## Alternativas rejeitadas
 

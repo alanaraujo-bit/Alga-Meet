@@ -154,7 +154,7 @@ O pipeline entregou 49–50 dos ~52 fps que a fonte produz (−6 %). O ritmo no 
 
 - **Recepção:** decodificação por hardware (`D3D11VideoDecoder`) para H.264/HEVC/VP9/AV1, `libvpx` (software) para VP8. H.264/HEVC estão no JSON (2.1). VP8/VP9/AV1 vêm do log da rodada descartada (fonte falsa de 20 fps; a escolha do decoder não depende da fonte), porque nesta matriz B ainda não capturava e o Chromium ocultou `decoderImplementation`.
 - `mediaCapabilities.encodingInfo({type:'webrtc'})` nesta máquina: `powerEfficient` **true só para H.265** e false para H.264/VP8/VP9/AV1. A decodificação é `powerEfficient` para H.264/H.265/VP9/AV1. O probe bate com o encoder realmente usado.
-- A memória privada do renderer de A cresceu a cada sessão de tela no mesmo processo: 143 → 302 → 708 → 797 → 889 MB ao longo de VP8/VP9/AV1/detalhe. **PENDENTE:** descobrir se é vazamento (motor/LiveKit) ou cache dos encoders de software. Repetir 20× start/stop com o mesmo codec.
+- A memória privada do renderer de A cresceu a cada sessão de tela no mesmo processo: 143 → 302 → 708 → 797 → 889 MB ao longo de VP8/VP9/AV1/detalhe. **Era vazamento** (encoders presos em transceivers inativos), corrigido: ver §4.
 
 ### 2.3 Acima de 1080p (fonte sintética) [MEDIDO, com ressalva]
 
@@ -171,10 +171,60 @@ O pipeline entregou 49–50 dos ~52 fps que a fonte produz (−6 %). O ritmo no 
 
 ## 3. O que localhost não prova (PENDENTE)
 
-- **Rede real:** RTT > 1 ms, jitter, perda, NAT/TURN/TCP, rampa do estimador de banda em uplinks domésticos (o simulcast desliga a camada alta quando a banda não chega), eficácia de FEC e RED sob perda.
-- **Máquinas independentes:** relógios separados, outras GPUs (AMD AMF, Intel QSV), CPUs fracas, notebook na bateria, espectador sem decodificação HEVC por hardware (caminho do codec reserva H.264 não exercitado: aqui todos decodificam HEVC).
+- **Rede real:** NAT/TURN/TCP, Wi-Fi e uplinks domésticos de verdade. Perda, atraso, jitter, limite de banda e quedas foram medidos com um proxy UDP local em `media-network.md`, que aproxima mas não substitui isso.
+- **Máquinas independentes:** relógios separados, outras GPUs (AMD AMF, Intel QSV), CPUs fracas, notebook na bateria, espectador real sem decodificação HEVC (o caminho do codec reserva H.264 foi exercitado só com a decodificação HEVC desligada por flag, §4.4).
 - **Latência de hardware de áudio:** ADC/DAC, buffers WASAPI, Bluetooth.
 - **60 fps reais** e **1440p60 real** (limites da fonte de teste e do monitor desta máquina).
 - **Qualidade perceptual:** VMAF/PSNR de HEVC vs H.264 a 8 Mbps; MOS/ABX de voz e RNNoise.
-- **Sessões longas (horas):** memória, deriva, estabilidade. Inclui o crescimento de memória visto em 2.2.
+- **Sessões longas (horas):** memória, deriva, estabilidade. O vazamento por transmissão de 2.2 foi corrigido (§4); sobra +0,5–1,7 MB por transmissão, a medir em centenas de ciclos.
 - **Não exercitado na automação** (lógica implementada): troca/desconexão física de dispositivo, PTT por atalho global, falha definitiva de reconexão, áudio do sistema na live (o engenheiro nativo mediu `restrictOwnAudio` em `docs/decisions/0002-screen-audio-capture.md`; o motor já pede a constraint).
+
+## 4. Memória em sessões repetidas, HEVC em janelas e server mute (revisão 2026-11-01)
+
+Dados brutos: [`media-memory.json`](media-memory.json). Reproduzir: `node apps/desktop/scripts/media-lab.mjs --phase=leak --cycles=20 --join-cycles=10 --leak-codecs=auto,h264` e `--phase=unmute`.
+
+### 4.1 Método [MEDIDO]
+
+- A: captura real de **janela** (ffplay `testsrc2` 1280×720@60 numa janela comum, sem tela cheia nem "sempre no topo"), só ouvindo. B: microfone falso (bipes), publica voz e assiste.
+- **Ciclo de transmissão:** A `startScreenShare` (1080p60) → B `watch('source')` → vídeo chega → 5 s → B `unwatch` → A `stopScreenShare` → 1,5 s. **Ciclo de assistir:** A transmitindo; B `watch` (alternando automática/original) → 3 s → `unwatch`. **Ciclo de entrar/sair:** B `leave` → `join` com microfone → 3 s.
+- **Amostra a cada ciclo**, depois de `gc()` forçado 3× (`--js-flags=--expose-gc`): MB privados por tipo de processo (`app.getAppMetrics()`: Tab = renderer, GPU, Browser, Utility), heap JS (`performance.memory` com `--enable-precise-memory-info`) e contadores do MediaLab (registros fracos instalados antes do motor): faixas `live`, AudioContexts abertos, PeerConnections, transceivers, elementos `<video>/<audio>`.
+- **Critério de "plano":** inclinação por mínimos quadrados ≤ 2 MB/ciclo na memória total da instância e mediana do último terço ≤ 10 % acima da do primeiro terço.
+
+### 4.2 Causa raiz
+
+O heap JS ficou parado (9–10 MB) e não sobrava nenhuma faixa `live`, AudioContext nem `<video>`: o crescimento era nativo. O que crescia junto era o número de **transceivers** do PeerConnection de publicação (+1 ou +2 por transmissão), e os `outbound-rtp` antigos continuavam aparecendo no `getStats()`. O `unpublishTrack` do LiveKit só deixa o transceiver `inactive`; o Chromium mantém o *send stream* e todos os encoders dele (3 camadas de simulcast + backup) até a conexão fechar. Correção: `stopScreenShare` para os transceivers da transmissão e renegocia (decisão 0001 §10). Assistir e entrar/sair nunca vazaram.
+
+### 4.3 Antes × depois (MB por ciclo, inclinação) [MEDIDO]
+
+| Ciclo | n | Antes: total A (renderer) | Antes: 1º → último terço | **Depois: total A (renderer)** | Depois: 1º → último terço |
+|---|---|---|---|---|---|
+| Transmitir, codec automático¹ | 20 | **+20,3** (+19,5) | 420 → 704 MB | **+1,7** (+0,5) | 449 → 475 MB |
+| Transmitir, H.264 (OpenH264) | 20 | **+38,8** (+38,8) | 904 → 1 450 MB | **+0,8** (+0,8) | 343 → 356 MB |
+| Transmitir, VP8 | 6 | +73,9 (+76,4) | 476 → 765 MB | −0,6 (+1,3) | 330 → 328 MB |
+| Transmitir, VP9 (SVC) | 6 | +172,1 (+165,4) | 1 173 → 1 837 MB | +0,1 (0) | 327 → 328 MB |
+| Transmitir, AV1 (SVC) | 6 | +43,4 (+43,2) | 1 937 → 2 104 MB | +0,8 (+0,6) | 326 → 330 MB |
+| Assistir/parar (B) | 20 | −0,2 (+0,1) | 364 → 363 MB | −1,0 (0) | 370 → 355 MB |
+| Entrar/sair com microfone (B) | 10 | +0,2 (+0,5) | 334 → 334 MB | +0,8 (+0,8) | 326 → 333 MB |
+
+¹ Antes da correção o "automático" (HEVC) nem usava HEVC nesta janela (§4.4): o WebRTC trocava para VP8. Depois, NVENC HEVC nas 20.
+
+- Depois da correção **todos os ciclos ficam dentro do critério**. Heap JS 8–10 MB do início ao fim, 0 faixas `live` de captura depois de parar, AudioContexts constantes (3: sons, áudio do LiveKit, medidor de nível), 1 PeerConnection.
+- Resíduo: no caminho HEVC o processo de GPU subiu 219 → 242 MB em 20 transmissões (+1,3 MB/ciclo); no H.264, o renderer +0,8 MB/ciclo. Os transceivers inertes que ocupam as m-lines liberadas (§4.4) somam um por transceiver parado (26 depois de 20 transmissões HEVC). **PENDENTE:** 200+ ciclos para ver se o resíduo satura.
+
+### 4.4 HEVC em janelas menores que o preset e o codec reserva [MEDIDO]
+
+- **Antes:** em janela 1280×720 com preset 1080p60 o `getSettings()` informa 1920×1080 (o buffer pedido), o LiveKit calcula camadas de 427×240 e 853×480 e o encoder NVIDIA HEVC não inicia: o WebRTC troca para **VP8** (`SimulcastEncoderAdapter (libvpx…)`, camadas com 1 quadro), o SFU registra `could not find codec for webrtc receiver (video/VP8)` e quem assiste só recebe o backup H.264 de uma camada. Com `max` igual ao tamanho da janela, HEVC funciona; com `max` 1366×768 ou `resizeMode: none` na mesma janela, falha.
+- **Depois:** o motor lê o primeiro quadro (`MediaStreamTrackProcessor`) e, se ele for menor que o pedido, captura de novo no tamanho real (par). Início da transmissão: 433–613 ms em janela contra 263–292 ms na tela. NVENC HEVC confirmado em janelas 1280×720, 1440×810 (→1440×808), 1600×900 (→1592×896) e na tela 1920×1080. **Ainda cai para o H.264 reserva** em 1366×705 e 1287×803 (camada ¼ com largura ímpar, ex. 341×176); quem assiste continua recebendo vídeo.
+- **Codec reserva com um espectador sem HEVC** (`--disable-features=PlatformHEVCDecoderSupport` em B; `RTCRtpReceiver.getCapabilities` passa a listar só H.264): com 3 camadas, B recebe H.264 em 5/5 transmissões seguidas (janelas 1280×720, 1366×705, 1600×900 e tela). Com **2 camadas** (preset 720p30, ou a escada antiga numa janela 720p) B não recebia nada, já na primeira transmissão, inclusive antes da correção. Daí a escada de 3 camadas ¼/½ (decisão 0001 §5).
+- **Reaproveitamento de m-line:** parando os transceivers, a 2ª transmissão reaproveitava a m-line da 1ª; com o SFU regredindo B para H.264, a resposta para a m-line nova vinha com VP8 primeiro e ninguém recebia. Ocupando cada m-line liberada com um transceiver inerte, 5/5 transmissões chegam (com e sem HEVC no espectador).
+
+### 4.5 Server mute → server unmute [MEDIDO]
+
+`RoomServiceClient.updateParticipant` no SFU do lab, exatamente como o servidor faz (`canPublishSources` sem/com `MICROPHONE`). Tempo = da chamada da API até as duas pontas mostrarem o resultado (amostrado a cada 250 ms); áudio = bytes de `inbound-rtp` do mic de A chegando em B.
+
+| Passo | Antes da correção | Depois |
+|---|---|---|
+| Server mute | B vê A mutado; a faixa do mic de A fica `ended` (o LiveKit a para) | B vê A mutado em 260 ms; `self.serverMuted=true`; captura fechada |
+| Server unmute | **A continua mudo para B até o fim do teste (15 s)**, 0 bytes; só reentrando | voz volta em **1,06 s** (republicação), B vê A desmutado, nível > 0 |
+| Auto-mutado + server mute → unmute | idem: mic morto | volta publicado **e mutado** (escolha do usuário), 0 bytes até ele desmutar; ao desmutar, voz em 260 ms |
+| Entrar já server-mutado | aviso falso "Microfone indisponível (insufficient permissions)", nunca publica | sem aviso, `serverMuted=true`; ao liberar, voz em 270 ms |
