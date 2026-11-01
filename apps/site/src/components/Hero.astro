@@ -1,151 +1,201 @@
 ---
-import { Picture } from 'astro:assets';
+// Abertura + mergulho + vista explodida: um capítulo só (preso no nível A).
+// A janela é a captura real em camadas: cada camada recorta a MESMA imagem (um download), então montada ela é a captura exata.
+import { getImage } from 'astro:assets';
 import Download from './Download.astro';
+import { downloadNote } from '../data/links';
 import chat from '../assets/shots/chat.png';
 
-const people = [
-  { name: 'Carlinha', av: 'av-sun' },
-  { name: 'Bruno', av: 'av-sky' },
-  { name: 'Diego', av: 'av-ink', initials: 'DA' },
-  { name: 'Você', av: 'av-plum', initials: 'AR' },
+const img = await getImage({ src: chat, format: 'avif', widths: [960, 1440, 1920], sizes: '(min-width: 1240px) 1120px, 92vw' });
+const webp = await getImage({ src: chat, format: 'webp', widths: [960, 1440, 1920], sizes: '(min-width: 1240px) 1120px, 92vw' });
+
+// Retângulos em % da captura 1920×1080 (x, y, w, h) e a profundidade de cada camada na vista explodida (px).
+const layers = [
+  { id: 'bar', r: [0, 0, 100, 4.63], z: 300 },
+  { id: 'rail', r: [0, 4.63, 4.17, 95.37], z: 230 },
+  { id: 'side', r: [4.17, 4.63, 16.14, 95.37], z: 160 },
+  { id: 'chat', r: [20.31, 4.63, 63.65, 95.37], z: 0 },
+  { id: 'side2', r: [83.96, 4.63, 16.04, 95.37], z: 130 },
 ];
+const pops = [
+  { id: 'composer', r: [21.35, 91.2, 61.5, 5.1], z: 90 },
+  { id: 'invoice', r: [84.4, 5.7, 14.6, 8.4], z: 250 },
+  { id: 'me', r: [4.69, 93.06, 15.1, 6.0], z: 220 },
+];
+// Rótulos da vista explodida: ponto de ancoragem (% da janela), profundidade da camada e texto.
+const tags = [
+  { x: 12, y: 32, z: 160, t: 'Canais de texto e de voz, do jeito que o grupo já usa' },
+  { x: 40, y: 30, z: 0, t: 'A conversa: respostas, reações, @menções' },
+  { x: 91, y: 10, z: 250, t: 'Quem está em voz aparece primeiro' },
+  { x: 74, y: 93, z: 90, t: 'Rascunho guardado por canal' },
+];
+const style = (r: number[], z: number) =>
+  `--x:${r[0]}%;--y:${r[1]}%;--w:${r[2]}%;--h:${r[3]}%;--iw:${(100 / r[2]) * 100}%;--ix:${(-r[0] / r[2]) * 100}%;--iy:${(-r[1] / r[3]) * 100}%;--z:${z}px`;
+const title = ['Sua galera,', 'de perto.'];
+// Cada letra com o seu atraso (calculado aqui: no CSS puro não dá para contar letras).
+let n = 0;
+const lines = title.map((line) => line.split(' ').map((word) => [...word].map((ch) => ({ ch, d: 120 + n++ * 34 }))));
 ---
-<section class="hero" id="topo">
-  <div class="aurora" aria-hidden="true"><div class="glow" data-glow></div></div>
-  <div class="wrap copy">
-    <p class="pill hero-in" style="--d:0ms"><span class="live-dot" aria-hidden="true"></span>Beta fechado · Windows 10 e 11</p>
-    <h1><span class="line hero-in" style="--d:60ms">A voz dos seus amigos,</span> <span class="line hero-in" style="--d:140ms">de perto.</span></h1>
-    <p class="lede hero-in" style="--d:240ms">Canais de voz que soam como se todo mundo estivesse na mesma sala. Tela em 1080p de graça. Leve enquanto você joga. E <strong>nenhum anúncio</strong>, nunca.</p>
-    <div class="ctas hero-in" style="--d:320ms">
-      <Download />
-      <a class="btn btn-ghost btn-lg" href="#voz">Ver por dentro</a>
-    </div>
-  </div>
+<section class="hero" id="topo" data-hero aria-labelledby="hero-t">
+  <div class="stage" data-stage>
+    <div class="backdrop" aria-hidden="true"></div>
 
-  <div class="stage wrap">
-    <div class="persp">
-      <div class="window" data-hero-shot>
-        <Picture src={chat} formats={['avif', 'webp']} widths={[640, 960, 1280, 1920]} sizes="(min-width: 1240px) 1160px, calc(100vw - 32px)" alt="O Alga Meet aberto no espaço Estúdio Alga: canais à esquerda, a conversa em #geral no centro e, à direita, quem está em voz agora." loading="eager" fetchpriority="high" />
+    <div class="copy wrap" data-copy>
+      <p class="pill rise" style="--d:0ms"><span class="live-dot" aria-hidden="true"></span>Beta fechado · Windows 10 e 11</p>
+      <h1 id="hero-t" class="title">
+        <span class="sr-only">{title.join(' ')}</span>
+        <span aria-hidden="true">{lines.map((words) => (
+          <span class="line">{words.map((word) => (
+            <span class="word">{word.map((c) => <span class="ch" style={`animation-delay:${c.d}ms`}>{c.ch}</span>)}</span>
+          ))}</span>
+        ))}</span>
+      </h1>
+      <p class="lede rise" style="--d:620ms">Voz que soa como se todo mundo estivesse na mesma sala. Tela em 1080p de graça. Leve a ponto de o jogo nem perceber. E <strong>nenhum anúncio</strong>, nunca.</p>
+      <div class="ctas rise" style="--d:760ms">
+        <Download />
+        <a class="btn btn-ghost btn-lg" href="#voz">Ouvir a sala</a>
+      </div>
+      <p class="dl-note rise" style="--d:860ms">{downloadNote}</p>
+    </div>
+
+    <p class="cue" data-cue aria-hidden="true"><span></span>Role para mergulhar</p>
+
+    <div class="scene" data-scene>
+      <div class="tilt" data-tilt>
+      <div class="win" data-win>
+        <div class="slab" data-slab aria-hidden="true"></div>
+        {layers.map((l, i) => (
+          <div class={`layer l-${l.id}`} data-layer data-z={l.z} style={style(l.r, l.z)}>
+            <picture>
+              <source type="image/avif" srcset={img.srcSet.attribute} sizes="(min-width: 1240px) 1120px, 92vw" />
+              <source type="image/webp" srcset={webp.srcSet.attribute} sizes="(min-width: 1240px) 1120px, 92vw" />
+              <img src={webp.src} width="1920" height="1080" decoding="async" loading={i === 3 ? 'eager' : 'lazy'}
+                alt={i === 3 ? 'O Alga Meet aberto no espaço Estúdio Alga: canais à esquerda, a conversa em #geral no centro e, à direita, quem está em voz agora.' : ''} />
+            </picture>
+          </div>
+        ))}
+        {pops.map((p) => (
+          <div class={`layer pop p-${p.id}`} data-pop data-z={p.z} style={style(p.r, p.z)} aria-hidden="true">
+            <picture>
+              <source type="image/avif" srcset={img.srcSet.attribute} sizes="(min-width: 1240px) 1120px, 92vw" />
+              <source type="image/webp" srcset={webp.srcSet.attribute} sizes="(min-width: 1240px) 1120px, 92vw" />
+              <img src={webp.src} width="1920" height="1080" decoding="async" loading="lazy" alt="" />
+            </picture>
+          </div>
+        ))}
+        {tags.map((g) => <span class="tag" data-tag data-z={g.z} style={`--ax:${g.x}%;--ay:${g.y}%`} aria-hidden="true">{g.t}</span>)}
+        <div class="sheen" data-sheen aria-hidden="true"></div>
+        <div class="flash" data-flash aria-hidden="true"></div>
+      </div>
       </div>
     </div>
 
-    <div class="room" data-voice-room data-parallax="14">
-      <p class="sr-only">Exemplo animado de uma sala de voz: quem fala ganha um anel índigo, como no app.</p>
-      <div aria-hidden="true">
-        <div class="room-head">
-          <svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="5" width="2" height="6" rx="1" fill="currentColor"/><rect x="7" y="3" width="2" height="10" rx="1" fill="currentColor"/><rect x="11" y="5" width="2" height="6" rx="1" fill="currentColor"/></svg>
-          <span class="room-name">Sala de jogo</span>
-          <span class="room-count">4 em voz</span>
-        </div>
-        <ul class="room-list">
-          {people.map((p, i) => (
-            <li class:list={['person', i === 0 && 'talking']} data-person={p.name === 'Você' ? 'Você' : p.name}>
-              <span class:list={['av', p.av]}>{p.initials}</span>
-              <span class="who">{p.name}</span>
-              <span class="meter"><i></i><i></i><i></i></span>
-            </li>
-          ))}
-        </ul>
-        <div class="room-foot">
-          <span class="connected"><span class="live-dot"></span>Voz conectada</span>
-          <span class="speaking" data-speaking>Carlinha está falando</span>
-        </div>
-      </div>
-    </div>
+    <p class="cap c1" data-cap="1">Tudo do grupo num lugar só.<br /><span>Nada no caminho.</span></p>
+    <p class="cap c2" data-cap="2">Por dentro, <span>o de sempre.</span><br />Só que leve.</p>
   </div>
 </section>
 
 <style>
-  .hero { position: relative; padding-top: clamp(112px, 16vh, 168px); overflow: clip; isolation: isolate; }
-  .aurora {
-    position: absolute; inset: 0 0 auto; height: 1100px; z-index: -1; pointer-events: none;
+  .hero { position: relative; isolation: isolate; }
+  .stage { position: relative; }
+  .backdrop {
+    position: absolute; inset: 0 0 auto; height: 120vh; z-index: -1; pointer-events: none;
     background:
-      radial-gradient(60% 45% at 50% 0%, rgba(110, 114, 232, 0.28), rgba(110, 114, 232, 0) 70%),
-      radial-gradient(40% 30% at 50% 8%, rgba(162, 168, 252, 0.16), rgba(162, 168, 252, 0) 70%);
+      radial-gradient(70% 55% at 62% 0%, rgba(92, 96, 214, 0.34), rgba(92, 96, 214, 0) 70%),
+      radial-gradient(50% 40% at 30% 10%, rgba(139, 142, 247, 0.12), rgba(139, 142, 247, 0) 70%),
+      linear-gradient(180deg, #10112a 0%, #0b0b10 70%);
   }
-  .glow {
-    position: absolute; left: 50%; top: 340px; width: 640px; height: 640px; margin: -320px 0 0 -320px; border-radius: 50%;
-    background: radial-gradient(closest-side, rgba(139, 142, 247, 0.16), rgba(139, 142, 247, 0));
-    will-change: transform;
-  }
-  .copy { display: grid; justify-items: center; text-align: center; gap: 22px; }
+  /* Com a água do WebGL ligada, o fundo em CSS some devagar (ele só segura a primeira pintura). */
+  :global(html.gl-on) .backdrop { opacity: 0; transition: opacity 1600ms var(--ease-out); }
+
+  .copy { padding-top: clamp(120px, 20vh, 200px); display: grid; justify-items: start; gap: 24px; position: relative; z-index: 2; }
   .pill {
     display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px 0 10px; border-radius: 999px;
     font-size: 13px; font-weight: 510; color: var(--text-2);
-    background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 0 0 1px var(--line-2), var(--top-light);
+    background: rgba(255, 255, 255, 0.05); box-shadow: inset 0 0 0 1px var(--line-2), var(--top-light);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
   }
   .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--online); box-shadow: 0 0 0 3px rgba(97, 194, 142, 0.16); }
-  h1 .line { display: block; }
-  .lede { text-align: center; max-width: 34em; text-wrap: balance; }
-  .ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 6px; }
+  .title { font-size: clamp(56px, 10.4vw, 156px); line-height: 0.92; letter-spacing: -0.055em; font-weight: 640; text-wrap: initial; }
+  .title .line { display: block; }
+  .title .line + .line { color: #a9acff; }
+  .word { display: inline-block; white-space: nowrap; margin-right: 0.22em; }
+  .ch { display: inline-block; }
+  .lede { max-width: 30em; color: var(--text-3); }
+  .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
+  .dl-note { margin-top: -10px; font-size: 12.5px; color: var(--text-3); max-width: 46ch; }
 
-  /* Entrada da abertura (A e B): sobe 18 px e acende. C: nada. */
-  :global(html.tier-a) .hero-in, :global(html.tier-b) .hero-in { animation: hero-in 900ms var(--ease-out) both; animation-delay: var(--d); }
-  @keyframes hero-in { from { opacity: 0; transform: translateY(18px); } }
+  /* Título que nasce da luz: cada letra sai do desfoque com brilho índigo (A e B). */
+  :global(html.tier-a) .ch, :global(html.tier-b) .ch { animation: from-light 1100ms var(--ease-out) both; }
+  :global(html.tier-a) .rise, :global(html.tier-b) .rise { animation: rise 1000ms var(--ease-out) both; animation-delay: var(--d); }
+  @keyframes from-light {
+    from { opacity: 0.001; filter: blur(16px); transform: translateY(0.18em) scale(1.25); text-shadow: 0 0 28px rgba(139, 142, 247, 0.9); }
+    60% { text-shadow: 0 0 18px rgba(162, 168, 252, 0.6); }
+    to { opacity: 1; filter: blur(0); transform: none; text-shadow: 0 0 0 rgba(139, 142, 247, 0); }
+  }
+  @keyframes rise { from { opacity: 0.001; transform: translateY(18px); } }
 
-  .stage { position: relative; margin-top: clamp(48px, 8vh, 88px); padding-bottom: clamp(64px, 12vh, 140px); }
-  .persp { perspective: 1600px; perspective-origin: 50% 0%; }
-  .window {
-    border-radius: 14px; overflow: hidden; background: var(--bg-1);
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 120px rgba(97, 99, 208, 0.18);
-    transform-origin: 50% 0%;
-  }
-  .window :global(img) { width: 100%; aspect-ratio: 16 / 9; }
-  :global(html.tier-b) .window { animation: tilt 1400ms var(--ease-sheet) 200ms both; }
-  @keyframes tilt { from { transform: rotateX(18deg) scale(0.94); opacity: 0.4; } }
-  /* Nível A: começa deitada antes do JS chegar; o GSAP assume a partir daí. */
-  :global(html.tier-a) .window { transform: rotateX(24deg) scale(0.9) translateY(4%); }
+  .cue { display: none; }
 
-  /* Sala de voz viva */
-  .room {
-    position: absolute; right: calc(var(--gutter) - 28px); bottom: clamp(24px, 10vh, 96px); width: 288px; z-index: 2;
-    padding: 12px; border-radius: 14px;
-    background: rgba(24, 24, 28, 0.82); -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6);
-    box-shadow: var(--elev), inset 0 0 0 1px var(--line-2), inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  }
-  :global(html.tier-b) .room, :global(html.tier-c) .room { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(24, 24, 28); }
-  .room-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px 10px; color: var(--accent); font-size: 13px; }
-  .room-name { color: var(--text-1); font-weight: 590; }
-  .room-count { margin-left: auto; color: var(--text-3); font-size: 12px; }
-  .room-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-  .person { --speak: 0; display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 6px; border-radius: 8px; }
-  .who { font-size: 14px; font-weight: 510; color: var(--text-2); }
-  .av {
-    position: relative; flex: none; width: 28px; height: 28px; border-radius: 50%;
-    display: grid; place-items: center; font-size: 11px; font-weight: 590; color: var(--text-1);
-  }
-  /* Anel de fala do app: 2 px índigo, opacidade segue a voz; borda macia até 16 %. Só opacity por quadro. */
-  .av::after {
-    content: ''; position: absolute; inset: -3px; border-radius: 50%;
-    box-shadow: 0 0 0 2px var(--accent), 0 0 0 5px rgba(139, 142, 247, 0.16);
-    opacity: min(1, calc(var(--speak) * 2.2));
-  }
-  .meter { margin-left: auto; display: flex; align-items: center; gap: 2px; height: 14px; }
-  .meter i { width: 2px; height: 14px; border-radius: 1px; background: var(--accent); transform-origin: 50% 50%; transform: scaleY(calc(0.2 + var(--speak) * 0.8)); opacity: calc(0.25 + var(--speak)); }
-  .meter i:nth-child(2) { transform: scaleY(calc(0.25 + var(--speak) * 1)); }
-  .person.talking .who { color: var(--text-1); }
-  /* Nível B: quem fala pulsa no CSS. Nível C (e sem JS): anel parado em quem fala. */
-  :global(html.tier-b) .person.talking { animation: talk 900ms ease-in-out infinite alternate; }
-  @keyframes talk { from { --speak: 0.25; } to { --speak: 0.75; } }
-  :global(html.tier-c) .person.talking, :global(html:not(.js)) .person.talking { --speak: 0.6; }
-  .room-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding: 10px 4px 2px; border-top: 1px solid var(--line-1); font-size: 12px; }
-  .connected { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); font-weight: 590; }
-  .speaking { color: var(--text-3); }
+  /* Janela (B, C e sem JS): em fluxo, montada, logo abaixo do texto. */
+  .scene { position: relative; z-index: 1; width: min(1120px, calc(100vw - 2 * var(--gutter))); margin: clamp(56px, 9vh, 96px) auto 0; padding-bottom: clamp(72px, 12vh, 140px); perspective: 2000px; }
+  .tilt { transform-style: preserve-3d; }
+  .win { position: relative; aspect-ratio: 16 / 9; transform-style: preserve-3d; border-radius: 14px; }
+  .slab { position: absolute; inset: 0; border-radius: 14px; background: linear-gradient(160deg, rgba(40, 42, 80, 0.55), rgba(10, 10, 16, 0.85)); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(160, 165, 255, calc(var(--edge, 0) * 0.5)), 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 140px rgba(97, 99, 208, 0.22); }
+  .layer { position: absolute; left: var(--x); top: var(--y); width: var(--w); height: var(--h); overflow: hidden; transform-style: preserve-3d; backface-visibility: hidden; }
+  .layer img { position: absolute; max-width: none; width: var(--iw); height: auto; left: var(--ix); top: var(--iy); aspect-ratio: 16 / 9; }
+  .l-bar { border-radius: 14px 14px 0 0; }
+  .l-rail { border-bottom-left-radius: 14px; }
+  .l-side2 { border-bottom-right-radius: 14px; }
+  .pop { border-radius: 10px; opacity: 0; }
+  .tag { display: none; }
+  .sheen, .flash { position: absolute; inset: 0; border-radius: 14px; pointer-events: none; }
+  .sheen { opacity: 0; background: linear-gradient(115deg, rgba(255, 255, 255, 0) 30%, rgba(200, 204, 255, 0.16) 46%, rgba(255, 255, 255, 0.04) 52%, rgba(255, 255, 255, 0) 64%); background-size: 260% 100%; background-position: var(--sx, 100%) 0; transform: translateZ(1px); }
+  .flash { opacity: 0; box-shadow: inset 0 0 0 1.5px rgba(200, 204, 255, 0.9), 0 0 60px rgba(139, 142, 247, 0.6); transform: translateZ(2px); }
+  .cap { display: none; }
 
-  .av-sun { background: linear-gradient(135deg, #f7c46c, #e86885); }
-  .av-sky { background: linear-gradient(135deg, #7cc0f5, #2f5ea8); }
-  .av-ink { background: oklch(0.29 0.02 30); color: oklch(0.86 0.03 30); }
-  .av-plum { background: oklch(0.29 0.02 295); color: oklch(0.86 0.03 295); }
+  /* ---------- Nível A: capítulo preso, a janela sobe da luz e se abre ---------- */
+  :global(html.tier-a) .hero { height: 560vh; }
+  :global(html.tier-a) .stage { position: sticky; top: 0; height: 100vh; height: 100lvh; overflow: hidden; }
+  :global(html.tier-a) .copy { position: absolute; inset: 0 0 auto; margin-inline: auto; left: 0; right: 0; }
+  :global(html.tier-a) .scene { position: absolute; left: 50%; top: 52%; margin: 0; padding: 0; transform: translate(-50%, -50%) scale(var(--bump, 1)); width: min(1120px, 86vw); }
+  :global(html.tier-a) .scene { opacity: 0; }
+  :global(html.tier-a) .tilt { transform: rotateX(64deg); }
+  :global(html.tier-a) .win { transform: translateY(75vh) scale(0.86); }
+  :global(html.tier-a) .layer { box-shadow: 0 0 0 1px rgba(170, 175, 255, calc(var(--edge, 0) * 0.85)), 0 0 24px rgba(139, 142, 247, calc(var(--edge, 0) * 0.35)), 0 30px 60px rgba(0, 0, 0, calc(var(--edge, 0) * 0.6)); }
+  /* Rótulos: ficam de frente para a câmera na pose explodida (desfazem o giro da janela) e descem uma linha até a camada. */
+  :global(html.tier-a) .tag {
+    display: block; position: absolute; left: var(--ax); top: var(--ay); z-index: 2; width: max-content; max-width: 24ch; opacity: 0;
+    padding: 8px 12px; border-radius: 10px; font-size: 14px; line-height: 1.3; font-weight: 560; color: var(--text-1);
+    background: rgba(16, 17, 34, 0.86); box-shadow: inset 0 0 0 1px rgba(160, 165, 255, 0.4), 0 12px 32px rgba(0, 0, 0, 0.5);
+    transform-origin: 50% 100%;
+    transform: translate(-50%, -100%) translateZ(var(--tz, 0px)) rotateZ(var(--rz, 0deg)) rotateX(var(--rx, 0deg)) translateY(-60px);
+    pointer-events: none;
+  }
+  :global(html.tier-a) .tag::after { content: ''; position: absolute; left: 50%; top: 100%; width: 1px; height: 60px; background: linear-gradient(rgba(160, 165, 255, 0.8), rgba(160, 165, 255, 0)); }
+  :global(html.tier-a) .tag::before { content: ''; position: absolute; left: calc(50% - 3px); top: calc(100% + 57px); width: 7px; height: 7px; border-radius: 50%; background: #a9acff; box-shadow: 0 0 12px #8b8ef7; }
+  :global(html.tier-a) .cue {
+    display: flex; flex-direction: column; align-items: center; gap: 10px; position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%);
+    font-size: 12px; font-weight: 560; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3);
+    animation: rise 1000ms var(--ease-out) 1400ms both;
+  }
+  :global(html.tier-a) .cue span { width: 1px; height: 36px; background: linear-gradient(180deg, rgba(139, 142, 247, 0), #8b8ef7); animation: drip 2.2s var(--ease-out) infinite; transform-origin: 50% 0; }
+  @keyframes drip { 0% { transform: scaleY(0); opacity: 1; } 60% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
+  :global(html.tier-a) .cap {
+    display: block; position: absolute; left: 0; right: 0; bottom: clamp(28px, 7vh, 72px); text-align: center; z-index: 3; opacity: 0;
+    font-size: clamp(26px, 3.4vw, 46px); line-height: 1.08; letter-spacing: -0.035em; font-weight: 620; color: var(--text-1);
+    font-variation-settings: 'opsz' 32; text-shadow: 0 2px 30px rgba(0, 0, 0, 0.6);
+  }
+  :global(html.tier-a) .cap span { color: var(--accent); }
+  :global(html.tier-a) .c2 { text-align: left; left: max(var(--gutter), calc(50vw - 600px)); right: auto; bottom: clamp(28px, 8vh, 80px); }
 
   @media (max-width: 760px) {
-    .room { position: relative; right: auto; bottom: auto; width: min(100%, 340px); margin: -28px auto 0; }
-    .stage { padding-bottom: 72px; }
-    /* No celular o app inteiro fica ilegível: mostramos a conversa maior, com as bordas sumindo. */
-    .persp { margin-inline: calc(var(--gutter) * -1); overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
-    .window { width: 190%; margin-left: -45%; border-radius: 0; }
+    .copy { justify-items: center; text-align: center; padding-top: 112px; }
+    .title { font-size: clamp(52px, 15vw, 72px); }
+    .word { margin-right: 0.18em; }
+    .ctas { justify-content: center; }
+    :global(html.tier-a) .scene { width: 92vw; top: 50%; }
+    :global(html.tier-a) .tag, :global(html.tier-a) .cue { display: none; }
+    :global(html.tier-a) .copy { padding-top: 104px; }
   }
-</style>
-
-<style is:global>
-  @property --speak { syntax: '<number>'; inherits: true; initial-value: 0; }
 </style>

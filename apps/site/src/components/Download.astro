@@ -1,9 +1,9 @@
 ---
-// Botão de download. PUBLIC_DOWNLOAD_URL definido = link real para o instalador.
-// Sem ele, o botão abre o aviso honesto de beta fechado (nunca um download falso).
+// Botão de download: link direto para o instalador da release mais recente (src/data/links.ts).
+// Se um dia o link ficar vazio, o botão volta a abrir o aviso honesto de beta fechado.
 interface Props { size?: 'md' | 'lg'; label?: string; class?: string }
 const { size = 'lg', label = 'Baixar para Windows', class: cls } = Astro.props;
-const url = import.meta.env.PUBLIC_DOWNLOAD_URL;
+import { downloadUrl as url } from '../data/links';
 const classes = ['btn', 'btn-primary', size === 'lg' && 'btn-lg', cls];
 ---
 {url ? (

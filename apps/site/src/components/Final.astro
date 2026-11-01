@@ -3,6 +3,7 @@ import Download from './Download.astro';
 import Logo from './Logo.astro';
 import mark from '../assets/brand/mark.svg?url';
 import { facts } from '../data/facts';
+import { downloadNote, releasesUrl } from '../data/links';
 const year = new Date().getFullYear();
 ---
 <section class="final" aria-labelledby="final-t">
@@ -12,7 +13,7 @@ const year = new Date().getFullYear();
     <h2 id="final-t" data-reveal>Chama o pessoal.</h2>
     <p class="lede" data-reveal>Baixe, crie um espaço e mande o convite. Em dois minutos vocês estão conversando.</p>
     <div data-reveal><Download /></div>
-    <p class="specs" data-reveal>Windows 10 e 11 · 64 bits · instalador de {facts.installerMb} MB</p>
+    <p class="specs" data-reveal>{downloadNote} · instalador de {facts.installerMb} MB · <a href={releasesUrl} rel="noopener">ver novidades</a></p>
   </div>
 </section>
 

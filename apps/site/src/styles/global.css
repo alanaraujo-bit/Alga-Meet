@@ -97,6 +97,11 @@ p { margin: 0; text-wrap: pretty; }
 .btn-lg { --h: 52px; padding: 0 24px; font-size: 16px; border-radius: 12px; }
 .btn svg { flex: none; }
 
+/* Água do nível A: canvas fixo atrás de tudo (src/scripts/world). O conteúdo fica por cima. */
+canvas.world { position: fixed; left: 0; top: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 1400ms var(--ease-out); }
+html.gl-on canvas.world { opacity: 1; }
+main, .final, .foot { position: relative; z-index: 1; }
+
 /* Revelação por scroll: só com JS (classe no <html>), nunca esconde conteúdo sem JS. */
 html.js.tier-a [data-reveal], html.js.tier-b [data-reveal] { opacity: 0; transform: translateY(16px); }
 html.js.tier-b [data-reveal] { transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out); transition-delay: var(--d, 0ms); }

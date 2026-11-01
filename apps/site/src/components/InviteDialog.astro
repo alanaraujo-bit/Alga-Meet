@@ -1,7 +1,7 @@
 ---
-// Aparece só quando PUBLIC_DOWNLOAD_URL não está definido: beta fechado, sem download falso.
+// Aparece só se não houver link de download (src/data/links.ts): beta fechado, sem download falso.
 // PUBLIC_INVITE_URL (opcional): link para pedir convite (formulário, e-mail, WhatsApp).
-const download = import.meta.env.PUBLIC_DOWNLOAD_URL;
+import { downloadUrl as download } from '../data/links';
 const invite = import.meta.env.PUBLIC_INVITE_URL;
 ---
 {!download && (
