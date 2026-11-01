@@ -125,3 +125,7 @@ if (tier !== 'c') {
     initTierB();
   }
 }
+
+// A lente da transmissão vale para todos os níveis (A: WebGL; B/C: fotos + CSS).
+const { initLens } = await import('./lens/chapter');
+initLens(tier);
