@@ -1,16 +1,16 @@
-import { CornerDownLeft, Hash, LayoutGrid, Search, Volume2 } from 'lucide-react'
+import { CornerDownLeft, Hash, Search, Volume2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { errorText } from '@/lib/errors'
-import { fuzzyScore } from '@/lib/fuzzy'
+import { fuzzyScore, matchRanges } from '@/lib/fuzzy'
 import { openDm } from '@/store/actions'
 import { isUnread, useData, type DataState } from '@/store/data'
 import { channelTitle, dmPeers, mentionCount, presenceOf } from '@/store/selectors'
 import { useUi } from '@/store/ui'
-import { Avatar, Badge, Icon, Kbd, toast } from '@/ui'
+import { Avatar, Badge, Icon, Kbd } from '@/ui'
 import { initials } from '@/ui/Avatar'
 import { EASE_IN, EASE_OUT_QUART } from '@/ui/motion'
+import { toastError } from '../auth/VerifyEmail'
 import s from './switcher.module.css'
 
 const t = {
@@ -18,10 +18,10 @@ const t = {
   placeholder: 'Para onde vamos? Canais, conversas, amigos, espaços',
   empty: 'Nada encontrado. Tente outro nome.',
   hint: { nav: 'navegar', open: 'abrir', close: 'fechar', filters: '# canais · @ pessoas · * espaços' },
-  kinds: { channel: 'Canal', voice: 'Voz', dm: 'Mensagem direta', friend: 'Amigo', space: 'Espaço' },
+  sections: { needs: 'Precisa de você', dm: 'Conversas', channel: 'Canais', friend: 'Pessoas', space: 'Espaços' },
 }
 
-type Kind = keyof typeof t.kinds
+type Kind = 'channel' | 'voice' | 'dm' | 'friend' | 'space'
 interface Item {
   id: string
   kind: Kind
@@ -79,7 +79,7 @@ function collect(d: DataState): Item[] {
       run: () =>
         void openDm([r.user.id]).then(
           (ch) => ui.go({ kind: 'dm', channelId: ch.id }),
-          (e: unknown) => toast.error(errorText(e)),
+          (e: unknown) => toastError(e),
         ),
     })
   }
@@ -90,7 +90,7 @@ function collect(d: DataState): Item[] {
       id: `space-${id}`,
       kind: 'space',
       label: sp.name,
-      icon: <span className={s.spaceIcon}>{initials(sp.name)}</span>,
+      icon: <span className={s.spaceIcon}>{sp.iconUrl ? <img src={sp.iconUrl} alt="" draggable={false} /> : initials(sp.name)}</span>,
       unread: false,
       mentions: 0,
       run: () => ui.go({ kind: 'space', spaceId: id, channelId: ui.lastChannelBySpace[id] ?? null }),
@@ -101,21 +101,61 @@ function collect(d: DataState): Item[] {
 
 const FILTER: Record<string, Kind[]> = { '#': ['channel', 'voice'], '@': ['dm', 'friend'], '*': ['space'] }
 
-export function rank(items: Item[], raw: string): Item[] {
+type SectionKey = keyof typeof t.sections
+const SECTION_OF: Record<Kind, Exclude<SectionKey, 'needs'>> = { dm: 'dm', channel: 'channel', voice: 'channel', friend: 'friend', space: 'space' }
+/** Without a query each section shows a few; "Precisa de você" (mentions, unread) comes first. */
+const CAP: Record<SectionKey, number> = { needs: 6, dm: 5, channel: 5, friend: 4, space: 4 }
+
+/**
+ * Results under section headers. No query: what needs you, then conversations, channels, people, spaces.
+ * With a query: best matches first, grouped by kind in the order their best match ranks.
+ */
+export function rank(items: Item[], raw: string): Array<{ key: SectionKey; items: Item[] }> {
   const f = FILTER[raw[0] ?? '']
   const q = f ? raw.slice(1) : raw
   const pool = f ? items.filter((i) => f.includes(i.kind)) : items
-  if (!q.trim()) {
-    // No query: what needs you first (mentions, unread), then DMs, channels, spaces.
-    const order: Kind[] = ['dm', 'channel', 'voice', 'friend', 'space']
-    return [...pool].sort((a, b) => b.mentions - a.mentions || Number(b.unread) - Number(a.unread) || order.indexOf(a.kind) - order.indexOf(b.kind)).slice(0, 12)
+  const groups = new Map<SectionKey, Item[]>()
+  const push = (k: SectionKey, i: Item) => {
+    const list = groups.get(k) ?? []
+    if (!groups.has(k)) groups.set(k, list)
+    list.push(i)
   }
-  return pool
+  if (!q.trim()) {
+    const needs = pool.filter((i) => i.mentions > 0 || i.unread).sort((a, b) => b.mentions - a.mentions)
+    if (needs.length) groups.set('needs', needs)
+    for (const k of ['dm', 'channel', 'friend', 'space'] as const) {
+      const rest = pool.filter((i) => SECTION_OF[i.kind] === k && !needs.includes(i))
+      if (rest.length) groups.set(k, rest)
+    }
+    return [...groups].map(([key, list]) => ({ key, items: list.slice(0, CAP[key]) }))
+  }
+  pool
     .map((i) => ({ i, score: Math.max(fuzzyScore(q, i.label) ?? -Infinity, (fuzzyScore(q, i.sub ?? '') ?? -Infinity) - 200) }))
     .filter((x) => x.score > -Infinity)
     .sort((a, b) => b.score - a.score || Number(b.i.unread) - Number(a.i.unread))
     .slice(0, 30)
-    .map((x) => x.i)
+    .forEach(({ i }) => push(SECTION_OF[i.kind], i))
+  return [...groups].map(([key, list]) => ({ key, items: list }))
+}
+
+/** The letters that matched, in weight 590 + primary text (why "des" found "Diego Alves"). */
+function Highlight({ text, query }: { text: string; query: string }) {
+  const q = FILTER[query[0] ?? ''] ? query.slice(1) : query
+  const ranges = matchRanges(q, text)
+  if (!ranges.length) return <>{text}</>
+  const out: ReactNode[] = []
+  let at = 0
+  for (const [a, b] of ranges) {
+    if (a > at) out.push(text.slice(at, a))
+    out.push(
+      <mark key={a} className={s.hit}>
+        {text.slice(a, b)}
+      </mark>,
+    )
+    at = b
+  }
+  out.push(text.slice(at))
+  return <>{out}</>
 }
 
 export function QuickSwitcher() {
@@ -133,7 +173,8 @@ function Panel() {
   const spaces = useData((st) => st.spaces)
   const readStates = useData((st) => st.readStates)
   const all = useMemo(() => collect(useData.getState()), [channels, relationships, spaces, readStates])
-  const results = useMemo(() => rank(all, q), [all, q])
+  const sections = useMemo(() => rank(all, q), [all, q])
+  const results = useMemo(() => sections.flatMap((x) => x.items), [sections])
   const close = () => useUi.getState().setSwitcher(false)
 
   useEffect(() => {
@@ -203,22 +244,34 @@ function Panel() {
           {results.length === 0 ? (
             <p className={s.empty}>{t.empty}</p>
           ) : (
-            results.map((i, idx) => (
-              <div
-                key={i.id}
-                id={`switcher-${i.id}`}
-                role="option"
-                aria-selected={idx === active}
-                data-index={idx}
-                className={s.item}
-                onPointerMove={() => idx !== active && setActive(idx)}
-                onClick={() => choose(i)}
-              >
-                <span className={s.itemIcon}>{i.icon}</span>
-                <span className={`${s.itemLabel} ${i.unread ? s.unread : ''}`}>{i.label}</span>
-                {i.sub && <span className={s.itemSub}>{i.sub}</span>}
-                <Badge count={i.mentions} mention />
-                {idx === active && <Icon icon={CornerDownLeft} size={14} className={s.enter} />}
+            sections.map((sec) => (
+              <div key={sec.key} role="group" aria-labelledby={`switcher-sec-${sec.key}`}>
+                <div id={`switcher-sec-${sec.key}`} className={s.sectionHead} role="presentation">
+                  {t.sections[sec.key]}
+                </div>
+                {sec.items.map((i) => {
+                  const idx = results.indexOf(i)
+                  return (
+                    <div
+                      key={i.id}
+                      id={`switcher-${i.id}`}
+                      role="option"
+                      aria-selected={idx === active}
+                      data-index={idx}
+                      className={s.item}
+                      onPointerMove={() => idx !== active && setActive(idx)}
+                      onClick={() => choose(i)}
+                    >
+                      <span className={s.itemIcon}>{i.icon}</span>
+                      <span className={`${s.itemLabel} ${i.unread ? s.unread : ''}`}>
+                        <Highlight text={i.label} query={q} />
+                      </span>
+                      {i.sub && <span className={s.itemSub}>{i.sub}</span>}
+                      <Badge count={i.mentions} mention />
+                      {idx === active && <Icon icon={CornerDownLeft} size={14} className={s.enter} />}
+                    </div>
+                  )
+                })}
               </div>
             ))
           )}
