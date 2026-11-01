@@ -1,0 +1,176 @@
+/*
+ * Alga Meet design tokens (dark-first). Source: docs/research/linear-design-study.md §17.
+ * Surfaces are OKLCH lightness steps on a "deep water" neutral (H 230, C ~0.006).
+ * Accent "Bioluminescência" (H 195) is a SIGNAL: voice presence, focus, mentions, primary action.
+ * Living reference: docs/design/design-system.md
+ */
+:root {
+  color-scheme: dark;
+
+  /* ── Surfaces (level 0 → 5) ───────────────────────────── */
+  --bg-app: #080b0c; /* 0  window, title bar, space rail */
+  --bg-sidebar: #0e1113; /* 1  channel / DM list, member list */
+  --bg-content: #121517; /* 2  conversation, call stage */
+  --bg-raised: #191c1e; /* 3  cards, inputs, composer */
+  --bg-overlay: #1f2426; /* 4  popover, menu, tooltip */
+  --bg-modal: #23272a; /* 5  modal */
+  --scrim: rgba(0, 0, 0, 0.6);
+
+  /* State overlays: stack on any surface. Selection is neutral, never accent. */
+  --state-hover: rgba(255, 255, 255, 0.04);
+  --state-selected: rgba(255, 255, 255, 0.07);
+  --state-pressed: rgba(255, 255, 255, 0.1);
+
+  /* ── Text (≥4.5:1 on every surface except disabled) ───── */
+  --text-primary: #f1f4f6;
+  --text-secondary: #c9cfd2;
+  --text-tertiary: #98a0a3;
+  --text-disabled: #636a6e;
+
+  /* ── Borders (translucent white: adapt to any surface) ── */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  /* ── Accent: Bioluminescência ─────────────────────────── */
+  --accent: #4ddcdc; /* text & icons */
+  --accent-fill: #21c9ca; /* filled controls, always with --on-accent text */
+  --accent-fill-hover: #3ad3d3;
+  --accent-pressed: #38b3b3;
+  --on-accent: #061415;
+  --accent-tint: rgba(77, 220, 220, 0.1);
+  --accent-tint-strong: rgba(77, 220, 220, 0.18);
+  --accent-glow: rgba(33, 201, 202, 0.55);
+  --selection-bg: rgba(77, 220, 220, 0.28);
+
+  /* ── Semantic ─────────────────────────────────────────── */
+  --online: #4fce74;
+  --idle: #fdbe45;
+  --dnd: #f75d59;
+  --offline: #7b8387;
+  --warning: #fdbe45;
+  --warning-tint: rgba(253, 190, 69, 0.1);
+  --danger: #f75d59;
+  --danger-hover: #ff7370;
+  --danger-tint: rgba(247, 93, 89, 0.12);
+  --on-danger: #1c0605;
+  --success: #4fce74;
+  --success-tint: rgba(79, 206, 116, 0.1);
+
+  /* ── Type ─────────────────────────────────────────────── */
+  --font-ui: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'Cascadia Mono', Consolas, monospace;
+  --font-features: 'cv11', 'ss01', 'calt';
+
+  --w-regular: 400;
+  --w-medium: 510;
+  --w-semibold: 590;
+  --w-bold: 680;
+
+  /* size / line-height / tracking (study §17.2) */
+  --type-badge: 590 11px/14px var(--font-ui);
+  --type-meta: 400 12px/16px var(--font-ui);
+  --type-ui: 400 13px/20px var(--font-ui);
+  --type-ui-lg: 510 14px/20px var(--font-ui);
+  --type-message: 400 15px/22px var(--font-ui);
+  --type-title-sm: 590 17px/24px var(--font-ui);
+  --type-title: 590 20px/28px var(--font-ui);
+  --type-title-lg: 590 24px/32px var(--font-ui);
+  --type-display: 590 32px/40px var(--font-ui);
+  --track-ui: -0.005em;
+  --track-ui-lg: -0.01em;
+  --track-message: -0.011em;
+  --track-title: -0.012em;
+  --track-display: -0.022em;
+
+  /* ── Space (4px base; 2 and 6 for dense controls) ─────── */
+  --s-0: 0;
+  --s-0_5: 2px;
+  --s-1: 4px;
+  --s-1_5: 6px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+
+  /* ── Radius (concentric: outer = inner + padding) ─────── */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-full: 9999px;
+
+  /* ── Control heights ──────────────────────────────────── */
+  --h-compact: 24px;
+  --h-row: 28px;
+  --h-control: 32px;
+  --h-control-lg: 36px;
+  --h-call: 40px;
+
+  /* ── Layout ───────────────────────────────────────────── */
+  --titlebar-h: 40px;
+  --caption-w: 140px; /* native caption-button overlay on the right */
+  --rail-w: 64px;
+  --sidebar-w: 248px;
+  --members-w: 240px;
+  --header-h: 48px;
+
+  /* ── Elevation (dark: luminance + border + dark ring) ─── */
+  --elev-overlay: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --elev-modal: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 16px 48px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --focus-ring: 0 0 0 2px var(--bg-content), 0 0 0 4px var(--accent);
+
+  /* ── Motion (study §17.4) ─────────────────────────────── */
+  --ease-out-quad: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-in-quad: cubic-bezier(0.55, 0.085, 0.68, 0.53);
+  --dur-instant: 0ms;
+  --dur-fast: 100ms;
+  --dur-hover-out: 120ms;
+  --dur-base: 160ms;
+  --dur-pop: 180ms;
+  --dur-morph: 220ms;
+  --dur-panel: 300ms;
+
+  /* ── Layers ───────────────────────────────────────────── */
+  --z-base: 0;
+  --z-sticky: 100;
+  --z-titlebar: 200;
+  --z-call-overlay: 300;
+  --z-overlay: 500;
+  --z-popover: 600;
+  --z-command-palette: 650;
+  --z-modal-scrim: 699;
+  --z-modal: 700;
+  --z-toast: 800;
+  --z-tooltip: 1100;
+  --z-context-menu: 1200;
+}
+
+/* Reduced motion: OS setting or the in-app toggle (html.reduce-motion). */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-hover-out: 0ms;
+    --dur-base: 0ms;
+    --dur-pop: 0ms;
+    --dur-morph: 0ms;
+    --dur-panel: 0ms;
+  }
+}
+:root.reduce-motion {
+  --dur-fast: 0ms;
+  --dur-hover-out: 0ms;
+  --dur-base: 0ms;
+  --dur-pop: 0ms;
+  --dur-morph: 0ms;
+  --dur-panel: 0ms;
+}

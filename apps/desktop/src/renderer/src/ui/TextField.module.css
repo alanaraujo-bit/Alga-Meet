@@ -1,0 +1,95 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1_5);
+}
+.label {
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.optional {
+  color: var(--text-tertiary);
+  font-weight: var(--w-regular);
+}
+
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: var(--h-control-lg);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  transition: box-shadow var(--dur-hover-out) var(--ease-out-quad);
+}
+.control:hover {
+  transition-duration: 0ms;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.control:focus-within {
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    0 0 0 3px var(--accent-tint);
+}
+.invalid,
+.invalid:hover {
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+.invalid:focus-within {
+  box-shadow:
+    inset 0 0 0 1px var(--danger),
+    0 0 0 3px var(--danger-tint);
+}
+.sm {
+  height: var(--h-control);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--s-3);
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-size: 14px;
+}
+.input:focus-visible {
+  outline: none;
+}
+.input::placeholder {
+  color: var(--text-tertiary);
+}
+.withLeading .input {
+  padding-left: 34px;
+}
+.leading {
+  position: absolute;
+  left: var(--s-3);
+  color: var(--text-tertiary);
+  pointer-events: none;
+  display: grid;
+}
+.trailing {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding-right: var(--s-1);
+}
+
+.help {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: 16px;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.error {
+  color: var(--danger);
+}
+.caps {
+  color: var(--warning);
+}

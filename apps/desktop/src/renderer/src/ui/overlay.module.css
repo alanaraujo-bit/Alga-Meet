@@ -1,0 +1,202 @@
+/* ── Modal ───────────────────────────────── */
+.modalRoot {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--s-6);
+}
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-modal-scrim);
+  background: var(--scrim);
+}
+.modal {
+  position: relative;
+  z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+  max-height: calc(100vh - 80px);
+  border-radius: var(--r-xl);
+  background: var(--bg-modal);
+  box-shadow: var(--elev-modal), inset 0 0 0 1px var(--border-default);
+  overflow: hidden;
+}
+.modal:focus-visible {
+  outline: none;
+}
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-5) var(--s-5) 0 var(--s-6);
+}
+.modalTitle {
+  font: var(--type-title);
+  letter-spacing: var(--track-title);
+  color: var(--text-primary);
+  padding-top: 2px;
+}
+.modalDesc {
+  margin-top: var(--s-1);
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+  text-wrap: pretty;
+}
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-5) var(--s-6) var(--s-6);
+  overflow-y: auto;
+}
+.modalFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  padding: var(--s-4) var(--s-6);
+  background: rgba(0, 0, 0, 0.14);
+  box-shadow: inset 0 1px 0 var(--border-subtle);
+}
+
+/* ── Popover / Menu surface ──────────────── */
+.floating {
+  position: fixed;
+  z-index: var(--z-popover);
+  border-radius: var(--r-lg);
+  background: var(--bg-overlay);
+  box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-default);
+  animation: popIn var(--dur-pop) var(--ease-out-quart);
+}
+.floating:focus-visible {
+  outline: none;
+}
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+.menu {
+  composes: floating;
+  z-index: var(--z-context-menu);
+  min-width: 200px;
+  max-width: 300px;
+  padding: var(--s-1_5);
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  height: var(--h-row);
+  padding: 0 var(--s-2);
+  border-radius: var(--r-sm);
+  color: var(--text-secondary);
+  font: var(--type-ui);
+  text-align: left;
+  /* Instant in, 120ms out (study §10). */
+  transition:
+    background-color var(--dur-hover-out) var(--ease-out-quad),
+    color var(--dur-hover-out) var(--ease-out-quad);
+}
+.menuItem[data-active='true'] {
+  transition-duration: 0ms;
+  background: var(--state-selected);
+  color: var(--text-primary);
+}
+.menuItem:disabled,
+.menuItem[aria-disabled='true'] {
+  color: var(--text-disabled);
+}
+.menuItem svg {
+  color: var(--text-tertiary);
+}
+.menuItem[data-active='true'] svg {
+  color: var(--text-secondary);
+}
+.menuDanger {
+  color: var(--danger);
+}
+.menuDanger svg,
+.menuDanger[data-active='true'] svg {
+  color: var(--danger);
+}
+.menuDanger[data-active='true'] {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+.menuLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menuHint {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.menuCheck {
+  color: var(--accent) !important;
+}
+.menuSep {
+  height: 1px;
+  margin: var(--s-1_5) calc(var(--s-1_5) * -1);
+  background: var(--border-subtle);
+}
+.menuGroup {
+  padding: var(--s-1_5) var(--s-2) var(--s-1);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+
+/* ── Toasts ──────────────────────────────── */
+.toasts {
+  position: fixed;
+  right: var(--s-4);
+  bottom: var(--s-4);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--s-2);
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 40px;
+  max-width: 380px;
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
+  border-radius: var(--r-lg);
+  background: var(--bg-overlay);
+  box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-default);
+  color: var(--text-primary);
+  font: var(--type-ui);
+  pointer-events: auto;
+}
+.toastIcon {
+  display: grid;
+  color: var(--text-tertiary);
+}
+.toastSuccess .toastIcon {
+  color: var(--success);
+}
+.toastError .toastIcon {
+  color: var(--danger);
+}
+.toastText {
+  flex: 1;
+  padding: 2px 0;
+}
+.toastDesc {
+  color: var(--text-tertiary);
+}
