@@ -36,8 +36,9 @@
   !endif
 !macroend
 
-; Runs after $INSTDIR is known, before anything is touched. A double-click gets the install window; an
-; electron-updater run (--updated /S) gets the small update card; other silent runs (/S) stay invisible.
+; Runs after $INSTDIR is known, before anything is touched. A double-click gets the install window; "Reiniciar e
+; atualizar" in the app (--updated /S --force-run) gets the small update card while it comes back; an update
+; installed because the app was quit (no --force-run), and any other silent run (/S), stays invisible.
 ; The window watches the work from outside, so NSIS goes silent and keeps doing exactly what it always did.
 !macro customInit
   !insertmacro algaWebView2 $R9
@@ -45,6 +46,7 @@
     ${IfNot} ${Silent}
       StrCpy $algaUi "install"
     ${ElseIf} ${isUpdated}
+    ${AndIf} ${isForceRun}
       StrCpy $algaUi "update"
     ${EndIf}
   ${EndIf}
