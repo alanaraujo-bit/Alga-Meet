@@ -109,7 +109,8 @@ function extractIcons(paths) {
 }
 const CODE = join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Microsoft VS Code', 'Code.exe')
 const BLENDER = 'C:\\Program Files\\Blender Foundation\\Blender 4.5\\blender.exe'
-const icons = extractIcons([CODE, BLENDER])
+const AE = String.raw`C:\Program Files\Adobe\Adobe After Effects 2026\Support Files\AfterFX.exe`
+const icons = extractIcons([CODE, BLENDER, AE])
 check(Object.keys(icons).length >= 1, `helper extracted ${Object.keys(icons).length} real icons`)
 
 const min = 60_000
@@ -127,6 +128,8 @@ const sockets = friends.map((f, i) => {
     if (j.t === 'READY') {
       ws.send(JSON.stringify({ op: 'activity', activity: cast[i] }))
       if (i === 2) ws.send(JSON.stringify({ op: 'custom_status', status: { text: 'Virando a noite no código', emoji: '☕' } }))
+      // Caio moves from Blender (47 min: becomes "Atividade recente") to After Effects.
+      if (i === 1) setTimeout(() => ws.send(JSON.stringify({ op: 'activity', activity: { kind: 'creative', name: 'Adobe After Effects', startedAt: Date.now() - 6 * min, ...(icons[AE] && { icon: icons[AE] }) } })), 1200)
       setInterval(() => ws.readyState === 1 && ws.send(JSON.stringify({ op: 'heartbeat' })), j.d.heartbeatIntervalMs * 0.8).unref()
     }
   }
@@ -241,6 +244,22 @@ await sleep(1400)
 check(await page.locator('[class*="bubble"]').getByText('Virando a noite no código').isVisible().catch(() => false), "a friend's bubble shows in their profile")
 await shot('profile-status')
 await closePopups()
+
+// 6. Full profile: from the popover's banner; current + recent activity, tabs.
+await members.getByRole('button', { name: /Caio/ }).click()
+await sleep(1000)
+await page.getByRole('button', { name: 'Ver perfil completo' }).first().click()
+await sleep(1600)
+const dlg = page.getByRole('dialog', { name: /Perfil de Caio/ })
+check(await dlg.isVisible().catch(() => false), 'full profile opens from the popover banner')
+check(await dlg.getByText('Atividade recente').isVisible().catch(() => false), 'recent activity listed (server memory)')
+check(await dlg.getByText('Membro desde').isVisible().catch(() => false), 'member since shown')
+await shot('full-profile')
+await dlg.getByRole('tab', { name: /Espaços em comum/ }).click().catch(() => undefined)
+await sleep(600)
+await shot('full-profile-spaces')
+await page.keyboard.press('Escape')
+await sleep(400)
 // Only the Calculator this run opened.
 spawnSync('powershell', ['-NoProfile', '-Command', `Get-Process CalculatorApp -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -gt [datetime]'${t0}' } | Stop-Process`], { windowsHide: true })
 

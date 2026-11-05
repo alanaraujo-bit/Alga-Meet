@@ -1,4 +1,4 @@
-import { liveStatus, sameActivity, type Activity, type CustomStatus, type DispatchOf, type DispatchType, type Presence, type PresenceStatus, type StatusPreference } from '@alga/shared'
+import { liveStatus, sameActivity, type Activity, type CustomStatus, type RecentActivity, type DispatchOf, type DispatchType, type Presence, type PresenceStatus, type StatusPreference } from '@alga/shared'
 import { eq, inArray } from 'drizzle-orm'
 import { presenceAudience } from '../access.js'
 import type { Db } from '../db/index.js'
@@ -17,6 +17,11 @@ export interface Conn {
 
 type Payload<T extends DispatchType> = DispatchOf<T> | ((userId: string) => DispatchOf<T> | undefined)
 
+const RECENT_WINDOW_MS = 14 * 24 * 3600_000
+const RECENT_MAX = 6
+/** Shorter than this is a glance, not something they did. */
+const RECENT_MIN_MS = 60_000
+
 /** In-process connection registry and fan-out. shortcut: single instance only; add Redis pub/sub to scale out. */
 export class Hub {
   private readonly byUser = new Map<string, Set<Conn>>()
@@ -24,6 +29,11 @@ export class Hub {
   private readonly activities = new Map<string, { activity: Activity; conn: Conn }>()
   /** Custom status per user, kept until their last socket closes (the client sends it again on every READY). */
   private readonly customs = new Map<string, CustomStatus>()
+  /**
+   * Finished activities per user (ProfileExtras.recent). shortcut: memory only, so a restart forgets them; move to
+   * a table if "Atividade recente" proves worth keeping across deploys.
+   */
+  private readonly recent = new Map<string, RecentActivity[]>()
   /** Set during shutdown: sockets are going away because of us, not because users left. */
   closing = false
 
@@ -49,6 +59,7 @@ export class Hub {
   /** Sets (or clears, with null) the user's activity. Returns whether what others see changed. */
   setActivity(conn: Conn, activity: Activity | null): boolean {
     const prev = this.activities.get(conn.userId)
+    if (prev && !(activity && activity.name === prev.activity.name && activity.startedAt === prev.activity.startedAt)) this.remember(conn.userId, prev.activity)
     if (activity) this.activities.set(conn.userId, { activity, conn })
     else this.activities.delete(conn.userId)
     return !sameActivity(prev?.activity, activity)
@@ -56,7 +67,9 @@ export class Hub {
 
   /** Clears the activity if `conn` set it (its socket is closing). Returns whether it did. */
   dropActivity(conn: Conn): boolean {
-    if (this.activities.get(conn.userId)?.conn !== conn) return false
+    const prev = this.activities.get(conn.userId)
+    if (prev?.conn !== conn) return false
+    this.remember(conn.userId, prev.activity)
     this.activities.delete(conn.userId)
     return true
   }
@@ -67,6 +80,23 @@ export class Hub {
     if (status) this.customs.set(userId, status)
     else this.customs.delete(userId)
     return prev !== JSON.stringify(status)
+  }
+
+  /** Recent finished activities, newest first, without anything older than the window. */
+  recentOf(userId: string, now = Date.now()): RecentActivity[] {
+    return (this.recent.get(userId) ?? []).filter((r) => now - r.lastAt < RECENT_WINDOW_MS)
+  }
+
+  private remember(userId: string, a: Activity, now = Date.now()): void {
+    const spent = now - a.startedAt
+    if (spent < RECENT_MIN_MS) return
+    const list = this.recentOf(userId, now)
+    const old = list.find((r) => r.name === a.name && r.kind === a.kind)
+    const entry: RecentActivity = {
+      kind: a.kind, name: a.name, lastAt: now, totalMs: Math.min(RECENT_WINDOW_MS, (old?.totalMs ?? 0) + spent),
+      ...(a.icon && { icon: a.icon }), ...(a.steamAppId && { steamAppId: a.steamAppId }),
+    }
+    this.recent.set(userId, [entry, ...list.filter((r) => r !== old)].slice(0, RECENT_MAX))
   }
 
   activityOf(userId: string): Activity | undefined {

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { PublicUser } from './models.js'
 
 /**
  * Rich presence ("Atividade"): what someone is doing right now, detected on their desktop (apps/desktop/src/main/
@@ -64,3 +65,29 @@ export type CustomStatus = z.infer<typeof CustomStatusSchema>
 
 export const liveStatus = (s: CustomStatus | null | undefined, now = Date.now()): CustomStatus | undefined =>
   s && (!s.expiresAt || s.expiresAt > now) ? s : undefined
+
+/** Something they did lately (a finished activity), for the full profile's "Atividade recente". */
+export interface RecentActivity {
+  kind: ActivityKind
+  name: string
+  icon?: string
+  steamAppId?: number
+  /** When it last ended (epoch ms). */
+  lastAt: number
+  /** Time spent on it within the window, summed (ms). */
+  totalMs: number
+}
+
+/**
+ * GET /users/:id/profile -> ProfileExtras: what the full profile adds to PublicUser. mutualFriends and recent are
+ * filled only for who sees the person's presence (friends and co-members; yourself); recent is empty while they
+ * are invisible. recent lives in server memory (last 14 days, up to 6, activities of at least a minute).
+ */
+export interface ProfileExtras {
+  /** Account creation (ISO-8601). */
+  memberSince: string
+  /** Friends you both have, by name (up to 50). */
+  mutualFriends: PublicUser[]
+  /** Newest first. */
+  recent: RecentActivity[]
+}

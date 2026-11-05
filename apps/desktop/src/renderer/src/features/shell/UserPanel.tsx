@@ -14,6 +14,8 @@ import { VoicePanel } from '../voice/VoicePanel'
 import { OwnActivity } from '../activity/Own'
 import { openStatusEditor, PersonLine, StatusBubble, StatusEditorHost } from '../activity/Status'
 import { useCustomStatus } from '../activity/custom'
+import { ProfileOpener } from '../profile/Opener'
+import { ProfileModalHost } from '../profile/ProfileModal'
 import { errorText } from '@/lib/errors'
 import { copyText } from '@/lib/clipboard'
 import { t } from '../app/strings'
@@ -25,6 +27,7 @@ export function UserPanel() {
       <VoicePanel />
       <UserRow />
       <StatusEditorHost />
+      <ProfileModalHost />
     </div>
   )
 }
@@ -93,6 +96,7 @@ function UserRow() {
 
       <Popover anchor={anchor} onClose={() => setAnchor(null)} side="top" align="start" gap={12} label={t.userPanel.setStatus} width={280}>
         <ProfileCard user={me} look={look} presence={presence}>
+          <ProfileOpener userId={me.id} spaceId={null} onOpen={() => setAnchor(null)} />
           <StatusBubble userId={me.id} editable />
           <OwnActivity onNavigate={() => setAnchor(null)} />
         </ProfileCard>

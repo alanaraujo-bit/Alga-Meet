@@ -21,6 +21,7 @@ import { metrics } from './metrics.js'
 import { RateLimitStore, installObservability, logUserHash, routeOf } from './observability.js'
 import { Privacy } from './privacy.js'
 import { activityPublicRoutes, activityRoutes, shopFunnelHook } from './routes/activity.js'
+import { profileRoutes } from './routes/profile.js'
 import { adminRoutes } from './routes/admin.js'
 import { authPublicRoutes, authRoutes } from './routes/auth.js'
 import { billingPublicRoutes, billingRoutes } from './routes/billing.js'
@@ -198,6 +199,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       telemetryRoutes(authed, ctx)
       eventRoutes(authed, ctx)
       activityRoutes(authed, ctx)
+      profileRoutes(authed, ctx)
       await authed.register(async (admin) => adminRoutes(admin, ctx))
     })
   }, { prefix: '/api/v1' })

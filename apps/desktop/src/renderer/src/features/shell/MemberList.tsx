@@ -10,6 +10,7 @@ import { ActivityBadge, ActivityCard } from '../activity/Activity'
 import { PersonLine, StatusBubble } from '../activity/Status'
 import { useCustomStatus } from '../activity/custom'
 import { useActivity } from '../activity/store'
+import { ProfileOpener } from '../profile/Opener'
 import { personEntries, ProfileFooter } from './people'
 import { t } from './strings'
 import s from './shell.module.css'
@@ -134,6 +135,7 @@ export function PersonPopover({
   return (
     <Popover anchor={anchor} onClose={onClose} side={side} align="start" gap={12} label={name} width={300}>
       <ProfileCard user={user} look={look} name={name} presence={presence}>
+        <ProfileOpener userId={user.id} spaceId={spaceId} onOpen={onClose} />
         <StatusBubble userId={user.id} />
         <ActivityCard userId={user.id} />
         {spaceId && <RoleChips userId={user.id} spaceId={spaceId} />}

@@ -110,3 +110,38 @@ describe('custom status', () => {
     for (const g of [gwB, late]) g.close()
   })
 })
+
+describe('full profile extras', () => {
+  it('member since, mutual friends and recent activity — only for who sees the presence', async () => {
+    const a = await register(s.app)
+    const b = await register(s.app)
+    const c = await register(s.app)
+    const stranger = await register(s.app)
+    await befriend(s.app, a, b)
+    await befriend(s.app, a, c)
+    await befriend(s.app, b, c)
+    const gwA = await connect(s.port, a.token)
+    gwA.send({ op: 'activity', activity: { kind: 'game', name: 'Minecraft', startedAt: Date.now() - 30 * 60_000 } })
+    await new Promise((r) => setTimeout(r, 150))
+    gwA.send({ op: 'activity', activity: { kind: 'code', name: 'Visual Studio Code', startedAt: Date.now() - 5_000 } })
+    await new Promise((r) => setTimeout(r, 150))
+    gwA.send({ op: 'activity', activity: null }) // VS Code for 5 s: a glance, not remembered
+
+    const seen = await api(s.app, 'GET', `/users/${a.user.id}/profile`, { token: b.token })
+    expect(seen.status).toBe(200)
+    expect(Date.parse(seen.body.memberSince)).toBeGreaterThan(0)
+    expect(seen.body.mutualFriends.map((u: { id: string }) => u.id)).toEqual([c.user.id])
+    expect(seen.body.recent).toHaveLength(1)
+    expect(seen.body.recent[0]).toMatchObject({ kind: 'game', name: 'Minecraft' })
+    expect(seen.body.recent[0].totalMs).toBeGreaterThanOrEqual(30 * 60_000)
+
+    const outsider = await api(s.app, 'GET', `/users/${a.user.id}/profile`, { token: stranger.token })
+    expect(outsider.body).toMatchObject({ mutualFriends: [], recent: [] })
+
+    await api(s.app, 'PATCH', '/users/@me', { token: a.token, body: { statusPreference: 'invisible' } })
+    expect((await api(s.app, 'GET', `/users/${a.user.id}/profile`, { token: b.token })).body.recent).toEqual([])
+    expect((await api(s.app, 'GET', `/users/${a.user.id}/profile`, { token: a.token })).body.recent).toHaveLength(1)
+    expect((await api(s.app, 'GET', '/users/00000000-0000-7000-8000-000000000000/profile', { token: a.token })).status).toBe(404)
+    gwA.close()
+  })
+})

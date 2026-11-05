@@ -25,7 +25,8 @@ export function sharedActivity(st: MyActivity = useMyActivity.getState(), now = 
 
 let lastSent: string | null = null
 function send(force = false): void {
-  const a = sharedActivity()
+  // Invisible: nothing leaves this PC (the server would hide it anyway; this way it never even knows).
+  const a = useData.getState().me?.statusPreference === 'invisible' ? null : sharedActivity()
   const json = JSON.stringify(a)
   if (!force && json === lastSent) return
   if (useSession.getState().send({ op: 'activity', activity: a })) lastSent = json
@@ -50,6 +51,9 @@ export function startActivitySync(): () => void {
   }
   void bridge.current().then(take, () => undefined)
   const offChange = bridge.onChange(take)
+  const offPref = useData.subscribe((st, prev) => {
+    if (st.me?.statusPreference !== prev.me?.statusPreference) send()
+  })
   const offReady = onDispatch((d) => {
     if (d.t === 'READY') {
       lastSent = null
@@ -59,6 +63,7 @@ export function startActivitySync(): () => void {
   return () => {
     offChange()
     offReady()
+    offPref()
   }
 }
 
