@@ -124,7 +124,7 @@ function collect(d: DataState): Item[] {
         kind: 'dm',
         label: channelTitle(d, c),
         sub: peer ? `@${peer.username}` : undefined,
-        icon: peer ? <Avatar user={peer} size={20} presence={presenceOf(d, peer.id)} decorative /> : <Avatar user={{ id: c.id, displayName: channelTitle(d, c), avatarUrl: null }} size={20} decorative />,
+        icon: peer ? <Avatar user={peer} size={20} presence={presenceOf(d, peer.id)} decorative /> : <Avatar user={{ id: c.id, displayName: channelTitle(d, c), avatarUrl: null }} size={20} decorative group />,
         unread: isUnread(d, c.id),
         mentions: mentionCount(d, c.id),
         run: () => ui.go({ kind: 'dm', channelId: c.id }),

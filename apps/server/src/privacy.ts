@@ -312,7 +312,7 @@ export class Privacy {
       generatedAt: now.toISOString(),
       account: {
         id: u.id, email: u.email, emailVerified: u.emailVerifiedAt !== null, username: u.username, displayName: u.displayName,
-        bio: u.bio, accentColor: u.accentColor, avatarUrl: u.avatarUrl, statusPreference: u.statusPreference,
+        bio: u.bio, accentColor: u.accentColor, avatarUrl: u.avatarUrl, eco: u.eco, statusPreference: u.statusPreference,
         createdAt: u.createdAt.toISOString(), birthDate: u.birthDate, birthDateSetAt: iso(u.birthDateSetAt), ageBracket: ageBracketOf(u),
         termsVersion: u.termsVersion, termsAcceptedAt: iso(u.termsAcceptedAt), plan: u.plan,
         cosmetics: u.cosmetics, telemetryOptIn: u.telemetryOptIn, telemetryOptInAt: iso(u.telemetryOptInAt),

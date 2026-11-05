@@ -109,7 +109,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
         )}
         {here && conn.state === 'reconnecting' && (
           <div className={s.reconnect} role="status" aria-live="polite">
-            <Eco state="connecting" framing="avatar" size={20} />
+            <Eco state="connecting" size={22} />
             <strong>{t.state.reconnecting}</strong>
             <span>{t.reconnectingShort}</span>
           </div>

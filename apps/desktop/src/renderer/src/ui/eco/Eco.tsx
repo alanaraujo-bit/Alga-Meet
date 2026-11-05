@@ -14,7 +14,7 @@ const VISOR = '#0c0c10'
 
 /** How the antennae turn per state (left, right), around their roots inside the hood. */
 const ANTENNAE: Record<EcoState, [number, number]> = {
-  idle: [0, 0], blink: [0, 0], talking: [0, 0], listening: [0, 38], muted: [-26, 26], connecting: [0, 0],
+  idle: [0, 0], hop: [0, 0], blink: [0, 0], talking: [0, 0], listening: [0, 38], muted: [-26, 26], connecting: [0, 0],
   streaming: [0, 0], sleeping: [-24, 30], error: [-62, 62], success: [0, 0],
 }
 
@@ -47,12 +47,8 @@ function Eyes({ state, eyes, color }: { state: EcoState; eyes: EcoEyes; color: s
         </g>
       )
     case 'listening':
-      return (
-        <g fill={color}>
-          <rect x="40" y="63.5" width="10" height="5" rx="2.5" />
-          <rect x="60" y="63.5" width="10" height="5" rx="2.5" />
-        </g>
-      )
+      // Same eyes, glancing toward the sound.
+      return <g transform="translate(5 0)">{baseEyes(eyes, color)}</g>
     case 'connecting':
       return <circle className={s.scan} cx="38" cy="66" r="3" fill={color} />
     case 'streaming':
@@ -72,8 +68,13 @@ function Eyes({ state, eyes, color }: { state: EcoState; eyes: EcoEyes; color: s
         </g>
       )
     case 'idle':
+    case 'hop':
       break
   }
+  return baseEyes(eyes, color)
+}
+
+function baseEyes(eyes: EcoEyes, color: string): ReactNode {
   switch (eyes) {
     case 'slit':
       return (
@@ -173,7 +174,8 @@ function Accessory({ kind, a }: { kind: EcoAccessory; a: string }): ReactNode {
         </>
       )
     case 'crown':
-      return <path d="M39 30 L40 18 L45.5 24 L50 15 L54.5 24 L60 18 L61 30 Z" fill={a} />
+      // Gold, so it never melts into the antennae (white on the gold Eco).
+      return <path d="M39 30 L40 18 L45.5 24 L50 15 L54.5 24 L60 18 L61 30 Z" fill={a.toLowerCase() === '#d6b14a' ? '#f7f8f8' : '#e8c35a'} />
     case 'horns':
       return (
         <>
@@ -284,7 +286,7 @@ function HairFront({ hair, a, dark }: { hair: EcoHair; a: string; dark: string }
   if (hair === 'fringe')
     return (
       <>
-        <path d="M27 62 C29 50 42 45 57 48 C65 50 71 54 73 58 C63 54 53 55 45 59 C40 62 36 66 34 70 C31 66 29 64 27 62 Z" fill={a} />
+        <path d="M27 60 C29 50 42 45 57 48 C65 50 71 54 73 57 C63 54 53 54 45 57 C40 58.5 36 60 33 61.5 C31 61 29 60.5 27 60 Z" fill={a} />
         <path d="M41 52 C48 50.5 56 51.5 63 54.5" fill="none" stroke={dark} strokeWidth="1.3" strokeLinecap="round" />
       </>
     )
@@ -316,13 +318,15 @@ export const Eco = memo(function Eco({
   const hair = spec.hair ?? 'none'
   const dark = shade(a, 0.55)
   const full = framing === 'full'
-  const lift = state === 'success' ? -4 : 0
+  const lift = state === 'success' || state === 'hop' ? -4 : 0
+  const box = full ? '0 0 100 130' : avatarBox(size)
+  const [bx, by] = box.split(' ').map(Number) as [number, number]
   return (
     <svg
       className={className}
       width={full ? Math.round((size * 100) / 130) : size}
       height={size}
-      viewBox={full ? '0 0 100 130' : avatarBox(size)}
+      viewBox={box}
       aria-hidden
       focusable="false"
     >
@@ -336,8 +340,8 @@ export const Eco = memo(function Eco({
         <HairFrame hair={hair} a={a} dark={dark} />
         <rect x="28" y="55" width="44" height="22" rx="11" fill={VISOR} />
         {BEHIND.has(accessory) && <Accessory kind={accessory} a={a} />}
-        <path d={ANT_L} fill={a} className={s.ant} style={{ transform: `rotate(${turnL}deg)`, transformOrigin: '46px 41px' }} />
-        <path d={ANT_R} fill={a} className={s.ant} style={{ transform: `rotate(${turnR}deg)`, transformOrigin: '54px 41px' }} />
+        <path d={ANT_L} fill={a} className={s.ant} style={{ transform: `rotate(${turnL}deg)`, transformOrigin: `${46 - bx}px ${41 - by}px` }} />
+        <path d={ANT_R} fill={a} className={s.ant} style={{ transform: `rotate(${turnR}deg)`, transformOrigin: `${54 - bx}px ${41 - by}px` }} />
         <HairFront hair={hair} a={a} dark={dark} />
         {!BEHIND.has(accessory) && accessory !== 'mask' && accessory !== 'shades' && <Accessory kind={accessory} a={a} />}
         {accessory === 'shades' ? (
@@ -349,7 +353,7 @@ export const Eco = memo(function Eco({
         ) : accessory === 'mask' ? (
           <>
             <Accessory kind="mask" a={a} />
-            <rect x="34" y="60" width="32" height="4" rx="2" fill={eye} />
+            <rect x="34" y="62.5" width="32" height="4" rx="2" fill={eye} />
           </>
         ) : (
           <Eyes state={state} eyes={spec.eyes} color={eye} />
@@ -358,4 +362,7 @@ export const Eco = memo(function Eco({
       </g>
     </svg>
   )
-})
+}, (p, n) =>
+  // By value: lists and the editor build a fresh spec object every render.
+  p.state === n.state && p.framing === n.framing && p.size === n.size && p.className === n.className &&
+  (p.spec === n.spec || (!!p.spec && !!n.spec && p.spec.accent === n.spec.accent && p.spec.eyes === n.spec.eyes && p.spec.hair === n.spec.hair && p.spec.accessory === n.spec.accessory)))

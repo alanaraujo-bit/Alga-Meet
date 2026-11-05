@@ -185,7 +185,7 @@ export interface Invite {
   expiresAt: string | null
   memberCount: number
   /** Who sent it (public profile): only on the public preview (GET /invites/:code), so a new person sees a face. */
-  inviter?: Pick<PublicUser, 'id' | 'displayName' | 'avatarUrl'>
+  inviter?: Pick<PublicUser, 'id' | 'displayName' | 'avatarUrl' | 'eco'>
 }
 
 export interface VoiceState {

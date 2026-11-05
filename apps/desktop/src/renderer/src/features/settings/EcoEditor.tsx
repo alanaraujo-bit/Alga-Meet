@@ -1,6 +1,6 @@
 import { ECO_ACCENTS, ECO_ACCESSORIES, ECO_EYES, ECO_HAIR, type EcoSpec } from '@alga/shared'
 import { Shuffle } from '@/ui/icons'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { errorText } from '@/lib/errors'
 import { patchMe } from '@/store/actions'
 import { useData } from '@/store/data'
@@ -40,7 +40,7 @@ export function EcoEditor() {
   const set = (p: Partial<EcoSpec>) => {
     setDraft({ ...current, ...p })
     setTrying(null)
-    react('success', 700)
+    react('hop', 700)
   }
   const shown = trying ?? current
 
@@ -66,6 +66,7 @@ export function EcoEditor() {
       aria-checked={selected}
       aria-label={label}
       title={label}
+      tabIndex={selected ? 0 : -1}
       className={s.option}
       onClick={onPick}
       onPointerEnter={() => (setTrying(spec), setMood('listening'))}
@@ -102,6 +103,7 @@ export function EcoEditor() {
                 type="button"
                 role="radio"
                 aria-checked={current.accent === c}
+                tabIndex={current.accent === c ? 0 : -1}
                 aria-label={t.eco.colors[i]}
                 title={t.eco.colors[i]}
                 className={s.swatch}
@@ -143,11 +145,27 @@ export function EcoEditor() {
   )
 }
 
+/** Colors sit in rows of eight: up and down jump a row. */
+const COLOR_COLUMNS = 8
+const STEP: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 1, ArrowUp: -1 }
+
+/** A radiogroup: Tab lands on the picked option; arrows move to the next one and pick it (it shows on the Eco). */
 function Picker({ label, children, grid }: { label: string; children: ReactNode; grid?: boolean }) {
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const radios = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')]
+    const at = radios.indexOf(document.activeElement as HTMLButtonElement)
+    const step = STEP[e.key]
+    if (at < 0 || (step === undefined && e.key !== 'Home' && e.key !== 'End')) return
+    const jump = grid && (e.key === 'ArrowDown' || e.key === 'ArrowUp') ? COLOR_COLUMNS : 1
+    const to = e.key === 'Home' ? 0 : e.key === 'End' ? radios.length - 1 : (at + step! * jump + radios.length) % radios.length
+    e.preventDefault()
+    radios[to]!.focus()
+    radios[to]!.click()
+  }
   return (
     <div className={s.picker}>
       <span className={s.pickerLabel}>{label}</span>
-      <div className={grid ? s.colors : s.options} role="radiogroup" aria-label={label}>
+      <div className={grid ? s.colors : s.options} role="radiogroup" aria-label={label} onKeyDown={onKeyDown}>
         {children}
       </div>
     </div>

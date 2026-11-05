@@ -8,12 +8,14 @@ import { ECO_ACCENTS, type EcoAccessory, type EcoEyes, type EcoSpec } from '@alg
 export { ECO_ACCENTS, ECO_ACCESSORIES, ECO_EYES, ECO_HAIR, type EcoAccessory, type EcoEyes, type EcoHair, type EcoSpec } from '@alga/shared'
 
 /** What the app shows in real situations (the face and antennae change, the body never does). */
-export type EcoState = 'idle' | 'blink' | 'talking' | 'listening' | 'muted' | 'connecting' | 'streaming' | 'sleeping' | 'error' | 'success'
+export type EcoState = 'idle' | 'hop' | 'blink' | 'talking' | 'listening' | 'muted' | 'connecting' | 'streaming' | 'sleeping' | 'error' | 'success'
 
 /** What the drawing needs: a pick, with any accent (a profile accentColor may tint the automatic Eco). */
 export type EcoLook = Omit<EcoSpec, 'accent'> & { accent: string }
 
 export const BRAND_ECO: EcoSpec = { accent: ECO_ACCENTS[0], eyes: 'bar', hair: 'none', accessory: 'none' }
+/** Calm and anonymous: the face of messages whose author deleted the account. */
+export const REMOVED_ECO: EcoSpec = { accent: ECO_ACCENTS[0], eyes: 'line', hair: 'none', accessory: 'none' }
 
 /**
  * The automatic Eco is neutral on purpose: no hair, no eyeliner, no gendered accessory (a hash must not decide how
@@ -30,8 +32,15 @@ function hash(s: string, seed: number): number {
   return Math.imul(h, 0x5bd1e995) >>> 0
 }
 
-/** The Eco a person is born with: three independent picks from their id. */
+/** The Eco a person is born with: three independent picks from their id (cached: avatars re-render a lot). */
+const born = new Map<string, EcoSpec>()
 export function ecoFor(id: string): EcoSpec {
+  let e = born.get(id)
+  if (!e) born.set(id, (e = bornFrom(id)))
+  return e
+}
+
+function bornFrom(id: string): EcoSpec {
   return {
     accent: AUTO_ACCENTS[hash(id, 1) % AUTO_ACCENTS.length]!,
     eyes: AUTO_EYES[hash(id, 2) % AUTO_EYES.length]!,

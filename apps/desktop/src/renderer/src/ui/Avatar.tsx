@@ -3,6 +3,8 @@ import { useEffect, useId, useState, type RefObject } from 'react'
 import s from './Avatar.module.css'
 import { Eco } from './eco/Eco'
 import { ecoBackdrop, ecoFor, type EcoLook } from './eco/ecoRules'
+import { Icon, type IconSize } from './Icon'
+import { Users } from './icons'
 import type { EcoSpec } from '@alga/shared'
 
 export type AvatarSize = 16 | 20 | 24 | 32 | 36 | 40 | 48 | 56 | 64 | 80 | 88 | 96 | 112 | 128
@@ -80,6 +82,7 @@ export function Avatar({
   glowRef,
   glow,
   decorative,
+  group,
 }: {
   user: AvatarUser
   size?: AvatarSize
@@ -91,13 +94,15 @@ export function Avatar({
   glow?: boolean
   /** Name is already visible next to it. */
   decorative?: boolean
+  /** A group conversation: a group glyph, never an Eco (it is nobody's face). */
+  group?: boolean
 }) {
   // Remember which URL failed, so a new avatar gets a fresh try.
   const [brokenUrl, setBrokenUrl] = useState<string | null>(null)
   const broken = !!user.avatarUrl && brokenUrl === user.avatarUrl
   const photo = !!user.avatarUrl && !broken
   // No photo: the Eco they picked (Configurações › Minha conta › Seu Eco), else the one born from their id.
-  const eco: EcoLook | null = photo ? null : (user.eco ?? ecoFor(user.id))
+  const eco: EcoLook | null = photo || group ? null : (user.eco ?? ecoFor(user.id))
   const showDot = presence && DOT[size] > 0
   const label = decorative ? undefined : presence ? `${user.displayName}, ${PRESENCE_LABEL[presence]}` : user.displayName
   return (
@@ -108,8 +113,8 @@ export function Avatar({
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <span className={s.face} style={{ background: eco ? ecoBackdrop(eco.accent) : undefined }}>
-        {eco ? <Eco spec={eco} framing="avatar" size={size} /> : <img src={user.avatarUrl!} alt="" draggable={false} onError={() => setBrokenUrl(user.avatarUrl)} />}
+      <span className={`${s.face} ${group && !photo ? s.group : ''}`} style={{ background: eco ? ecoBackdrop(eco.accent) : undefined }}>
+        {eco ? <Eco spec={eco} framing="avatar" size={size} /> : group && !photo ? <Icon icon={Users} size={groupGlyph(size)} /> : <img src={user.avatarUrl!} alt="" draggable={false} onError={() => setBrokenUrl(user.avatarUrl)} />}
       </span>
       {(speaking || glowRef || glow) && <span ref={glowRef} className={s.glow} />}
       {showDot && (
@@ -120,6 +125,8 @@ export function Avatar({
     </span>
   )
 }
+
+const groupGlyph = (size: number): IconSize => (size >= 48 ? 24 : size >= 32 ? 16 : size >= 24 ? 14 : 12)
 
 const reducedMotion = () =>
   document.documentElement.classList.contains('reduce-motion') || matchMedia('(prefers-reduced-motion: reduce)').matches

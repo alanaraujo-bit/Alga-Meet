@@ -28,9 +28,10 @@ Regras do desenho:
 | Estado | Olhos | Antenas |
 |---|---|---|
 | idle | conforme o tipo (barra, fenda, ponto, linha); pisca a cada ~4,6 s dentro de `.eco-alive` | em pé |
+| hop | os mesmos, corpo 4 unidades acima (ao escolher uma opção no editor) | em pé |
 | blink | linha fina | em pé |
 | talking | duas barras de medidor, fora de compasso | em pé |
-| listening | olhar para o lado | a direita dobrada para o som |
+| listening | os mesmos olhos, olhando para o lado | a direita dobrada para o som |
 | muted | linha fina apagada | abaixadas |
 | connecting | um ponto de luz varrendo o visor | em pé |
 | streaming | um retângulo (tela) | em pé |

@@ -20,6 +20,10 @@
   line-height: 1;
   user-select: none;
 }
+.group {
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+}
 .face img {
   width: 100%;
   height: 100%;

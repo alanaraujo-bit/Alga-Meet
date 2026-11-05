@@ -146,7 +146,7 @@ function DmRow({ channel, active }: { channel: Channel; active: boolean }) {
       {peer ? (
         <Avatar user={peer} size={32} presence={presence ?? undefined} decorative />
       ) : (
-        <Avatar user={{ id: channel.id, displayName: title, avatarUrl: null }} size={32} decorative />
+        <Avatar user={{ id: channel.id, displayName: title, avatarUrl: null }} size={32} decorative group />
       )}
       {/* One line: the presence dot already says "online"; a subtitle only when it adds something. */}
       <span className={s.rowName}>

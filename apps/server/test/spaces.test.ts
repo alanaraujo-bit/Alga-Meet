@@ -129,6 +129,10 @@ describe('invites', () => {
     // A new person sees who called them: the inviter's public profile only (no e-mail).
     expect(preview.body.inviter).toMatchObject({ id: owner.user.id, displayName: owner.user.displayName })
     expect(Object.keys(preview.body.inviter!).sort()).toEqual(['avatarUrl', 'displayName', 'id'])
+    // Their Eco is part of the face once they pick one.
+    const eco = { accent: '#e5484d', eyes: 'slit', hair: 'none', accessory: 'horns' } as const
+    expect((await api(s.app, 'PATCH', '/users/@me', { token: owner.token, body: { eco } })).status).toBe(200)
+    expect((await api<Invite>(s.app, 'GET', `/invites/${code}`)).body.inviter).toMatchObject({ eco })
 
     const gwOwner = await connect(s.port, owner.token)
     const gwJoiner = await connect(s.port, joiner.token)
