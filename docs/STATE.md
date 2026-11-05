@@ -20,7 +20,7 @@ Worktree `D:\PROJETOS\alga-presence`, a partir da main `ffb4ec2`. Itens P0 de `d
   tinha `/i/`. Agora: página `apps/site/src/pages/i` (quem chamou, abrir no app, baixar, código) e links do app para
   `https://alga-meet.vercel.app/i/<código>`; "Enviar no WhatsApp" no convite. **Para valer:** publicar o site com a rota do README
   e pôr `https://alga-meet.vercel.app` em `CORS_ORIGINS` do staging.
-Verificado: servidor 251 testes, desktop 328, typecheck limpo; E2E real 18/18 (`apps/desktop/scripts/fundamentals-shots.mjs`, API
+Verificado: servidor 251 testes, desktop 329, typecheck limpo; revisão independente (8 achados, todos corrigidos); E2E real 19/19 (`apps/desktop/scripts/fundamentals-shots.mjs`, API
 de QA :4360, voz simulada por webhook do LiveKit) e página de convite em Chromium contra a API de QA. Prints:
 `docs/screenshots/2026-11-05-fundamentals-*`. **Publicar** = deploy do servidor (migração 0014 roda no boot), release 0.1.6 no
 `alga-verify`, deploy do site e o `CORS_ORIGINS`. Não feito (depende do dono): BL-01 parecer jurídico, BL-08 auditoria da loja
