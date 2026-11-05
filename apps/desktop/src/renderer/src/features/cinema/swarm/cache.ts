@@ -70,5 +70,22 @@ export async function opfsCache(sessionId: string): Promise<PieceCache> {
 
 /** Removes every cinema session dir left by a crash. Call at app start, before any session opens. */
 export async function clearStaleOpfs(): Promise<void> {
-  await navigator.storage.getDirectory().then((r) => r.removeEntry(ROOT, { recursive: true })).catch(() => {})
+  try {
+    await (await navigator.storage.getDirectory()).removeEntry(ROOT, { recursive: true })
+  } catch {
+    // no OPFS on this origin, or nothing to clear
+  }
+}
+
+/** RAM fallback ceiling (spec §6.5: the cinema stays ≤ 1.5 GB of RAM). */
+export const MEMORY_CAP_BYTES = 1024 ** 3
+
+/** OPFS when the origin has it (the packaged file:// origin may not), else memory with a smaller cap. */
+export async function createPieceCache(sessionId: string, capBytes: number): Promise<{ cache: PieceCache; kind: 'opfs' | 'memory'; capBytes: number }> {
+  try {
+    return { cache: await opfsCache(sessionId), kind: 'opfs', capBytes }
+  } catch (e) {
+    console.warn('[cinema] OPFS unavailable, keeping swarm pieces in memory', e)
+    return { cache: memoryCache(), kind: 'memory', capBytes: Math.min(capBytes, MEMORY_CAP_BYTES) }
+  }
 }

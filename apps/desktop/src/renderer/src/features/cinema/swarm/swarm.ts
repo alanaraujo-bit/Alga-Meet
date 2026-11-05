@@ -2,7 +2,7 @@ import type { CinemaPieceMeta, CinemaTrackId } from '@alga/shared'
 import { Assembler } from './assembler'
 import type { PieceCache } from './cache'
 import { CHUNK_BYTES, bitsOf, decode, encode, setOf, verOf, type WireMsg } from './protocol'
-import { hostShouldSend, isCritical, nextRequests, pieceKey, type SwarmView } from './scheduler'
+import { hostShouldSend, isCritical, isLate, nextRequests, pieceKey, type SwarmView } from './scheduler'
 
 /** Sending pauses above this many queued bytes and resumes on bufferedamountlow at LOW_WATER (spec §6.4). */
 export const HIGH_WATER = 256 * 1024
@@ -14,6 +14,12 @@ const MAX_UPLOAD_QUEUE = 4
 const REQ_TIMEOUT_MS = 15_000
 /** A `none` keeps us from asking that peer for that piece this long (or until it announces it again). */
 const REFUSED_MS = 5_000
+/** Host: a piece turned down for super-seed is served if the same peer asks again this soon (it can't reach the holder). */
+const REPEAT_MS = 10_000
+/** This many timeouts or bans within STRIKE_WINDOW_MS put a peer in back-off for BACKOFF_MS. */
+const STRIKES = 3
+const STRIKE_WINDOW_MS = 60_000
+const BACKOFF_MS = 60_000
 const TICK_MS = 1_000
 /** Default cache budget: 10 min ahead of a 40 Mbps remux (3 GB) plus slack; the app may pass its OPFS quota. */
 const DEFAULT_CAP_BYTES = 4 * 1024 ** 3
@@ -31,14 +37,18 @@ export interface ChannelLike {
 }
 
 type Source = (track: CinemaTrackId, n: number) => Promise<ArrayBuffer | null>
-interface Upload { track: CinemaTrackId; n: number; v: number; buf: ArrayBuffer | null; off: number }
-interface Flight { peer: string; track: CinemaTrackId; n: number; at: number }
+interface Upload { track: CinemaTrackId; n: number; v: number; urgent: boolean; buf: ArrayBuffer | null; off: number }
+/** `at` = last chunk; `done` = every byte is in (being verified/stored): later chunks for it are ignored. */
+interface Flight { peer: string; track: CinemaTrackId; n: number; start: number; at: number; got: number; done: boolean }
 interface Peer {
   id: string; ch: ChannelLike; has: Map<CinemaTrackId, Set<number>>
   /** Sent bytes with a wrong hash for this piece version: never asked again for it. */
   banned: Set<string>
   /** Answered `none` (key → when): skipped for REFUSED_MS, until it announces the piece, or until a peer leaves. */
   refused: Map<string, number>
+  /** Host side: pieces turned down for this peer (super-seed), key -> when. */
+  declined: Map<string, number>
+  strikes: number[]; backoffUntil: number
   queue: Upload[]; loading: boolean; bytesIn: number; mbps: number
 }
 
@@ -60,6 +70,8 @@ export class Swarm {
   private readonly mine = new Map<CinemaTrackId, Set<number>>()
   private readonly inflight = new Map<string, Flight>()
   private readonly asm = new Assembler()
+  /** Critical pieces already moved once from a late source (never moved again: no ping-pong). */
+  private readonly moved = new Set<string>()
   private readonly cbs = new Set<(track: CinemaTrackId, n: number) => void>()
   private readonly timer: ReturnType<typeof setInterval>
   private tracks: CinemaTrackId[] = []
@@ -83,7 +95,10 @@ export class Swarm {
 
   addPeer(id: string, ch: ChannelLike): void {
     this.removePeer(id)
-    const p: Peer = { id, ch, has: new Map(), banned: new Set(), refused: new Map(), queue: [], loading: false, bytesIn: 0, mbps: 0 }
+    const p: Peer = {
+      id, ch, has: new Map(), banned: new Set(), refused: new Map(), declined: new Map(), strikes: [], backoffUntil: 0,
+      queue: [], loading: false, bytesIn: 0, mbps: 0,
+    }
     this.peers.set(id, p)
     ch.bufferedAmountLowThreshold = LOW_WATER
     ch.onbufferedamountlow = () => this.pump(p)
@@ -103,7 +118,7 @@ export class Swarm {
     p.ch.onbufferedamountlow = null
     p.ch.close()
     this.asm.dropPeer(id)
-    for (const [k, f] of this.inflight) if (f.peer === id) this.inflight.delete(k)
+    for (const [k, f] of this.inflight) if (f.peer === id) this.dropFlight(k)
     for (const q of this.peers.values()) q.refused.clear() // whoever turned us down (super-seed) may serve now
     this.schedule()
   }
@@ -181,6 +196,7 @@ export class Swarm {
     clearInterval(this.timer)
     for (const id of [...this.peers.keys()]) this.removePeer(id)
     this.cbs.clear()
+    await this.storing
     await this.opts.cache.clear()
   }
 
@@ -195,11 +211,8 @@ export class Swarm {
     } else if (m.t === 'none') {
       const k = pieceKey(m.track, m.n)
       p.refused.set(k, Date.now())
-      if (this.inflight.get(k)?.peer === p.id) {
-        this.inflight.delete(k)
-        this.asm.drop(k)
-      }
-    } else if (m.t === 'req') return this.serve(p, m.track, m.n, m.v)
+      if (this.inflight.get(k)?.peer === p.id) this.dropFlight(k)
+    } else if (m.t === 'req') return this.serve(p, m.track, m.n, m.v, m.urgent)
     else if (m.t === 'cancel') {
       p.queue = p.queue.filter((u) => u.track !== m.track || u.n !== m.n)
       if (this.opts.isHost) p.has.get(m.track)?.delete(m.n)
@@ -208,14 +221,27 @@ export class Swarm {
     this.schedule()
   }
 
-  private serve(p: Peer, track: CinemaTrackId, n: number, v: number): void {
+  private serve(p: Peer, track: CinemaTrackId, n: number, v: number, urgent: boolean): void {
     if (p.queue.some((u) => u.track === track && u.n === n)) return
     const meta = this.index.get(track)?.[n]
-    const ok = meta && verOf(meta[3]) === v && this.mine.get(track)?.has(n) && p.queue.length < MAX_UPLOAD_QUEUE &&
-      (!this.opts.isHost || hostShouldSend(this.view(), p.id, track, n))
-    if (!ok) return this.ctl(p, { t: 'none', track, n })
-    if (this.opts.isHost) setIn(p.has, track).add(n) // super-seed: count it as theirs from now on
-    p.queue.push({ track, n, v, buf: null, off: 0 })
+    if (!meta || verOf(meta[3]) !== v || !this.mine.get(track)?.has(n) || p.queue.length >= MAX_UPLOAD_QUEUE) return this.ctl(p, { t: 'none', track, n })
+    if (this.opts.isHost) {
+      // super-seed, unless it is urgent for them or asked again (they can't reach the friend who has it)
+      const k = pieceKey(track, n)
+      const now = Date.now()
+      if (!urgent && now - (p.declined.get(k) ?? -Infinity) >= REPEAT_MS && !hostShouldSend(this.view(), p.id, track, n)) {
+        p.declined.set(k, now)
+        return this.ctl(p, { t: 'none', track, n })
+      }
+      p.declined.delete(k)
+      setIn(p.has, track).add(n) // count it as theirs from now on
+    }
+    // urgent pieces go before queued prefetch; a head already being sent keeps going
+    const u: Upload = { track, n, v, urgent, buf: null, off: 0 }
+    const from = p.queue[0] && (p.queue[0].off > 0 || p.loading) ? 1 : 0
+    const at = urgent ? p.queue.findIndex((x, i) => i >= from && !x.urgent) : -1
+    if (at >= 0) p.queue.splice(at, 0, u)
+    else p.queue.push(u)
     this.pump(p)
   }
 
@@ -244,7 +270,7 @@ export class Swarm {
         else {
           p.queue.shift()
           this.ctl(p, { t: 'none', track: u.track, n: u.n })
-          if (!buf) this.mine.get(u.track)?.delete(u.n) // evicted (host: the factory dropped it)
+          if (!buf && this.mine.get(u.track)?.delete(u.n)) this.announce(u.track) // evicted (host: the factory dropped it)
           if (this.opts.isHost) p.has.get(u.track)?.delete(u.n)
         }
       }
@@ -256,15 +282,19 @@ export class Swarm {
     const k = pieceKey(m.track, m.n)
     const f = this.inflight.get(k)
     const meta = this.index.get(m.track)?.[m.n]
-    if (!f || f.peer !== p.id || !meta || m.v !== verOf(meta[3])) return // unsolicited, or an old version still in the pipe
+    // unsolicited, already whole, or an old version still in the pipe
+    if (!f || f.peer !== p.id || f.done || !meta || m.v !== verOf(meta[3])) return
     if (m.total !== meta[2]) return this.reject(p, f, 'size')
     f.at = Date.now()
+    f.got += m.data.byteLength
     p.bytesIn += m.data.byteLength
     this.down += m.data.byteLength
     if (p.id === this.opts.hostId) this.fromHost += m.data.byteLength
     else this.fromPeers += m.data.byteLength
     const whole = this.asm.add(p.id, k, m.offset, m.total, m.data)
-    if (whole) void this.complete(p, f, meta, whole)
+    if (!whole) return
+    f.done = true
+    void this.complete(p, f, meta, whole)
   }
 
   private async complete(p: Peer, f: Flight, meta: CinemaPieceMeta, whole: Uint8Array<ArrayBuffer>): Promise<void> {
@@ -272,27 +302,37 @@ export class Swarm {
     const hex = hexOf(await crypto.subtle.digest('SHA-256', whole))
     if (this.closed || this.inflight.get(k) !== f) return // cancelled or superseded meanwhile
     if (hex !== meta[3]) return this.reject(p, f, 'hash')
-    const stored = this.storing.then(async () => {
-      await this.makeRoom(whole.byteLength)
-      await this.opts.cache.put(k, whole.buffer)
-    })
-    this.storing = stored.catch(() => {})
+    const step = this.storing.then(() => this.store(f, whole))
+    this.storing = step.catch(() => {})
     try {
-      await stored
+      await step
     } catch (e) {
       console.warn(`[cinema] could not cache ${k}`, e)
       this.cap = Math.min(this.cap, this.opts.cache.bytes()) // storage is smaller than planned: live within what fits
-      if (this.inflight.get(k) === f) this.inflight.delete(k)
-      return this.schedule()
+      if (this.inflight.get(k) === f) this.cancelFlight(k) // the cancel undoes the uploader's "they have it" mark
+      this.schedule()
     }
+  }
+
+  /** Runs one at a time (eviction and the byte count stay in step); commits only if the flight is still current. */
+  private async store(f: Flight, whole: Uint8Array<ArrayBuffer>): Promise<void> {
+    const k = pieceKey(f.track, f.n)
+    if (this.closed || this.inflight.get(k) !== f) return
+    await this.makeRoom(whole.byteLength)
+    await this.opts.cache.put(k, whole.buffer)
     if (this.closed) return
-    if (this.inflight.get(k) !== f) return void this.opts.cache.delete(k) // overwritten while writing
+    if (this.inflight.get(k) !== f) {
+      // overwritten while writing; nothing newer is stored yet since stores are serialized
+      if (!this.mine.get(f.track)?.has(f.n)) await this.opts.cache.delete(k)
+      return
+    }
     this.inflight.delete(k)
     this.gotPiece(f.track, f.n)
     this.schedule()
   }
 
   private gotPiece(track: CinemaTrackId, n: number): void {
+    this.moved.delete(pieceKey(track, n))
     setIn(this.mine, track).add(n)
     for (const q of this.peers.values()) this.ctl(q, { t: 'got', track, n })
     for (const cb of this.cbs) cb(track, n)
@@ -302,23 +342,43 @@ export class Swarm {
     const k = pieceKey(f.track, f.n)
     console.warn(`[cinema] ${why} mismatch for ${k} from ${p.id}: banned for this piece`)
     p.banned.add(k)
+    this.strike(p)
+    this.cancelFlight(k)
+    this.schedule()
+  }
+
+  /** Timeouts and bans add up: STRIKES of them within STRIKE_WINDOW_MS put the peer in back-off. */
+  private strike(p: Peer, now = Date.now()): void {
+    p.strikes = [...p.strikes.filter((t) => now - t < STRIKE_WINDOW_MS), now]
+    if (p.strikes.length >= STRIKES) p.backoffUntil = now + BACKOFF_MS
+  }
+
+  private dropFlight(k: string): Flight | undefined {
+    const f = this.inflight.get(k)
     this.inflight.delete(k)
     this.asm.drop(k)
-    this.ctl(p, { t: 'cancel', track: f.track, n: f.n })
-    this.schedule()
+    return f
+  }
+
+  /** Drops the download and tells its source to stop (the host then stops counting the piece as ours). */
+  private cancelFlight(k: string): void {
+    const f = this.dropFlight(k)
+    const p = f && this.peers.get(f.peer)
+    if (f && p) this.ctl(p, { t: 'cancel', track: f.track, n: f.n })
+  }
+
+  /** Tells every peer what we hold for `track` now (after dropping pieces). */
+  private announce(track: CinemaTrackId): void {
+    const bits = bitsOf(this.mine.get(track) ?? [])
+    for (const q of this.peers.values()) this.ctl(q, { t: 'have', track, bits })
   }
 
   /** A changed index entry: drop our copy, the download in progress and per-piece verdicts about the old version. */
   private invalidate(track: CinemaTrackId, n: number): void {
     const k = pieceKey(track, n)
     if (this.mine.get(track)?.delete(n) && !this.opts.isHost) void this.opts.cache.delete(k)
-    const f = this.inflight.get(k)
-    if (f) {
-      this.inflight.delete(k)
-      this.asm.drop(k)
-      const p = this.peers.get(f.peer)
-      if (p) this.ctl(p, { t: 'cancel', track, n })
-    }
+    this.cancelFlight(k)
+    this.moved.delete(k)
     for (const p of this.peers.values()) {
       p.banned.delete(k)
       p.refused.delete(k)
@@ -341,13 +401,15 @@ export class Swarm {
       }
     }
     victims.sort((a, b) => b[0] - a[0])
+    const touched = new Set<CinemaTrackId>()
     for (const [, track, n, size] of victims) {
       if (over <= 0) break
       this.mine.get(track)?.delete(n)
-      for (const q of this.peers.values()) this.ctl(q, { t: 'none', track, n })
+      touched.add(track)
       await this.opts.cache.delete(pieceKey(track, n))
       over -= size
     }
+    for (const track of touched) this.announce(track)
   }
 
   private ctl(p: Peer, m: WireMsg): void {
@@ -361,15 +423,22 @@ export class Swarm {
   // ---- scheduling ---------------------------------------------------------------------------------------------------
 
   private view(): SwarmView {
+    const now = Date.now()
     const load = new Map<string, number>()
-    for (const f of this.inflight.values()) load.set(f.peer, (load.get(f.peer) ?? 0) + 1)
+    const inflight = new Map<string, string>()
+    for (const [k, f] of this.inflight) {
+      // a whole piece being verified no longer takes its source's slot and is not worth preempting
+      inflight.set(k, f.done ? '' : f.peer)
+      if (!f.done) load.set(f.peer, (load.get(f.peer) ?? 0) + 1)
+    }
     return {
-      now: Date.now(), playheadS: this.playheadS, tracks: this.tracks, index: this.index, mine: this.mine,
+      now, playheadS: this.playheadS, tracks: this.tracks, index: this.index, mine: this.mine,
       peers: [...this.peers.values()].map((p) => ({
-        id: p.id, isHost: p.id === this.opts.hostId, has: p.has, inflight: load.get(p.id) ?? 0, mbps: p.mbps,
+        id: p.id, isHost: p.id === this.opts.hostId, has: p.has, inflight: load.get(p.id) ?? 0,
+        mbps: p.backoffUntil > now ? -1 : p.mbps,
         bannedFor: p.refused.size ? new Set([...p.banned, ...p.refused.keys()]) : p.banned,
       })),
-      inflight: new Set(this.inflight.keys()),
+      inflight,
       budgetPieces: this.opts.isHost ? 0 : this.budget(),
     }
   }
@@ -398,11 +467,13 @@ export class Swarm {
       this.queued = false
       if (this.closed) return
       for (const r of nextRequests(this.view(), MAX_INFLIGHT - this.inflight.size)) {
+        if (r.preempt) this.cancelFlight(r.preempt)
         const meta = this.index.get(r.track)?.[r.n]
         const p = this.peers.get(r.peer)
         if (!meta || !p) continue
-        this.inflight.set(pieceKey(r.track, r.n), { peer: r.peer, track: r.track, n: r.n, at: Date.now() })
-        this.ctl(p, { t: 'req', track: r.track, n: r.n, v: verOf(meta[3]) })
+        const now = Date.now()
+        this.inflight.set(pieceKey(r.track, r.n), { peer: r.peer, track: r.track, n: r.n, start: now, at: now, got: 0, done: false })
+        this.ctl(p, { t: 'req', track: r.track, n: r.n, v: verOf(meta[3]), urgent: r.urgent })
       }
     })
   }
@@ -414,20 +485,31 @@ export class Swarm {
       p.mbps = ewma(p.mbps, p.bytesIn)
       p.bytesIn = 0
       for (const [k, at] of p.refused) if (now - at > REFUSED_MS) p.refused.delete(k)
+      for (const [k, at] of p.declined) if (now - at >= REPEAT_MS) p.declined.delete(k)
     }
     this.downMbps = ewma(this.downMbps, this.down)
     this.upMbps = ewma(this.upMbps, this.up)
     this.down = this.up = 0
     for (const [k, f] of this.inflight) {
-      if (now - f.at < REQ_TIMEOUT_MS) continue
-      this.inflight.delete(k)
-      this.asm.drop(k)
       const p = this.peers.get(f.peer)
-      if (p) {
-        p.refused.set(k, now)
-        this.ctl(p, { t: 'cancel', track: f.track, n: f.n })
-      }
+      const m = this.index.get(f.track)?.[f.n]
+      if (f.done || !p || !m) continue
+      const timedOut = now - f.at >= REQ_TIMEOUT_MS
+      // a critical download that will miss the playhead moves (once) to another holder
+      const late = !timedOut && !this.moved.has(k) && isCritical(m, this.playheadS) &&
+        isLate(m, f.got, (now - f.start) / 1000, this.playheadS) && this.otherHolder(p, f.track, f.n)
+      if (!timedOut && !late) continue
+      this.cancelFlight(k)
+      p.refused.set(k, now)
+      if (timedOut) this.strike(p, now)
+      else this.moved.add(k)
     }
     this.schedule()
+  }
+
+  private otherHolder(p: Peer, track: CinemaTrackId, n: number): boolean {
+    const k = pieceKey(track, n)
+    for (const q of this.peers.values()) if (q !== p && q.has.get(track)?.has(n) && !q.banned.has(k) && !q.refused.has(k)) return true
+    return false
   }
 }

@@ -23,6 +23,11 @@ export class Assembler {
     return p.buf
   }
 
+  /** Pieces being assembled. */
+  pending(): number {
+    return this.parts.size
+  }
+
   drop(key: string): void {
     this.parts.delete(key)
   }

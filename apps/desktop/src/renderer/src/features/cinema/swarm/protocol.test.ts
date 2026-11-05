@@ -8,7 +8,8 @@ describe('wire protocol', () => {
     { t: 'have', track: 'v', bits: bitsOf(new Set([0, 3, 9])) },
     { t: 'have', track: 'a0', bits: new Uint8Array(0) },
     { t: 'got', track: 'a12', n: 7 },
-    { t: 'req', track: 's3', n: 0, v: 0xdeadbeef },
+    { t: 'req', track: 's3', n: 0, v: 0xdeadbeef, urgent: false },
+    { t: 'req', track: 'v', n: 9, v: 1, urgent: true },
     { t: 'cancel', track: 'poster', n: 0 },
     { t: 'none', track: 'thumbs', n: MAX_PIECES - 1 },
     { t: 'chunk', track: 'v', n: 42, v: 1, offset: 0, total: CHUNK_BYTES * 2, data: bytes(CHUNK_BYTES) },
@@ -25,7 +26,7 @@ describe('wire protocol', () => {
   })
 
   it('keeps a full chunk at the 224 KiB message size', () => {
-    expect(encode(msgs[6]!).byteLength).toBe(224 * 1024)
+    expect(encode(msgs[7]!).byteLength).toBe(224 * 1024)
   })
 
   it('round-trips bitfields', () => {
@@ -76,8 +77,14 @@ describe('wire protocol', () => {
       expect(decode(u8(2, 1, 0xe7, 0x03, 1, 0, 0, 0))).toEqual({ t: 'got', track: 'a999', n: 1 })
     })
 
+    it('urgent flag other than 0/1', () => {
+      const b = new DataView(encode({ t: 'req', track: 'v', n: 0, v: 0, urgent: true }))
+      b.setUint8(12, 2)
+      expect(decode(b.buffer)).toBeNull()
+    })
+
     it('n out of range', () => {
-      const b = new DataView(encode({ t: 'req', track: 'v', n: 0, v: 0 }))
+      const b = new DataView(encode({ t: 'req', track: 'v', n: 0, v: 0, urgent: false }))
       b.setUint32(4, MAX_PIECES, true)
       expect(decode(b.buffer)).toBeNull()
       expect(decode(chunk(MAX_PIECES, 0, 1, 1))).toBeNull()

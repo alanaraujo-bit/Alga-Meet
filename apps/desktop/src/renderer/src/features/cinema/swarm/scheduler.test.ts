@@ -1,6 +1,6 @@
 import type { CinemaPieceMeta, CinemaTrackId } from '@alga/shared'
 import { describe, expect, it } from 'vitest'
-import { MAX_PEER_INFLIGHT, hostShouldSend, nextRequests, type SwarmView } from './scheduler'
+import { LATE_MIN_AGE_S, MAX_PEER_INFLIGHT, hostShouldSend, isLate, nextRequests, type SwarmView } from './scheduler'
 
 const H = 'ab'.repeat(32)
 const meta = (startS: number, durS: number): CinemaPieceMeta => [startS, durS, 1000, H]
@@ -12,7 +12,7 @@ const peer = (id: string, mbps: number, has: number[], over: Partial<PeerView> =
   ({ id, isHost: false, has: new Map([['v', new Set(has)]]), inflight: 0, mbps, bannedFor: new Set(), ...over })
 
 const view = (over: Partial<SwarmView>): SwarmView => ({
-  now: 0, playheadS: 0, tracks: ['v'], index: new Map(), mine: new Map(), peers: [], inflight: new Set(), budgetPieces: 1000, ...over,
+  now: 0, playheadS: 0, tracks: ['v'], index: new Map(), mine: new Map(), peers: [], inflight: new Map(), budgetPieces: 1000, ...over,
 })
 const asked = (v: SwarmView, maxNew = 100) => nextRequests(v, maxNew).map((r) => `${r.n}@${r.peer}`)
 const all = (k: number) => Array.from({ length: k }, (_, i) => i)
@@ -60,7 +60,7 @@ describe('nextRequests', () => {
     const v = view({
       index: new Map([['v', track(0, 10, 20, 30, 40)]]),
       mine: new Map([['v', new Set([0, 1])]]),
-      inflight: new Set(['v:2']),
+      inflight: new Map([['v:2', 'z']]),
       peers: [peer('a', 9, [0, 1, 2, 3, 5], { bannedFor: new Set(['v:3']) }), peer('b', 1, [3])],
     })
     // n3 only from b (a banned for it), n4 nobody has, n5 from a
@@ -86,6 +86,59 @@ describe('nextRequests', () => {
       peers: [peer('a', 1, [], { has: new Map([['v', new Set([0, 1])], ['a1', new Set([0, 1, 2])]]) })],
     })
     expect(nextRequests(v, 10).map((r) => `${r.track}:${r.n}`)).toEqual(['a1:0', 'a1:2'])
+  })
+})
+
+describe('nextRequests: preemption, urgency and back-off', () => {
+  const index = new Map<CinemaTrackId, CinemaPieceMeta[]>([['v', track(...all(20).map((i) => i * 10))]])
+
+  it('marks critical requests urgent and prefetch not', () => {
+    const v = view({ index, mine: new Map([['v', new Set([0, 1, 2])]]), peers: [peer('a', 1, all(21))] })
+    expect(nextRequests(v, 2).map((r) => [r.n, r.urgent])).toEqual([[3, true], [4, false]])
+  })
+
+  it('preempts the farthest prefetch on the fastest holder when every slot is busy, even at maxNew', () => {
+    const v = view({
+      playheadS: 150, index, mine: new Map([['v', new Set([0])]]),
+      inflight: new Map([['v:5', 'fast'], ['v:9', 'fast'], ['v:7', 'fast'], ['v:6', 'slow'], ['v:8', 'slow'], ['v:4', 'slow']]),
+      peers: [peer('slow', 1, all(21), { inflight: 3 }), peer('fast', 9, all(21), { inflight: 3 })],
+    })
+    // critical: n16 (150 s), n17, n18; prefetch to cancel on 'fast' farthest first: n9, n7, n5
+    expect(nextRequests(v, 0)).toEqual([
+      { peer: 'fast', track: 'v', n: 16, urgent: true, preempt: 'v:9' },
+      { peer: 'fast', track: 'v', n: 17, urgent: true, preempt: 'v:7' },
+      { peer: 'fast', track: 'v', n: 18, urgent: true, preempt: 'v:5' },
+    ])
+  })
+
+  it('never preempts critical downloads', () => {
+    const v = view({ index, mine: new Map([['v', new Set([0])]]), inflight: new Map([['v:1', 'a'], ['v:2', 'a'], ['v:3', 'a']]), peers: [peer('a', 1, all(21), { inflight: 3 })] })
+    expect(nextRequests(v, 10)).toEqual([])
+  })
+
+  it('uses a peer in back-off (mbps < 0) only when nobody else holds the piece', () => {
+    const v = view({
+      index, mine: new Map([['v', new Set([0, 1, 2, 3])]]),
+      peers: [peer('host', 0, all(21), { isHost: true }), peer('bad', -1, all(21)), peer('lone', -1, [], { has: new Map([['a1', new Set([0])]]) })],
+      tracks: ['v', 'a1'], budgetPieces: 2,
+    })
+    v.index.set('a1', [meta(-1, 0)])
+    expect(asked(v)).toEqual(['0@lone', '4@host', '5@host'])
+    const full = view({ ...v, peers: [peer('host', 0, all(21), { isHost: true, inflight: 3 }), peer('bad', -1, all(21))] })
+    expect(asked(full)).toEqual([]) // not even as overflow when the host is busy
+  })
+})
+
+describe('isLate', () => {
+  const m: CinemaPieceMeta = [40, 10, 1_000_000, H]
+  it('waits LATE_MIN_AGE_S before judging', () => {
+    expect(isLate(m, 0, LATE_MIN_AGE_S - 0.1, 40)).toBe(false)
+  })
+  it('is late with no bytes, or when the projected end passes the time left before the playhead reaches the piece', () => {
+    expect(isLate(m, 0, 2, 0)).toBe(true)
+    expect(isLate(m, 100_000, 2, 30)).toBe(true) // 900 kB left at 50 kB/s = 18 s > 10 s
+    expect(isLate(m, 500_000, 2, 30)).toBe(false) // 2 s < 10 s
+    expect(isLate(m, 500_000, 2, 45)).toBe(true) // already playing: deadline 0
   })
 })
 

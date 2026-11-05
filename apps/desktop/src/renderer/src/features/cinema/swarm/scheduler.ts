@@ -4,17 +4,23 @@ import type { CinemaPieceMeta, CinemaTrackId } from '@alga/shared'
 export const CRITICAL_S = 30
 /** Pieces in flight per source at once. */
 export const MAX_PEER_INFLIGHT = 3
+/** A critical download is judged late only after it has run this long (its rate means little before). */
+export const LATE_MIN_AGE_S = 2
 
 export interface SwarmView {
   now: number; playheadS: number; tracks: CinemaTrackId[]
   index: Map<CinemaTrackId, CinemaPieceMeta[]>
   mine: Map<CinemaTrackId, Set<number>>
+  /** mbps < 0 marks a peer in back-off: used only when nobody else holds the piece. */
   peers: { id: string; isHost: boolean; has: Map<CinemaTrackId, Set<number>>; inflight: number; mbps: number; bannedFor: Set<string> }[]
-  /** `${track}:${n}` */
-  inflight: Set<string>
+  /** `${track}:${n}` → peer it is being downloaded from */
+  inflight: Map<string, string>
   /** Cache capacity left, in pieces (limits prefetch only: the critical window is always fetched). */
   budgetPieces: number
 }
+
+/** `urgent` = in our critical window (the uploader serves it first); `preempt` = in-flight prefetch to cancel for it. */
+export interface PieceRequest { peer: string; track: CinemaTrackId; n: number; urgent: boolean; preempt?: string }
 
 export const pieceKey = (track: CinemaTrackId, n: number): string => `${track}:${n}`
 
@@ -23,15 +29,24 @@ export function isCritical(m: CinemaPieceMeta, playheadS: number): boolean {
   return m[1] === 0 || (m[0] + m[1] > playheadS && m[0] < playheadS + CRITICAL_S)
 }
 
+/** At its own average rate so far, the download ends after the playhead reaches the piece (playing at 1×). */
+export function isLate(m: CinemaPieceMeta, gotBytes: number, ageS: number, playheadS: number): boolean {
+  if (ageS < LATE_MIN_AGE_S) return false
+  const rate = gotBytes / ageS
+  return rate === 0 || (m[2] - gotBytes) / rate > Math.max(0, m[0] - playheadS)
+}
+
 /**
  * Pure piece picker. n is generation order (R4): everything is ordered by startS from the index, never by n.
- * 1. Critical pieces (init/single-file first, then the window in time order), each from the fastest holder.
+ * 1. Critical pieces (init/single-file first, then the window in time order), each from the fastest holder with a free
+ *    slot; if every holder is full, the farthest prefetch in flight on the fastest holder is preempted for it.
  * 2. Then pieces ahead of the playhead, rarest first (fewest holders), nearest on a tie, while budgetPieces (minus the
  *    critical media pieces just asked) lasts. Here a friend that holds the piece is always used instead of the host
- *    (super-seed): the host only serves what no friend has.
- * Never asks for what is held or in flight, nor from a peer banned for that piece, nor beyond MAX_PEER_INFLIGHT a peer.
+ *    (super-seed): the host only serves what no friend (out of back-off) has.
+ * Never asks for what is held or in flight, nor from a peer banned for that piece, nor beyond MAX_PEER_INFLIGHT a peer;
+ * maxNew bounds the flights added (a preempting request replaces one).
  */
-export function nextRequests(v: SwarmView, maxNew: number): { peer: string; track: CinemaTrackId; n: number }[] {
+export function nextRequests(v: SwarmView, maxNew: number): PieceRequest[] {
   const crit: [CinemaTrackId, number, number][] = []
   const rest: [CinemaTrackId, number, number, number][] = []
   for (const track of v.tracks) {
@@ -48,26 +63,60 @@ export function nextRequests(v: SwarmView, maxNew: number): { peer: string; trac
   rest.sort((a, b) => a[3] - b[3] || a[2] - b[2])
 
   const load = new Map(v.peers.map((p) => [p.id, p.inflight]))
-  const out: { peer: string; track: CinemaTrackId; n: number }[] = []
-  const take = (track: CinemaTrackId, n: number, critical: boolean): boolean => {
+  const loadOf = (id: string) => load.get(id) ?? 0
+  const out: PieceRequest[] = []
+  let fresh = 0
+  const holders = (track: CinemaTrackId, n: number, critical: boolean) => {
     const k = pieceKey(track, n)
-    let holders = v.peers.filter((p) => p.has.get(track)?.has(n) && !p.bannedFor.has(k))
-    if (!critical && holders.some((p) => !p.isHost)) holders = holders.filter((p) => !p.isHost)
-    let best: SwarmView['peers'][number] | null = null
-    for (const p of holders) {
-      const l = load.get(p.id) ?? 0
-      if (l >= MAX_PEER_INFLIGHT) continue
-      if (!best || p.mbps > best.mbps || (p.mbps === best.mbps && l < (load.get(best.id) ?? 0))) best = p
+    let hs = v.peers.filter((p) => p.has.get(track)?.has(n) && !p.bannedFor.has(k))
+    if (hs.some((p) => p.mbps >= 0)) hs = hs.filter((p) => p.mbps >= 0) // back-off peers only as the last holder, never as overflow
+    if (!critical && hs.some((p) => !p.isHost)) hs = hs.filter((p) => !p.isHost)
+    return hs.sort((a, b) => b.mbps - a.mbps || loadOf(a.id) - loadOf(b.id))
+  }
+  const preempted = new Set<string>()
+  const victimOn = (peer: string): string | undefined => {
+    let victim: string | undefined
+    let farthest = -Infinity
+    for (const [k, id] of v.inflight) {
+      if (id !== peer || preempted.has(k)) continue
+      const i = k.lastIndexOf(':')
+      const m = v.index.get(k.slice(0, i) as CinemaTrackId)?.[Number(k.slice(i + 1))]
+      if (m && !isCritical(m, v.playheadS) && m[0] > farthest) [victim, farthest] = [k, m[0]]
     }
-    if (!best) return false
-    load.set(best.id, (load.get(best.id) ?? 0) + 1)
-    out.push({ peer: best.id, track, n })
-    return true
+    return victim
   }
   // critical media pieces are never held back by the budget, but they use it up before any prefetch
   let budget = v.budgetPieces
-  for (const [track, n, at] of crit) if (out.length < maxNew && take(track, n, true) && at !== -Infinity) budget--
-  for (const [track, n] of rest) if (out.length < maxNew && budget > 0 && take(track, n, false)) budget--
+  for (const [track, n, at] of crit) {
+    const hs = holders(track, n, true)
+    const free = fresh < maxNew ? hs.find((p) => loadOf(p.id) < MAX_PEER_INFLIGHT) : undefined
+    let req: PieceRequest | undefined
+    if (free) {
+      load.set(free.id, loadOf(free.id) + 1)
+      fresh++
+      req = { peer: free.id, track, n, urgent: true }
+    } else {
+      for (const p of hs) {
+        const k = victimOn(p.id)
+        if (!k) continue
+        preempted.add(k)
+        req = { peer: p.id, track, n, urgent: true, preempt: k }
+        break
+      }
+    }
+    if (!req) continue
+    out.push(req)
+    if (at !== -Infinity) budget--
+  }
+  for (const [track, n] of rest) {
+    if (fresh >= maxNew || budget <= 0) break
+    const p = holders(track, n, false).find((h) => loadOf(h.id) < MAX_PEER_INFLIGHT)
+    if (!p) continue
+    load.set(p.id, loadOf(p.id) + 1)
+    fresh++
+    budget--
+    out.push({ peer: p.id, track, n, urgent: false })
+  }
   return out
 }
 
