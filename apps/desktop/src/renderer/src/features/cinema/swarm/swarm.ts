@@ -1,0 +1,433 @@
+import type { CinemaPieceMeta, CinemaTrackId } from '@alga/shared'
+import { Assembler } from './assembler'
+import type { PieceCache } from './cache'
+import { CHUNK_BYTES, bitsOf, decode, encode, setOf, verOf, type WireMsg } from './protocol'
+import { hostShouldSend, isCritical, nextRequests, pieceKey, type SwarmView } from './scheduler'
+
+/** Sending pauses above this many queued bytes and resumes on bufferedamountlow at LOW_WATER (spec §6.4). */
+export const HIGH_WATER = 256 * 1024
+export const LOW_WATER = 128 * 1024
+/** Pieces downloading at once (bounds assembly memory). */
+const MAX_INFLIGHT = 12
+/** Requests a peer may queue with us; more are answered `none` (bounds upload memory and abuse). */
+const MAX_UPLOAD_QUEUE = 4
+const REQ_TIMEOUT_MS = 15_000
+/** A `none` keeps us from asking that peer for that piece this long (or until it announces it again). */
+const REFUSED_MS = 5_000
+const TICK_MS = 1_000
+/** Default cache budget: 10 min ahead of a 40 Mbps remux (3 GB) plus slack; the app may pass its OPFS quota. */
+const DEFAULT_CAP_BYTES = 4 * 1024 ** 3
+/** When space runs short, pieces more than this far behind the playhead go first. */
+const BEHIND_S = 600
+
+/** The part of RTCDataChannel the swarm uses; tests back it with a MessageChannel. */
+export interface ChannelLike {
+  send(data: ArrayBuffer): void
+  readonly bufferedAmount: number
+  bufferedAmountLowThreshold: number
+  onmessage: ((e: MessageEvent) => void) | null
+  onbufferedamountlow: ((e: Event) => void) | null
+  close(): void
+}
+
+type Source = (track: CinemaTrackId, n: number) => Promise<ArrayBuffer | null>
+interface Upload { track: CinemaTrackId; n: number; v: number; buf: ArrayBuffer | null; off: number }
+interface Flight { peer: string; track: CinemaTrackId; n: number; at: number }
+interface Peer {
+  id: string; ch: ChannelLike; has: Map<CinemaTrackId, Set<number>>
+  /** Sent bytes with a wrong hash for this piece version: never asked again for it. */
+  banned: Set<string>
+  /** Answered `none` (key → when): skipped for REFUSED_MS, until it announces the piece, or until a peer leaves. */
+  refused: Map<string, number>
+  queue: Upload[]; loading: boolean; bytesIn: number; mbps: number
+}
+
+const setIn = <K, V>(m: Map<K, Set<V>>, k: K): Set<V> => {
+  let s = m.get(k)
+  if (!s) m.set(k, (s = new Set()))
+  return s
+}
+const hexOf = (d: ArrayBuffer) => Array.from(new Uint8Array(d), (b) => b.toString(16).padStart(2, '0')).join('')
+
+/**
+ * The film as a small torrent between the seated peers (spec §6.4): pieces are requested by the scheduler, sent in
+ * chunks with data-channel backpressure, verified by SHA-256 against the host's index (§6.8) and cached. The host
+ * serves from `source` (its piece factory) and super-seeds; friends serve from the cache.
+ */
+export class Swarm {
+  private readonly peers = new Map<string, Peer>()
+  private readonly index = new Map<CinemaTrackId, CinemaPieceMeta[]>()
+  private readonly mine = new Map<CinemaTrackId, Set<number>>()
+  private readonly inflight = new Map<string, Flight>()
+  private readonly asm = new Assembler()
+  private readonly cbs = new Set<(track: CinemaTrackId, n: number) => void>()
+  private readonly timer: ReturnType<typeof setInterval>
+  private tracks: CinemaTrackId[] = []
+  private playheadS = 0
+  private queued = false
+  private closed = false
+  private fromHost = 0
+  private fromPeers = 0
+  private down = 0
+  private up = 0
+  private downMbps = 0
+  private upMbps = 0
+  private cap: number
+  /** Stores run one at a time so eviction and the byte count stay in step. */
+  private storing: Promise<unknown> = Promise.resolve()
+
+  constructor(private readonly opts: { sessionId: string; isHost: boolean; cache: PieceCache; source?: Source; hostId?: string; capBytes?: number }) {
+    this.cap = opts.capBytes ?? DEFAULT_CAP_BYTES
+    this.timer = setInterval(() => this.tick(), TICK_MS)
+  }
+
+  addPeer(id: string, ch: ChannelLike): void {
+    this.removePeer(id)
+    const p: Peer = { id, ch, has: new Map(), banned: new Set(), refused: new Map(), queue: [], loading: false, bytesIn: 0, mbps: 0 }
+    this.peers.set(id, p)
+    ch.bufferedAmountLowThreshold = LOW_WATER
+    ch.onbufferedamountlow = () => this.pump(p)
+    ch.onmessage = (e) => {
+      const m = e.data instanceof ArrayBuffer ? decode(e.data) : null // text or malformed: dropped
+      if (m && this.peers.get(id) === p) this.onMessage(p, m)
+    }
+    for (const [track, set] of this.mine) if (set.size) this.ctl(p, { t: 'have', track, bits: bitsOf(set) })
+    this.schedule()
+  }
+
+  removePeer(id: string): void {
+    const p = this.peers.get(id)
+    if (!p) return
+    this.peers.delete(id)
+    p.ch.onmessage = null
+    p.ch.onbufferedamountlow = null
+    p.ch.close()
+    this.asm.dropPeer(id)
+    for (const [k, f] of this.inflight) if (f.peer === id) this.inflight.delete(k)
+    for (const q of this.peers.values()) q.refused.clear() // whoever turned us down (super-seed) may serve now
+    this.schedule()
+  }
+
+  /** Index entries from `from` on (may overwrite: a changed entry is a new version and drops the old bytes, R4). */
+  setIndex(track: CinemaTrackId, from: number, items: CinemaPieceMeta[]): void {
+    let list = this.index.get(track)
+    if (!list) this.index.set(track, (list = []))
+    const host = this.opts.hostId === undefined ? undefined : this.peers.get(this.opts.hostId)
+    items.forEach((m, i) => {
+      const n = from + i
+      const old = list[n]
+      list[n] = m
+      if (old && old.some((x, j) => x !== m[j])) this.invalidate(track, n)
+      if (this.opts.isHost && !setIn(this.mine, track).has(n)) this.gotPiece(track, n)
+      // the index comes from the host's factory, so the host has what it lists (until it answers `none`)
+      if (host) {
+        setIn(host.has, track).add(n)
+        host.refused.delete(pieceKey(track, n))
+      }
+    })
+    this.schedule()
+  }
+
+  setPlayhead(s: number): void {
+    this.playheadS = s
+    this.schedule()
+  }
+
+  setTracks(t: CinemaTrackId[]): void {
+    this.tracks = [...t]
+    this.schedule()
+  }
+
+  async get(track: CinemaTrackId, n: number): Promise<ArrayBuffer | null> {
+    if (this.opts.isHost) return this.opts.source ? this.opts.source(track, n).catch(() => null) : null
+    return this.mine.get(track)?.has(n) ? this.opts.cache.get(pieceKey(track, n)).catch(() => null) : null
+  }
+
+  /** Init segment = piece 0 (R5). */
+  init(track: CinemaTrackId): Promise<ArrayBuffer | null> {
+    return this.get(track, 0)
+  }
+
+  /** Seconds held contiguously from the playhead on (pieces ordered by startS, R4). */
+  aheadS(track: CinemaTrackId): number {
+    const mine = this.mine.get(track)
+    const media = (this.index.get(track) ?? []).flatMap((m, n) => (m[1] > 0 ? [[m[0], m[1], n] as const] : [])).sort((a, b) => a[0] - b[0])
+    let end = this.playheadS
+    for (const [s, d, n] of media) {
+      if (s + d <= end) continue
+      if (s > end + 0.05 || !mine?.has(n)) break
+      end = s + d
+    }
+    return end - this.playheadS
+  }
+
+  stats(): { fromHostPct: number; fromPeersPct: number; downMbps: number; upMbps: number; peers: number } {
+    const total = this.fromHost + this.fromPeers
+    return {
+      fromHostPct: total ? (100 * this.fromHost) / total : 0,
+      fromPeersPct: total ? (100 * this.fromPeers) / total : 0,
+      downMbps: this.downMbps, upMbps: this.upMbps, peers: this.peers.size,
+    }
+  }
+
+  onPiece(cb: (track: CinemaTrackId, n: number) => void): () => void {
+    this.cbs.add(cb)
+    return () => this.cbs.delete(cb)
+  }
+
+  /** Detaches every peer and clears the session's cache (its OPFS dir). */
+  async close(): Promise<void> {
+    this.closed = true
+    clearInterval(this.timer)
+    for (const id of [...this.peers.keys()]) this.removePeer(id)
+    this.cbs.clear()
+    await this.opts.cache.clear()
+  }
+
+  // ---- wire ---------------------------------------------------------------------------------------------------------
+
+  private onMessage(p: Peer, m: WireMsg): void {
+    if (!this.index.has(m.track)) return // only this film's tracks: bounds what a peer can make us keep
+    if (m.t === 'have') p.has.set(m.track, setOf(m.bits))
+    else if (m.t === 'got') {
+      setIn(p.has, m.track).add(m.n)
+      p.refused.delete(pieceKey(m.track, m.n))
+    } else if (m.t === 'none') {
+      const k = pieceKey(m.track, m.n)
+      p.refused.set(k, Date.now())
+      if (this.inflight.get(k)?.peer === p.id) {
+        this.inflight.delete(k)
+        this.asm.drop(k)
+      }
+    } else if (m.t === 'req') return this.serve(p, m.track, m.n, m.v)
+    else if (m.t === 'cancel') {
+      p.queue = p.queue.filter((u) => u.track !== m.track || u.n !== m.n)
+      if (this.opts.isHost) p.has.get(m.track)?.delete(m.n)
+      return this.pump(p)
+    } else return this.onChunk(p, m)
+    this.schedule()
+  }
+
+  private serve(p: Peer, track: CinemaTrackId, n: number, v: number): void {
+    if (p.queue.some((u) => u.track === track && u.n === n)) return
+    const meta = this.index.get(track)?.[n]
+    const ok = meta && verOf(meta[3]) === v && this.mine.get(track)?.has(n) && p.queue.length < MAX_UPLOAD_QUEUE &&
+      (!this.opts.isHost || hostShouldSend(this.view(), p.id, track, n))
+    if (!ok) return this.ctl(p, { t: 'none', track, n })
+    if (this.opts.isHost) setIn(p.has, track).add(n) // super-seed: count it as theirs from now on
+    p.queue.push({ track, n, v, buf: null, off: 0 })
+    this.pump(p)
+  }
+
+  private pump(p: Peer): void {
+    while (p.queue.length && p.ch.bufferedAmount <= HIGH_WATER && this.peers.get(p.id) === p) {
+      const u = p.queue[0]!
+      if (!u.buf) return this.load(p, u)
+      const total = u.buf.byteLength
+      const data = new Uint8Array(u.buf, u.off, Math.min(CHUNK_BYTES, total - u.off))
+      this.ctl(p, { t: 'chunk', track: u.track, n: u.n, v: u.v, offset: u.off, total, data })
+      this.up += data.byteLength
+      u.off += data.byteLength
+      if (u.off >= total) p.queue.shift()
+    }
+  }
+
+  /** Reads the head upload's bytes (one piece in memory per peer); gone or changed → `none`. */
+  private load(p: Peer, u: Upload): void {
+    if (p.loading) return
+    p.loading = true
+    void this.get(u.track, u.n).then((buf) => {
+      p.loading = false
+      if (p.queue[0] === u) {
+        const meta = this.index.get(u.track)?.[u.n]
+        if (buf && meta && buf.byteLength === meta[2] && verOf(meta[3]) === u.v) u.buf = buf
+        else {
+          p.queue.shift()
+          this.ctl(p, { t: 'none', track: u.track, n: u.n })
+          if (!buf) this.mine.get(u.track)?.delete(u.n) // evicted (host: the factory dropped it)
+          if (this.opts.isHost) p.has.get(u.track)?.delete(u.n)
+        }
+      }
+      this.pump(p)
+    })
+  }
+
+  private onChunk(p: Peer, m: Extract<WireMsg, { t: 'chunk' }>): void {
+    const k = pieceKey(m.track, m.n)
+    const f = this.inflight.get(k)
+    const meta = this.index.get(m.track)?.[m.n]
+    if (!f || f.peer !== p.id || !meta || m.v !== verOf(meta[3])) return // unsolicited, or an old version still in the pipe
+    if (m.total !== meta[2]) return this.reject(p, f, 'size')
+    f.at = Date.now()
+    p.bytesIn += m.data.byteLength
+    this.down += m.data.byteLength
+    if (p.id === this.opts.hostId) this.fromHost += m.data.byteLength
+    else this.fromPeers += m.data.byteLength
+    const whole = this.asm.add(p.id, k, m.offset, m.total, m.data)
+    if (whole) void this.complete(p, f, meta, whole)
+  }
+
+  private async complete(p: Peer, f: Flight, meta: CinemaPieceMeta, whole: Uint8Array<ArrayBuffer>): Promise<void> {
+    const k = pieceKey(f.track, f.n)
+    const hex = hexOf(await crypto.subtle.digest('SHA-256', whole))
+    if (this.closed || this.inflight.get(k) !== f) return // cancelled or superseded meanwhile
+    if (hex !== meta[3]) return this.reject(p, f, 'hash')
+    const stored = this.storing.then(async () => {
+      await this.makeRoom(whole.byteLength)
+      await this.opts.cache.put(k, whole.buffer)
+    })
+    this.storing = stored.catch(() => {})
+    try {
+      await stored
+    } catch (e) {
+      console.warn(`[cinema] could not cache ${k}`, e)
+      this.cap = Math.min(this.cap, this.opts.cache.bytes()) // storage is smaller than planned: live within what fits
+      if (this.inflight.get(k) === f) this.inflight.delete(k)
+      return this.schedule()
+    }
+    if (this.closed) return
+    if (this.inflight.get(k) !== f) return void this.opts.cache.delete(k) // overwritten while writing
+    this.inflight.delete(k)
+    this.gotPiece(f.track, f.n)
+    this.schedule()
+  }
+
+  private gotPiece(track: CinemaTrackId, n: number): void {
+    setIn(this.mine, track).add(n)
+    for (const q of this.peers.values()) this.ctl(q, { t: 'got', track, n })
+    for (const cb of this.cbs) cb(track, n)
+  }
+
+  private reject(p: Peer, f: Flight, why: 'hash' | 'size'): void {
+    const k = pieceKey(f.track, f.n)
+    console.warn(`[cinema] ${why} mismatch for ${k} from ${p.id}: banned for this piece`)
+    p.banned.add(k)
+    this.inflight.delete(k)
+    this.asm.drop(k)
+    this.ctl(p, { t: 'cancel', track: f.track, n: f.n })
+    this.schedule()
+  }
+
+  /** A changed index entry: drop our copy, the download in progress and per-piece verdicts about the old version. */
+  private invalidate(track: CinemaTrackId, n: number): void {
+    const k = pieceKey(track, n)
+    if (this.mine.get(track)?.delete(n) && !this.opts.isHost) void this.opts.cache.delete(k)
+    const f = this.inflight.get(k)
+    if (f) {
+      this.inflight.delete(k)
+      this.asm.drop(k)
+      const p = this.peers.get(f.peer)
+      if (p) this.ctl(p, { t: 'cancel', track, n })
+    }
+    for (const p of this.peers.values()) {
+      p.banned.delete(k)
+      p.refused.delete(k)
+      // the host knows nobody has the new version yet; a friend's old `has` is fixed by a `none` and its next `got`
+      if (this.opts.isHost) p.has.get(track)?.delete(n)
+    }
+  }
+
+  /** Evicts until `bytes` fit: > 10 min behind the playhead first, then other pieces behind, then the farthest ahead. */
+  private async makeRoom(bytes: number): Promise<void> {
+    let over = this.opts.cache.bytes() + bytes - this.cap
+    if (over <= 0) return
+    const victims: [number, CinemaTrackId, number, number][] = []
+    for (const [track, set] of this.mine) {
+      for (const n of set) {
+        const m = this.index.get(track)?.[n]
+        if (!m || isCritical(m, this.playheadS)) continue
+        const behind = this.playheadS - m[0] - m[1]
+        victims.push([behind > BEHIND_S ? 2e9 + behind : behind >= 0 ? 1e9 + behind : m[0], track, n, m[2]])
+      }
+    }
+    victims.sort((a, b) => b[0] - a[0])
+    for (const [, track, n, size] of victims) {
+      if (over <= 0) break
+      this.mine.get(track)?.delete(n)
+      for (const q of this.peers.values()) this.ctl(q, { t: 'none', track, n })
+      await this.opts.cache.delete(pieceKey(track, n))
+      over -= size
+    }
+  }
+
+  private ctl(p: Peer, m: WireMsg): void {
+    try {
+      p.ch.send(encode(m))
+    } catch {
+      // channel closing: the mesh removes the peer
+    }
+  }
+
+  // ---- scheduling ---------------------------------------------------------------------------------------------------
+
+  private view(): SwarmView {
+    const load = new Map<string, number>()
+    for (const f of this.inflight.values()) load.set(f.peer, (load.get(f.peer) ?? 0) + 1)
+    return {
+      now: Date.now(), playheadS: this.playheadS, tracks: this.tracks, index: this.index, mine: this.mine,
+      peers: [...this.peers.values()].map((p) => ({
+        id: p.id, isHost: p.id === this.opts.hostId, has: p.has, inflight: load.get(p.id) ?? 0, mbps: p.mbps,
+        bannedFor: p.refused.size ? new Set([...p.banned, ...p.refused.keys()]) : p.banned,
+      })),
+      inflight: new Set(this.inflight.keys()),
+      budgetPieces: this.opts.isHost ? 0 : this.budget(),
+    }
+  }
+
+  /** Media pieces that still fit in the cache (counting what may be evicted from far behind), at the average size. */
+  private budget(): number {
+    let free = this.cap - this.opts.cache.bytes()
+    let sum = 0
+    let count = 0
+    for (const track of this.tracks) {
+      ;(this.index.get(track) ?? []).forEach((m, n) => {
+        if (m[1] === 0) return
+        sum += m[2]
+        count++
+        if (this.mine.get(track)?.has(n) && this.playheadS - m[0] - m[1] > BEHIND_S) free += m[2]
+        if (this.inflight.has(pieceKey(track, n))) free -= m[2]
+      })
+    }
+    return count ? Math.max(0, Math.floor(free / (sum / count))) : 0
+  }
+
+  private schedule(): void {
+    if (this.queued || this.closed || this.opts.isHost) return
+    this.queued = true
+    queueMicrotask(() => {
+      this.queued = false
+      if (this.closed) return
+      for (const r of nextRequests(this.view(), MAX_INFLIGHT - this.inflight.size)) {
+        const meta = this.index.get(r.track)?.[r.n]
+        const p = this.peers.get(r.peer)
+        if (!meta || !p) continue
+        this.inflight.set(pieceKey(r.track, r.n), { peer: r.peer, track: r.track, n: r.n, at: Date.now() })
+        this.ctl(p, { t: 'req', track: r.track, n: r.n, v: verOf(meta[3]) })
+      }
+    })
+  }
+
+  private tick(): void {
+    const now = Date.now()
+    const ewma = (prev: number, bytes: number) => prev / 2 + (bytes * 8) / 1e6 / 2 // bytes per TICK_MS (1 s) → Mbps
+    for (const p of this.peers.values()) {
+      p.mbps = ewma(p.mbps, p.bytesIn)
+      p.bytesIn = 0
+      for (const [k, at] of p.refused) if (now - at > REFUSED_MS) p.refused.delete(k)
+    }
+    this.downMbps = ewma(this.downMbps, this.down)
+    this.upMbps = ewma(this.upMbps, this.up)
+    this.down = this.up = 0
+    for (const [k, f] of this.inflight) {
+      if (now - f.at < REQ_TIMEOUT_MS) continue
+      this.inflight.delete(k)
+      this.asm.drop(k)
+      const p = this.peers.get(f.peer)
+      if (p) {
+        p.refused.set(k, now)
+        this.ctl(p, { t: 'cancel', track: f.track, n: f.n })
+      }
+    }
+    this.schedule()
+  }
+}
