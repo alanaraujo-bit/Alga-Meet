@@ -118,6 +118,8 @@ interface Engine {
   timer: ReturnType<typeof setInterval>
   stalled: boolean
   unsupported: boolean
+  /** The call's E2EE failed while I sat: no mesh, the seat stays preparing. */
+  e2eeFailed: boolean
   checked: boolean
   /** Audio track the player could not switch to yet (its init is still on the way). */
   pendingAudio: number | null
@@ -175,7 +177,7 @@ function createEngine(v: CinemaSessionView): void {
   const isHost = v.hostId === meId()
   const e: Engine = {
     sessionId: v.sessionId, hostId: v.hostId, isHost, film: v.film, swarm: null, mesh: null, player: null, earlyPieces: [], earlySignals: [],
-    offs: [], timer: setInterval(() => tick(e), 500), stalled: false, unsupported: false, checked: false, pendingAudio: null, sentStatus: null,
+    offs: [], timer: setInterval(() => tick(e), 500), stalled: false, unsupported: false, e2eeFailed: false, checked: false, pendingAudio: null, sentStatus: null,
     sentAt: 0, closed: false,
   }
   eng = e
@@ -212,22 +214,24 @@ async function openSwarm(e: Engine, v: CinemaSessionView): Promise<void> {
 
 /**
  * The mesh is tagged with the call's MLS epoch when the call is E2EE. While E2EE is still being set up its state is
- * unknown: wait (signals stay buffered) for `active` (tagged) or `off` (untagged); `failed` → no mesh at all (an
- * untagged mesh in an E2EE call would let the server sit in the middle).
+ * unknown: wait (signals stay buffered) for `active` (tagged) or `off` (untagged); `failed`, at any time while seated →
+ * no mesh from then on (an untagged mesh in an E2EE call would let the server sit in the middle), a notice, and the
+ * seat stays preparing.
  */
 function meshWhenE2eeSettles(e: Engine, v: CinemaSessionView): void {
-  const settle = (): boolean => {
-    const st = useMedia.getState().e2ee.state
-    if (st === 'establishing') return false
-    if (st !== 'failed') createMesh(e, v, st === 'active')
-    return true
+  const settle = (st: string): void => {
+    if (st === 'failed') {
+      if (e.e2eeFailed) return
+      e.e2eeFailed = true
+      useCinema.setState((s) => ({ notices: s.notices.includes(t.e2eeFailed) ? s.notices : [...s.notices, t.e2eeFailed] }))
+      return pushStatus(e)
+    }
+    if (st !== 'establishing' && !e.e2eeFailed) createMesh(e, v, st === 'active')
   }
-  if (settle()) return
-  const off = useMedia.subscribe((s, prev) => {
-    if (s.e2ee.state === prev.e2ee.state || e.closed) return
-    if (settle()) off()
-  })
-  e.offs.push(off)
+  settle(useMedia.getState().e2ee.state)
+  e.offs.push(useMedia.subscribe((s, prev) => {
+    if (s.e2ee.state !== prev.e2ee.state && !e.closed) settle(s.e2ee.state)
+  }))
 }
 
 function createMesh(e: Engine, v: CinemaSessionView, e2ee: boolean): void {
@@ -327,6 +331,7 @@ function aheadS(e: Engine): number {
 
 function statusNow(e: Engine): Status {
   if (e.unsupported) return 'unsupported'
+  if (e.e2eeFailed) return 'preparing'
   if (e.stalled) return 'stalled'
   const pos = playheadS(e)
   const need = Math.max(0, Math.min(CINEMA_SEEK_READY_S, e.film.durationS - pos - 0.5))
@@ -601,11 +606,14 @@ function onError(d: DispatchOf<'CINEMA_ERROR'>): void {
   useCinema.setState({ error: t.errors[d.reason] || t.errors.invalid, busy: false })
 }
 
-/** The session is gone for me (not found, call left, host away for good): engine, factory (if it was this session's) and state. */
-function dropSession(): void {
+/**
+ * The session is gone for me (not found, call left, host away for good): engine, factory (if it was this session's) and
+ * state. `keepFile`: only the server's silence, not its answer — the host keeps its file for when the state comes.
+ */
+function dropSession(keepFile = false): void {
   clearTimeout(helloTimer)
   closeEngine()
-  if (hostFile?.sessionId) hostEnd() // an open still waiting for its session (sessionId null) stays
+  if (hostFile?.sessionId && !keepFile) hostEnd() // an open still waiting for its session (sessionId null) stays
   stopPing()
   useCinema.setState({ session: null, mine: freshMine(), busy: false })
 }
@@ -618,8 +626,9 @@ function hello(newSocket: boolean): void {
   if (newSocket && hostFile?.sessionId) hostFile.resync = true
   if (!send({ op: 'cinema_hello' })) return
   clearTimeout(helloTimer)
+  // a slow server must never cost the host its film: only not_found, ended or leaving the call close the file
   helloTimer = setTimeout(() => {
-    if (useCinema.getState().session) dropSession()
+    if (useCinema.getState().session) dropSession(true)
   }, HELLO_TIMEOUT_MS)
 }
 

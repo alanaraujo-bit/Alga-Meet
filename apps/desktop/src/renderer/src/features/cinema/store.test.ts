@@ -315,6 +315,24 @@ describe('session gone while the gateway was down', () => {
     expect(engine.swarms[0].close).toHaveBeenCalled()
   })
 
+  it('a slow server (no state 5 s after hello) never costs the host its film: the file stays, and serves again when the state comes', async () => {
+    await hosting()
+    dispatch({ t: 'READY', d: {} })
+    await vi.advanceTimersByTimeAsync(6000)
+    expect(useCinema.getState().session).toBeNull()
+    expect(engine.swarms[0].close).toHaveBeenCalled()
+    expect(bridge.close).not.toHaveBeenCalled()
+    expect(useCinema.getState().host.fileId).toBe('f1')
+    dispatch({ t: 'CINEMA_STATE', d: hostView({ playback: { ...view().playback, seq: 2 } }) })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(engine.swarms).toHaveLength(2)
+    expect((engine.swarms[1].opts as { source?: unknown }).source).toBeTypeOf('function')
+    expect(bridge.start).toHaveBeenCalledTimes(1) // the same factory, not a new one
+    // the session really ended meanwhile: now the file goes
+    dispatch({ t: 'CINEMA_STATE', d: { channelId: CH, sessionId: SID, ended: true, reason: 'host_ended', summary: { watchedS: 0, seats: [], reactions: 0, peak: null } } })
+    expect(bridge.close).toHaveBeenCalledWith('f1')
+  })
+
   it('an open still on its way survives a not_found hello', async () => {
     bridge.probe.mockResolvedValueOnce({ film, warnings: [], next: [] })
     await openFromFile()
@@ -389,6 +407,46 @@ describe('E2EE gating of the mesh', () => {
     useMedia.setState({ e2ee: { state: 'failed', epoch: null } } as never)
     useMedia.setState({ e2ee: { state: 'off', epoch: null } } as never)
     expect(engine.meshes).toHaveLength(0)
+  })
+
+  it('failed while seated: the notice in pt-BR, never a mesh, and the seat stays preparing even with pieces ahead', async () => {
+    vi.useFakeTimers()
+    try {
+      useMedia.setState({ e2ee: { state: 'establishing', epoch: null } } as never)
+      dispatch({ t: 'CINEMA_STATE', d: view() })
+      await vi.advanceTimersByTimeAsync(0)
+      engine.swarms[0].aheadS = () => 60 // a host serving from its own file would be ready
+      useMedia.setState({ e2ee: { state: 'failed', epoch: null } } as never)
+      useMedia.setState({ e2ee: { state: 'off', epoch: null } } as never)
+      sent.length = 0
+      await vi.advanceTimersByTimeAsync(2500)
+      expect(useCinema.getState().notices).toEqual(['Não foi possível proteger a conexão desta sessão'])
+      expect(engine.meshes).toHaveLength(0)
+      expect(useCinema.getState().mine.status).toBe('preparing')
+      const statuses = sent.filter((f) => f.op === 'cinema_status').map((f) => f.status)
+      expect(statuses.length).toBeGreaterThan(0)
+      expect(new Set(statuses)).toEqual(new Set(['preparing']))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('failed after a tagged mesh: the notice, no second mesh, preparing', async () => {
+    vi.useFakeTimers()
+    try {
+      useMedia.setState({ e2ee: { state: 'active', epoch: 3 } } as never)
+      dispatch({ t: 'CINEMA_STATE', d: view() })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(engine.meshes).toHaveLength(1)
+      engine.swarms[0].aheadS = () => 60
+      useMedia.setState({ e2ee: { state: 'failed', epoch: null } } as never)
+      await vi.advanceTimersByTimeAsync(2500)
+      expect(useCinema.getState().notices).toContain(t.e2eeFailed)
+      expect(engine.meshes).toHaveLength(1)
+      expect(useCinema.getState().mine.status).toBe('preparing')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('off from the start: an untagged mesh', async () => {

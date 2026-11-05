@@ -76,6 +76,7 @@ export const t = {
   playerFailed: 'Seu PC não conseguiu tocar este vídeo.',
   unsupported: { video_codec: 'Seu PC não decodifica o vídeo deste filme.', audio_codec: 'Seu PC não decodifica esta faixa de áudio.' } as Record<string, string>,
   ipNotice: 'Na sala de cinema seu PC conecta direto com quem está assistindo.',
+  e2eeFailed: 'Não foi possível proteger a conexão desta sessão',
   ended: { host_ended: 'Sessão encerrada', host_left: 'Quem projetava saiu', moderator: 'Um moderador encerrou a sessão', call_empty: 'A chamada acabou', channel_gone: 'O canal não existe mais' } satisfies Record<CinemaEndReason, string>,
   endedSummary: (watched: string, reactions: number) => `${watched} assistidos juntos · ${reactions} ${reactions === 1 ? 'reação' : 'reações'}`,
   stage: {
