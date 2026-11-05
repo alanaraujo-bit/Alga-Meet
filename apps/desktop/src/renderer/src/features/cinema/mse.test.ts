@@ -1,5 +1,5 @@
 import type { CinemaPieceMeta, CinemaTrackId } from '@alga/shared'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { aheadOf, feedLane, gapJumpTarget, laneOf, swapLane, type PieceSource, type TimeRange } from './mse'
 
 const piece = (startS: number, durS: number, sha = 'a'.repeat(64)): CinemaPieceMeta => [startS, durS, 1_000, sha]
@@ -124,6 +124,50 @@ describe('feedLane', () => {
     })
     await feedLane(lane, swarm, () => playhead, () => true)
     expect(fake.appended).toEqual([0, 1])
+  })
+
+  it('keeps the round going while the playhead advances with normal playback', async () => {
+    const pieces = [INIT, piece(0, 4), piece(4, 4), piece(8, 4)]
+    const { fake, lane } = setup(pieces)
+    let playhead = 0
+    let clock = 0
+    const now = vi.spyOn(performance, 'now').mockImplementation(() => clock)
+    try {
+      // each read takes 1.5 s while the video plays at 1×: the playhead ends 4.5 s on, never a stale plan
+      const swarm = swarmOf({ v: pieces }, () => true, () => {
+        clock += 1500
+        playhead += 1.5
+      })
+      await feedLane(lane, swarm, () => playhead, () => true)
+    } finally {
+      now.mockRestore()
+    }
+    expect(fake.appended).toEqual([0, 1, 2, 3])
+  })
+
+  it('abandons a stale plan on a backward seek too', async () => {
+    const pieces = [INIT, piece(0, 4), piece(4, 4), piece(8, 4)]
+    const { fake, lane } = setup(pieces)
+    let playhead = 6
+    const swarm = swarmOf({ v: pieces }, () => true, (_t, n) => {
+      if (n === 3) playhead = 1
+    })
+    await feedLane(lane, swarm, () => playhead, () => true)
+    expect(fake.appended).toEqual([0, 2])
+  })
+
+  it('a swarm read that throws ends the round without breaking the lane', async () => {
+    const pieces = [INIT, piece(0, 4), piece(4, 4)]
+    const { fake, lane } = setup(pieces)
+    let fail = true
+    const base = swarmOf({ v: pieces })
+    const swarm: PieceSource = { pieces: base.pieces, get: async (t, n) => (n === 2 && fail ? Promise.reject(new Error('cache read')) : base.get(t, n)) }
+    await expect(feedLane(lane, swarm, () => 0, () => true)).resolves.toBeUndefined()
+    expect(lane.broken).toBe(false)
+    expect(fake.appended).toEqual([0, 1])
+    fail = false
+    await feedLane(lane, swarm, () => 0, () => true)
+    expect(fake.appended).toEqual([0, 1, 2])
   })
 
   it('cuts what is more than 90 s ahead after a backward seek', async () => {

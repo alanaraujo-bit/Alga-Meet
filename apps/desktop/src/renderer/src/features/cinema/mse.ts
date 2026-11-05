@@ -12,8 +12,10 @@ const KEEP_AHEAD_S = 90
  */
 export const EDGE_S = 0.25
 const PROBE_TIMEOUT_MS = 5_000
-/** A feeding round whose playhead moved more than this (a seek) is abandoned: its plan is stale. */
+/** A feeding round whose playhead is this far off where playback would have taken it (a seek) is abandoned: its plan is stale. */
 const STALE_PLAN_S = 1
+/** Fastest rate the sync loop plays at (1 + 5 %, spec §6.6), with margin. */
+const MAX_RATE = 1.1
 
 export interface TimeRange { startS: number; endS: number }
 export type PieceSource = Pick<Swarm, 'get' | 'pieces'>
@@ -188,7 +190,8 @@ export function laneOp(l: Lane, f: (sb: SourceBuffer) => void): Promise<void> {
 /**
  * One feeding round: the init (again if its version changed), then the plan around `playheadS()`: cut far behind and
  * far ahead, append what the swarm holds in time order. Stops when `alive()` fails, the lane swaps track or the playhead
- * jumps (a seek: the next round plans again). A failed update marks the lane broken and rejects.
+ * jumps (a seek: the next round plans again). Only a failed SourceBuffer update marks the lane broken (and rejects); a
+ * swarm read that throws just ends the round (the next one retries).
  */
 export async function feedLane(l: Lane, swarm: PieceSource, playheadS: () => number, alive: () => boolean): Promise<void> {
   const track = l.track
@@ -196,32 +199,41 @@ export async function feedLane(l: Lane, swarm: PieceSource, playheadS: () => num
   const pieces = swarm.pieces(track)
   const init = pieces[0]
   if (!live() || !init) return
-  try {
-    if (l.init !== init[3]) {
-      const buf = await swarm.get(track, 0)
-      if (!buf || !live()) return
-      await laneOp(l, (sb) => sb.appendBuffer(buf))
-      if (!live()) return
-      l.init = init[3]
+  const op = async (f: (sb: SourceBuffer) => void): Promise<boolean> => {
+    try {
+      await laneOp(l, f)
+      return true
+    } catch (e) {
+      if ((e as Error).name === 'QuotaExceededError') return false // full: Chromium evicts behind the playhead, retry next tick
+      l.broken = true
+      throw e
     }
-    const at = playheadS()
-    const plan = bufferPlan(rangesOf(l.sb.buffered), at, pieces)
-    const cut = plan.removeBeforeS
-    const keep = plan.removeAfterS
-    if (cut !== null) await laneOp(l, (sb) => sb.remove(0, cut))
-    if (keep !== null) await laneOp(l, (sb) => sb.remove(keep, Infinity))
-    for (const n of plan.append) {
-      const buf = await swarm.get(track, n)
-      const m = pieces[n]
-      if (!live() || Math.abs(playheadS() - at) > STALE_PLAN_S) return
-      // not held yet, or an overlapping (regenerated, R4) piece already filled the range
-      if (!buf || !m || covers(rangesOf(l.sb.buffered), m[0], m[0] + m[1])) continue
-      await laneOp(l, (sb) => sb.appendBuffer(buf))
-    }
-  } catch (e) {
-    if ((e as Error).name === 'QuotaExceededError') return // full: Chromium evicts behind the playhead, retry next tick
-    l.broken = true
-    throw e
+  }
+  const read = (n: number): Promise<ArrayBuffer | null> => swarm.get(track, n).catch(() => null)
+  if (l.init !== init[3]) {
+    const buf = await read(0)
+    if (!buf || !live() || !(await op((sb) => sb.appendBuffer(buf))) || !live()) return
+    l.init = init[3]
+  }
+  const at = playheadS()
+  const t0 = performance.now()
+  // Stale = a seek: the playhead left the span normal playback (paused, or up to MAX_RATE) could have reached.
+  const stale = () => {
+    const p = playheadS()
+    return p < at - STALE_PLAN_S || p > at + ((performance.now() - t0) / 1000) * MAX_RATE + STALE_PLAN_S
+  }
+  const plan = bufferPlan(rangesOf(l.sb.buffered), at, pieces)
+  const cut = plan.removeBeforeS
+  const keep = plan.removeAfterS
+  if (cut !== null && !(await op((sb) => sb.remove(0, cut)))) return
+  if (keep !== null && !(await op((sb) => sb.remove(keep, Infinity)))) return
+  for (const n of plan.append) {
+    const buf = await read(n)
+    const m = pieces[n]
+    if (!live() || stale()) return
+    // not held yet, or an overlapping (regenerated, R4) piece already filled the range
+    if (!buf || !m || covers(rangesOf(l.sb.buffered), m[0], m[0] + m[1])) continue
+    if (!(await op((sb) => sb.appendBuffer(buf)))) return
   }
 }
 
