@@ -5,7 +5,7 @@ import { ACTIVITY_ICON_MAX, ActivitySchema, sameActivity } from '@alga/shared'
 import { app, nativeImage, powerMonitor } from 'electron'
 import type { DetectedApp, LocalActivity } from '../shared/bridge'
 import { IPC } from '../shared/ipc'
-import { classify, exeNameOf, initialState, step, type Classified, type Sample, type State } from './activity-logic'
+import { classify, defaultShown, exeNameOf, initialState, step, type Classified, type Sample, type State } from './activity-logic'
 import { bool, emit, handle, str } from './ipc'
 import { log } from './log'
 import { ACTIVITY_APPS_MAX, getSettings, updateSettings, type SavedActivityApp } from './settings'
@@ -79,7 +79,7 @@ function steamLookup(path: string): { name: string; appId: number } | undefined 
           const appId = Number(g('appid'))
           const name = g('name')
           const installdir = g('installdir')
-          if (appId > 0 && name && installdir) list.push({ dir: installdir, name, appId })
+          if (appId > 0 && appId <= 2_147_483_647 && name && installdir) list.push({ dir: installdir, name, appId })
         }
     } catch {}
     steamDirs.set(root, { at: Date.now(), list })
@@ -118,7 +118,7 @@ function metaOf(path: string): { manifestName?: string; steamAppId?: number } {
 // ---- state ----
 
 const savedApps = (): SavedActivityApp[] => getSettings().activityApps
-const shownFor = (key: string, kind: Classified['kind']): boolean => savedApps().find((a) => a.key === key)?.shown ?? kind !== null
+const shownFor = (key: string, c: Classified): boolean => savedApps().find((a) => a.key === key)?.shown ?? defaultShown(c)
 
 function resolve(f: Foreground): { key: string; c: Classified | 'ignore'; steamAppId?: number } {
   const key = exeNameOf(f.path)
@@ -132,7 +132,7 @@ function noteSeen(key: string, c: Classified, now: number): void {
   const apps = savedApps()
   const old = apps.find((a) => a.key === key)
   if (old && old.name === c.name && old.kind === c.kind && now - old.lastSeen < PERSIST_MS) return
-  const entry: SavedActivityApp = { key, name: c.name, kind: c.kind, lastSeen: now, shown: old?.shown ?? c.kind !== null }
+  const entry: SavedActivityApp = { key, name: c.name, kind: c.kind, lastSeen: now, shown: old?.shown ?? defaultShown(c) }
   updateSettings({ activityApps: [entry, ...apps.filter((a) => a.key !== key)].slice(0, ACTIVITY_APPS_MAX) })
 }
 
@@ -153,7 +153,8 @@ function view(): LocalActivity | null {
   if (!getSettings().activityShare) return null
   if (f) return f.activity
   const cur = st.current
-  if (!cur || !shownFor(cur.key, cur.kind === 'app' ? null : cur.kind)) return null
+  // Every app reaches the saved list before it can become current: no entry = not shown.
+  if (!cur || !savedApps().find((a) => a.key === cur.key)?.shown) return null
   const icon = icons.get(pathOfKey.get(cur.key) ?? '')
   return { kind: cur.kind, name: cur.name, startedAt: Math.round(cur.startedAt), key: cur.key, ...(icon && { icon }), ...(cur.steamAppId && { steamAppId: cur.steamAppId }) }
 }
@@ -182,7 +183,7 @@ function tickOnce(): void {
     else {
       pathOfKey.set(r.key, fg.path)
       noteSeen(r.key, r.c, now)
-      sample = { pid: fg.pid, key: r.key, name: r.c.name, kind: r.c.kind, ignored: false, shown: shownFor(r.key, r.c.kind), procStart: fg.start, steamAppId: r.steamAppId }
+      sample = { pid: fg.pid, key: r.key, name: r.c.name, kind: r.c.kind, ignored: false, shown: shownFor(r.key, r.c), procStart: fg.start, steamAppId: r.steamAppId }
       askIcon(fg.path)
     }
   }
@@ -213,16 +214,30 @@ export function storeLogo(exePath: string): string {
       .sort((a, b) => score(b) - score(a))[0]
     const img = best ? nativeImage.createFromPath(join(dir, best)) : null
     if (!img || img.isEmpty()) return ''
-    const url = img.resize({ width: 64, height: 64, quality: 'best' }).toDataURL()
-    return url.length <= ACTIVITY_ICON_MAX ? url : ''
+    return compactIcon(img.resize({ width: 64, height: 64, quality: 'best' }).toDataURL())
   } catch {
     return ''
   }
 }
 
+/**
+ * Icons ride every presence update to every friend: past ICON_SOFT_MAX a 64 px icon is redrawn at 48 px; past the
+ * wire limit it is dropped (the kind's glyph shows instead).
+ */
+const ICON_SOFT_MAX = 6000
+function compactIcon(url: string): string {
+  if (!url || url.length <= ICON_SOFT_MAX) return url
+  const small = nativeImage.createFromDataURL(url).resize({ width: 48, height: 48, quality: 'best' }).toDataURL()
+  if (small.length <= ACTIVITY_ICON_MAX) return small
+  log.info('activity icon too large, dropped', small.length)
+  return ''
+}
+
 function askIcon(path: string): void {
   if (asked.has(path) || !helper) return
   asked.add(path)
+  // Local executables only: no UNC (a dead share would stall the helper), nothing but an .exe.
+  if (!/^[a-z]:\\[^\t\r\n]+\.exe$/i.test(path)) return void icons.set(path, '')
   const logo = storeLogo(path)
   if (logo) {
     icons.set(path, logo)
@@ -246,9 +261,8 @@ function onLine(line: string): void {
     fg = { pid: j.pid, path: j.path, start: Number(j.start) || 0, product: String(j.product ?? ''), desc: String(j.desc ?? ''), fs: j.fs === true }
     tick() // react to focus changes now, not at the next second
   } else if (j.t === 'icon' && typeof j.path === 'string' && typeof j.png === 'string') {
-    const url = j.png ? `data:image/png;base64,${j.png}` : ''
-    icons.set(j.path, url.length <= ACTIVITY_ICON_MAX ? url : '')
-    if (url.length > ACTIVITY_ICON_MAX) log.info('activity icon too large, dropped', j.path, url.length)
+    const url = compactIcon(j.png ? `data:image/png;base64,${j.png}` : '')
+    icons.set(j.path, url)
     publish()
   }
 }

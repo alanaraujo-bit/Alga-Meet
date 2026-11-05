@@ -145,3 +145,49 @@ describe('full profile extras', () => {
     gwA.close()
   })
 })
+
+describe('blocks', () => {
+  it('a block hides activity, custom status and profile extras even inside a shared space', async () => {
+    const a = await register(s.app)
+    const b = await register(s.app)
+    const space = (await api(s.app, 'POST', '/spaces', { token: a.token, body: { name: 'Juntos' } })).body
+    const invite = (await api(s.app, 'POST', `/spaces/${space.id}/invites`, { token: a.token, body: {} })).body
+    expect((await api(s.app, 'POST', `/invites/${invite.code}`, { token: b.token })).status).toBe(200)
+    const gwA = await connect(s.port, a.token)
+    const gwB = await connect(s.port, b.token)
+    gwA.send({ op: 'activity', activity: { kind: 'game', name: 'Antes', startedAt: Date.now() - 120_000 } })
+    await gwB.waitFor('PRESENCE_UPDATE', (p) => p.userId === a.user.id && p.activity?.name === 'Antes')
+
+    expect((await api(s.app, 'PUT', `/relationships/${b.user.id}`, { token: a.token, body: { type: 'blocked' } })).status).toBe(200)
+    gwB.events.length = 0
+    gwA.send({ op: 'activity', activity: { kind: 'game', name: 'Depois', startedAt: Date.now() } })
+    gwA.send({ op: 'custom_status', status: { text: 'segredo' } })
+    await gwB.expectNone('PRESENCE_UPDATE', (p) => p.userId === a.user.id, 1500)
+    const again = await connect(s.port, b.token)
+    expect((await again.waitFor('READY')).presences.find((p) => p.userId === a.user.id)).toBeUndefined()
+    expect((await api(s.app, 'GET', `/users/${a.user.id}/profile`, { token: b.token })).body).toMatchObject({ mutualFriends: [], recent: [] })
+    for (const g of [gwA, gwB, again]) g.close()
+  })
+
+  it('another device sending null does not end the activity; bad PNG headers and invisible text are refused', async () => {
+    const a = await register(s.app)
+    const b = await register(s.app)
+    await befriend(s.app, a, b)
+    const pc = await connect(s.port, a.token)
+    const laptop = await connect(s.port, a.token)
+    const gwB = await connect(s.port, b.token)
+    pc.send({ op: 'activity', activity: { kind: 'game', name: 'No PC', startedAt: Date.now() } })
+    await gwB.waitFor('PRESENCE_UPDATE', (p) => p.userId === a.user.id && p.activity?.name === 'No PC')
+    gwB.events.length = 0
+    laptop.send({ op: 'activity', activity: null })
+    await gwB.expectNone('PRESENCE_UPDATE', (p) => p.userId === a.user.id && !p.activity, 1200)
+
+    // "PNG" of a 1×1 GIF's bytes: right prefix, wrong file.
+    laptop.send({ op: 'activity', activity: { kind: 'game', name: 'x', startedAt: Date.now(), icon: 'data:image/png;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==' } })
+    expect((await laptop.closed).code).toBe(GatewayClose.INVALID_PAYLOAD)
+    const p2 = await connect(s.port, a.token)
+    p2.send({ op: 'custom_status', status: { text: '\u200B\u200B' } })
+    expect((await p2.closed).code).toBe(GatewayClose.INVALID_PAYLOAD)
+    for (const g of [pc, gwB]) g.close()
+  })
+})

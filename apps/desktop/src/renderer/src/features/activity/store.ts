@@ -1,4 +1,4 @@
-import type { Activity } from '@alga/shared'
+import { ActivitySchema, type Activity } from '@alga/shared'
 import { useMemo, useSyncExternalStore } from 'react'
 import { create } from 'zustand'
 import { useData } from '@/store/data'
@@ -26,7 +26,9 @@ export function sharedActivity(st: MyActivity = useMyActivity.getState(), now = 
 let lastSent: string | null = null
 function send(force = false): void {
   // Invisible: nothing leaves this PC (the server would hide it anyway; this way it never even knows).
-  const a = useData.getState().me?.statusPreference === 'invisible' ? null : sharedActivity()
+  const raw = useData.getState().me?.statusPreference === 'invisible' ? null : sharedActivity()
+  // An invalid frame would close the socket, and the next READY would resend it: check before sending.
+  const a = raw && ActivitySchema.safeParse(raw).success ? raw : null
   const json = JSON.stringify(a)
   if (!force && json === lastSent) return
   if (useSession.getState().send({ op: 'activity', activity: a })) lastSent = json

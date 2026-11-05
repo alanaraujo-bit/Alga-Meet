@@ -1,4 +1,4 @@
-import { liveStatus, type CustomStatus } from '@alga/shared'
+import { CustomStatusSchema, liveStatus, type CustomStatus } from '@alga/shared'
 import { create } from 'zustand'
 import { useData } from '@/store/data'
 import { onDispatch, useSession } from '@/store/session'
@@ -17,7 +17,8 @@ function schedule(s: CustomStatus | null): void {
 }
 
 function send(): void {
-  useSession.getState().send({ op: 'custom_status', status: liveStatus(useOwnStatus.getState().status) ?? null })
+  const s = liveStatus(useOwnStatus.getState().status) ?? null
+  useSession.getState().send({ op: 'custom_status', status: s && CustomStatusSchema.safeParse(s).success ? s : null })
 }
 
 export function setOwnStatus(s: CustomStatus | null): void {
@@ -38,7 +39,8 @@ export function startStatusSync(): () => void {
     if (d.t !== 'READY') return
     let saved: CustomStatus | null = null
     try {
-      saved = JSON.parse(localStorage.getItem(keyFor(d.d.user.id)) ?? 'null') as CustomStatus | null
+      const parsed = CustomStatusSchema.safeParse(JSON.parse(localStorage.getItem(keyFor(d.d.user.id)) ?? 'null'))
+      saved = parsed.success ? parsed.data : null
     } catch {
       saved = null
     }

@@ -6,7 +6,12 @@ export interface Classified {
   /** null = not recognized (browsers, messengers, anything unknown): listed, hidden until the person turns it on. */
   kind: ActivityKind | null
   name: string
+  /** A guess (an unknown app in fullscreen may be a game, or a maximized remote desktop): listed, but opt-in. */
+  guessed?: boolean
 }
+
+/** Shared unless the person says otherwise: recognized apps yes; unknown apps and guesses no. */
+export const defaultShown = (c: Classified): boolean => c.kind !== null && !c.guessed
 
 export interface ClassifyInput {
   path: string
@@ -240,8 +245,9 @@ export function classify(i: ClassifyInput): Classified | 'ignore' {
   const unknownKnown = UNKNOWN_KNOWN[exe]
   if (unknownKnown) return { kind: null, name: unknownKnown }
   const dir = folderOf(i.path)
-  const name = usable(i.manifestName) || usable(i.product) || usable(i.desc) || usable(dir) || clean(stem(exe)).slice(0, 64)
-  return { kind: dir || i.fs ? 'game' : null, name }
+  const name = usable(i.manifestName) || usable(i.product) || usable(i.desc) || usable(dir) || clean(stem(exe)).slice(0, 64) || 'App'
+  if (dir) return { kind: 'game', name }
+  return i.fs ? { kind: 'game', name, guessed: true } : { kind: null, name }
 }
 
 // ---- state machine ----

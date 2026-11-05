@@ -37,7 +37,7 @@ describe('classify', () => {
     expect(cls('D:\\SteamLibrary\\steamapps\\common\\Hades II\\Ship\\Hades2.exe')).toEqual({ kind: 'game', name: 'Hades II' })
     expect(cls('D:\\SteamLibrary\\steamapps\\common\\Hades II\\Hades2.exe', { product: 'Hades II: Early' })).toEqual({ kind: 'game', name: 'Hades II: Early' })
     expect(cls('C:\\XboxGames\\Forza\\Content\\gamelaunchhelper.exe')).toMatchObject({ kind: 'game', name: 'Forza' })
-    expect(cls('C:\\Some\\Thing\\mygame.exe', { fs: true })).toEqual({ kind: 'game', name: 'mygame' })
+    expect(cls('C:\\Some\\Thing\\mygame.exe', { fs: true })).toEqual({ kind: 'game', name: 'mygame', guessed: true })
     expect(cls('C:\\Some\\Thing\\mytool.exe', { product: 'My Tool' })).toEqual({ kind: null, name: 'My Tool' })
   })
   it('name precedence: table > manifest > product > desc > folder > exe; generic product names are skipped', () => {

@@ -82,7 +82,10 @@ export async function buildReady(ctx: Ctx, user: UserRow): Promise<ReadyPayload>
 export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
   const { db, hub, voice, config } = ctx
   const stateOps = new Throttle(STATE_OP_INTERVAL_MS, (err) => ctx.log.error({ err: safeErr(err) }, 'gateway state op failed'))
-  const prune = setInterval(() => stateOps.prune(), 60_000)
+  const prune = setInterval(() => {
+    stateOps.prune()
+    hub.pruneRecent()
+  }, 60_000)
   prune.unref()
   app.addHook('onClose', async () => {
     clearInterval(prune)
