@@ -69,7 +69,7 @@ function phaseFfmpeg() {
     // Video remux: copy into HLS fMP4, 4 s segments.
     rmSync(tmp, { recursive: true, force: true })
     mkdirSync(tmp, { recursive: true })
-    const hls = (extra, name) => [...extra, '-f', 'hls', '-hls_time', '4', '-hls_segment_type', 'fmp4', '-hls_playlist_type', 'vod', '-hls_segment_filename', join(tmp, `${name}%d.m4s`), join(tmp, `${name}.m3u8`)]
+    const hls = (extra, name) => [...extra, '-f', 'hls', '-hls_time', '4', '-hls_segment_type', 'fmp4', '-hls_playlist_type', 'vod', '-hls_fmp4_init_filename', join(tmp, `${name}-init.mp4`), '-hls_segment_filename', join(tmp, `${name}%d.m4s`), join(tmp, `${name}.m3u8`)]
     const vcodec = probe(file).streams.find((s) => s.codec_type === 'video')?.codec_name
     const tag = vcodec === 'hevc' ? ['-tag:v', 'hvc1'] : []
     const v = timed('ffmpeg', ['-y', '-v', 'error', '-i', file, '-map', '0:v:0', '-c:v', 'copy', ...tag, '-an', '-sn', ...hls([], 'v')])
