@@ -3,7 +3,10 @@
  * Implemented in src/preload (exposed as `window.alga`), consumed by src/renderer.
  * Everything crossing this boundary must be structured-cloneable.
  */
-import type { Activity, ActivityKind, E2eeClientFrame } from '@alga/shared'
+import type { Activity, ActivityKind, CinemaFilm, CinemaSubtitleTrack, CinemaTrackId, E2eeClientFrame } from '@alga/shared'
+import type { FfmpegCheck } from '../main/cinema/ffmpeg'
+import type { PieceEvent } from '../main/cinema/pieces'
+import type { CinemaProbeError, CinemaWarning } from '../main/cinema/probe'
 
 export type Unsubscribe = () => void
 
@@ -243,6 +246,38 @@ export interface AlgaBridge {
     onEpoch(cb: (e: E2eeEpochInfo) => void): Unsubscribe
     /** Call code (30 digits, the same for everyone in the call) or, with `userId`, the pairwise code (45 digits). */
     verificationCode(channelId: string, userId?: string): Promise<string | null>
+    /**
+     * Base64 HMAC-SHA256 of `message` under a key exported from that epoch of the call's MLS group (label
+     * "Alga Cinema v1"): peers use it to authenticate each other's DTLS fingerprints. null if the call is not E2EE,
+     * `channelId` is not the current call or the epoch is no longer kept (last 16). The key never leaves main.
+     */
+    cinemaTag(channelId: string, epoch: number, message: string): Promise<string | null>
+  }
+
+  /**
+   * Sala de Cinema, host side. The local file path never leaves main: the renderer only holds opaque `fileId`s
+   * (16 random bytes, base64url). Unknown or closed ids reject.
+   */
+  cinema: {
+    checkFfmpeg(): Promise<FfmpegCheck>
+    pick(): Promise<{ fileId: string; name: string } | null>
+    /** A dropped File: the preload resolves its path (webUtils) and sends only that string to main. */
+    fromDrop(file: File): Promise<{ fileId: string; name: string }>
+    /** `next`: the following episodes of the same folder, each with its own fileId. */
+    probe(fileId: string): Promise<{ film: CinemaFilm; warnings: CinemaWarning[]; next: { fileId: string; name: string }[] } | { error: CinemaProbeError }>
+    start(fileId: string, startS: number, audioIds: number[]): Promise<void>
+    ensure(fileId: string, track: CinemaTrackId, atS: number): void
+    addAudio(fileId: string, audioId: number): void
+    /** Opens a dialog for .srt/.ass/.ssa/.vtt; its piece arrives through onPieces. null if cancelled or unusable. */
+    addSubtitle(fileId: string): Promise<CinemaSubtitleTrack | null>
+    setPlayhead(fileId: string, s: number): void
+    init(fileId: string, track: CinemaTrackId): Promise<ArrayBuffer | null>
+    piece(fileId: string, track: CinemaTrackId, n: number): Promise<ArrayBuffer | null>
+    onPieces(cb: (e: PieceEvent & { fileId: string }) => void): Unsubscribe
+    /** Pieces the host deleted for its disk budget. */
+    onEvicted(cb: (e: { fileId: string; track: CinemaTrackId; n: number[] }) => void): Unsubscribe
+    onError(cb: (e: { fileId: string; track: CinemaTrackId; reason: string }) => void): Unsubscribe
+    close(fileId: string): Promise<void>
   }
 
   /**

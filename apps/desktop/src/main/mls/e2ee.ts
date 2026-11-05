@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { app, safeStorage } from 'electron'
 import type { E2eeStatus } from '../../shared/bridge'
 import { IPC } from '../../shared/ipc'
-import { emit, handle, on, str } from '../ipc'
+import { emit, handle, int, on, str } from '../ipc'
 import { log } from '../log'
 import { writeFileAtomic } from '../settings'
 import { mls, onWorkerExit, stopMls, warmMls } from './host'
@@ -205,6 +205,7 @@ export function registerE2eeIpc(): void {
   handle(IPC.e2eeJoin, async (c) => (await ready()).joinCall(uuid(c)))
   handle(IPC.e2eeLeave, async (c) => session?.leaveCall(uuid(c)))
   handle(IPC.e2eeCode, async (c, u) => session?.verificationCode(uuid(c), u === null ? undefined : uuid(u)) ?? null)
+  handle(IPC.e2eeCinemaTag, async (c, e, m) => session?.cinemaTag(uuid(c), int(e, 0, 2 ** 32), str(m, 4096)) ?? null)
   on(IPC.e2eeDispatch, (t, d) => {
     const type = str(t, 64)
     if (!DISPATCHES.has(type)) throw new TypeError('not an E2EE dispatch')

@@ -3,7 +3,7 @@
 // (here and apps/server/test/e2ee.test.ts) drive it over the real WASM. MLS state and identity keys stay in the
 // worker; what leaves this module is gateway frames (public or encrypted to their recipients) and per-sender media
 // keys of the current call.
-import { scrypt } from 'node:crypto'
+import { createHmac, scrypt } from 'node:crypto'
 import type { E2eeClientFrame } from '@alga/shared'
 import type { E2eeCallState, E2eeEpochInfo, E2eeFrameKey, E2eeMember } from '../../shared/bridge'
 import type { MlsMethod } from './rpc'
@@ -11,6 +11,10 @@ import type { MlsMethod } from './rpc'
 /** Same values as packages/shared/src/e2ee.ts (kept local: main does not bundle the shared runtime). */
 export const MEDIA_LABEL = 'Alga Media v1'
 export const DS_IDENTITY = 'alga-ds'
+/** Label of the cinema tag key (context: the channel id); used in main only. */
+export const CINEMA_LABEL = 'Alga Cinema v1'
+/** Epochs whose cinema key is kept, like LiveKit's keyring for media keys. */
+const CINEMA_KEEP = 16
 export const mediaKeyContext = (userId: string, deviceId: string) => `${userId}\0${deviceId}`
 /** LiveKit's keyring holds 16 keys per participant. */
 export const keyIndexOf = (epoch: number) => epoch % 16
@@ -50,6 +54,8 @@ interface Call {
   sendEpoch: number
   members: Member[]
   retries: number
+  /** epoch -> cinema key of the last CINEMA_KEEP epochs (export_secret only works for the current one). */
+  cinemaKeys: Map<number, Uint8Array>
 }
 
 // Payload checks: dispatches come from the renderer, which relays the gateway; anything off-shape throws.
@@ -111,7 +117,7 @@ export class E2eeSession {
       const c = this.call
       if (c?.channelId === channelId && c.joined && c.state === 'active') return this.deps.send({ op: 'e2ee_join', channelId, deviceId: this.deviceId, epoch: c.epoch })
       if (c) await this.drop()
-      this.call = { channelId, state: 'joining', joined: false, epoch: -1, ownLeaf: -1, committerLeaf: -1, pending: 0, committing: false, sendEpoch: -1, members: [], retries: 0 }
+      this.call = { channelId, state: 'joining', joined: false, epoch: -1, ownLeaf: -1, committerLeaf: -1, pending: 0, committing: false, sendEpoch: -1, members: [], retries: 0, cinemaKeys: new Map() }
       this.deps.send({ op: 'e2ee_join', channelId, deviceId: this.deviceId })
     })
   }
@@ -159,6 +165,16 @@ export class E2eeSession {
     })
     if (!userId) return authenticator ? digits(authenticator, 30) : null
     return me && them ? pairCode(me, them) : null
+  }
+
+  /** Base64 HMAC-SHA256 of `message` under that epoch's cinema key; null if not the current call or epoch not kept. */
+  async cinemaTag(channelId: string, epoch: number, message: string): Promise<string | null> {
+    let tag: string | null = null
+    await this.enqueue(async () => {
+      const key = this.call?.channelId === channelId && this.call.joined ? this.call.cinemaKeys.get(epoch) : undefined
+      if (key) tag = createHmac('sha256', key).update(message, 'utf8').digest('base64')
+    })
+    return tag
   }
 
   private enqueue(fn: () => Promise<void>): Promise<void> {
@@ -261,6 +277,8 @@ export class E2eeSession {
   private async receive(c: Call): Promise<void> {
     c.ownLeaf = Number(await this.deps.mls('own_leaf_index'))
     c.members = parseMembers((await this.deps.mls('members')) as string, c.ownLeaf)
+    c.cinemaKeys.set(c.epoch, (await this.deps.mls('export_secret', CINEMA_LABEL, utf8(c.channelId), 32)) as Uint8Array)
+    for (const e of c.cinemaKeys.keys()) if (e <= c.epoch - CINEMA_KEEP) c.cinemaKeys.delete(e)
     const seen = new Map<string, number>()
     for (const m of c.members) seen.set(m.userId, (seen.get(m.userId) ?? 0) + 1)
     for (const m of c.members) {
@@ -315,7 +333,7 @@ export class E2eeSession {
 
   private async forget(c: Call): Promise<void> {
     if (c.joined) await this.deps.mls('leave').catch(() => {})
-    Object.assign(c, { state: 'joining', joined: false, epoch: -1, pending: 0, committing: false, sendEpoch: -1, members: [] })
+    Object.assign(c, { state: 'joining', joined: false, epoch: -1, pending: 0, committing: false, sendEpoch: -1, members: [], cinemaKeys: new Map() })
   }
 
   private async fail(c: Call, reason: string): Promise<void> {

@@ -11,6 +11,8 @@ import { receiveDeepLink, registerDeepLinkIpc, trackDeepLinkPage } from './deep-
 import { registerHotkeyIpc, stopHotkeys } from './hotkeys'
 import { bool, handle, isTrustedSender, on, str } from './ipc'
 import { initLog, log, logDir } from './log'
+import { cinemaRoot, cleanupStale } from './cinema/pieces'
+import { closeAllCinema, registerCinemaIpc } from './cinema/ipc'
 import { registerE2eeIpc, startE2ee, stopE2ee } from './mls/e2ee'
 import { registerNotificationIpc } from './notifications'
 import { initPower } from './power'
@@ -105,6 +107,7 @@ function registerAppIpc(): void {
   registerNotificationIpc()
   registerDeepLinkIpc()
   registerE2eeIpc()
+  registerCinemaIpc()
   registerActivityIpc()
 }
 
@@ -124,6 +127,7 @@ else {
     initPower()
     initUpdater()
     startActivity()
+    void cleanupStale(cinemaRoot())
     // Signed in from a previous run: pre-warm E2EE now (the worker and key packages must be ready before a join).
     void getToken().then((t) => t && startE2ee(apiUrl, t))
   })
@@ -131,6 +135,7 @@ else {
   app.on('will-quit', () => {
     stopHotkeys() // the hook thread would otherwise keep the process alive
     stopE2ee()
+    void closeAllCinema() // removes the temp pieces; leftovers of a hard kill are swept at next start
     stopActivity() // kills the helper process
     destroyTray()
     log.info('quit')

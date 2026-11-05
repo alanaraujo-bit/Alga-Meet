@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import type { AlgaBridge, AppConfig, DetectedApp, HotkeyBinding, LocalActivity, Unsubscribe } from '../shared/bridge'
 import { IPC } from '../shared/ipc'
 
@@ -117,6 +117,26 @@ const bridge: AlgaBridge = {
     onFrameKey: (cb) => subscribe(IPC.e2eeKey, cb),
     onEpoch: (cb) => subscribe(IPC.e2eeEpoch, cb),
     verificationCode: (channelId, userId) => ipcRenderer.invoke(IPC.e2eeCode, String(channelId), userId === undefined ? null : String(userId)),
+    cinemaTag: (channelId, epoch, message) => ipcRenderer.invoke(IPC.e2eeCinemaTag, String(channelId), Number(epoch), String(message)),
+  },
+
+  cinema: {
+    checkFfmpeg: () => ipcRenderer.invoke(IPC.cinemaCheckFfmpeg),
+    pick: () => ipcRenderer.invoke(IPC.cinemaPick),
+    // Only the path string crosses; main checks it again.
+    fromDrop: (file) => ipcRenderer.invoke(IPC.cinemaFromDrop, webUtils.getPathForFile(file)),
+    probe: (fileId) => ipcRenderer.invoke(IPC.cinemaProbe, String(fileId)),
+    start: (fileId, startS, audioIds) => ipcRenderer.invoke(IPC.cinemaStart, String(fileId), Number(startS), nums(audioIds)),
+    ensure: (fileId, track, atS) => ipcRenderer.send(IPC.cinemaEnsure, String(fileId), String(track), Number(atS)),
+    addAudio: (fileId, audioId) => ipcRenderer.send(IPC.cinemaAddAudio, String(fileId), Number(audioId)),
+    addSubtitle: (fileId) => ipcRenderer.invoke(IPC.cinemaAddSubtitle, String(fileId)),
+    setPlayhead: (fileId, s) => ipcRenderer.send(IPC.cinemaSetPlayhead, String(fileId), Number(s)),
+    init: (fileId, track) => ipcRenderer.invoke(IPC.cinemaInit, String(fileId), String(track)),
+    piece: (fileId, track, n) => ipcRenderer.invoke(IPC.cinemaPiece, String(fileId), String(track), Number(n)),
+    onPieces: (cb) => subscribe(IPC.cinemaPieces, cb),
+    onEvicted: (cb) => subscribe(IPC.cinemaEvicted, cb),
+    onError: (cb) => subscribe(IPC.cinemaError, cb),
+    close: (fileId) => ipcRenderer.invoke(IPC.cinemaClose, String(fileId)),
   },
 
   activity: {

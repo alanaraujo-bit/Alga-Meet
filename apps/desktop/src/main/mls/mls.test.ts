@@ -64,7 +64,7 @@ describe('E2eeSession', () => {
       log: () => {},
       retryMs: 0,
     }, userId, deviceId)
-    return { session, sent, keys, epochs, userId, deviceId }
+    return { session, sent, keys, epochs, userId, deviceId, run, handle }
   }
   const ds = new glue.Client(new Uint8Array(Buffer.from('alga-ds'))) as unknown as { signature_public_key(): Uint8Array }
   const externalSender = { publicKey: Buffer.from(ds.signature_public_key()).toString('base64'), identity: 'alga-ds' }
@@ -103,5 +103,41 @@ describe('E2eeSession', () => {
     const n = d.sent.length
     await d.session.handleDispatch('E2EE_RESYNC_REQUIRED', { channelId, reason: 'not_member' })
     expect(d.sent).toHaveLength(n)
+  })
+
+  it('cinemaTag: same group + epoch => same tag on both devices; other channel / epoch / call => null', async () => {
+    const a = device()
+    const b = device()
+    const channelId = randomUUID()
+    await a.session.joinCall(channelId)
+    await a.session.handleDispatch('E2EE_EPOCH', { channelId, epoch: 0, committerLeaf: 0, create: true, externalSender })
+    const tag0 = await a.session.cinemaTag(channelId, 0, 'fingerprint')
+    expect(tag0).toMatch(/^[A-Za-z0-9+/]{43}=$/)
+    // b joins: the DS proposes the add, a commits (with a welcome), b processes it.
+    await b.session.joinCall(channelId)
+    const kp = b.run({ op: 'call', handle: b.handle, method: 'key_package', args: [] }) as Uint8Array
+    const proposal = (ds as unknown as { external_propose_add(g: Uint8Array, e: bigint, kp: Uint8Array): Uint8Array }).external_propose_add(new Uint8Array(Buffer.from(channelId)), 0n, kp)
+    await a.session.handleDispatch('E2EE_PROPOSALS', { channelId, epoch: 0, proposals: [Buffer.from(proposal).toString('base64')], committerLeaf: 0 })
+    const commit = a.sent.find((f) => f.op === 'e2ee_commit') as { commit: string; welcome: string }
+    await a.session.handleDispatch('E2EE_COMMIT', { channelId, epoch: 0, commit: commit.commit })
+    await b.session.handleDispatch('E2EE_WELCOME', { channelId, epoch: 1, welcome: commit.welcome })
+    expect(b.session.current?.epoch).toBe(1)
+    expect(a.session.current?.epoch).toBe(1)
+    const ta = await a.session.cinemaTag(channelId, 1, 'fingerprint')
+    expect(ta).not.toBeNull()
+    expect(await b.session.cinemaTag(channelId, 1, 'fingerprint')).toBe(ta)
+    expect(await a.session.cinemaTag(channelId, 1, 'other message')).not.toBe(ta)
+    expect(ta).not.toBe(await a.session.cinemaTag(channelId, 0, 'fingerprint')) // epoch 0 key is still kept
+    expect(await a.session.cinemaTag(channelId, 0, 'fingerprint')).toBe(tag0)
+    expect(await a.session.cinemaTag(channelId, 2, 'fingerprint')).toBeNull() // not reached
+    expect(await a.session.cinemaTag(randomUUID(), 1, 'fingerprint')).toBeNull() // not the current call
+    // Another group has another key.
+    const c = device()
+    const other = randomUUID()
+    await c.session.joinCall(other)
+    await c.session.handleDispatch('E2EE_EPOCH', { channelId: other, epoch: 0, committerLeaf: 0, create: true, externalSender })
+    expect(await c.session.cinemaTag(other, 0, 'fingerprint')).not.toBe(tag0)
+    await a.session.leaveCall(channelId)
+    expect(await a.session.cinemaTag(channelId, 1, 'fingerprint')).toBeNull()
   })
 })

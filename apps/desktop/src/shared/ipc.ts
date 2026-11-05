@@ -62,6 +62,23 @@ export const IPC = {
   e2eeSend: 'alga:e2ee:send', // event
   e2eeKey: 'alga:e2ee:key', // event
   e2eeEpoch: 'alga:e2ee:epoch', // event
+  e2eeCinemaTag: 'alga:e2ee:cinema-tag', // invoke
+
+  cinemaCheckFfmpeg: 'alga:cinema:check-ffmpeg', // invoke
+  cinemaPick: 'alga:cinema:pick', // invoke
+  cinemaFromDrop: 'alga:cinema:from-drop', // invoke (path only)
+  cinemaProbe: 'alga:cinema:probe', // invoke
+  cinemaStart: 'alga:cinema:start', // invoke
+  cinemaEnsure: 'alga:cinema:ensure', // send
+  cinemaAddAudio: 'alga:cinema:add-audio', // send
+  cinemaAddSubtitle: 'alga:cinema:add-subtitle', // invoke
+  cinemaSetPlayhead: 'alga:cinema:set-playhead', // send
+  cinemaInit: 'alga:cinema:init', // invoke
+  cinemaPiece: 'alga:cinema:piece', // invoke
+  cinemaClose: 'alga:cinema:close', // invoke
+  cinemaPieces: 'alga:cinema:pieces', // event
+  cinemaEvicted: 'alga:cinema:evicted', // event
+  cinemaError: 'alga:cinema:error', // event
 
   activityCurrent: 'alga:activity:current', // invoke
   activityChanged: 'alga:activity:changed', // event
