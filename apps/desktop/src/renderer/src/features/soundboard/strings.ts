@@ -61,6 +61,7 @@ export const t = {
     save: 'Salvar som',
     saving: 'Enviando…',
     other: 'Trocar arquivo',
+    showAll: 'Ver tudo',
     startHandle: 'Início do trecho',
     endHandle: 'Fim do trecho',
     waveform: 'Forma de onda. Arraste as alças para cortar; setas movem 10 ms, Shift + setas 100 ms.',

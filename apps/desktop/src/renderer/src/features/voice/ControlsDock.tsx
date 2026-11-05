@@ -1,7 +1,7 @@
 import type { Channel } from '@alga/shared'
 import type { Glyph } from '@/ui/icons'
-import { ArrowLeftRight, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, Settings2, Square } from '@/ui/icons'
-import { useCallback, useLayoutEffect, useRef, type ButtonHTMLAttributes, type ReactNode, type RefObject } from 'react'
+import { ArrowLeftRight, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, Settings2, Square, Waveform } from '@/ui/icons'
+import { useCallback, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Ref, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
 import { useData } from '@/store/data'
@@ -9,6 +9,10 @@ import { Icon, MenuButton, Tooltip, useEnvelope } from '@/ui'
 import { openSettings } from '../settings/store'
 import { levelNow } from './levels'
 import { t } from './strings'
+import { SoundboardPanel } from '../soundboard/SoundboardPanel'
+import { SoundEditor } from '../soundboard/SoundEditor'
+import { setOpen, useSoundboard } from '../soundboard/store'
+import { t as sbT } from '../soundboard/strings'
 import { leaveVoice, useVoice } from './voice'
 import s from './stage.module.css'
 
@@ -35,7 +39,7 @@ function useToastClearance(ref: RefObject<HTMLElement | null>) {
 }
 
 /** Floating call controls: mic, deafen | share | settings | disconnect. 40px targets, state by icon + color + tint. */
-export function ControlsDock({ channel: _channel }: { channel: Channel }) {
+export function ControlsDock({ channel }: { channel: Channel }) {
   const self = useMedia(useShallow((st) => ({ muted: st.self.muted, deafened: st.self.deafened, mic: st.self.micAvailable, ptt: st.self.inputMode === 'ptt' })))
   const sharing = useMedia((st) => st.screen.active)
   const connected = useMedia((st) => st.connection.state === 'connected')
@@ -47,6 +51,10 @@ export function ControlsDock({ channel: _channel }: { channel: Channel }) {
   useEnvelope(meter, level)
   const dock = useRef<HTMLDivElement>(null)
   useToastClearance(dock)
+  const sbButton = useRef<HTMLButtonElement>(null)
+  const sbOpen = useSoundboard((st) => st.open)
+  const [sbAnchor, setSbAnchor] = useState<HTMLElement | null>(null)
+  useLayoutEffect(() => setSbAnchor(sbOpen ? sbButton.current : null), [sbOpen])
 
   return (
     <div ref={dock} className={s.dock} role="toolbar" aria-label="Controles da chamada">
@@ -88,9 +96,24 @@ export function ControlsDock({ channel: _channel }: { channel: Channel }) {
           <CallButton icon={MonitorUp} label={t.dock.share} disabled={!connected} onClick={() => useVoice.setState({ picker: true })} />
         )}
       </MenuButton>
+      {channel.spaceId && (
+        <CallButton
+          ref={sbButton}
+          icon={Waveform}
+          label={sbT.button}
+          hint={sbT.buttonHint}
+          on={sbOpen}
+          aria-expanded={sbOpen}
+          aria-haspopup="dialog"
+          disabled={!connected}
+          onClick={() => setOpen(!sbOpen)}
+        />
+      )}
       <CallButton icon={Settings2} label={t.dock.settings} onClick={() => openSettings('voice')} />
       <span className={s.dockSep} />
       <CallButton icon={PhoneOff} label={t.dock.leave} leave onClick={leaveVoice} />
+      {channel.spaceId && <SoundboardPanel anchor={sbAnchor} onClose={() => setOpen(false)} channel={channel} />}
+      {channel.spaceId && <SoundEditor />}
     </div>
   )
 }
@@ -117,6 +140,7 @@ function CallButton({
   leave?: boolean
   disabled?: boolean
   children?: ReactNode
+  ref?: Ref<HTMLButtonElement>
 }) {
   return (
     <Tooltip content={hint ? `${label}. ${hint}` : label} side="top">

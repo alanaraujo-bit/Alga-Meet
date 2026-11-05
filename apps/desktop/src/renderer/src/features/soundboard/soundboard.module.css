@@ -1,0 +1,358 @@
+/* Soundboard panel: a calm grid of sound tiles. Motion is feedback only (press, playing, cooldown), never decoration. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(560px, calc(100vh - 160px));
+  padding: var(--s-3);
+  gap: var(--s-2);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 0;
+}
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1_5);
+  font: var(--type-ui-lg);
+  letter-spacing: var(--track-ui-lg);
+  color: var(--text-primary);
+}
+.title svg { color: var(--accent); }
+.count {
+  font: var(--type-meta);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 32px;
+  padding: 0 var(--s-2_5, 10px);
+  border-radius: var(--r-md);
+  background: var(--state-hover);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  color: var(--text-tertiary);
+  transition: box-shadow var(--dur-fast, 100ms) var(--ease-out-quad);
+}
+.search:focus-within { box-shadow: inset 0 0 0 1px var(--accent); }
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  font: var(--type-ui);
+  color: var(--text-primary);
+}
+.search input::placeholder { color: var(--text-tertiary); }
+
+.notice, .hint, .mutedHint {
+  margin: 0;
+  padding: 0 4px;
+  font: var(--type-meta);
+  color: var(--text-tertiary);
+}
+.notice {
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--warning-tint);
+  color: var(--warning);
+}
+.hint { padding-top: var(--s-2); }
+
+.scroll {
+  overflow-y: auto;
+  margin: 0 calc(var(--s-1) * -1);
+  padding: 2px var(--s-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  scrollbar-width: thin;
+}
+.section {
+  margin: 0 0 var(--s-1_5);
+  padding: 0 4px;
+  font: var(--type-badge);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: var(--s-1_5);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s-6) var(--s-4);
+  text-align: center;
+  font: var(--type-meta);
+  color: var(--text-tertiary);
+}
+.empty strong { font: var(--type-ui-lg); color: var(--text-secondary); }
+
+/* ---- tile ---------------------------------------------------------------------------------------------------- */
+.tile {
+  position: relative;
+  height: 84px;
+  border-radius: var(--r-lg);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  overflow: hidden;
+  isolation: isolate;
+  transition: box-shadow 140ms var(--ease-out-quad), background 140ms var(--ease-out-quad), transform 120ms var(--ease-out-quart);
+}
+.tile:hover { background: #1a1b1d; box-shadow: inset 0 0 0 1px var(--border-default); }
+.tile:has(.hit:active):not([data-state='cooldown']):not([data-state='disabled']) { transform: scale(0.97); }
+
+.hit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--s-2) var(--s-2) var(--s-1_5);
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  z-index: 1;
+}
+.hit:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.hit[aria-disabled] { cursor: default; }
+
+.emoji {
+  font-size: 26px;
+  line-height: 32px;
+  transition: transform 180ms var(--ease-out-quart);
+}
+.tile:hover:not([data-state='cooldown']):not([data-state='disabled']) .emoji { transform: translateY(-1px) scale(1.06); }
+.name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 510 12px/16px var(--font-ui);
+  color: var(--text-primary);
+}
+.dur {
+  font: 400 11px/14px var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+}
+
+/* The fill layer: playing = a bar crossing the tile left→right; cooldown = an indigo wash draining down. */
+.fill {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.tile[data-state='playing'] {
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-tint);
+  animation: struck 360ms var(--ease-out-quart);
+}
+.tile[data-state='playing'] .fill {
+  background: linear-gradient(90deg, var(--accent-tint-strong) calc(var(--p) * 100%), transparent calc(var(--p) * 100%));
+}
+.tile[data-state='playing'] .emoji { animation: bob 360ms var(--ease-out-quart); }
+.tile[data-state='cooldown'] .fill {
+  background: linear-gradient(0deg, var(--accent-tint) calc(var(--p) * 100%), transparent calc(var(--p) * 100%));
+}
+.tile[data-state='cooldown'] .emoji,
+.tile[data-state='cooldown'] .name,
+.tile[data-state='disabled'] .emoji,
+.tile[data-state='disabled'] .name { opacity: 0.5; }
+@keyframes struck {
+  0% { transform: scale(0.96); }
+  60% { transform: scale(1.015); }
+  100% { transform: scale(1); }
+}
+@keyframes bob {
+  40% { transform: translateY(-3px) scale(1.12); }
+}
+
+.tools {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  z-index: 2;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 120ms var(--ease-out-quad), transform 120ms var(--ease-out-quad);
+}
+.tile:hover .tools, .tile:focus-within .tools { opacity: 1; transform: none; }
+.tool {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: rgba(15, 16, 17, 0.72);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.tool:hover { background: var(--bg-overlay); color: var(--text-primary); }
+.tool:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; opacity: 1; }
+.toolDanger:hover { color: var(--danger); }
+
+.add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-1);
+  border: 0;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  border-style: dashed;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  background-image: linear-gradient(var(--bg-content), var(--bg-content));
+  outline: 1px dashed var(--border-strong);
+  outline-offset: -1px;
+  box-shadow: none;
+}
+.add:hover { color: var(--accent); outline-color: var(--accent); background-image: linear-gradient(var(--accent-tint), var(--accent-tint)); }
+.add:focus-visible { outline: 2px solid var(--accent); }
+.add .name { color: inherit; }
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--s-2);
+  box-shadow: inset 0 0 0 1px var(--danger-tint);
+  background: #1c1415;
+}
+.confirmText {
+  font: 400 11px/14px var(--font-ui);
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.confirmRow { display: flex; gap: 4px; }
+.confirmNo, .confirmYes {
+  flex: 1;
+  height: 22px;
+  border: 0;
+  border-radius: var(--r-sm);
+  font: 510 11px/14px var(--font-ui);
+  cursor: pointer;
+}
+.confirmNo { background: var(--state-selected); color: var(--text-secondary); }
+.confirmYes { background: var(--danger-fill); color: var(--on-danger); }
+.confirmNo:focus-visible, .confirmYes:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---- footer -------------------------------------------------------------------------------------------------- */
+.foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) 4px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+.muteBtn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.muteBtn:hover { background: var(--state-hover); color: var(--text-primary); }
+.muteBtn:focus-visible { outline: 2px solid var(--accent); }
+.volume {
+  flex: 1;
+  min-width: 60px;
+  height: 4px;
+  appearance: none;
+  border-radius: var(--r-full);
+  background: linear-gradient(90deg, var(--accent) var(--v), var(--border-strong) var(--v));
+  cursor: pointer;
+}
+.volume:disabled { opacity: 0.4; cursor: default; }
+.volume::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: transform 120ms var(--ease-out-quart);
+}
+.volume:hover::-webkit-slider-thumb { transform: scale(1.15); }
+.volume:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.muteLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font: var(--type-meta);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.mutedHint { padding-top: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile, .emoji, .tools, .search { transition: none; }
+  .tile[data-state='playing'], .tile[data-state='playing'] .emoji { animation: none; }
+  .tile:hover .emoji { transform: none; }
+}
+
+/* ---- who played (on the call stage seat) ---------------------------------------------------------------------- */
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.ring {
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 18px 2px var(--accent-glow);
+  animation: ringIn 220ms var(--ease-out-quart) both;
+}
+.rise {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  font-size: 22px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+  animation: rise 1100ms var(--ease-out-quart) both;
+}
+@keyframes ringIn {
+  from { opacity: 0; transform: scale(0.92); }
+}
+@keyframes rise {
+  0% { opacity: 0; transform: translate(-50%, 8px) scale(0.6); }
+  18% { opacity: 1; transform: translate(-50%, -6px) scale(1.1); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -34px) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring { animation: none; }
+  .rise { animation: none; transform: translate(-50%, -14px); }
+}

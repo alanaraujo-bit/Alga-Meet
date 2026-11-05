@@ -55,3 +55,12 @@ describe('cleanName', () => {
     expect(cleanName('a'.repeat(50) + '.ogg')).toHaveLength(32)
   })
 })
+
+describe('roles screen', () => {
+  it('lists both soundboard permissions', async () => {
+    const { PERMISSION_GROUPS } = await import('../spaceSettings/strings')
+    const keys = PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i.key))
+    expect(keys).toContain('USE_SOUNDBOARD')
+    expect(keys).toContain('MANAGE_SOUNDBOARD')
+  })
+})

@@ -3,6 +3,8 @@ import { useMedia } from '@/media'
 import { useData } from '@/store/data'
 import { channelTitle, displayName } from '@/store/selectors'
 import { t } from './strings'
+import { useSoundboard } from '../soundboard/store'
+import { t as sbT } from '../soundboard/strings'
 
 /**
  * Screen readers hear who joins and leaves the call you are in (sighted people see the tile come and go). A live
@@ -40,9 +42,18 @@ export function VoiceAnnouncer() {
     update()
     const offData = useData.subscribe(update)
     const offMedia = useMedia.subscribe(update)
+    // Soundboard: "Ana tocou Corneta" (sighted people see the emoji rise on the seat).
+    const offSounds = useSoundboard.subscribe((now, prev) => {
+      const st = useData.getState()
+      const spaceId = room ? st.channels[room]?.spaceId ?? null : null
+      for (const [userId, p] of Object.entries(now.playing)) {
+        if (prev.playing[userId]?.playId !== p.playId) say(sbT.played(displayName(st, userId, spaceId), p.name))
+      }
+    })
     return () => {
       offData()
       offMedia()
+      offSounds()
     }
   }, [])
   return (

@@ -22,6 +22,8 @@ export interface SoundboardState {
   volume: number
   muted: boolean
   open: boolean
+  /** Upload editor (new sound) or rename (`sound` set); null = closed. */
+  editor: { spaceId: string; sound?: SpaceSound } | null
 }
 
 const PREFS_KEY = 'alga.soundboard.v1'
@@ -36,7 +38,7 @@ function loadPrefs(): { volume: number; muted: boolean } {
 }
 
 export const useSoundboard = create<SoundboardState>(() => ({
-  bySpace: {}, playing: {}, mine: null, cooldownFrom: 0, cooldownUntil: 0, ...loadPrefs(), open: false,
+  bySpace: {}, playing: {}, mine: null, cooldownFrom: 0, cooldownUntil: 0, ...loadPrefs(), open: false, editor: null,
 }))
 
 function savePrefs(): void {
@@ -56,6 +58,7 @@ export function setMuted(muted: boolean): void {
 }
 
 export const setOpen = (open: boolean): void => useSoundboard.setState({ open })
+export const openEditor = (editor: SoundboardState['editor']): void => useSoundboard.setState({ editor, ...(editor ? { open: false } : {}) })
 
 /** Sound metadata for an id in a space (space sound or Alga pack). */
 export function soundInfo(spaceId: string | null, id: string): { name: string; emoji: string | null; durationMs: number } | undefined {

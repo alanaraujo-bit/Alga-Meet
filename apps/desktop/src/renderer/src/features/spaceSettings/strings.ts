@@ -164,6 +164,8 @@ export const PERMISSION_GROUPS: Array<{ title: string; items: Array<{ key: Permi
       { key: 'CONNECT', label: 'Entrar em canais de voz', hint: 'Entrar e ouvir quem está falando.' },
       { key: 'SPEAK', label: 'Falar', hint: 'Usar o microfone nos canais de voz.' },
       { key: 'STREAM', label: 'Transmitir a tela', hint: 'Compartilhar a tela ou uma janela.' },
+      { key: 'USE_SOUNDBOARD', label: 'Usar o soundboard', hint: 'Tocar sons para todos na call (com intervalo entre um e outro).' },
+      { key: 'MANAGE_SOUNDBOARD', label: 'Gerenciar sons', hint: 'Subir, renomear e apagar os sons do espaço.' },
       { key: 'MUTE_MEMBERS', label: 'Silenciar membros', hint: 'Desligar o microfone de alguém para todos.' },
       { key: 'DEAFEN_MEMBERS', label: 'Ensurdecer membros', hint: 'Impedir alguém de ouvir o canal.' },
       { key: 'MOVE_MEMBERS', label: 'Mover membros', hint: 'Levar alguém para outro canal de voz ou desconectar.' },

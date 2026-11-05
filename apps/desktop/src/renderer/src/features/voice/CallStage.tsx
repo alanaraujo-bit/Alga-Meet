@@ -18,6 +18,7 @@ import { E2eeChip, MismatchBanner } from './E2ee'
 import { cardWidth, featuredWidth, seatWidth, stripTile, voiceLayout, type SeatSize } from './layout'
 import { useLevelGetter } from './levels'
 import { t } from './strings'
+import { SoundLayer } from '../soundboard/SoundLayer'
 import { joinVoice, leaveVoice, useVoice } from './voice'
 import sh from '../shell/shell.module.css'
 import s from './stage.module.css'
@@ -474,6 +475,7 @@ function Seat({ userId, channel, size }: { userId: string; channel: Channel; siz
           <IconButton icon={MoreHorizontal} label={t.stage.personVolume(p.name)} size="sm" className={s.more} aria-expanded={!!menu} onClick={(e) => setMenu(menu ? null : e.currentTarget)} />
         )}
         <ReactionLayer userId={userId} />
+        <SoundLayer userId={userId} />
       </div>
       <span className={s.name}>
         {!small && (p.quality === 'poor' || p.quality === 'lost') && (
