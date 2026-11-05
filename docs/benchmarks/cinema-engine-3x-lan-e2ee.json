@@ -1,0 +1,1313 @@
+{
+  "at": "2026-11-05T23:11:49.742Z",
+  "tag": "3x-lan-e2ee",
+  "instances": 3,
+  "e2ee": true,
+  "playS": 170,
+  "netem": null,
+  "hostCapKbps": null,
+  "route": "mediastream",
+  "film": {
+    "path": "<QA_WORK>/Noite.no.Cinema.Lab.89.mkv",
+    "MiB": 611.6
+  },
+  "results": [
+    {
+      "name": "3 instâncias entram na call",
+      "pass": true,
+      "ms": 2748,
+      "detail": "chamada E2EE (MLS) em todas"
+    },
+    {
+      "name": "Abrir sessão → primeiro frame em todas as poltronas sentadas",
+      "pass": true,
+      "ms": 4035,
+      "detail": {
+        "firstFrameMs": {
+          "ana": 1344,
+          "bruno": 3770
+        },
+        "allReadyMs": 3772
+      }
+    },
+    {
+      "name": "Começar: as poltronas tocam; play agendado em ±1 frame de `at`",
+      "pass": true,
+      "ms": 3217,
+      "detail": null
+    },
+    {
+      "name": "Tocando 170 s (carla entra no meio, 6×)",
+      "pass": true,
+      "ms": 166842,
+      "detail": {
+        "trials": 6
+      }
+    },
+    {
+      "name": "Pausa 1: todos no mesmo frame em ≤ 300 ms",
+      "pass": true,
+      "ms": 8612,
+      "detail": {
+        "position": 160.696,
+        "atAfterClickMs": 270,
+        "per": {
+          "ana": {
+            "settledAfterAtMs": 16,
+            "settledAfterClickMs": 286,
+            "frameDelta": 0,
+            "seekedBack": true
+          },
+          "bruno": {
+            "settledAfterAtMs": 135,
+            "settledAfterClickMs": 405,
+            "frameDelta": 0,
+            "seekedBack": true
+          },
+          "carla": {
+            "settledAfterAtMs": 21,
+            "settledAfterClickMs": 291,
+            "frameDelta": 0,
+            "seekedBack": true
+          }
+        },
+        "maxSettledAfterAtMs": 135,
+        "maxSettledAfterClickMs": 405,
+        "sameFrame": true
+      }
+    },
+    {
+      "name": "Pausa 2: todos no mesmo frame em ≤ 300 ms",
+      "pass": true,
+      "ms": 8129,
+      "detail": {
+        "position": 166.96,
+        "atAfterClickMs": 268,
+        "per": {
+          "ana": {
+            "settledAfterAtMs": 16,
+            "settledAfterClickMs": 284,
+            "frameDelta": 0,
+            "seekedBack": true
+          },
+          "bruno": {
+            "settledAfterAtMs": 25,
+            "settledAfterClickMs": 293,
+            "frameDelta": 0,
+            "seekedBack": true
+          },
+          "carla": {
+            "settledAfterAtMs": 13,
+            "settledAfterClickMs": 281,
+            "frameDelta": 0,
+            "seekedBack": true
+          }
+        },
+        "maxSettledAfterAtMs": 25,
+        "maxSettledAfterClickMs": 293,
+        "sameFrame": true
+      }
+    },
+    {
+      "name": "Pausa 3: todos no mesmo frame em ≤ 300 ms",
+      "pass": true,
+      "ms": 8107,
+      "detail": {
+        "position": 173.226,
+        "atAfterClickMs": 269,
+        "per": {
+          "ana": {
+            "settledAfterAtMs": 49,
+            "settledAfterClickMs": 318,
+            "frameDelta": 0,
+            "seekedBack": true
+          },
+          "bruno": {
+            "settledAfterAtMs": 231,
+            "settledAfterClickMs": 500,
+            "frameDelta": 0,
+            "seekedBack": true
+          },
+          "carla": {
+            "settledAfterAtMs": 50,
+            "settledAfterClickMs": 319,
+            "frameDelta": 0,
+            "seekedBack": true
+          }
+        },
+        "maxSettledAfterAtMs": 231,
+        "maxSettledAfterClickMs": 500,
+        "sameFrame": true
+      }
+    },
+    {
+      "name": "setAudio: Bruno troca a faixa e o frame de vídeo não muda",
+      "pass": true,
+      "ms": 4271,
+      "detail": {
+        "switchMs": 232,
+        "seeksDuringSwitch": 0,
+        "maxFrameJumpMs": 24.2,
+        "vsHost": {
+          "bins": 13,
+          "p50AbsMs": 27.4,
+          "p95AbsMs": 32.6,
+          "maxAbsMs": 32.6,
+          "over125LongestMs": 0
+        }
+      }
+    },
+    {
+      "name": "Painel de estatísticas: peças de amigos (screenshot)",
+      "pass": true,
+      "ms": 503,
+      "detail": {
+        "ana": "de quem projeta 0% · de amigos 0% · ↓ 0 ↑ 19,8 Mbps · 2 pares",
+        "bruno": "de quem projeta 100% · de amigos 0% · ↓ 17,6 ↑ 0 Mbps · 2 pares",
+        "carla": "de quem projeta 1% · de amigos 99% · ↓ 0 ↑ 0 Mbps · 2 pares"
+      }
+    },
+    {
+      "name": "ASS: Bruno liga a legenda ASS e ela aparece (JASSUB)",
+      "pass": true,
+      "ms": 2612,
+      "detail": {
+        "canvas": {
+          "w": 668,
+          "h": 376
+        }
+      }
+    },
+    {
+      "name": "Encerrar",
+      "pass": true,
+      "ms": 201,
+      "detail": null
+    }
+  ],
+  "M": {
+    "firstFrameMs": {
+      "ana": 1344,
+      "bruno": 3770
+    },
+    "firstFrameAllMs": 3770,
+    "allReadyMs": 3772,
+    "lateTrials": [
+      {
+        "sitAt": 1793920136697,
+        "firstFrameMs": 826,
+        "syncedMs": 2553,
+        "seeks": [
+          [
+            762,
+            28.3
+          ],
+          [
+            1188,
+            29.5
+          ]
+        ],
+        "trajectory": [
+          [
+            803,
+            -732.7
+          ],
+          [
+            1303,
+            -38.9
+          ],
+          [
+            1803,
+            -55.2
+          ],
+          [
+            2303,
+            -43.9
+          ],
+          [
+            2803,
+            -38.7
+          ],
+          [
+            3303,
+            -32.7
+          ],
+          [
+            3803,
+            -22
+          ],
+          [
+            4303,
+            -16
+          ],
+          [
+            4803,
+            -8
+          ],
+          [
+            5303,
+            -5.3
+          ],
+          [
+            5803,
+            -2.9
+          ],
+          [
+            6303,
+            0.1
+          ],
+          [
+            6803,
+            -4.9
+          ],
+          [
+            7303,
+            -2.7
+          ],
+          [
+            7803,
+            -2.7
+          ],
+          [
+            8303,
+            -2.7
+          ],
+          [
+            8803,
+            -2.6
+          ],
+          [
+            9303,
+            -2.7
+          ],
+          [
+            9803,
+            -18.8
+          ],
+          [
+            10303,
+            -8.7
+          ],
+          [
+            10803,
+            -16.7
+          ],
+          [
+            11303,
+            -3.1
+          ],
+          [
+            11803,
+            -2.5
+          ],
+          [
+            12303,
+            -2.2
+          ],
+          [
+            12803,
+            -2.9
+          ],
+          [
+            13303,
+            -2.9
+          ],
+          [
+            13803,
+            -8
+          ],
+          [
+            14303,
+            -10.7
+          ],
+          [
+            14803,
+            -19.4
+          ]
+        ],
+        "after": {
+          "bins": 50,
+          "p50AbsMs": 4.9,
+          "p95AbsMs": 33.1,
+          "maxAbsMs": 41.1,
+          "over125LongestMs": 0
+        }
+      },
+      {
+        "sitAt": 1793920156735,
+        "firstFrameMs": 1090,
+        "syncedMs": 2265,
+        "seeks": [
+          [
+            1049,
+            48.4
+          ],
+          [
+            1450,
+            49.8
+          ]
+        ],
+        "trajectory": [
+          [
+            1015,
+            -988.9
+          ],
+          [
+            1515,
+            -39
+          ],
+          [
+            2015,
+            -44.5
+          ],
+          [
+            2515,
+            -36
+          ],
+          [
+            3015,
+            -35.4
+          ],
+          [
+            3515,
+            -19.8
+          ],
+          [
+            4015,
+            -13.6
+          ],
+          [
+            4515,
+            -5.3
+          ],
+          [
+            5015,
+            -18.8
+          ],
+          [
+            5515,
+            -35.3
+          ],
+          [
+            6015,
+            -27.5
+          ],
+          [
+            6515,
+            -19.7
+          ],
+          [
+            7015,
+            -33.1
+          ],
+          [
+            7515,
+            -27.7
+          ],
+          [
+            8015,
+            -19.3
+          ],
+          [
+            8515,
+            -11.2
+          ],
+          [
+            9015,
+            -5.2
+          ],
+          [
+            9515,
+            14.2
+          ],
+          [
+            10015,
+            14.6
+          ],
+          [
+            10515,
+            14.1
+          ],
+          [
+            11015,
+            10.9
+          ],
+          [
+            11515,
+            11.2
+          ],
+          [
+            12015,
+            11.1
+          ],
+          [
+            12515,
+            11.1
+          ],
+          [
+            13015,
+            11.2
+          ],
+          [
+            13515,
+            11.2
+          ],
+          [
+            14015,
+            10.9
+          ],
+          [
+            14515,
+            8.4
+          ]
+        ],
+        "after": {
+          "bins": 51,
+          "p50AbsMs": 14.1,
+          "p95AbsMs": 38.3,
+          "maxAbsMs": 41.4,
+          "over125LongestMs": 0
+        }
+      },
+      {
+        "sitAt": 1793920176984,
+        "firstFrameMs": 3342,
+        "syncedMs": 3766,
+        "seeks": [
+          [
+            3154,
+            68.6
+          ],
+          [
+            3377,
+            71.9
+          ]
+        ],
+        "trajectory": [
+          [
+            3266,
+            -3219.4
+          ],
+          [
+            4016,
+            0.1
+          ],
+          [
+            4516,
+            0
+          ],
+          [
+            5016,
+            0
+          ],
+          [
+            5516,
+            0
+          ],
+          [
+            6016,
+            0
+          ],
+          [
+            6516,
+            0
+          ],
+          [
+            7016,
+            0.1
+          ],
+          [
+            7516,
+            0.1
+          ],
+          [
+            8016,
+            0.1
+          ],
+          [
+            8516,
+            0.1
+          ],
+          [
+            9016,
+            -5.2
+          ],
+          [
+            9516,
+            -5.5
+          ],
+          [
+            10016,
+            -5.6
+          ],
+          [
+            10516,
+            -5.5
+          ],
+          [
+            11016,
+            -5.6
+          ],
+          [
+            11516,
+            -5.6
+          ],
+          [
+            12016,
+            -5.6
+          ],
+          [
+            12516,
+            0.1
+          ],
+          [
+            13016,
+            0
+          ],
+          [
+            13516,
+            0.1
+          ],
+          [
+            14016,
+            0
+          ],
+          [
+            14516,
+            0
+          ]
+        ],
+        "after": {
+          "bins": 45,
+          "p50AbsMs": 0.1,
+          "p95AbsMs": 5.6,
+          "maxAbsMs": 5.7,
+          "over125LongestMs": 0
+        }
+      },
+      {
+        "sitAt": 1793920199523,
+        "firstFrameMs": 664,
+        "syncedMs": 2477,
+        "seeks": [
+          [
+            634,
+            90.7
+          ],
+          [
+            997,
+            91.6
+          ]
+        ],
+        "trajectory": [
+          [
+            477,
+            -527.6
+          ],
+          [
+            977,
+            -38.7
+          ],
+          [
+            1477,
+            -41.8
+          ],
+          [
+            1977,
+            -44.5
+          ],
+          [
+            2477,
+            -38.9
+          ],
+          [
+            2977,
+            -33.1
+          ],
+          [
+            3477,
+            -25.2
+          ],
+          [
+            3977,
+            -19.1
+          ],
+          [
+            4477,
+            -13.9
+          ],
+          [
+            4977,
+            -14
+          ],
+          [
+            5477,
+            -14
+          ],
+          [
+            5977,
+            -14.1
+          ],
+          [
+            6477,
+            -14
+          ],
+          [
+            6977,
+            -14
+          ],
+          [
+            7477,
+            -16.8
+          ],
+          [
+            7977,
+            -30.6
+          ],
+          [
+            8477,
+            -24.7
+          ],
+          [
+            8977,
+            -19.1
+          ],
+          [
+            9477,
+            -14
+          ],
+          [
+            9977,
+            -11.2
+          ],
+          [
+            10477,
+            -8.4
+          ],
+          [
+            10977,
+            -10.5
+          ],
+          [
+            11477,
+            -8.4
+          ],
+          [
+            11977,
+            -8.4
+          ],
+          [
+            12477,
+            -8.4
+          ],
+          [
+            12977,
+            -8.4
+          ],
+          [
+            13477,
+            -10.5
+          ],
+          [
+            13977,
+            -40.9
+          ],
+          [
+            14477,
+            -13.3
+          ]
+        ],
+        "after": {
+          "bins": 49,
+          "p50AbsMs": 14,
+          "p95AbsMs": 38.9,
+          "maxAbsMs": 42.1,
+          "over125LongestMs": 0
+        }
+      },
+      {
+        "sitAt": 1793920219324,
+        "firstFrameMs": 1170,
+        "syncedMs": 1426,
+        "seeks": [
+          [
+            1062,
+            110.5
+          ],
+          [
+            1498,
+            111.9
+          ]
+        ],
+        "trajectory": [
+          [
+            1176,
+            -1042
+          ],
+          [
+            1676,
+            -19.9
+          ],
+          [
+            2176,
+            -27.4
+          ],
+          [
+            2676,
+            -14.2
+          ],
+          [
+            3176,
+            -3
+          ],
+          [
+            3676,
+            -8
+          ],
+          [
+            4176,
+            -5.9
+          ],
+          [
+            4676,
+            -0.2
+          ],
+          [
+            5176,
+            27.3
+          ],
+          [
+            5676,
+            -5.5
+          ],
+          [
+            6176,
+            -5.5
+          ],
+          [
+            6676,
+            5.6
+          ],
+          [
+            7176,
+            3.4
+          ],
+          [
+            7676,
+            -30.4
+          ],
+          [
+            8176,
+            0
+          ],
+          [
+            8676,
+            0.2
+          ],
+          [
+            9176,
+            0.4
+          ],
+          [
+            9676,
+            2.1
+          ],
+          [
+            10176,
+            0
+          ],
+          [
+            10676,
+            14.2
+          ],
+          [
+            11176,
+            16.4
+          ],
+          [
+            11676,
+            0
+          ],
+          [
+            12176,
+            2.1
+          ],
+          [
+            12676,
+            -0.1
+          ],
+          [
+            13176,
+            2.6
+          ],
+          [
+            13676,
+            5.6
+          ],
+          [
+            14176,
+            18.8
+          ],
+          [
+            14676,
+            2
+          ]
+        ],
+        "after": {
+          "bins": 54,
+          "p50AbsMs": 5.6,
+          "p95AbsMs": 27.8,
+          "maxAbsMs": 30.4,
+          "over125LongestMs": 0
+        }
+      },
+      {
+        "sitAt": 1793920239652,
+        "firstFrameMs": 2744,
+        "syncedMs": 9848,
+        "seeks": [
+          [
+            2709,
+            130.8
+          ],
+          [
+            2844,
+            133.5
+          ]
+        ],
+        "trajectory": [
+          [
+            2598,
+            -2660.8
+          ],
+          [
+            10098,
+            0
+          ],
+          [
+            10598,
+            0
+          ],
+          [
+            11098,
+            0
+          ],
+          [
+            11598,
+            0
+          ],
+          [
+            12098,
+            0
+          ],
+          [
+            12598,
+            0
+          ],
+          [
+            13098,
+            0.1
+          ],
+          [
+            13598,
+            5.6
+          ],
+          [
+            14098,
+            5.5
+          ],
+          [
+            14598,
+            5.6
+          ]
+        ],
+        "after": {
+          "bins": 21,
+          "p50AbsMs": 0,
+          "p95AbsMs": 5.6,
+          "maxAbsMs": 5.6,
+          "over125LongestMs": 0
+        }
+      }
+    ],
+    "pauses": [
+      {
+        "position": 160.696,
+        "atAfterClickMs": 270,
+        "per": {
+          "ana": {
+            "settledAfterAtMs": 16,
+            "settledAfterClickMs": 286,
+            "frameDelta": 0,
+            "seekedBack": true
+          },
+          "bruno": {
+            "settledAfterAtMs": 135,
+            "settledAfterClickMs": 405,
+            "frameDelta": 0,
+            "seekedBack": true
+          },
+          "carla": {
+            "settledAfterAtMs": 21,
+            "settledAfterClickMs": 291,
+            "frameDelta": 0,
+            "seekedBack": true
+          }
+        },
+        "maxSettledAfterAtMs": 135,
+        "maxSettledAfterClickMs": 405,
+        "sameFrame": true
+      },
+      {
+        "position": 166.96,
+        "atAfterClickMs": 268,
+        "per": {
+          "ana": {
+            "settledAfterAtMs": 16,
+            "settledAfterClickMs": 284,
+            "frameDelta": 0,
+            "seekedBack": true
+          },
+          "bruno": {
+            "settledAfterAtMs": 25,
+            "settledAfterClickMs": 293,
+            "frameDelta": 0,
+            "seekedBack": true
+          },
+          "carla": {
+            "settledAfterAtMs": 13,
+            "settledAfterClickMs": 281,
+            "frameDelta": 0,
+            "seekedBack": true
+          }
+        },
+        "maxSettledAfterAtMs": 25,
+        "maxSettledAfterClickMs": 293,
+        "sameFrame": true
+      },
+      {
+        "position": 173.226,
+        "atAfterClickMs": 269,
+        "per": {
+          "ana": {
+            "settledAfterAtMs": 49,
+            "settledAfterClickMs": 318,
+            "frameDelta": 0,
+            "seekedBack": true
+          },
+          "bruno": {
+            "settledAfterAtMs": 231,
+            "settledAfterClickMs": 500,
+            "frameDelta": 0,
+            "seekedBack": true
+          },
+          "carla": {
+            "settledAfterAtMs": 50,
+            "settledAfterClickMs": 319,
+            "frameDelta": 0,
+            "seekedBack": true
+          }
+        },
+        "maxSettledAfterAtMs": 231,
+        "maxSettledAfterClickMs": 500,
+        "sameFrame": true
+      }
+    ],
+    "sameFrameShot": "D:\\PROJETOS\\alga-cinema\\docs\\screenshots\\2026-11-05-cinema-lab-same-frame.png",
+    "audioSwitch": {
+      "switchMs": 232,
+      "seeksDuringSwitch": 0,
+      "maxFrameJumpMs": 24.2,
+      "vsHost": {
+        "bins": 13,
+        "p50AbsMs": 27.4,
+        "p95AbsMs": 32.6,
+        "maxAbsMs": 32.6,
+        "over125LongestMs": 0
+      }
+    },
+    "statsShot": "D:\\PROJETOS\\alga-cinema\\docs\\screenshots\\2026-11-05-cinema-lab-stats.png",
+    "assShot": "D:\\PROJETOS\\alga-cinema\\docs\\screenshots\\2026-11-05-cinema-lab-ass-bruno.png",
+    "ass": {
+      "canvas": {
+        "w": 668,
+        "h": 376
+      }
+    },
+    "levels": {
+      "t": 1793920305530,
+      "label": "stats shot",
+      "ana": {
+        "stats": "VídeoH264 1920×1080 · 8,6 MbpsPosiçãosala 183,3 s · meu vídeo 183,4 sSincronia0 ms · p95 22 ms · quadros perdidos 1Buffer à frente60,6 sRelógiooffset 0.0 ms · RTT 0 msPeçasde quem projeta 0% · de amigos 0% · ↓ 0 ↑ 19,8 Mbps · 2 paresRelaynenhumCacheOPFS · 6,5 GBFaixa de áudioa0PoltronasAna Cine: pronto 418 s · Bruno Cine: pronto 418,4 s · Carla Cine: pronto 418,2 sSaída do som do filmeWebAudioMediaStream (<audio>) vale na próxima sessão",
+        "dc": {
+          "sent": 630289401,
+          "recv": 10650,
+          "pairs": [
+            "host→host fdfd::1aed:8384:54321 rtt 0 ms",
+            "host→host fdfd::1aed:8384:60224 rtt 0 ms"
+          ]
+        },
+        "levels": [
+          {
+            "route": "mediastream (graph)",
+            "dbfs": -10.3
+          },
+          {
+            "route": "mediastream (stream)",
+            "dbfs": -13.4
+          }
+        ],
+        "latencyMs": 51.00000000000001
+      },
+      "bruno": {
+        "stats": "VídeoH264 1920×1080 · 8,6 MbpsPosiçãosala 183,4 s · meu vídeo 183,5 sSincronia+7 ms · p95 42 ms · quadros perdidos 4Buffer à frente60,5 sRelógiooffset 0.0 ms · RTT 1 msPeçasde quem projeta 100% · de amigos 0% · ↓ 17,6 ↑ 0 Mbps · 2 paresRelaynenhumCacheOPFS · 6,5 GBFaixa de áudioa1PoltronasAna Cine: pronto 418 s · Bruno Cine: pronto 418,4 s · Carla Cine: pronto 418,2 sSaída do som do filmeWebAudioMediaStream (<audio>) vale na próxima sessão",
+        "dc": {
+          "sent": 462865397,
+          "recv": 626362547,
+          "pairs": [
+            "host→host fdfd::1aed:8384:54314 rtt 0 ms",
+            "host→host fdfd::1aed:8384:60217 rtt 0 ms"
+          ]
+        },
+        "levels": [
+          {
+            "route": "mediastream (graph)",
+            "dbfs": -10.3
+          },
+          {
+            "route": "mediastream (stream)",
+            "dbfs": -13.4
+          }
+        ],
+        "latencyMs": 52.00000000000001
+      },
+      "carla": {
+        "stats": "VídeoH264 1920×1080 · 8,6 MbpsPosiçãosala 183,1 s · meu vídeo 183,2 sSincronia-3 ms · p95 21 ms · quadros perdidos 0Buffer à frente60,8 sRelógiooffset 0.0 ms · RTT 0 msPeçasde quem projeta 1% · de amigos 99% · ↓ 0 ↑ 0 Mbps · 2 paresRelaynenhumCacheOPFS · 5,9 GBFaixa de áudioa0PoltronasAna Cine: pronto 418 s · Bruno Cine: pronto 418,4 s · Carla Cine: pronto 418,2 sSaída do som do filmeWebAudioMediaStream (<audio>) vale na próxima sessão",
+        "dc": {
+          "sent": 7012,
+          "recv": 466788613,
+          "pairs": [
+            "host→host fdfd::1aed:8384:60208 rtt 0 ms",
+            "host→host fdfd::1aed:8384:60207 rtt 1 ms"
+          ]
+        },
+        "levels": [
+          {
+            "route": "mediastream (graph)",
+            "dbfs": -15.4
+          },
+          {
+            "route": "mediastream (stream)",
+            "dbfs": -999
+          },
+          {
+            "route": "mediastream (graph)",
+            "dbfs": -12.9
+          },
+          {
+            "route": "mediastream (stream)",
+            "dbfs": -999
+          },
+          {
+            "route": "mediastream (graph)",
+            "dbfs": -11.7
+          },
+          {
+            "route": "mediastream (stream)",
+            "dbfs": -999
+          },
+          {
+            "route": "mediastream (graph)",
+            "dbfs": -25.4
+          },
+          {
+            "route": "mediastream (stream)",
+            "dbfs": -999
+          },
+          {
+            "route": "mediastream (graph)",
+            "dbfs": -13.5
+          },
+          {
+            "route": "mediastream (stream)",
+            "dbfs": -999
+          },
+          {
+            "route": "mediastream (graph)",
+            "dbfs": -10.3
+          },
+          {
+            "route": "mediastream (stream)",
+            "dbfs": -13.4
+          }
+        ],
+        "latencyMs": 52.00000000000001
+      }
+    },
+    "start": {
+      "ana": {
+        "firstFrameAfterAtMs": 36.4,
+        "errMs": -5.4,
+        "leadMs": 52
+      },
+      "bruno": {
+        "firstFrameAfterAtMs": 30.7,
+        "errMs": 0.3,
+        "leadMs": 52
+      }
+    },
+    "sync": {
+      "bruno-vs-ana": {
+        "bins": 612,
+        "p50AbsMs": 11.1,
+        "p95AbsMs": 33.3,
+        "maxAbsMs": 52.9,
+        "over125LongestMs": 0
+      }
+    },
+    "syncAllP95": 33.3,
+    "syncLongestOver125": 0,
+    "stalls": {
+      "ana": {
+        "waitingEvents": 0,
+        "over2s": 0,
+        "totalS": 0,
+        "longestS": 0
+      },
+      "bruno": {
+        "waitingEvents": 0,
+        "over2s": 0,
+        "totalS": 0,
+        "longestS": 0
+      },
+      "carla": {
+        "waitingEvents": 0,
+        "over2s": 0,
+        "totalS": 0,
+        "longestS": 0
+      }
+    },
+    "roomWaits": [
+      {
+        "atS": 73.7,
+        "reason": "waiting",
+        "waitingFor": [
+          "01a1adf8-34d4-7706-9ed6-75b96a7386f9"
+        ],
+        "endS": 74.2
+      },
+      {
+        "atS": 135.9,
+        "reason": "waiting",
+        "waitingFor": [
+          "01a1adf8-34d4-7706-9ed6-75b96a7386f9"
+        ],
+        "endS": 142.9
+      }
+    ],
+    "upload": {
+      "filmPiecesMiB": {
+        "v": 518.9,
+        "a0": 45.7,
+        "a1": 45.7
+      },
+      "hostSentMiB": 627.5,
+      "viewersRecvMiB": {
+        "bruno": 611.7,
+        "carla": 553.9
+      },
+      "viewersSentMiB": {
+        "bruno": 538.4,
+        "carla": 0
+      },
+      "pairs": {
+        "ana": [
+          "host→host fdfd::1aed:8384:54321 rtt 1 ms",
+          "host→host fdfd::1aed:8384:60224 rtt 10 ms"
+        ],
+        "bruno": [
+          "host→host fdfd::1aed:8384:54314 rtt 1 ms",
+          "host→host fdfd::1aed:8384:60217 rtt 12 ms"
+        ],
+        "carla": [
+          "host→host fdfd::1aed:8384:60208 rtt 9 ms",
+          "host→host fdfd::1aed:8384:60207 rtt 10 ms"
+        ]
+      },
+      "hostOverMeanViewer": 1.1,
+      "hostOverFilm": 1.1,
+      "netem": null
+    },
+    "memory": {
+      "ana": {
+        "samples": 20,
+        "peakMiB": {
+          "Browser": 177.2,
+          "GPU": 252.1,
+          "Utility": 391.6,
+          "Tab": 548.2
+        },
+        "peakTotalMiB": 1305
+      },
+      "bruno": {
+        "samples": 20,
+        "peakMiB": {
+          "Browser": 142.2,
+          "GPU": 278.3,
+          "Utility": 448.5,
+          "Tab": 497.8
+        },
+        "peakTotalMiB": 1353.1
+      },
+      "carla": {
+        "samples": 20,
+        "peakMiB": {
+          "Browser": 153.3,
+          "GPU": 287.6,
+          "Utility": 456.4,
+          "Tab": 678.6
+        },
+        "peakTotalMiB": 1555.5
+      }
+    },
+    "e2ee": {
+      "ana": {
+        "tagged": 7,
+        "untagged": 0
+      },
+      "bruno": {
+        "tagged": 7,
+        "untagged": 0
+      },
+      "carla": {
+        "tagged": 12,
+        "untagged": 0
+      }
+    },
+    "frameLoad": {
+      "ana": {
+        "total": 210,
+        "max60s": 113
+      },
+      "bruno": {
+        "total": 137,
+        "max60s": 48
+      },
+      "carla": {
+        "total": 135,
+        "max60s": 48
+      }
+    }
+  },
+  "jpgs": [
+    "/docs/screenshots/2026-11-05-cinema-lab-ass-bruno.jpg",
+    "/docs/screenshots/2026-11-05-cinema-lab-paused-ana.jpg",
+    "/docs/screenshots/2026-11-05-cinema-lab-paused-bruno.jpg",
+    "/docs/screenshots/2026-11-05-cinema-lab-paused-carla.jpg",
+    "/docs/screenshots/2026-11-05-cinema-lab-same-frame.jpg",
+    "/docs/screenshots/2026-11-05-cinema-lab-stats-ana.jpg",
+    "/docs/screenshots/2026-11-05-cinema-lab-stats-bruno.jpg",
+    "/docs/screenshots/2026-11-05-cinema-lab-stats-carla.jpg",
+    "/docs/screenshots/2026-11-05-cinema-lab-stats.jpg"
+  ]
+}

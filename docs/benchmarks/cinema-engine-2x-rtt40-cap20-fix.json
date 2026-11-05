@@ -1,0 +1,318 @@
+{
+  "at": "2026-11-05T23:27:18.484Z",
+  "tag": "2x-rtt40-cap20-fix",
+  "instances": 2,
+  "e2ee": false,
+  "playS": 20,
+  "netem": "loss=0,delay=20,jitter=2",
+  "hostCapKbps": 20000,
+  "route": "webaudio",
+  "film": {
+    "path": "<QA_WORK>/Noite.no.Cinema.Lab.89.mkv",
+    "MiB": 611.6
+  },
+  "results": [
+    {
+      "name": "2 instâncias entram na call",
+      "pass": true,
+      "ms": 1809,
+      "detail": "chamada sem E2EE"
+    },
+    {
+      "name": "Abrir sessão → primeiro frame em todas as poltronas sentadas",
+      "pass": false,
+      "ms": 25837,
+      "error": "first frame 25532 ms > 10 s"
+    },
+    {
+      "name": "Começar: as poltronas tocam; play agendado em ±1 frame de `at`",
+      "pass": true,
+      "ms": 3411,
+      "detail": null
+    },
+    {
+      "name": "Tocando 20 s",
+      "pass": true,
+      "ms": 16923,
+      "detail": {
+        "trials": 0
+      }
+    },
+    {
+      "name": "setAudio: Bruno troca a faixa e o frame de vídeo não muda",
+      "pass": true,
+      "ms": 4812,
+      "detail": {
+        "switchMs": 780,
+        "seeksDuringSwitch": 0,
+        "maxFrameJumpMs": 24.7,
+        "vsHost": {
+          "bins": 16,
+          "p50AbsMs": 5.2,
+          "p95AbsMs": 16.3,
+          "maxAbsMs": 16.3,
+          "over125LongestMs": 0
+        }
+      }
+    },
+    {
+      "name": "Painel de estatísticas: peças de amigos (screenshot)",
+      "pass": true,
+      "ms": 13,
+      "detail": {
+        "ana": "de quem projeta 0% · de amigos 0% · ↓ 0 ↑ 18,7 Mbps · 1 pares",
+        "bruno": "de quem projeta 100% · de amigos 0% · ↓ 19,5 ↑ 0 Mbps · 1 pares"
+      }
+    },
+    {
+      "name": "ASS: Bruno liga a legenda ASS e ela aparece (JASSUB)",
+      "pass": true,
+      "ms": 2408,
+      "detail": {
+        "canvas": {
+          "w": 668,
+          "h": 376
+        }
+      }
+    },
+    {
+      "name": "Encerrar",
+      "pass": true,
+      "ms": 110,
+      "detail": null
+    }
+  ],
+  "M": {
+    "firstFrameMs": {
+      "ana": 1491,
+      "bruno": 25532
+    },
+    "firstFrameAllMs": 25532,
+    "allReadyMs": 25534,
+    "lateTrials": [],
+    "pauses": [],
+    "audioSwitch": {
+      "switchMs": 780,
+      "seeksDuringSwitch": 0,
+      "maxFrameJumpMs": 24.7,
+      "vsHost": {
+        "bins": 16,
+        "p50AbsMs": 5.2,
+        "p95AbsMs": 16.3,
+        "maxAbsMs": 16.3,
+        "over125LongestMs": 0
+      }
+    },
+    "ass": {
+      "canvas": {
+        "w": 668,
+        "h": 376
+      }
+    },
+    "levels": {
+      "t": 1793921235936,
+      "label": "stats shot",
+      "ana": {
+        "stats": "VídeoH264 1920×1080 · 8,6 MbpsPosiçãosala 22,6 s · meu vídeo 22,7 sSincronia-17 ms · p95 41 ms · quadros perdidos 0Buffer à frente61,3 sRelógiooffset 0.0 ms · RTT 1 msPeçasde quem projeta 0% · de amigos 0% · ↓ 0 ↑ 18,7 Mbps · 1 paresRelaynenhumCacheOPFS · 6,4 GBFaixa de áudioa0PoltronasAna Cine: pronto 519,3 s · Bruno Cine: pronto 34,2 sSaída do som do filmeWebAudioMediaStream (<audio>) vale na próxima sessão",
+        "dc": {
+          "sent": 62591404,
+          "recv": 963,
+          "pairs": [
+            "prflx→host <LAN>:59421 rtt 147 ms"
+          ]
+        },
+        "levels": [
+          {
+            "route": "webaudio",
+            "dbfs": -10.4
+          }
+        ],
+        "latencyMs": 52.00000000000001
+      },
+      "bruno": {
+        "stats": "VídeoH264 1920×1080 · 8,6 MbpsPosiçãosala 22,8 s · meu vídeo 22,8 sSincronia-49 ms · p95 38 ms · quadros perdidos 0Buffer à frente33,2 sRelógiooffset 0.0 ms · RTT 1 msPeçasde quem projeta 100% · de amigos 0% · ↓ 19,5 ↑ 0 Mbps · 1 paresRelaynenhumCacheOPFS · 6,4 GBFaixa de áudioa1PoltronasAna Cine: pronto 519,3 s · Bruno Cine: pronto 34,2 sSaída do som do filmeWebAudioMediaStream (<audio>) vale na próxima sessão",
+        "dc": {
+          "sent": 963,
+          "recv": 62041015,
+          "pairs": [
+            "prflx→host <LAN>:59419 rtt 151 ms"
+          ]
+        },
+        "levels": [
+          {
+            "route": "webaudio",
+            "dbfs": -10.4
+          }
+        ],
+        "latencyMs": 52.00000000000001
+      },
+      "netem": {
+        "type": "stats",
+        "id": 5,
+        "proxies": 2,
+        "bySender": {
+          "bruno": {
+            "in": 28921,
+            "sent": 28897,
+            "lost": 0,
+            "queueDrop": 0,
+            "bytesIn": 1544401,
+            "bytesSent": 1543201
+          },
+          "ana": {
+            "in": 57188,
+            "sent": 56320,
+            "lost": 0,
+            "queueDrop": 581,
+            "bytesIn": 65829059,
+            "bytesSent": 64963951
+          }
+        }
+      }
+    },
+    "start": {
+      "ana": {
+        "firstFrameAfterAtMs": 13.9,
+        "errMs": -23.9,
+        "leadMs": 52
+      },
+      "bruno": {
+        "firstFrameAfterAtMs": 13.9,
+        "errMs": -23.9,
+        "leadMs": 52
+      }
+    },
+    "sync": {
+      "bruno-vs-ana": {
+        "bins": 42,
+        "p50AbsMs": 7.7,
+        "p95AbsMs": 27.5,
+        "maxAbsMs": 33,
+        "over125LongestMs": 0
+      }
+    },
+    "syncAllP95": 27.5,
+    "syncLongestOver125": 0,
+    "stalls": {
+      "ana": {
+        "waitingEvents": 0,
+        "over2s": 0,
+        "totalS": 0,
+        "longestS": 0
+      },
+      "bruno": {
+        "waitingEvents": 0,
+        "over2s": 0,
+        "totalS": 0,
+        "longestS": 0
+      }
+    },
+    "roomWaits": [],
+    "upload": {
+      "filmPiecesMiB": {
+        "v": 518.9,
+        "a0": 44.1,
+        "a1": 44.1
+      },
+      "hostSentMiB": 65.2,
+      "viewersRecvMiB": {
+        "bruno": 64.8
+      },
+      "viewersSentMiB": {
+        "bruno": 0
+      },
+      "pairs": {
+        "ana": [
+          "prflx→host <LAN>:59421 rtt 157 ms"
+        ],
+        "bruno": [
+          "prflx→host <LAN>:59419 rtt 155 ms"
+        ]
+      },
+      "hostOverMeanViewer": 1,
+      "hostOverFilm": 0.1,
+      "netem": {
+        "type": "stats",
+        "id": 6,
+        "proxies": 2,
+        "bySender": {
+          "bruno": {
+            "in": 31554,
+            "sent": 31533,
+            "lost": 0,
+            "queueDrop": 0,
+            "bytesIn": 1676447,
+            "bytesSent": 1675397
+          },
+          "ana": {
+            "in": 62439,
+            "sent": 61550,
+            "lost": 0,
+            "queueDrop": 581,
+            "bytesIn": 71894041,
+            "bytesSent": 71008043
+          }
+        }
+      }
+    },
+    "memory": {
+      "ana": {
+        "samples": 5,
+        "baselineMiB": {
+          "total": 833.3,
+          "Browser": 123.6,
+          "Tab": 176.3,
+          "GPU": 144.4,
+          "Utility": 389.1
+        },
+        "peakMiB": {
+          "total": 1083,
+          "Browser": 171.4,
+          "Tab": 385.1,
+          "GPU": 181.4,
+          "Utility": 388.3
+        },
+        "cinemaDeltaMiB": 249.7
+      },
+      "bruno": {
+        "samples": 5,
+        "baselineMiB": {
+          "total": 926,
+          "Browser": 143.4,
+          "Tab": 171.7,
+          "GPU": 165.6,
+          "Utility": 445.4
+        },
+        "peakMiB": {
+          "total": 1127.6,
+          "Browser": 145.9,
+          "Tab": 336.4,
+          "GPU": 211.6,
+          "Utility": 444.7
+        },
+        "cinemaDeltaMiB": 201.6
+      }
+    },
+    "e2ee": {
+      "ana": {
+        "tagged": 0,
+        "untagged": 1
+      },
+      "bruno": {
+        "tagged": 0,
+        "untagged": 1
+      }
+    },
+    "frameLoad": {
+      "ana": {
+        "total": 103,
+        "max60s": 103
+      },
+      "bruno": {
+        "total": 41,
+        "max60s": 41
+      }
+    }
+  },
+  "jpgs": []
+}
