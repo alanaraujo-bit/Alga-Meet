@@ -82,7 +82,7 @@ export const TEXT_ON = {
   // Includes the porcelain versions of the plates (cosmetics.module.css), flattened on #f4f4f6.
   theme_ha_porcelana: { primary: '#1b1b1d', secondary: '#4a4c55', under: ['#f4f4f6', '#e9e9ee', '#e2e3ea', '#d3d0f1', '#d2d3ef'] },
   theme_ha_nevoa_lavanda: { primary: '#f7f8f8', secondary: '#d0d6e0', under: [HA.ink, 'rgba(185, 178, 249, 0.18)', 'rgba(97, 99, 208, 0.22)'] },
-  nameplate_ha_crepusculo: { primary: '#f7f8f8', secondary: '#f7f8f8', under: ['rgba(36, 37, 90, 0.7)', 'rgba(97, 99, 208, 0.35)'] },
+  nameplate_ha_crepusculo: { primary: '#f7f8f8', secondary: '#f7f8f8', under: ['rgba(36, 37, 90, 0.82)', 'rgba(97, 99, 208, 0.46)'] },
   nameplate_ha_vidro_fosco: { primary: '#f7f8f8', secondary: '#f7f8f8', under: ['rgba(247, 248, 248, 0.07)'] },
   nameplate_ha_fio_luz: { primary: '#f7f8f8', secondary: '#f7f8f8', under: ['rgba(0, 0, 0, 0)'] },
   nameplate_ha_nanquim: { primary: '#f7f8f8', secondary: '#f7f8f8', under: ['rgba(36, 37, 90, 0.62)'] },

@@ -1,4 +1,4 @@
-import type { BillingMe, CosmeticSlot, Entitlement, Order, Product, Subscription } from '@alga/shared'
+import { PRIVATE_COSMETIC_SLOTS, type BillingMe, type CosmeticSlot, type Entitlement, type Order, type Product, type Subscription, type TryOn } from '@alga/shared'
 import { HORA_AZUL, type CosmeticId, type Slot } from './hora-azul'
 
 export type { CosmeticId, Slot }
@@ -40,14 +40,15 @@ export function lookOf(equipped: Readonly<Record<string, string | undefined>> | 
   return look
 }
 
-export type ItemState = 'in_use' | 'owned' | 'included' | 'plus_only' | 'buy' | 'unavailable'
+/** `soon` = sold, but its wave has not opened yet (Product.available false): see it, try it on the profile, wish it. */
+export type ItemState = 'in_use' | 'owned' | 'included' | 'plus_only' | 'buy' | 'soon' | 'unavailable'
 
 /** How the shop presents one cosmetic to this user. `look` = what is equipped right now (server). */
 export function itemState(p: Product, items: readonly Entitlement[], look: Look, planId: string): ItemState {
   const ent = items.find((e) => e.sku === p.id)
   if (ent) return isCosmeticId(p.id) && look[COSMETICS[p.id]] === p.id ? 'in_use' : ent.source === 'subscription' ? 'included' : 'owned'
   if (p.includedIn?.includes(planId as never)) return 'included'
-  if (p.purchasable) return 'buy'
+  if (p.purchasable && !p.retired) return p.available === false ? 'soon' : 'buy'
   return p.includedIn?.length ? 'plus_only' : 'unavailable'
 }
 
@@ -69,6 +70,34 @@ export function historyOf(me: Pick<BillingMe, 'subscriptions' | 'orders'>): Hist
   ]
   return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
 }
+
+/**
+ * The look with a try-on on top (PublicUser.tryOn, "provando"): only while it lasts, only a public slot this client
+ * draws, only an item made for that slot. Anything else leaves the look as it was.
+ */
+export function withTryOn(look: Look, tryOn: TryOn | undefined, now = Date.now()): Look {
+  if (!tryOn || Date.parse(tryOn.expiresAt) <= now || PRIVATE_COSMETIC_SLOTS.includes(tryOn.slot)) return look
+  const slot = SLOTS.find((s) => SLOT_KEY[s] === tryOn.slot)
+  if (!slot || !isCosmeticId(tryOn.productId) || COSMETICS[tryOn.productId] !== slot) return look
+  return { ...look, [slot]: tryOn.productId }
+}
+
+/** A bundle as the store shows it: what it holds, what those cost apart, and what you already have of it. */
+export interface BundleView {
+  items: Product[]
+  /** List price of the items bought one by one (they are all sold apart at these prices: the saving is real). */
+  separateCents: number
+  savingCents: number
+  owned: number
+}
+export function bundleView(bundle: Product, products: readonly Product[], owned: readonly Entitlement[]): BundleView {
+  const items = (bundle.items ?? []).map((id) => products.find((p) => p.id === id)).filter((p): p is Product => !!p)
+  const separateCents = items.reduce((t, p) => t + p.priceBrlCents, 0)
+  return { items, separateCents, savingCents: Math.max(0, separateCents - bundle.priceBrlCents), owned: items.filter((p) => owned.some((e) => e.sku === p.id)).length }
+}
+
+/** Whole days until `iso` from `now`, rounded up (0 = today or past). */
+export const daysUntil = (iso: string, now = Date.now()) => Math.max(0, Math.ceil((Date.parse(iso) - now) / 86_400_000))
 
 /** SKUs that are new in `next` compared with `prev` (what a purchase just granted). */
 export const granted = (prev: readonly Entitlement[], next: readonly Entitlement[]): string[] =>

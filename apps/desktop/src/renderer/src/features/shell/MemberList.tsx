@@ -6,6 +6,7 @@ import { useSession } from '@/store/session'
 import { contextMenuHandler, Popover, ScrollArea } from '@/ui'
 import { DecoratedAvatar, Nameplate, ProfileCard } from '../billing/Cosmetics'
 import { useLook } from '../billing/store'
+import { ProfileStoreActions } from '../billing/TryOn'
 import { ActivityBadge, ActivityCard } from '../activity/Activity'
 import { PersonLine, StatusBubble } from '../activity/Status'
 import { useCustomStatus } from '../activity/custom'
@@ -139,6 +140,7 @@ export function PersonPopover({
         <StatusBubble userId={user.id} />
         <ActivityCard userId={user.id} />
         {spaceId && <RoleChips userId={user.id} spaceId={spaceId} />}
+        <ProfileStoreActions user={user} onDone={onClose} />
         <ProfileFooter user={user} spaceId={spaceId} onDone={onClose} />
       </ProfileCard>
     </Popover>

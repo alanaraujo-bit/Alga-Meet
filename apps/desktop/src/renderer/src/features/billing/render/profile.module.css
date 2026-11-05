@@ -36,17 +36,18 @@
 }
 
 /* HA-09 Crepúsculo: dusk from the left, the last of the sun as a 1 px ember line under the first 40 %. */
+/* Denser after the in-context review (2026-11-01): in a 32 px list row the dusk read as a shadow, not a sky. */
 .plate[data-plate='nameplate_ha_crepusculo'] {
   background:
-    linear-gradient(90deg, rgba(247, 248, 248, 0.07), rgba(247, 248, 248, 0) 60%) top / 100% 1px no-repeat,
-    linear-gradient(in oklab 90deg, rgba(36, 37, 90, 0.7), rgba(97, 99, 208, 0.35) 48%, rgba(97, 99, 208, 0) 85%);
+    linear-gradient(90deg, rgba(247, 248, 248, 0.12), rgba(247, 248, 248, 0) 60%) top / 100% 1px no-repeat,
+    linear-gradient(in oklab 90deg, rgba(36, 37, 90, 0.82), rgba(97, 99, 208, 0.46) 48%, rgba(97, 99, 208, 0) 88%);
 }
 .plate[data-plate='nameplate_ha_crepusculo']::after {
   left: 0;
   bottom: 0;
-  width: 40%;
+  width: 44%;
   height: 1px;
-  background: linear-gradient(90deg, rgba(232, 168, 152, 0.6), rgba(232, 168, 152, 0.35) 55%, rgba(232, 168, 152, 0));
+  background: linear-gradient(90deg, rgba(232, 168, 152, 0.85), rgba(232, 168, 152, 0.45) 55%, rgba(232, 168, 152, 0));
 }
 /* One 24 px band of light crosses once per hover (and once when the card opens). */
 .plate[data-plate='nameplate_ha_crepusculo']::before {
@@ -140,7 +141,8 @@
   top: calc(var(--banner-h, 72px) * 0.78);
   height: 1px;
   background: linear-gradient(90deg, rgba(232, 168, 152, 0), rgba(232, 168, 152, 0.9) 35%, rgba(232, 168, 152, 0.7) 70%, rgba(232, 168, 152, 0));
-  opacity: 0.2;
+  /* The night keeps a trace of the dusk: .2 read as gone in the popover; .34 is the last light, still a line. */
+  opacity: 0.34;
   transform: translateY(6px);
 }
 /* Stars rest at their own opacity attribute. */

@@ -16,6 +16,7 @@ import { useSettings } from '../settings/store'
 import { SpaceModals } from '../spaces/SpaceModals'
 import { useSpaceSettings } from '../spaceSettings/store'
 import { VerifyEmailDialog } from '../auth/VerifyEmail'
+import { BillingHost } from '../billing/Host'
 import { closeStaff, useStaff } from '../staff/store'
 import { QuickSwitcher } from '../switcher/QuickSwitcher'
 import { useDeletionCanceledNotice } from '../trust/Gate'
@@ -108,6 +109,7 @@ export function Shell() {
         {staffPanel && <StaffPanel />}
       </Suspense>
       <VerifyEmailDialog />
+      <BillingHost />
       <ReportHost />
     </motion.div>
   )

@@ -59,7 +59,8 @@ export const replayAll = () => [...roots].filter((r) => run(r.el, r.ms, r.onRun,
 export function useOneShot(ref: RefObject<HTMLElement | SVGElement | null>, motion: Motion, ms: number, onRun?: (el: HTMLElement) => void) {
   useLayoutEffect(() => {
     const el = ref.current as HTMLElement | null
-    if (!el || !ms) return
+    // `rest` never moves, not even on replayAll: a stage decoration replaying was a gesture the real app never plays.
+    if (!el || !ms || motion === 'rest') return
     const entry = { el, ms, onRun }
     roots.add(entry)
     if (motion === 'play') run(el, ms, onRun, false)

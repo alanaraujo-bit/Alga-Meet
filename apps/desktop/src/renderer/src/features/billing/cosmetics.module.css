@@ -129,8 +129,22 @@
   letter-spacing: var(--track-title);
 }
 .username {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1_5);
   color: var(--text-tertiary);
   font: var(--type-meta);
+}
+/* Plus tenure: months summed, a hairline chip in the accent, never louder than the name. */
+.plusBadge {
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--r-full);
+  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.35);
+  color: var(--accent);
+  font: var(--type-badge);
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
 }
 .bio {
   margin-top: var(--s-2);

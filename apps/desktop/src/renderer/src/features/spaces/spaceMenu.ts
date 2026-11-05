@@ -8,6 +8,9 @@ import { useUi } from '@/store/ui'
 import { openReport } from '../trust/Report'
 import { t as tr } from '../trust/strings'
 import type { MenuEntry } from '@/ui'
+import { House } from '../billing/icons'
+import { openCasa } from '../billing/store'
+import { t as tb } from '../billing/strings'
 import { t } from '../shell/strings'
 import { actorFor, visibleSections } from '../spaceSettings/permissions'
 import { openSpaceSettings } from '../spaceSettings/store'
@@ -57,6 +60,8 @@ export function spaceMenu(spaceId: string): MenuEntry[] {
     )
   }
   if (visibleSections(actorFor(d, spaceId)).length) items.push({ label: tss.open, icon: Settings, onSelect: () => openSpaceSettings(spaceId) })
+  // Casa: every member sees the space's Casa (perks, mural); contributing is 18+ and explained inside.
+  items.push({ label: tb.casa.menu, icon: House, onSelect: () => openCasa(spaceId) })
   if (items.length) items.push({ kind: 'separator' })
   items.push({ label: t.space.markRead, icon: CheckCheck, onSelect: () => markSpaceRead(spaceId) })
   items.push(...notifyEntries(spaceId))

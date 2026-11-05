@@ -34,6 +34,24 @@ export interface VideoOutStats {
   bitrateKbps: number
   layers: VideoLayerStats[]
   rttMs: number | null
+  /** Frames per second the capture delivered to WebRTC (`media-source`), before any encoder drop. */
+  sourceFps: number | null
+}
+
+export type SendLimit = 'none' | 'capture' | 'cpu' | 'bandwidth' | 'encoder'
+/** Why the share leaves below its frame rate, for the streamer (media/README.md, `screen.send`). */
+export interface SendDiagnosis {
+  /** fps of the best layer going out (what viewers in "Original" get). */
+  fps: number
+  /** What that layer should carry (the preset's fps for the top layer). */
+  targetFps: number
+  /** fps the capture delivered (Windows → Chromium), null = unknown. */
+  sourceFps: number | null
+  encoder: string | null
+  hardware: boolean | null
+  limit: SendLimit
+  /** pt-BR, ready to show; null when nothing is limiting. */
+  reason: string | null
 }
 export interface VideoInStats {
   codec: string | null
@@ -135,7 +153,49 @@ export function videoOut({ cur, prev }: { cur: Report; prev: Report }): VideoOut
       }
     })
     .sort((a, b) => b.width * b.height - a.width * a.height)
-  return { codec: codecOf(cur, outs[0]!).codec, bitrateKbps: layers.reduce((t, l) => t + l.bitrateKbps, 0), layers, rttMs: rttOf(cur, 'video') }
+  const src = [...cur.values()].find((v) => v.type === 'media-source' && v.kind === 'video')
+  const sourceFps = src ? num(src.framesPerSecond) || rate(src, prev.get(src.id as string), 'frames') : null
+  return { codec: codecOf(cur, outs[0]!).codec, bitrateKbps: layers.reduce((t, l) => t + l.bitrateKbps, 0), layers, rttMs: rttOf(cur, 'video'), sourceFps }
+}
+
+/**
+ * Diagnose the last few seconds of a share (≥ 3 one-second samples, medians so one slow second doesn't flap).
+ * `caps`: max fps per simulcast rid (sender encodings), `presetFps` for a layer without one. The best layer still
+ * sending (dynacast pauses the ones nobody watches) is compared with its own cap. Order of blame: the encoder's own
+ * limitation (cpu, bandwidth), then the capture (below the cap while the content is `motion`: a game or video is
+ * expected to move; still text/code legitimately sends few frames, and a capture under 10 fps is a still image), then
+ * frames the capture delivered but the encoder dropped. docs/benchmarks/game-capture.md.
+ */
+export function diagnoseSend(recent: VideoOutStats[], caps: Record<string, number>, presetFps: number, motion: boolean, surface: 'screen' | 'window' | null): SendDiagnosis | null {
+  const samples = recent.flatMap((s) => {
+    const l = s.layers.find((x) => x.fps > 0)
+    return l ? [{ l, cap: Math.min(presetFps, caps[l.rid ?? ''] ?? presetFps), src: s.sourceFps }] : []
+  })
+  if (samples.length < 3) return null
+  const mid = (v: number[]) => [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)]!
+  const fps = Math.round(mid(samples.map((s) => s.l.fps)))
+  const targetFps = Math.round(mid(samples.map((s) => s.cap)))
+  const srcs = samples.flatMap((s) => (s.src === null ? [] : [s.src]))
+  const sourceFps = srcs.length ? Math.round(mid(srcs)) : null
+  const reasons = samples.map((s) => s.l.qualityLimitationReason)
+  const ql = (['cpu', 'bandwidth'] as const).find((r) => reasons.filter((x) => x === r).length * 2 > reasons.length)
+  const ok = (v: number) => v >= 0.85 * targetFps
+  let limit: SendLimit = 'none'
+  if (ok(fps)) limit = 'none'
+  else if (ql) limit = ql
+  else if (sourceFps !== null && ok(sourceFps)) limit = 'encoder'
+  else if (sourceFps !== null && motion && sourceFps >= 10) limit = 'capture'
+  const head = `Sua transmissão está em ${fps} fps (meta: ${targetFps})`
+  const what = surface === 'window' ? 'desta janela' : 'desta tela'
+  const reason = {
+    none: null,
+    cpu: `${head}: o processador não está dando conta de codificar o vídeo. Feche programas pesados ou escolha uma qualidade menor.`,
+    bandwidth: `${head}: sua conexão de envio está no limite. Pause downloads ou envios, ou escolha uma qualidade menor.`,
+    capture: `${head}: o Windows está entregando só ${sourceFps} quadros por segundo ${what}. Limite o fps do jogo (ex.: 144) ou feche programas pesados para sobrar processador.`,
+    encoder: `${head}: o codificador de vídeo está descartando quadros (processador ou placa de vídeo ocupados). Limite o fps do jogo ou escolha uma qualidade menor.`,
+  }[limit]
+  const top = samples.at(-1)!.l
+  return { fps, targetFps, sourceFps, encoder: top.encoderImplementation, hardware: top.powerEfficientEncoder, limit, reason }
 }
 
 export function videoIn({ cur, prev }: { cur: Report; prev: Report }): VideoInStats | null {

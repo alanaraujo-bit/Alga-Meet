@@ -85,6 +85,51 @@ export async function captureFps(ms = 2000): Promise<number | null> {
   return Math.round((n * 1000) / (performance.now() - t0))
 }
 
+/**
+ * Pace of the live screen capture over `ms` (scripts/media-game.mjs): frames delivered, distinct source frames (the
+ * test game draws its frame index as 16 64-px blocks at the top-left of a `srcWidth`-px wide source) and intervals.
+ */
+export async function capturePace(ms: number, srcWidth: number) {
+  type Frame = { displayWidth: number; codedWidth: number; format: string; close(): void; copyTo(b: Uint8Array, o: object): Promise<{ offset: number }[]> }
+  const t = media.debug.screen?.video.track?.mediaStreamTrack
+  const P = (window as unknown as { MediaStreamTrackProcessor?: new (o: { track: MediaStreamTrack }) => { readable: ReadableStream<Frame> } }).MediaStreamTrackProcessor
+  if (!t || !P) return null
+  const clone = t.clone()
+  const rd = new P({ track: clone }).readable.getReader()
+  const ts: number[] = []
+  const ids: number[] = []
+  const t0 = performance.now()
+  try {
+    while (performance.now() - t0 < ms) {
+      const r = await Promise.race([rd.read(), new Promise<null>((res) => setTimeout(() => res(null), 500))])
+      const f = r?.value
+      if (!f) continue
+      ts.push(performance.now())
+      const sc = f.displayWidth / srcWidth
+      const w = Math.min(f.codedWidth, (Math.round(1024 * sc) + 1) & ~1)
+      const buf = new Uint8Array(w * 16)
+      const bpp = /^(I4|NV)/.test(f.format) ? 1 : 4
+      const lay = await f.copyTo(buf, { rect: { x: 0, y: Math.round(32 * sc) & ~1, width: w, height: 2 } }).catch(() => null)
+      let id = 0
+      for (let i = 0; lay && i < 16; i++) if ((buf[lay[0]!.offset + Math.round((32 + 64 * i) * sc) * bpp + (bpp === 4 ? 1 : 0)] ?? 0) > 128) id |= 1 << i
+      ids.push(id)
+      f.close()
+    }
+  } finally {
+    void rd.cancel().catch(() => undefined)
+    clone.stop()
+  }
+  const dt = ts.slice(1).map((x, i) => x - ts[i]!)
+  const s = (ts.at(-1)! - ts[0]!) / 1000 || 1
+  const sorted = [...dt].sort((a, b) => a - b)
+  return {
+    fps: Math.round((10 * dt.length) / s) / 10,
+    uniqueFps: Math.round((10 * ids.slice(1).filter((v, i) => v !== ids[i]).length) / s) / 10,
+    intervalMs: { p50: sorted[Math.floor(sorted.length / 2)] ?? null, p95: sorted[Math.floor(sorted.length * 0.95)] ?? null },
+    settings: t.getSettings(),
+  }
+}
+
 /** Is `identity`'s screen track subscribed with adaptive stream (resolution follows the element)? */
 export const screenAdaptive = (identity: string): boolean | null => {
   const pub = [...(media.debug.room?.remoteParticipants.get(identity)?.trackPublications.values() ?? [])].filter((p) => p.source === Track.Source.ScreenShare).pop()

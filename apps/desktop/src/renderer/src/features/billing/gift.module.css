@@ -1,0 +1,559 @@
+/* Gifts: the dialog (who → what → review), the reveal, the history. */
+
+.stepLabel {
+  margin-bottom: var(--s-3);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.sectionLabel {
+  margin: var(--s-4) 0 var(--s-2);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.note {
+  margin-top: var(--s-3);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-wrap: pretty;
+}
+
+/* ── Friends ── */
+.picker {
+  display: grid;
+  gap: var(--s-2);
+}
+.friends {
+  display: grid;
+  gap: 2px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.friend {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  height: 48px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-md);
+  text-align: left;
+  transition: background var(--dur-hover-out) var(--ease-out-quad);
+}
+.friend:hover:not(:disabled) {
+  background: var(--state-hover);
+  transition-duration: 0ms;
+}
+.friend:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.friendText {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.friendName {
+  overflow: hidden;
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.friendSub {
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.go {
+  color: var(--text-tertiary);
+}
+.chip {
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--r-xs);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-tertiary);
+  font: var(--type-badge);
+  line-height: 20px;
+}
+.productLine {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+  padding: var(--s-2);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.productThumb {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: linear-gradient(in oklab 180deg, #13132a, #17183a);
+  color: #b9b2f9;
+}
+.productThumb > span {
+  transform: scale(0.42);
+}
+
+/* ── What ── */
+.itemPicker {
+  max-height: 460px;
+  margin-right: calc(var(--s-2) * -1);
+  padding-right: var(--s-2);
+  overflow-y: auto;
+}
+.items {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-1_5);
+}
+.item {
+  display: grid;
+  gap: 1px;
+  padding: var(--s-1_5);
+  border-radius: var(--r-md);
+  text-align: left;
+  transition: background var(--dur-hover-out) var(--ease-out-quad);
+}
+.item:hover {
+  background: var(--state-hover);
+  transition-duration: 0ms;
+}
+.itemThumb {
+  display: grid;
+  place-items: center;
+  height: 76px;
+  margin-bottom: var(--s-1);
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.itemThumb > span:only-child {
+  width: 100%;
+  transform: scale(0.8);
+}
+.bundleGlyph {
+  color: #b9b2f9;
+  font: var(--type-ui-lg);
+  font-weight: var(--w-semibold);
+}
+.itemName {
+  overflow: hidden;
+  color: var(--text-primary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.itemPrice {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+
+/* ── Review: their card wearing it, the form beside ── */
+.review {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: var(--s-6);
+  align-items: start;
+}
+.reviewCard {
+  display: grid;
+  gap: var(--s-2);
+}
+.onThem {
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-default);
+}
+.onThemCaption {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-align: center;
+}
+.reviewForm {
+  display: grid;
+  gap: var(--s-3);
+}
+.back {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 4px;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.back:hover {
+  color: var(--text-primary);
+}
+.field {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-1_5);
+}
+.fieldLabel {
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.fieldHint {
+  justify-self: end;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: var(--s-2) var(--s-3);
+  border: 0;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  color: var(--text-primary);
+  font: var(--type-ui);
+  resize: none;
+  outline: none;
+}
+.textarea::placeholder {
+  color: var(--text-tertiary);
+}
+.textarea:focus {
+  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.75), 0 0 0 3px rgba(139, 142, 247, 0.16);
+}
+.date {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 32px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-md);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  color: var(--text-tertiary);
+}
+.date input {
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: var(--type-ui);
+  color-scheme: dark;
+  outline: none;
+}
+.summary {
+  display: grid;
+  gap: 4px;
+  padding: var(--s-2) 0;
+  border-block: 1px solid var(--border-subtle);
+}
+.summary div {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-secondary);
+  font: var(--type-meta);
+}
+.summary .total {
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-semibold);
+}
+.pix {
+  color: var(--text-secondary);
+  font: var(--type-meta);
+}
+.blocked {
+  color: var(--danger);
+  font: var(--type-meta);
+}
+.done {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-3);
+  color: var(--text-primary);
+  font: var(--type-ui);
+}
+.done > svg {
+  color: var(--success);
+}
+
+/* ── The reveal ── */
+.reveal {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-4);
+}
+.box {
+  position: relative;
+  width: 300px;
+  height: 236px;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: linear-gradient(in oklab 180deg, #0f0f1a, #17183a);
+  box-shadow: var(--elev-overlay), inset 0 0 0 1px rgba(139, 142, 247, 0.14);
+}
+.boxInside {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+}
+.revealCard {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.plusMark {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-1);
+  color: var(--text-primary);
+  font: var(--type-title);
+  font-variation-settings: var(--opsz-display);
+}
+.plusMark svg {
+  color: #b9b2f9;
+}
+.plusSub {
+  color: var(--text-secondary);
+  font: var(--type-ui);
+}
+/* Night paper: ink into deep indigo, a faint sheen from 11 h. */
+.paper {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(115deg, rgba(247, 248, 248, 0.06), rgba(247, 248, 248, 0) 38%),
+    radial-gradient(60% 60% at 20% 0%, rgba(139, 142, 247, 0.16), transparent 70%),
+    linear-gradient(in oklab 180deg, #17183a, #24255a);
+}
+/* The silk ribbon: Fita de seda's gradient (deep → indigo → lilac), a 1 px sheen along its edge. */
+.ribbonV,
+.ribbonH {
+  position: absolute;
+  background: linear-gradient(in oklab 90deg, #24255a, #6163d0 45%, #b9b2f9);
+  box-shadow: inset 1px 0 0 rgba(247, 248, 248, 0.25);
+}
+.ribbonV {
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 11px);
+  width: 22px;
+}
+.ribbonH {
+  left: 0;
+  right: 0;
+  top: calc(44% - 11px);
+  height: 22px;
+  background: linear-gradient(in oklab 180deg, #b9b2f9, #6163d0 55%, #24255a);
+  box-shadow: inset 0 1px 0 rgba(247, 248, 248, 0.25);
+}
+.bow {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: 0;
+  height: 0;
+}
+.loopL,
+.loopR {
+  position: absolute;
+  top: -20px;
+  width: 38px;
+  height: 26px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: linear-gradient(in oklab 160deg, #b9b2f9, #6163d0 60%, #24255a);
+  box-shadow: inset 0 0 0 1px rgba(247, 248, 248, 0.18);
+}
+.loopL {
+  right: 2px;
+  transform-origin: 100% 80%;
+  transform: rotate(-14deg);
+}
+.loopR {
+  left: 2px;
+  transform-origin: 0 80%;
+  transform: rotate(14deg);
+}
+.knot {
+  position: absolute;
+  left: -8px;
+  top: -9px;
+  width: 16px;
+  height: 18px;
+  border-radius: 5px;
+  background: linear-gradient(in oklab 180deg, #8b8ef7, #24255a);
+  box-shadow: inset 0 1px 0 rgba(247, 248, 248, 0.35);
+}
+
+/* Opening (1.2 s, transform/opacity only): the bow lets go, the ribbon slides off, the paper lifts, the gift is lit.
+   Each rule below is the end state; the keyframes only say where it starts (backwards fill, never `to`). */
+.reveal[data-phase='opening'] .loopL {
+  opacity: 0;
+  transform: rotate(-70deg) translateX(-10px);
+  animation: loopOff 420ms var(--ease-in-out-cubic) backwards;
+}
+.reveal[data-phase='opening'] .loopR {
+  opacity: 0;
+  transform: rotate(70deg) translateX(10px);
+  animation: loopOffR 420ms var(--ease-in-out-cubic) backwards;
+}
+.reveal[data-phase='opening'] .knot {
+  opacity: 0;
+  animation: fadeOff 300ms 200ms var(--ease-out-quad) backwards;
+}
+.reveal[data-phase='opening'] .ribbonV {
+  opacity: 0;
+  transform: translateY(70%);
+  animation: ribbonOffV 560ms 260ms var(--ease-in-out-cubic) backwards;
+}
+.reveal[data-phase='opening'] .ribbonH {
+  opacity: 0;
+  transform: scaleX(0);
+  animation: ribbonOffH 560ms 260ms var(--ease-in-out-cubic) backwards;
+}
+.reveal[data-phase='opening'] .paper {
+  opacity: 0;
+  transform: translateY(-14px);
+  animation: paperOff 500ms 700ms var(--ease-out-quart) backwards;
+}
+.reveal[data-phase='opening'] .boxInside {
+  opacity: 1;
+  transform: none;
+  animation: insideOn 520ms 680ms var(--ease-out-quart) backwards;
+}
+.reveal[data-phase='open'] .paper {
+  display: none;
+}
+.reveal[data-phase='open'] .boxInside {
+  opacity: 1;
+}
+@keyframes loopOff {
+  from {
+    opacity: 1;
+    transform: rotate(-14deg);
+  }
+}
+@keyframes loopOffR {
+  from {
+    opacity: 1;
+    transform: rotate(14deg);
+  }
+}
+@keyframes fadeOff {
+  from {
+    opacity: 1;
+  }
+}
+@keyframes ribbonOffV {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ribbonOffH {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes paperOff {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes insideOn {
+  from {
+    opacity: 0;
+    transform: scale(0.965);
+  }
+}
+.message {
+  max-width: 320px;
+  color: var(--text-secondary);
+  font: var(--type-ui-lg);
+  font-weight: var(--w-regular);
+  text-align: center;
+  text-wrap: pretty;
+}
+.revealText {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-1);
+  text-align: center;
+}
+.revealTitle {
+  color: var(--text-primary);
+  font: var(--type-title-sm);
+  font-variation-settings: var(--opsz-display);
+  letter-spacing: var(--track-title);
+}
+.revealLine {
+  color: var(--text-secondary);
+  font: var(--type-ui);
+  text-wrap: pretty;
+}
+.messageSmall {
+  margin-top: var(--s-1);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.revealActions {
+  display: flex;
+  justify-content: center;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+
+/* ── History ── */
+.giftList {
+  display: grid;
+  gap: 2px;
+}
+.giftRow {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: 56px;
+  padding: var(--s-1) 0;
+}
+.giftThumb {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: linear-gradient(in oklab 180deg, #13132a, #17183a);
+  color: #b9b2f9;
+}
+.giftThumb > span {
+  transform: scale(0.42);
+}
+.giftMsg {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  font-style: italic;
+}
+.tab {
+  display: grid;
+  gap: var(--s-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal[data-phase='opening'] * {
+    animation: none !important;
+  }
+}

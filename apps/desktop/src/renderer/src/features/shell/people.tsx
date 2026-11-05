@@ -9,6 +9,7 @@ import { channelTitle } from '@/store/selectors'
 import { useUi } from '@/store/ui'
 import { Button, IconButton, MenuButton, toast, VoiceDot, type MenuEntry } from '@/ui'
 import { openSettings } from '../settings/store'
+import { giftEntries } from '../billing/TryOn'
 import { openSpaceSettings } from '../spaceSettings/store'
 import { actorFor, visibleSections } from '../spaceSettings/permissions'
 import { userReportEntries } from '../trust/Report'
@@ -77,7 +78,7 @@ export function personEntries(user: PublicUser, opts: { spaceId?: string | null;
   const out: MenuEntry[] = []
   if (opts.profile) out.push({ label: t.people.profile, icon: UserRound, onSelect: opts.profile })
   if (opts.reach !== false && !blocked) {
-    out.push({ label: t.people.message, icon: MessageCircle, onSelect: () => void messageUser(user.id) }, { label: t.people.call, icon: Phone, onSelect: () => void callUser(user.id) })
+    out.push({ label: t.people.message, icon: MessageCircle, onSelect: () => void messageUser(user.id) }, { label: t.people.call, icon: Phone, onSelect: () => void callUser(user.id) }, ...giftEntries(user))
   }
   const inMyCall = useMedia.getState().participants[user.id]
   if (inMyCall) {

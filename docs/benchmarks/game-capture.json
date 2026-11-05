@@ -1,0 +1,5547 @@
+{
+  "probe-real": {
+    "when": "2026-11-01T15:36:38.162Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 55.2,
+          "uniqueFps": 37.7,
+          "intervalMs": {
+            "p50": 17.700000002980232,
+            "p95": 21.5
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 56,
+          "p95": 57,
+          "min": 53,
+          "max": 57,
+          "mean": 55.6
+        },
+        "sourceFramesRate": 55.4,
+        "encodedFps": 55.6,
+        "sentFps": 55.6,
+        "sendFps": {
+          "n": 10,
+          "median": 56,
+          "p95": 57,
+          "min": 53,
+          "max": 57,
+          "mean": 55.6
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2689.7,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.1,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 56,
+          "p95": 57,
+          "min": 53,
+          "max": 57,
+          "mean": 55.6
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.2,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.6,
+            "privMBMedian": 165.8
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 260.3
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.3
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 89.4
+          }
+        },
+        "gpuPct": 43
+      },
+      "borderless:window": {
+        "mode": "borderless",
+        "kind": "window",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 54.3,
+          "uniqueFps": 54.3,
+          "intervalMs": {
+            "p50": 18.30000001192093,
+            "p95": 21.599999994039536
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "window:2689234:0",
+            "displaySurface": "window",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 55,
+          "p95": 55,
+          "min": 52,
+          "max": 55,
+          "mean": 54.2
+        },
+        "sourceFramesRate": 54.2,
+        "encodedFps": 54.2,
+        "sentFps": 54.2,
+        "sendFps": {
+          "n": 10,
+          "median": 55,
+          "p95": 56,
+          "min": 52,
+          "max": 56,
+          "mean": 54.5
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2907.5,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.5,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 54,
+          "p95": 56,
+          "min": 53,
+          "max": 56,
+          "mean": 54.2
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.7,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.8,
+            "privMBMedian": 150.8
+          },
+          "GPU": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 257.9
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.3
+          },
+          "Tab": {
+            "cpuMedian": 0.9,
+            "privMBMedian": 87.7
+          }
+        },
+        "gpuPct": 53
+      }
+    }
+  },
+  "probe-cpu20": {
+    "when": "2026-11-01T15:37:53.988Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 20
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "error": "page.evaluate: AbortError: Timeout starting video source"
+      }
+    }
+  },
+  "probe-cpu12": {
+    "when": "2026-11-01T15:38:45.743Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 12
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 46.5,
+          "uniqueFps": 46.5,
+          "intervalMs": {
+            "p50": 20.200000002980232,
+            "p95": 29.600000008940697
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 48,
+          "p95": 50,
+          "min": 35,
+          "max": 50,
+          "mean": 45.1
+        },
+        "sourceFramesRate": 45.1,
+        "encodedFps": 45.1,
+        "sentFps": 45.1,
+        "sendFps": {
+          "n": 10,
+          "median": 48,
+          "p95": 50,
+          "min": 35,
+          "max": 50,
+          "mean": 45.1
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2832,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.5,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 48,
+          "p95": 50,
+          "min": 36,
+          "max": 50,
+          "mean": 45.7
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.1,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.5,
+            "privMBMedian": 162.9
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 259.1
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.1
+          },
+          "Tab": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 90.1
+          }
+        },
+        "gpuPct": 41
+      }
+    }
+  },
+  "probe-cpu16": {
+    "when": "2026-11-01T15:39:14.010Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 39.2,
+          "uniqueFps": 39.2,
+          "intervalMs": {
+            "p50": 20.799999997019768,
+            "p95": 50.20000000298023
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 31,
+          "p95": 43,
+          "min": 12,
+          "max": 43,
+          "mean": 26.7
+        },
+        "sourceFramesRate": 25.1,
+        "encodedFps": 25.1,
+        "sentFps": 25.1,
+        "sendFps": {
+          "n": 10,
+          "median": 32,
+          "p95": 43,
+          "min": 12,
+          "max": 43,
+          "mean": 26.7
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2602.8,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 4.3,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 34,
+          "p95": 42,
+          "min": 12,
+          "max": 42,
+          "mean": 26.8
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 1,
+        "cpuA": 1.6,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 161.6
+          },
+          "GPU": {
+            "cpuMedian": 0.4,
+            "privMBMedian": 256.5
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83
+          },
+          "Tab": {
+            "cpuMedian": 0.5,
+            "privMBMedian": 94.6
+          }
+        },
+        "gpuPct": 39
+      }
+    }
+  },
+  "probe-cpu16-harness": {
+    "when": "2026-11-01T15:39:51.375Z",
+    "harnessFlags": true,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 31,
+          "uniqueFps": 31,
+          "intervalMs": {
+            "p50": 28.700000002980232,
+            "p95": 59.79999999701977
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 33,
+          "p95": 43,
+          "min": 19,
+          "max": 43,
+          "mean": 32.3
+        },
+        "sourceFramesRate": 30.8,
+        "encodedFps": 30.8,
+        "sentFps": 30.8,
+        "sendFps": {
+          "n": 10,
+          "median": 32,
+          "p95": 44,
+          "min": 19,
+          "max": 44,
+          "mean": 32.1
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2734.7,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 4.4,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 34,
+          "p95": 41,
+          "min": 18,
+          "max": 41,
+          "mean": 30.8
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 2.2,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.9,
+            "privMBMedian": 167.9
+          },
+          "GPU": {
+            "cpuMedian": 0.5,
+            "privMBMedian": 257.7
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84.2
+          },
+          "Tab": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 97.1
+          }
+        },
+        "gpuPct": 39
+      }
+    }
+  },
+  "probe-prio-Browser": {
+    "when": "2026-11-01T15:40:47.270Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 46.6,
+          "uniqueFps": 46.6,
+          "intervalMs": {
+            "p50": 20.400000005960464,
+            "p95": 31.100000008940697
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 48,
+          "p95": 52,
+          "min": 44,
+          "max": 52,
+          "mean": 47.9
+        },
+        "sourceFramesRate": 47.5,
+        "encodedFps": 47.5,
+        "sentFps": 47.5,
+        "sendFps": {
+          "n": 10,
+          "median": 48,
+          "p95": 52,
+          "min": 44,
+          "max": 52,
+          "mean": 48.2
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2929.6,
+        "targetKbps": 2961.232,
+        "encodeMsPerFrame": 6.3,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 48,
+          "p95": 49,
+          "min": 42,
+          "max": 49,
+          "mean": 47.1
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 2.7,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.2,
+            "privMBMedian": 171.6
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 258.8
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84.2
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 97.1
+          }
+        },
+        "gpuPct": 43
+      }
+    }
+  },
+  "probe-prio-GPU": {
+    "when": "2026-11-01T15:41:21.757Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 27.7,
+          "uniqueFps": 27.5,
+          "intervalMs": {
+            "p50": 24.399999991059303,
+            "p95": 97.8999999910593
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 13,
+          "p95": 42,
+          "min": 6,
+          "max": 42,
+          "mean": 17.6
+        },
+        "sourceFramesRate": 16.5,
+        "encodedFps": 16.5,
+        "sentFps": 16.5,
+        "sendFps": {
+          "n": 10,
+          "median": 13,
+          "p95": 43,
+          "min": 7,
+          "max": 43,
+          "mean": 18.2
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2367.3,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.9,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 14,
+          "p95": 44,
+          "min": 8,
+          "max": 44,
+          "mean": 19.1
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 1,
+        "cpuA": 1.3,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.4,
+            "privMBMedian": 166.8
+          },
+          "GPU": {
+            "cpuMedian": 0.3,
+            "privMBMedian": 255.4
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.9
+          },
+          "Tab": {
+            "cpuMedian": 0.5,
+            "privMBMedian": 90.4
+          }
+        },
+        "gpuPct": 39
+      }
+    }
+  },
+  "probe-prio-Tab": {
+    "when": "2026-11-01T15:41:53.812Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 19.9,
+          "uniqueFps": 19.9,
+          "intervalMs": {
+            "p50": 44.19999998807907,
+            "p95": 105.90000000596046
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 18,
+          "p95": 24,
+          "min": 10,
+          "max": 24,
+          "mean": 17.1
+        },
+        "sourceFramesRate": 17.1,
+        "encodedFps": 17.1,
+        "sentFps": 17.1,
+        "sendFps": {
+          "n": 10,
+          "median": 18,
+          "p95": 24,
+          "min": 9,
+          "max": 24,
+          "mean": 16.9
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2601.9,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.9,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 17,
+          "p95": 25,
+          "min": 11,
+          "max": 25,
+          "mean": 16.4
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 3,
+        "cpuA": 1.4,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.5,
+            "privMBMedian": 172.7
+          },
+          "GPU": {
+            "cpuMedian": 0.3,
+            "privMBMedian": 257.1
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84.8
+          },
+          "Tab": {
+            "cpuMedian": 0.4,
+            "privMBMedian": 97
+          }
+        },
+        "gpuPct": 39
+      }
+    }
+  },
+  "probe-rep-none-1": {
+    "when": "2026-11-01T15:42:48.136Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 7.2,
+          "uniqueFps": 7.2,
+          "intervalMs": {
+            "p50": 130.3999999910593,
+            "p95": 247.40000000596046
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 6,
+          "p95": 10,
+          "min": 3,
+          "max": 10,
+          "mean": 5.8
+        },
+        "sourceFramesRate": 5.6,
+        "encodedFps": 5.6,
+        "sentFps": 5.6,
+        "sendFps": {
+          "n": 10,
+          "median": 5,
+          "p95": 9,
+          "min": 3,
+          "max": 9,
+          "mean": 5.5
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2372.9,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 8.1,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 6,
+          "p95": 10,
+          "min": 2,
+          "max": 10,
+          "mean": 5.8
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 1,
+        "cpuA": 0.8,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 170.3
+          },
+          "GPU": {
+            "cpuMedian": 0.1,
+            "privMBMedian": 259.1
+          },
+          "Utility": {
+            "cpuMedian": 0.1,
+            "privMBMedian": 83.2
+          },
+          "Tab": {
+            "cpuMedian": 0.4,
+            "privMBMedian": 91.3
+          }
+        },
+        "gpuPct": 39
+      }
+    }
+  },
+  "probe-rep-Browser-1": {
+    "when": "2026-11-01T15:43:25.444Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 49,
+          "uniqueFps": 49,
+          "intervalMs": {
+            "p50": 19.200000002980232,
+            "p95": 29.5
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 48,
+          "p95": 55,
+          "min": 42,
+          "max": 55,
+          "mean": 48.2
+        },
+        "sourceFramesRate": 47.8,
+        "encodedFps": 47.7,
+        "sentFps": 47.7,
+        "sendFps": {
+          "n": 10,
+          "median": 47,
+          "p95": 56,
+          "min": 42,
+          "max": 56,
+          "mean": 48.2
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2853.2,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 8.8,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 49,
+          "p95": 55,
+          "min": 45,
+          "max": 55,
+          "mean": 48.4
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 2.7,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.2,
+            "privMBMedian": 172.6
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 258.1
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 93.8
+          }
+        },
+        "gpuPct": 40
+      }
+    }
+  },
+  "probe-rep-none-2": {
+    "when": "2026-11-01T15:43:57.277Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 6.7,
+          "uniqueFps": 5.2,
+          "intervalMs": {
+            "p50": 133.5,
+            "p95": 289.09999999403954
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 7,
+          "p95": 9,
+          "min": 2,
+          "max": 9,
+          "mean": 6
+        },
+        "sourceFramesRate": 5.5,
+        "encodedFps": 5.5,
+        "sentFps": 5.5,
+        "sendFps": {
+          "n": 10,
+          "median": 7,
+          "p95": 9,
+          "min": 2,
+          "max": 9,
+          "mean": 6.1
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 989.5,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 6.3,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 6,
+          "p95": 11,
+          "min": 4,
+          "max": 11,
+          "mean": 6.5
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 1,
+        "cpuA": 0.8,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 171.2
+          },
+          "GPU": {
+            "cpuMedian": 0.1,
+            "privMBMedian": 257.5
+          },
+          "Utility": {
+            "cpuMedian": 0.1,
+            "privMBMedian": 83.4
+          },
+          "Tab": {
+            "cpuMedian": 0.3,
+            "privMBMedian": 92.2
+          }
+        },
+        "gpuPct": 40
+      }
+    }
+  },
+  "probe-rep-Browser-2": {
+    "when": "2026-11-01T15:44:33.915Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 23.4,
+          "uniqueFps": 23.4,
+          "intervalMs": {
+            "p50": 31.599999994039536,
+            "p95": 123.29999999701977
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 35,
+          "p95": 52,
+          "min": 18,
+          "max": 52,
+          "mean": 34.9
+        },
+        "sourceFramesRate": 36.4,
+        "encodedFps": 36.3,
+        "sentFps": 36.3,
+        "sendFps": {
+          "n": 10,
+          "median": 36,
+          "p95": 52,
+          "min": 18,
+          "max": 52,
+          "mean": 35
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2099.4,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 7.9,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 35,
+          "p95": 50,
+          "min": 18,
+          "max": 50,
+          "mean": 34.2
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 2,
+        "cpuA": 2.3,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.9,
+            "privMBMedian": 175.4
+          },
+          "GPU": {
+            "cpuMedian": 0.5,
+            "privMBMedian": 258.2
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.6
+          },
+          "Tab": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 93.7
+          }
+        },
+        "gpuPct": 39
+      }
+    }
+  },
+  "probe-rep-none-3": {
+    "when": "2026-11-01T15:45:14.177Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 12.2,
+          "uniqueFps": 12.2,
+          "intervalMs": {
+            "p50": 76.59999999403954,
+            "p95": 154.80000001192093
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 8,
+          "p95": 20,
+          "min": 2,
+          "max": 20,
+          "mean": 9.9
+        },
+        "sourceFramesRate": 9.5,
+        "encodedFps": 9.5,
+        "sentFps": 9.5,
+        "sendFps": {
+          "n": 10,
+          "median": 8,
+          "p95": 19,
+          "min": 2,
+          "max": 19,
+          "mean": 9.7
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 1894.3,
+        "targetKbps": 2322.299,
+        "encodeMsPerFrame": 6.2,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 10,
+          "p95": 16,
+          "min": 2,
+          "max": 16,
+          "mean": 9.1
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 2,
+        "cpuA": 1,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.3,
+            "privMBMedian": 174.4
+          },
+          "GPU": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 256.4
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.1
+          },
+          "Tab": {
+            "cpuMedian": 0.4,
+            "privMBMedian": 90
+          }
+        },
+        "gpuPct": 38
+      }
+    }
+  },
+  "probe-rep-Browser-3": {
+    "when": "2026-11-01T15:45:49.451Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 52.4,
+          "uniqueFps": 52.4,
+          "intervalMs": {
+            "p50": 18.600000008940697,
+            "p95": 26.299999997019768
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 52,
+          "p95": 54,
+          "min": 48,
+          "max": 54,
+          "mean": 51.6
+        },
+        "sourceFramesRate": 51.7,
+        "encodedFps": 51.7,
+        "sentFps": 51.7,
+        "sendFps": {
+          "n": 10,
+          "median": 52,
+          "p95": 54,
+          "min": 48,
+          "max": 54,
+          "mean": 51.7
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2887.7,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 6.9,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 51,
+          "p95": 56,
+          "min": 43,
+          "max": 56,
+          "mean": 50.9
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 2.9,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.3,
+            "privMBMedian": 175.7
+          },
+          "GPU": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 254.7
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.8
+          },
+          "Tab": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 96.8
+          }
+        },
+        "gpuPct": 41
+      }
+    }
+  },
+  "probe-zc-1": {
+    "when": "2026-11-01T15:46:48.085Z",
+    "harnessFlags": false,
+    "flags": [
+      "--enable-features=ZeroCopyDesktopCapture"
+    ],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 9.9,
+          "uniqueFps": 9.9,
+          "intervalMs": {
+            "p50": 84.6000000089407,
+            "p95": 242.69999998807907
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 10,
+          "p95": 19,
+          "min": 3,
+          "max": 19,
+          "mean": 10.9
+        },
+        "sourceFramesRate": 10.8,
+        "encodedFps": 10.8,
+        "sentFps": 10.8,
+        "sendFps": {
+          "n": 10,
+          "median": 11,
+          "p95": 20,
+          "min": 3,
+          "max": 20,
+          "mean": 11.2
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 1897.7,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 5.7,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 11,
+          "p95": 20,
+          "min": 3,
+          "max": 20,
+          "mean": 10.6
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 2,
+        "cpuA": 1,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.3,
+            "privMBMedian": 165.5
+          },
+          "GPU": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 260.1
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 82.9
+          },
+          "Tab": {
+            "cpuMedian": 0.4,
+            "privMBMedian": 92.7
+          }
+        },
+        "gpuPct": 37
+      }
+    }
+  },
+  "probe-zc-2": {
+    "when": "2026-11-01T15:47:26.388Z",
+    "harnessFlags": false,
+    "flags": [
+      "--enable-features=ZeroCopyDesktopCapture"
+    ],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "error": "page.waitForFunction: Timeout 20000ms exceeded."
+      }
+    }
+  },
+  "probe-rep-Browser:high-1": {
+    "when": "2026-11-01T15:48:30.216Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 57,
+          "uniqueFps": 57,
+          "intervalMs": {
+            "p50": 17.5,
+            "p95": 19.399999991059303
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 35,
+          "max": 58,
+          "mean": 53.5
+        },
+        "sourceFramesRate": 53.1,
+        "encodedFps": 31.9,
+        "sentFps": 31.9,
+        "sendFps": {
+          "n": 9,
+          "median": 49,
+          "p95": 57,
+          "min": 10,
+          "max": 57,
+          "mean": 40
+        },
+        "sendRes": [
+          "1280x720",
+          "640x360"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 1537.1,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 5.3,
+        "qualityLimitation": {
+          "bandwidth": 3,
+          "none": 7
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 53,
+          "p95": 130,
+          "min": 0,
+          "max": 130,
+          "mean": 46.3
+        },
+        "recvRes": [
+          "640x360",
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 5,
+        "cpuA": 2.9,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.4,
+            "privMBMedian": 175.8
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 257.5
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 82.8
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 90.9
+          }
+        },
+        "gpuPct": 41
+      }
+    }
+  },
+  "probe-rep-Browser,GPU-1": {
+    "when": "2026-11-01T15:49:08.086Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 51.9,
+          "uniqueFps": 51.9,
+          "intervalMs": {
+            "p50": 18.299999997019768,
+            "p95": 27.399999991059303
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 52,
+          "p95": 56,
+          "min": 50,
+          "max": 56,
+          "mean": 52.3
+        },
+        "sourceFramesRate": 52.5,
+        "encodedFps": 52.5,
+        "sentFps": 52.5,
+        "sendFps": {
+          "n": 10,
+          "median": 52,
+          "p95": 56,
+          "min": 50,
+          "max": 56,
+          "mean": 52.1
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2988,
+        "targetKbps": 2742.804,
+        "encodeMsPerFrame": 5,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 53,
+          "p95": 55,
+          "min": 47,
+          "max": 55,
+          "mean": 52.1
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 2.8,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.3,
+            "privMBMedian": 174.2
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 259.6
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.7
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 93
+          }
+        },
+        "gpuPct": 40
+      }
+    }
+  },
+  "probe-rep-Browser:high-2": {
+    "when": "2026-11-01T15:49:40.301Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 56.4,
+          "uniqueFps": 56.4,
+          "intervalMs": {
+            "p50": 17.5,
+            "p95": 19.799999997019768
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 56,
+          "p95": 58,
+          "min": 55,
+          "max": 58,
+          "mean": 56.4
+        },
+        "sourceFramesRate": 56.6,
+        "encodedFps": 56.7,
+        "sentFps": 56.7,
+        "sendFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 54,
+          "max": 58,
+          "mean": 56.4
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2880,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.8,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 54,
+          "max": 58,
+          "mean": 56.4
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.4,
+            "privMBMedian": 173.1
+          },
+          "GPU": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 258.1
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 82.7
+          },
+          "Tab": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 95.4
+          }
+        },
+        "gpuPct": 39
+      }
+    }
+  },
+  "probe-rep-Browser,GPU-2": {
+    "when": "2026-11-01T15:50:10.501Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 30.3,
+          "uniqueFps": 30.3,
+          "intervalMs": {
+            "p50": 22.700000002980232,
+            "p95": 93.20000000298023
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 33,
+          "p95": 44,
+          "min": 16,
+          "max": 44,
+          "mean": 31.2
+        },
+        "sourceFramesRate": 31.7,
+        "encodedFps": 31.4,
+        "sentFps": 31.4,
+        "sendFps": {
+          "n": 10,
+          "median": 33,
+          "p95": 43,
+          "min": 15,
+          "max": 43,
+          "mean": 30.8
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2552.1,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 13.5,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 35,
+          "p95": 40,
+          "min": 14,
+          "max": 40,
+          "mean": 32.1
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 4,
+        "cpuA": 2.5,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.1,
+            "privMBMedian": 168
+          },
+          "GPU": {
+            "cpuMedian": 0.5,
+            "privMBMedian": 255
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.5
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 92.5
+          }
+        },
+        "gpuPct": 41
+      }
+    }
+  },
+  "probe-rep-Browser:high-3": {
+    "when": "2026-11-01T15:50:53.421Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 55.4,
+          "uniqueFps": 55.4,
+          "intervalMs": {
+            "p50": 17.600000008940697,
+            "p95": 22.599999994039536
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 55,
+          "p95": 57,
+          "min": 29,
+          "max": 57,
+          "mean": 48.4
+        },
+        "sourceFramesRate": 46.3,
+        "encodedFps": 34.1,
+        "sentFps": 34.1,
+        "sendFps": {
+          "n": 8,
+          "median": 54,
+          "p95": 56,
+          "min": 15,
+          "max": 56,
+          "mean": 45.4
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 874.9,
+        "targetKbps": 945.818,
+        "encodeMsPerFrame": 12.9,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 30,
+          "p95": 57,
+          "min": 22,
+          "max": 57,
+          "mean": 36.2
+        },
+        "recvRes": [
+          "640x360",
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 5,
+        "cpuA": 2.9,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.3,
+            "privMBMedian": 168.3
+          },
+          "GPU": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 264.9
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84.5
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 96.5
+          }
+        },
+        "gpuPct": 39
+      }
+    }
+  },
+  "probe-rep-Browser,GPU-3": {
+    "when": "2026-11-01T15:51:30.477Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 46.6,
+          "uniqueFps": 46.6,
+          "intervalMs": {
+            "p50": 19,
+            "p95": 41
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 48,
+          "p95": 51,
+          "min": 39,
+          "max": 51,
+          "mean": 46.7
+        },
+        "sourceFramesRate": 46.8,
+        "encodedFps": 46.6,
+        "sentFps": 46.6,
+        "sendFps": {
+          "n": 10,
+          "median": 47,
+          "p95": 51,
+          "min": 38,
+          "max": 51,
+          "mean": 46.5
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2798.4,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 7.1,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 48,
+          "p95": 51,
+          "min": 34,
+          "max": 51,
+          "mean": 46.5
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 2,
+        "cpuA": 2.7,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.2,
+            "privMBMedian": 174.5
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 254.1
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.8
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 95.9
+          }
+        },
+        "gpuPct": 43
+      }
+    }
+  },
+  "probe-rep-all-1": {
+    "when": "2026-11-01T15:52:33.816Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 53.3,
+          "uniqueFps": 53.3,
+          "intervalMs": {
+            "p50": 17.799999997019768,
+            "p95": 26.100000008940697
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 56,
+          "p95": 57,
+          "min": 50,
+          "max": 57,
+          "mean": 55.1
+        },
+        "sourceFramesRate": 55.2,
+        "encodedFps": 55.2,
+        "sentFps": 55.2,
+        "sendFps": {
+          "n": 10,
+          "median": 56,
+          "p95": 57,
+          "min": 48,
+          "max": 57,
+          "mean": 54.8
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2872.1,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.6,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 56,
+          "p95": 57,
+          "min": 49,
+          "max": 57,
+          "mean": 54.8
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.4,
+            "privMBMedian": 170.7
+          },
+          "GPU": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 256.9
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.6
+          },
+          "Tab": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 97.7
+          }
+        },
+        "gpuPct": 40
+      }
+    }
+  },
+  "probe-rep-all:high-1": {
+    "when": "2026-11-01T15:53:03.009Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 57.1,
+          "uniqueFps": 57.1,
+          "intervalMs": {
+            "p50": 17.599999994039536,
+            "p95": 19
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 57,
+          "max": 58,
+          "mean": 57.1
+        },
+        "sourceFramesRate": 56.8,
+        "encodedFps": 56.8,
+        "sentFps": 56.8,
+        "sendFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 56,
+          "max": 58,
+          "mean": 56.9
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2903.8,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.1,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 56,
+          "max": 58,
+          "mean": 57
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.4,
+            "privMBMedian": 170
+          },
+          "GPU": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 257.6
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84
+          },
+          "Tab": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 97.2
+          }
+        },
+        "gpuPct": 39
+      }
+    }
+  },
+  "probe-rep-all-2": {
+    "when": "2026-11-01T15:53:30.658Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 55.2,
+          "uniqueFps": 55.2,
+          "intervalMs": {
+            "p50": 17.900000005960464,
+            "p95": 20.599999994039536
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 55,
+          "p95": 56,
+          "min": 53,
+          "max": 56,
+          "mean": 54.8
+        },
+        "sourceFramesRate": 54.3,
+        "encodedFps": 54.3,
+        "sentFps": 54.3,
+        "sendFps": {
+          "n": 10,
+          "median": 55,
+          "p95": 57,
+          "min": 53,
+          "max": 57,
+          "mean": 55
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2890.1,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.5,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 55,
+          "p95": 57,
+          "min": 54,
+          "max": 57,
+          "mean": 55.1
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.3,
+            "privMBMedian": 171.3
+          },
+          "GPU": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 253.9
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84.1
+          },
+          "Tab": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 98.9
+          }
+        },
+        "gpuPct": 40
+      }
+    }
+  },
+  "probe-rep-all:high-2": {
+    "when": "2026-11-01T15:54:01.645Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 56.8,
+          "uniqueFps": 56.8,
+          "intervalMs": {
+            "p50": 17.600000008940697,
+            "p95": 19.299999997019768
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 56,
+          "max": 58,
+          "mean": 57.1
+        },
+        "sourceFramesRate": 56.8,
+        "encodedFps": 56.6,
+        "sentFps": 56.6,
+        "sendFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 57,
+          "min": 55,
+          "max": 57,
+          "mean": 56.6
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 3183.4,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.2,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 55,
+          "max": 58,
+          "mean": 56.5
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.1,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.4,
+            "privMBMedian": 166.6
+          },
+          "GPU": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 259.6
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.1
+          },
+          "Tab": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 99.3
+          }
+        },
+        "gpuPct": 39
+      }
+    }
+  },
+  "probe-rep-all-3": {
+    "when": "2026-11-01T15:54:34.189Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 52.2,
+          "uniqueFps": 52.2,
+          "intervalMs": {
+            "p50": 18.100000008940697,
+            "p95": 25.299999997019768
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 50,
+          "p95": 55,
+          "min": 41,
+          "max": 55,
+          "mean": 49.2
+        },
+        "sourceFramesRate": 48.9,
+        "encodedFps": 48.9,
+        "sentFps": 48.9,
+        "sendFps": {
+          "n": 10,
+          "median": 50,
+          "p95": 55,
+          "min": 41,
+          "max": 55,
+          "mean": 49.3
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2812,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.7,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 50,
+          "p95": 53,
+          "min": 42,
+          "max": 53,
+          "mean": 48.6
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 2.8,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.2,
+            "privMBMedian": 164.8
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 253.8
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84.6
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 98.9
+          }
+        },
+        "gpuPct": 41
+      }
+    }
+  },
+  "probe-rep-all:high-3": {
+    "when": "2026-11-01T15:55:05.700Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 54.6,
+          "uniqueFps": 54.6,
+          "intervalMs": {
+            "p50": 17.799999997019768,
+            "p95": 20.5
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 56,
+          "p95": 57,
+          "min": 50,
+          "max": 57,
+          "mean": 55.7
+        },
+        "sourceFramesRate": 56.3,
+        "encodedFps": 56.3,
+        "sentFps": 56.3,
+        "sendFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 51,
+          "max": 58,
+          "mean": 56
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2991.9,
+        "targetKbps": 2735.041,
+        "encodeMsPerFrame": 3.2,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 56,
+          "p95": 58,
+          "min": 50,
+          "max": 58,
+          "mean": 55.8
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.1,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.3,
+            "privMBMedian": 171.5
+          },
+          "GPU": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 258.5
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.5
+          },
+          "Tab": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 100.6
+          }
+        },
+        "gpuPct": 42
+      }
+    }
+  },
+  "before-idle": {
+    "when": "2026-11-01T15:57:19.840Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 0
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 51.4,
+          "uniqueFps": 51.4,
+          "intervalMs": {
+            "p50": 19,
+            "p95": 23.599999994039536
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 50,
+          "p95": 55,
+          "min": 42,
+          "max": 55,
+          "mean": 48.8
+        },
+        "sourceFramesRate": 48.2,
+        "encodedFps": 48.1,
+        "sentFps": 48.1,
+        "sendFps": {
+          "n": 10,
+          "median": 50,
+          "p95": 55,
+          "min": 42,
+          "max": 55,
+          "mean": 49
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2894.9,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.7,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 51,
+          "p95": 54,
+          "min": 42,
+          "max": 54,
+          "mean": 49.3
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.6,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.7,
+            "privMBMedian": 170.6
+          },
+          "GPU": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 261.3
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84.4
+          },
+          "Tab": {
+            "cpuMedian": 0.9,
+            "privMBMedian": 97.9
+          }
+        },
+        "gpuPct": 49
+      },
+      "borderless:window": {
+        "mode": "borderless",
+        "kind": "window",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 28.8,
+          "uniqueFps": 28.8,
+          "intervalMs": {
+            "p50": 31.299999997019768,
+            "p95": 57.5
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "window:3214370:0",
+            "displaySurface": "window",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 27,
+          "p95": 33,
+          "min": 21,
+          "max": 33,
+          "mean": 26.7
+        },
+        "sourceFramesRate": 26.2,
+        "encodedFps": 26.2,
+        "sentFps": 26.2,
+        "sendFps": {
+          "n": 10,
+          "median": 27,
+          "p95": 33,
+          "min": 21,
+          "max": 33,
+          "mean": 26.8
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2700.9,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 6.7,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 25,
+          "p95": 37,
+          "min": 18,
+          "max": 37,
+          "mean": 26.2
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.4,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.4,
+            "privMBMedian": 161.6
+          },
+          "GPU": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 261.8
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84.4
+          },
+          "Tab": {
+            "cpuMedian": 1,
+            "privMBMedian": 94.2
+          }
+        },
+        "gpuPct": 45
+      },
+      "exclusive:screen": {
+        "mode": "exclusive",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": "exclusive 1920x1080 @ 179.84 Hz",
+        "capture": {
+          "fps": 53.3,
+          "uniqueFps": 53.3,
+          "intervalMs": {
+            "p50": 18.399999991059303,
+            "p95": 22
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 53,
+          "p95": 56,
+          "min": 43,
+          "max": 56,
+          "mean": 52.1
+        },
+        "sourceFramesRate": 51.5,
+        "encodedFps": 51.5,
+        "sentFps": 51.5,
+        "sendFps": {
+          "n": 10,
+          "median": 53,
+          "p95": 56,
+          "min": 43,
+          "max": 56,
+          "mean": 51.8
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2926.8,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.3,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 54,
+          "p95": 56,
+          "min": 33,
+          "max": 56,
+          "mean": 51.9
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.4,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.7,
+            "privMBMedian": 151.2
+          },
+          "GPU": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 262.2
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.9
+          },
+          "Tab": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 82.6
+          }
+        },
+        "gpuPct": 44
+      },
+      "exclusive:window": {
+        "mode": "exclusive",
+        "kind": "window",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": "exclusive 1920x1080 @ 179.84 Hz",
+        "capture": {
+          "fps": 56.9,
+          "uniqueFps": 56.9,
+          "intervalMs": {
+            "p50": 17.5,
+            "p95": 19.700000002980232
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "window:1705802:0",
+            "displaySurface": "window",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 57,
+          "min": 57,
+          "max": 57,
+          "mean": 57
+        },
+        "sourceFramesRate": 57,
+        "encodedFps": 57,
+        "sentFps": 57,
+        "sendFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 57,
+          "max": 58,
+          "mean": 57.1
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2942.7,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 2.9,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 56,
+          "max": 58,
+          "mean": 57
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 2.9,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.5,
+            "privMBMedian": 162.9
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 259.5
+          },
+          "Utility": {
+            "cpuMedian": 0.1,
+            "privMBMedian": 83.8
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 86
+          }
+        },
+        "gpuPct": 44
+      },
+      "windowed:screen": {
+        "mode": "windowed",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 47.9,
+          "uniqueFps": 0,
+          "intervalMs": {
+            "p50": 18.799999997019768,
+            "p95": 34.29999999701977
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 54,
+          "p95": 56,
+          "min": 32,
+          "max": 56,
+          "mean": 51.4
+        },
+        "sourceFramesRate": 51,
+        "encodedFps": 51,
+        "sentFps": 51,
+        "sendFps": {
+          "n": 10,
+          "median": 54,
+          "p95": 56,
+          "min": 33,
+          "max": 56,
+          "mean": 51.9
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2965.9,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.5,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 54,
+          "p95": 55,
+          "min": 32,
+          "max": 55,
+          "mean": 51.3
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.3,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.6,
+            "privMBMedian": 171
+          },
+          "GPU": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 264.1
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.9
+          },
+          "Tab": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 83.1
+          }
+        },
+        "gpuPct": 30
+      },
+      "windowed:window": {
+        "mode": "windowed",
+        "kind": "window",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 56.7,
+          "uniqueFps": 56.7,
+          "intervalMs": {
+            "p50": 17.599999994039536,
+            "p95": 19.900000005960464
+          },
+          "settings": {
+            "aspectRatio": 1.7075208913649025,
+            "cursor": "always",
+            "deviceId": "window:77335088:0",
+            "displaySurface": "window",
+            "frameRate": 60,
+            "height": 718,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1226
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 56,
+          "max": 58,
+          "mean": 56.8
+        },
+        "sourceFramesRate": 56.9,
+        "encodedFps": 0,
+        "sentFps": 0,
+        "sendFps": {
+          "n": 0,
+          "median": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null
+        },
+        "sendRes": [
+          "undefinedxundefined"
+        ],
+        "sourceRes": "1226x718",
+        "kbps": 0,
+        "targetKbps": null,
+        "encodeMsPerFrame": 0,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (OpenH264, OpenH264, OpenH264)",
+        "hw": false,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 57,
+          "min": 55,
+          "max": 57,
+          "mean": 56.5
+        },
+        "recvRes": [
+          "1226x718"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.3,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.2,
+            "privMBMedian": 137.4
+          },
+          "GPU": {
+            "cpuMedian": 0,
+            "privMBMedian": 107.1
+          },
+          "Utility": {
+            "cpuMedian": 0.1,
+            "privMBMedian": 83.5
+          },
+          "Tab": {
+            "cpuMedian": 1.9,
+            "privMBMedian": 103
+          }
+        },
+        "gpuPct": 38
+      }
+    }
+  },
+  "probe-zct-none-1": {
+    "when": "2026-11-01T16:02:42.912Z",
+    "harnessFlags": false,
+    "flags": [
+      "--enable-features=ZeroCopyDesktopCapture,WebRtcAllowWgcUsingTexture"
+    ],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 28.2,
+          "uniqueFps": 28.2,
+          "intervalMs": {
+            "p50": 22.299999997019768,
+            "p95": 110
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 17,
+          "p95": 51,
+          "min": 2,
+          "max": 51,
+          "mean": 19.5
+        },
+        "sourceFramesRate": 15.9,
+        "encodedFps": 15.9,
+        "sentFps": 15.9,
+        "sendFps": {
+          "n": 10,
+          "median": 17,
+          "p95": 51,
+          "min": 2,
+          "max": 51,
+          "mean": 19.3
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2042.9,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 10.6,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 20,
+          "p95": 38,
+          "min": 2,
+          "max": 38,
+          "mean": 19.9
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 4,
+        "cpuA": 1.4,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.1,
+            "privMBMedian": 138.2
+          },
+          "GPU": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 310.7
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.1
+          },
+          "Tab": {
+            "cpuMedian": 0.3,
+            "privMBMedian": 92.8
+          }
+        },
+        "gpuPct": 38
+      }
+    }
+  },
+  "probe-zct-all-1": {
+    "when": "2026-11-01T16:03:16.974Z",
+    "harnessFlags": false,
+    "flags": [
+      "--enable-features=ZeroCopyDesktopCapture,WebRtcAllowWgcUsingTexture"
+    ],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "error": "page.evaluate: AbortError: Timeout starting video source"
+      }
+    }
+  },
+  "probe-zct-none-2": {
+    "when": "2026-11-01T16:04:01.850Z",
+    "harnessFlags": false,
+    "flags": [
+      "--enable-features=ZeroCopyDesktopCapture,WebRtcAllowWgcUsingTexture"
+    ],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 0,
+          "uniqueFps": 0,
+          "intervalMs": {
+            "p50": null,
+            "p95": null
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 2,
+          "p95": 3,
+          "min": 0,
+          "max": 3,
+          "mean": 1.5
+        },
+        "sourceFramesRate": 1.6,
+        "encodedFps": 1.6,
+        "sentFps": 1.6,
+        "sendFps": {
+          "n": 6,
+          "median": 2,
+          "p95": 3,
+          "min": 1,
+          "max": 3,
+          "mean": 1.8
+        },
+        "sendRes": [
+          "1280x720",
+          "640x360"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 36,
+        "targetKbps": 354.167,
+        "encodeMsPerFrame": 13.1,
+        "qualityLimitation": {
+          "none": 3,
+          "bandwidth": 7
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 1,
+          "p95": 8,
+          "min": 0,
+          "max": 8,
+          "mean": 1.5
+        },
+        "recvRes": [
+          "1280x720",
+          "640x360"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 1,
+        "cpuA": 0.6,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0,
+            "privMBMedian": 133.9
+          },
+          "GPU": {
+            "cpuMedian": 0.1,
+            "privMBMedian": 307.6
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.6
+          },
+          "Tab": {
+            "cpuMedian": 0.3,
+            "privMBMedian": 73.4
+          }
+        },
+        "gpuPct": 38
+      }
+    }
+  },
+  "probe-zct-all-2": {
+    "when": "2026-11-01T16:04:59.935Z",
+    "harnessFlags": false,
+    "flags": [
+      "--enable-features=ZeroCopyDesktopCapture,WebRtcAllowWgcUsingTexture"
+    ],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 57.3,
+          "uniqueFps": 57.3,
+          "intervalMs": {
+            "p50": 17.400000005960464,
+            "p95": 19.099999994039536
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 48,
+          "max": 58,
+          "mean": 56.1
+        },
+        "sourceFramesRate": 56,
+        "encodedFps": 56.1,
+        "sentFps": 56.1,
+        "sendFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 49,
+          "max": 58,
+          "mean": 56.2
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2945.8,
+        "targetKbps": 2752.127,
+        "encodeMsPerFrame": 8.4,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 58,
+          "p95": 63,
+          "min": 48,
+          "max": 63,
+          "mean": 56.9
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 1,
+        "cpuA": 3.3,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.3,
+            "privMBMedian": 129.4
+          },
+          "GPU": {
+            "cpuMedian": 2.2,
+            "privMBMedian": 302.3
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.2
+          },
+          "Tab": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 100.4
+          }
+        },
+        "gpuPct": 43
+      }
+    }
+  },
+  "probe-zct-none-3": {
+    "when": "2026-11-01T16:05:51.221Z",
+    "harnessFlags": false,
+    "flags": [
+      "--enable-features=ZeroCopyDesktopCapture,WebRtcAllowWgcUsingTexture"
+    ],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 20.6,
+          "uniqueFps": 20.6,
+          "intervalMs": {
+            "p50": 28,
+            "p95": 151.3999999910593
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 27,
+          "p95": 37,
+          "min": 3,
+          "max": 37,
+          "mean": 23.4
+        },
+        "sourceFramesRate": 22.4,
+        "encodedFps": 22.4,
+        "sentFps": 22.4,
+        "sendFps": {
+          "n": 10,
+          "median": 27,
+          "p95": 38,
+          "min": 4,
+          "max": 38,
+          "mean": 23.7
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2252.4,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 10.9,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 25,
+          "p95": 36,
+          "min": 9,
+          "max": 36,
+          "mean": 23.4
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 4,
+        "cpuA": 1.8,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.1,
+            "privMBMedian": 133
+          },
+          "GPU": {
+            "cpuMedian": 1.1,
+            "privMBMedian": 304.5
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84.3
+          },
+          "Tab": {
+            "cpuMedian": 0.4,
+            "privMBMedian": 93.1
+          }
+        },
+        "gpuPct": 40
+      }
+    }
+  },
+  "probe-zct-all-3": {
+    "when": "2026-11-01T16:06:25.432Z",
+    "harnessFlags": false,
+    "flags": [
+      "--enable-features=ZeroCopyDesktopCapture,WebRtcAllowWgcUsingTexture"
+    ],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 16
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 53.7,
+          "uniqueFps": 53.7,
+          "intervalMs": {
+            "p50": 17.5,
+            "p95": 24.700000002980232
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 55,
+          "p95": 58,
+          "min": 50,
+          "max": 58,
+          "mean": 54
+        },
+        "sourceFramesRate": 53.8,
+        "encodedFps": 53.3,
+        "sentFps": 53.3,
+        "sendFps": {
+          "n": 10,
+          "median": 53,
+          "p95": 57,
+          "min": 49,
+          "max": 57,
+          "mean": 53.1
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2885.3,
+        "targetKbps": 2679.257,
+        "encodeMsPerFrame": 14.6,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 54,
+          "p95": 56,
+          "min": 48,
+          "max": 56,
+          "mean": 53.1
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.2,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.3,
+            "privMBMedian": 134.2
+          },
+          "GPU": {
+            "cpuMedian": 2.1,
+            "privMBMedian": 318.1
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84.2
+          },
+          "Tab": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 97.2
+          }
+        },
+        "gpuPct": 43
+      }
+    }
+  },
+  "probe-idle-none-1": {
+    "when": "2026-11-01T16:07:30.008Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 0
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 20,
+          "uniqueFps": 20,
+          "intervalMs": {
+            "p50": 41.5,
+            "p95": 99.1000000089407
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 13,
+          "p95": 36,
+          "min": 5,
+          "max": 36,
+          "mean": 13.2
+        },
+        "sourceFramesRate": 10.4,
+        "encodedFps": 10.4,
+        "sentFps": 10.4,
+        "sendFps": {
+          "n": 10,
+          "median": 13,
+          "p95": 36,
+          "min": 5,
+          "max": 36,
+          "mean": 13.2
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2437.1,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 6.4,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 13,
+          "p95": 29,
+          "min": 4,
+          "max": 29,
+          "mean": 13.3
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 2,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 165.3
+          },
+          "GPU": {
+            "cpuMedian": 0.4,
+            "privMBMedian": 266.5
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 82.9
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 93.2
+          }
+        },
+        "gpuPct": 42
+      }
+    }
+  },
+  "probe-idle-zct-1": {
+    "when": "2026-11-01T16:07:59.973Z",
+    "harnessFlags": false,
+    "flags": [
+      "--enable-features=ZeroCopyDesktopCapture,WebRtcAllowWgcUsingTexture"
+    ],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 0
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 56.1,
+          "uniqueFps": 56.1,
+          "intervalMs": {
+            "p50": 17.69999998807907,
+            "p95": 20.700000002980232
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 57,
+          "min": 54,
+          "max": 57,
+          "mean": 56.4
+        },
+        "sourceFramesRate": 56.6,
+        "encodedFps": 56.6,
+        "sentFps": 56.6,
+        "sendFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 54,
+          "max": 58,
+          "mean": 56.7
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2928.7,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 6.7,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 57,
+          "min": 54,
+          "max": 57,
+          "mean": 56.6
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.3,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.3,
+            "privMBMedian": 132.4
+          },
+          "GPU": {
+            "cpuMedian": 2.1,
+            "privMBMedian": 305.5
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.3
+          },
+          "Tab": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 93.9
+          }
+        },
+        "gpuPct": 45
+      }
+    }
+  },
+  "probe-idle-none-2": {
+    "when": "2026-11-01T16:08:27.321Z",
+    "harnessFlags": false,
+    "flags": [],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 0
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 54.7,
+          "uniqueFps": 54.7,
+          "intervalMs": {
+            "p50": 18,
+            "p95": 21.600000008940697
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 56,
+          "p95": 57,
+          "min": 51,
+          "max": 57,
+          "mean": 54.8
+        },
+        "sourceFramesRate": 54.5,
+        "encodedFps": 54.7,
+        "sentFps": 54.7,
+        "sendFps": {
+          "n": 10,
+          "median": 56,
+          "p95": 57,
+          "min": 51,
+          "max": 57,
+          "mean": 54.6
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2935.3,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3.1,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 55,
+          "p95": 57,
+          "min": 51,
+          "max": 57,
+          "mean": 54.7
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.1,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.6,
+            "privMBMedian": 166.2
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 260.2
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 82.8
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 102.2
+          }
+        },
+        "gpuPct": 43
+      }
+    }
+  },
+  "probe-idle-zct-2": {
+    "when": "2026-11-01T16:08:54.243Z",
+    "harnessFlags": false,
+    "flags": [
+      "--enable-features=ZeroCopyDesktopCapture,WebRtcAllowWgcUsingTexture"
+    ],
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 0
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 57.1,
+          "uniqueFps": 57.1,
+          "intervalMs": {
+            "p50": 17.5,
+            "p95": 19.099999994039536
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 36,
+          "max": 58,
+          "mean": 51.4
+        },
+        "sourceFramesRate": 50.7,
+        "encodedFps": 50.7,
+        "sentFps": 50.7,
+        "sendFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 36,
+          "max": 58,
+          "mean": 51.5
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2938.2,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 7.4,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": null,
+        "recvFps": {
+          "n": 10,
+          "median": 57,
+          "p95": 58,
+          "min": 36,
+          "max": 58,
+          "mean": 51.7
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.7,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 0.4,
+            "privMBMedian": 136.7
+          },
+          "GPU": {
+            "cpuMedian": 2.3,
+            "privMBMedian": 306.8
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.4
+          },
+          "Tab": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 93.3
+          }
+        },
+        "gpuPct": 44
+      }
+    }
+  },
+  "probe-after-idle": {
+    "when": "2026-11-01T16:16:20.391Z",
+    "harnessFlags": false,
+    "flags": [],
+    "boost": true,
+    "headroom": 1.2,
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 0
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 59.6,
+          "uniqueFps": 59.6,
+          "intervalMs": {
+            "p50": 16,
+            "p95": 29.100000008940697
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 72,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 10,
+          "median": 59,
+          "p95": 60,
+          "min": 56,
+          "max": 60,
+          "mean": 59
+        },
+        "sourceFramesRate": 58.8,
+        "encodedFps": 58.6,
+        "sentFps": 58.6,
+        "sendFps": {
+          "n": 10,
+          "median": 59,
+          "p95": 60,
+          "min": 55,
+          "max": 60,
+          "mean": 58.7
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2887.2,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 3,
+        "qualityLimitation": {
+          "none": 10
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": {
+          "fps": 60,
+          "targetFps": 60,
+          "sourceFps": 60,
+          "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+          "hardware": true,
+          "limit": "none",
+          "reason": null
+        },
+        "recvFps": {
+          "n": 10,
+          "median": 59,
+          "p95": 61,
+          "min": 55,
+          "max": 61,
+          "mean": 58.7
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.4,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.7,
+            "privMBMedian": 168.9
+          },
+          "GPU": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 256.3
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84.1
+          },
+          "Tab": {
+            "cpuMedian": 0.8,
+            "privMBMedian": 89.9
+          }
+        },
+        "gpuPct": 45,
+        "prio": [
+          "Browser:-7",
+          "GPU:-7",
+          "Utility:-7",
+          "Tab:-7",
+          "Utility:-7",
+          "Utility:-7"
+        ]
+      }
+    }
+  },
+  "m-idle-before-exclusive-screen": {
+    "when": "2026-11-01T16:16:57.190Z",
+    "harnessFlags": false,
+    "flags": [],
+    "boost": false,
+    "headroom": 1,
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 0
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "exclusive:screen": {
+        "mode": "exclusive",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": "exclusive 1920x1080 @ 179.84 Hz",
+        "capture": {
+          "fps": 57.1,
+          "uniqueFps": 57.1,
+          "intervalMs": {
+            "p50": 17.5,
+            "p95": 19.700000002980232
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 8,
+          "median": 57,
+          "p95": 58,
+          "min": 54,
+          "max": 58,
+          "mean": 56.6
+        },
+        "sourceFramesRate": 56.3,
+        "encodedFps": 56.5,
+        "sentFps": 56.5,
+        "sendFps": {
+          "n": 8,
+          "median": 57,
+          "p95": 57,
+          "min": 55,
+          "max": 57,
+          "mean": 56.4
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 3019.3,
+        "targetKbps": 2796.442,
+        "encodeMsPerFrame": 2.9,
+        "qualityLimitation": {
+          "none": 8
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": {
+          "fps": 57,
+          "targetFps": 60,
+          "sourceFps": 57,
+          "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+          "hardware": true,
+          "limit": "none",
+          "reason": null
+        },
+        "recvFps": {
+          "n": 8,
+          "median": 57,
+          "p95": 58,
+          "min": 54,
+          "max": 58,
+          "mean": 56.6
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 2.9,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.4,
+            "privMBMedian": 169.9
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 259.6
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 82.6
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 94
+          }
+        },
+        "gpuPct": 43,
+        "prio": [
+          "Browser:0",
+          "GPU:0",
+          "Utility:0",
+          "Tab:0",
+          "Utility:0",
+          "Utility:0"
+        ]
+      }
+    }
+  },
+  "m-idle-after-exclusive-screen": {
+    "when": "2026-11-01T16:17:22.193Z",
+    "harnessFlags": false,
+    "flags": [],
+    "boost": true,
+    "headroom": 1.2,
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 0
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "exclusive:screen": {
+        "mode": "exclusive",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": "exclusive 1920x1080 @ 179.84 Hz",
+        "capture": {
+          "fps": 59.9,
+          "uniqueFps": 59.7,
+          "intervalMs": {
+            "p50": 15.299999997019768,
+            "p95": 30.299999997019768
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 72,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 8,
+          "median": 60,
+          "p95": 61,
+          "min": 59,
+          "max": 61,
+          "mean": 59.8
+        },
+        "sourceFramesRate": 59.8,
+        "encodedFps": 59.8,
+        "sentFps": 59.8,
+        "sendFps": {
+          "n": 8,
+          "median": 60,
+          "p95": 61,
+          "min": 59,
+          "max": 61,
+          "mean": 60
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2972.8,
+        "targetKbps": 2781.478,
+        "encodeMsPerFrame": 2.9,
+        "qualityLimitation": {
+          "none": 8
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": {
+          "fps": 60,
+          "targetFps": 60,
+          "sourceFps": 59,
+          "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+          "hardware": true,
+          "limit": "none",
+          "reason": null
+        },
+        "recvFps": {
+          "n": 8,
+          "median": 60,
+          "p95": 60,
+          "min": 59,
+          "max": 60,
+          "mean": 59.9
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.1,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.5,
+            "privMBMedian": 167
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 255.5
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.8
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 93.4
+          }
+        },
+        "gpuPct": 43,
+        "prio": [
+          "Browser:-7",
+          "GPU:-7",
+          "Utility:-7",
+          "Tab:-7",
+          "Utility:-7",
+          "Utility:-7"
+        ]
+      }
+    }
+  },
+  "m-idle-before-exclusive-window": {
+    "when": "2026-11-01T16:17:47.161Z",
+    "harnessFlags": false,
+    "flags": [],
+    "boost": false,
+    "headroom": 1,
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 0
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "exclusive:window": {
+        "mode": "exclusive",
+        "kind": "window",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": "exclusive 1920x1080 @ 179.84 Hz",
+        "capture": {
+          "fps": 56.9,
+          "uniqueFps": 56.9,
+          "intervalMs": {
+            "p50": 17.599999994039536,
+            "p95": 19.799999997019768
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "window:5245332:0",
+            "displaySurface": "window",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 8,
+          "median": 57,
+          "p95": 58,
+          "min": 56,
+          "max": 58,
+          "mean": 57.1
+        },
+        "sourceFramesRate": 57.1,
+        "encodedFps": 57.1,
+        "sentFps": 57.1,
+        "sendFps": {
+          "n": 8,
+          "median": 57,
+          "p95": 58,
+          "min": 56,
+          "max": 58,
+          "mean": 57.1
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 3036.5,
+        "targetKbps": 2743.342,
+        "encodeMsPerFrame": 3,
+        "qualityLimitation": {
+          "none": 8
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": {
+          "fps": 57,
+          "targetFps": 60,
+          "sourceFps": 57,
+          "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+          "hardware": true,
+          "limit": "none",
+          "reason": null
+        },
+        "recvFps": {
+          "n": 8,
+          "median": 57,
+          "p95": 58,
+          "min": 56,
+          "max": 58,
+          "mean": 57
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.5,
+            "privMBMedian": 167.5
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 256.1
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 82.7
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 96
+          }
+        },
+        "gpuPct": 41,
+        "prio": [
+          "Browser:0",
+          "GPU:0",
+          "Utility:0",
+          "Tab:0",
+          "Utility:0",
+          "Utility:0"
+        ]
+      }
+    }
+  },
+  "m-idle-after-exclusive-window": {
+    "when": "2026-11-01T16:18:12.251Z",
+    "harnessFlags": false,
+    "flags": [],
+    "boost": true,
+    "headroom": 1.2,
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 0
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "exclusive:window": {
+        "mode": "exclusive",
+        "kind": "window",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": "exclusive 1920x1080 @ 179.84 Hz",
+        "capture": {
+          "fps": 59.8,
+          "uniqueFps": 59.8,
+          "intervalMs": {
+            "p50": 15.100000008940697,
+            "p95": 29.400000005960464
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "window:3279122:0",
+            "displaySurface": "window",
+            "frameRate": 72,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 8,
+          "median": 59,
+          "p95": 61,
+          "min": 59,
+          "max": 61,
+          "mean": 59.5
+        },
+        "sourceFramesRate": 59.7,
+        "encodedFps": 59.7,
+        "sentFps": 59.7,
+        "sendFps": {
+          "n": 8,
+          "median": 60,
+          "p95": 60,
+          "min": 59,
+          "max": 60,
+          "mean": 59.5
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2950.2,
+        "targetKbps": 2866.495,
+        "encodeMsPerFrame": 2.8,
+        "qualityLimitation": {
+          "none": 8
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": {
+          "fps": 60,
+          "targetFps": 60,
+          "sourceFps": 60,
+          "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+          "hardware": true,
+          "limit": "none",
+          "reason": null
+        },
+        "recvFps": {
+          "n": 8,
+          "median": 60,
+          "p95": 61,
+          "min": 58,
+          "max": 61,
+          "mean": 59.8
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 0,
+        "cpuA": 3.1,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.6,
+            "privMBMedian": 171.2
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 257.4
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 83.4
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 93.4
+          }
+        },
+        "gpuPct": 43,
+        "prio": [
+          "Browser:-7",
+          "GPU:-7",
+          "Utility:-7",
+          "Tab:-7",
+          "Utility:-7",
+          "Utility:-7"
+        ]
+      }
+    }
+  },
+  "m-idle-before-borderless-screen": {
+    "when": "2026-11-01T16:18:37.585Z",
+    "harnessFlags": false,
+    "flags": [],
+    "boost": false,
+    "headroom": 1,
+    "preset": "720p60",
+    "game": {
+      "iters": 450,
+      "fpsCap": 191,
+      "cpuThreads": 0
+    },
+    "env": {
+      "screen": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "codec": "h265"
+    },
+    "cases": {
+      "borderless:screen": {
+        "mode": "borderless",
+        "kind": "screen",
+        "preset": "720p60",
+        "gameFps": 191,
+        "gameInfo": null,
+        "capture": {
+          "fps": 45.7,
+          "uniqueFps": 0,
+          "intervalMs": {
+            "p50": 20.400000005960464,
+            "p95": 36.20000000298023
+          },
+          "settings": {
+            "aspectRatio": 1.7777777777777777,
+            "cursor": "always",
+            "deviceId": "screen:0:0",
+            "displaySurface": "monitor",
+            "frameRate": 60,
+            "height": 720,
+            "logicalSurface": true,
+            "resizeMode": "crop-and-scale",
+            "screenPixelRatio": 1,
+            "width": 1280
+          }
+        },
+        "sourceFps": {
+          "n": 8,
+          "median": 48,
+          "p95": 53,
+          "min": 40,
+          "max": 53,
+          "mean": 47.1
+        },
+        "sourceFramesRate": 46.6,
+        "encodedFps": 46.6,
+        "sentFps": 46.6,
+        "sendFps": {
+          "n": 8,
+          "median": 47,
+          "p95": 53,
+          "min": 40,
+          "max": 53,
+          "mean": 46.6
+        },
+        "sendRes": [
+          "1280x720"
+        ],
+        "sourceRes": "1280x720",
+        "kbps": 2775.5,
+        "targetKbps": 3000,
+        "encodeMsPerFrame": 4.3,
+        "qualityLimitation": {
+          "none": 8
+        },
+        "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+        "hw": true,
+        "codec": "video/H265",
+        "diagnosis": {
+          "fps": 47,
+          "targetFps": 60,
+          "sourceFps": 47,
+          "encoder": "SimulcastEncoderAdapter (MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT), MediaFoundationVideoEncodeAccelerator (NVIDIA HEVC Encoder MFT))",
+          "hardware": true,
+          "limit": "capture",
+          "reason": "Sua transmissão está em 47 fps (meta: 60): o Windows está entregando só 47 quadros por segundo desta tela. Limite o fps do jogo (ex.: 144) ou feche programas pesados para sobrar processador."
+        },
+        "recvFps": {
+          "n": 8,
+          "median": 47,
+          "p95": 53,
+          "min": 42,
+          "max": 53,
+          "mean": 46.5
+        },
+        "recvRes": [
+          "1280x720"
+        ],
+        "recvDecoder": "ExternalDecoder (D3D11VideoDecoder)",
+        "freezes": 1,
+        "cpuA": 3.3,
+        "cpuAByType": {
+          "Browser": {
+            "cpuMedian": 1.7,
+            "privMBMedian": 167.7
+          },
+          "GPU": {
+            "cpuMedian": 0.6,
+            "privMBMedian": 258.4
+          },
+          "Utility": {
+            "cpuMedian": 0.2,
+            "privMBMedian": 84.3
+          },
+          "Tab": {
+            "cpuMedian": 0.7,
+            "privMBMedian": 96.9
+          }
+        },
+        "gpuPct": 41,
+        "prio": [
+          "Browser:0",
+          "GPU:0",
+          "Utility:0",
+          "Tab:0",
+          "Utility:0",
+          "Utility:0"
+        ]
+      }
+    }
+  }
+}

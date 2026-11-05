@@ -63,7 +63,7 @@ describe('call-quality telemetry', () => {
 
   it('buckets the most used screen-share fps/resolution and keeps the HW flag', () => {
     const layer = (width: number, height: number, fps: number) => ({ rid: 'f', width, height, fps, bitrateKbps: 5000, encoderImplementation: 'x', powerEfficientEncoder: true, qualityLimitationReason: 'none', scalabilityMode: null })
-    const share = (w: number, h: number, fps: number): Patch => ({ local: local(30), screen: { active: true, codec: 'h265', stats: { codec: 'video/H265', bitrateKbps: 5000, rttMs: 30, layers: [layer(w, h, fps), layer(640, 360, 15)] } } })
+    const share = (w: number, h: number, fps: number): Patch => ({ local: local(30), screen: { active: true, codec: 'h265', stats: { codec: 'video/H265', bitrateKbps: 5000, rttMs: 30, sourceFps: null, layers: [layer(w, h, fps), layer(640, 360, 15)] } } })
     const r = run([{ connection: { state: 'connected' } }, share(1920, 1080, 52), share(1920, 1080, 50), share(1280, 720, 29), { connection: { state: 'idle' } }])!
     expect(r.stream).toEqual({ fps: '30-59', resolution: '1080p' })
     expect(r.videoCodec).toBe('h265')

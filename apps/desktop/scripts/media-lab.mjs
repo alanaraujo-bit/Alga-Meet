@@ -180,7 +180,8 @@ async function token(identity) {
 }
 
 // ─────────────── Electron ───────────────
-async function launch(profile, wav, extra = [], fake = true) {
+/** `harness: false` = the app's real switches (no occlusion/backgrounding overrides), as on a user's machine. */
+async function launch(profile, wav, extra = [], fake = true, harness = true) {
   const env = { ...process.env }
   delete env.ELECTRON_RENDERER_URL
   const app = await _electron.launch({
@@ -194,9 +195,7 @@ async function launch(profile, wav, extra = [], fake = true) {
       // 20 fps desktop source (id screen:-3:0), so screen phases run without it and without a mic.
       ...(fake ? ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${wav}`] : []),
       // Harness only: keep both windows rendering even when covered by the test pattern.
-      '--disable-features=CalculateNativeWinOcclusion',
-      '--disable-renderer-backgrounding',
-      '--disable-background-timer-throttling',
+      ...(harness ? ['--disable-features=CalculateNativeWinOcclusion', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] : []),
       ...extra,
     ],
   })

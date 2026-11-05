@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import type { E2eeMember } from '../../../shared/bridge'
 import { DEFAULT_PREFS, type InputMode, type ProcessingMode } from './prefs'
 import type { ContentType, ScreenPreset, ScreenPresetId, VideoCodecId } from './presets'
-import type { AudioInStats, AudioOutStats, VideoInStats, VideoOutStats } from './stats'
+import type { AudioInStats, AudioOutStats, SendDiagnosis, VideoInStats, VideoOutStats } from './stats'
 
 export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected'
 export type Quality = 'excellent' | 'good' | 'poor' | 'lost' | 'unknown'
@@ -106,6 +106,8 @@ export interface MediaState {
     plan: ScreenPresetId[] | null
     hardwareEncoder: boolean | null
     stats: VideoOutStats | null
+    /** While sharing: sent fps vs target, encoder, and a pt-BR reason when something limits it (null the first 3 s). */
+    send: SendDiagnosis | null
     error: string | null
   }
   viewers: Record<string, ViewerView>
@@ -169,6 +171,7 @@ export const initialState = (): MediaState => ({
     plan: null,
     hardwareEncoder: null,
     stats: null,
+    send: null,
     error: null,
   },
   viewers: {},

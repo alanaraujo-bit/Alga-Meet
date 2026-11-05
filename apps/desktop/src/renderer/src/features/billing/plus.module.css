@@ -1,0 +1,264 @@
+/* Plus v2: the wardrobe drawn as itself (pickers), the tenure ladder, passes, the annual item. */
+
+.badgeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  margin-left: var(--s-2);
+  padding: 0 8px;
+  border-radius: var(--r-full);
+  background: rgba(139, 142, 247, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.3);
+  color: var(--accent);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+  vertical-align: 2px;
+}
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.giftPlus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+/* ── Pickers ── */
+.picker {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.pickerHead {
+  display: grid;
+  gap: 2px;
+}
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.option {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-1_5);
+  min-width: 96px;
+  padding: var(--s-2);
+  border-radius: var(--r-lg);
+  transition: background var(--dur-hover-out) var(--ease-out-quad);
+}
+.option:hover {
+  background: var(--state-hover);
+  transition-duration: 0ms;
+}
+.option[aria-checked='true'] {
+  background: var(--state-selected);
+  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.5);
+}
+.optionArt {
+  display: grid;
+  place-items: center;
+  min-height: 76px;
+}
+.optionLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+.option[aria-checked='true'] .optionLabel {
+  color: var(--text-primary);
+}
+.option[aria-checked='true'] .optionLabel svg {
+  color: var(--accent);
+}
+.auraSample {
+  padding: 12px 16px 8px !important;
+}
+.auraPill {
+  display: inline-flex;
+  align-items: center;
+  min-width: 12px;
+  min-height: 12px;
+}
+.swatch {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-lg);
+  background: var(--bg-content);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.swatchBtn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 22px;
+  border-radius: var(--r-sm);
+  background: var(--accent-sheen), var(--fill);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font: var(--type-badge);
+}
+.swatchDot {
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--acc);
+}
+.defaultIcon {
+  display: block;
+  line-height: 0;
+}
+
+/* ── Tenure ladder ── */
+.ladder {
+  display: flex;
+  align-items: center;
+  margin-top: var(--s-3);
+}
+.rung {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  flex: 1;
+  gap: 4px;
+}
+/* The line between rungs: lit up to where you are. */
+.rung + .rung::before {
+  content: '';
+  position: absolute;
+  top: 15px;
+  right: 50%;
+  width: 100%;
+  height: 1px;
+  background: var(--border-default);
+}
+.rung[data-on] + .rung[data-on]::before {
+  background: rgba(139, 142, 247, 0.5);
+}
+.medal {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-full);
+  background: var(--bg-content);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  color: var(--text-tertiary);
+}
+.rung[data-on] .medal {
+  background: radial-gradient(80% 80% at 30% 20%, rgba(185, 178, 249, 0.3), rgba(97, 99, 208, 0.2));
+  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.5), inset 0 1px 0 rgba(247, 248, 248, 0.2);
+  color: #d4d0fb;
+}
+.rungLabel {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.rung[data-on] .rungLabel {
+  color: var(--text-secondary);
+}
+.tenureLine {
+  margin-top: var(--s-3);
+  color: var(--text-secondary);
+  font: var(--type-meta);
+}
+
+.passes {
+  display: inline-flex;
+  gap: 4px;
+  color: var(--accent);
+}
+
+/* ── Annual item ── */
+.annualGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+.annualItem {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-1);
+  padding: var(--s-2);
+  border-radius: var(--r-lg);
+  transition: background var(--dur-hover-out) var(--ease-out-quad);
+}
+.annualItem:hover {
+  background: var(--state-hover);
+  transition-duration: 0ms;
+}
+.annualThumb {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 84px;
+  overflow: hidden;
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.annualThumb > span:only-child {
+  width: 100%;
+}
+
+/* ── What Plus looks like on you (free users) ── */
+.worth {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+.worthCell {
+  display: grid;
+  justify-items: center;
+  align-content: space-between;
+  gap: var(--s-2);
+  margin: 0;
+  padding: var(--s-3) var(--s-2);
+  border-radius: var(--r-lg);
+  background: radial-gradient(90% 70% at 20% 0%, rgba(139, 142, 247, 0.08), transparent 70%), var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.worthCell figcaption {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.icons {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1_5);
+  min-height: 76px;
+}
+.icons .swatch {
+  width: 48px;
+  height: 56px;
+}
+.icons .swatchBtn {
+  width: 30px;
+}
+.streamBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 76px;
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-semibold);
+}
+.streamBadge svg {
+  color: #b9b2f9;
+}

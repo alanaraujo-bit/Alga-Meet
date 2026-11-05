@@ -71,6 +71,8 @@ export function Nameplate({ id, children, row, play, motion }: { id?: CosmeticId
 export interface ProfileUser extends AvatarUser {
   username: string
   bio?: string
+  /** Plus tenure badge (PublicUser.plusBadge, months summed): a quiet chip next to the username. */
+  plusBadge?: number
 }
 
 /**
@@ -112,7 +114,14 @@ export function ProfileCard({
             {name ?? user.displayName}
           </Nameplate>
         </div>
-        <div className={s.username}>@{user.username}</div>
+        <div className={s.username}>
+          @{user.username}
+          {user.plusBadge ? (
+            <span className={s.plusBadge} title={`Alga Plus · ${user.plusBadge === 1 ? '1 mês' : `${user.plusBadge} meses`}`}>
+              Plus · {user.plusBadge}
+            </span>
+          ) : null}
+        </div>
         {user.bio && <p className={s.bio}>{user.bio}</p>}
         {children}
       </div>

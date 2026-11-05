@@ -1,4 +1,5 @@
-import { desktopCapturer, session } from 'electron'
+import { constants, setPriority } from 'node:os'
+import { app, desktopCapturer, session } from 'electron'
 import type { CaptureSource } from '../shared/bridge'
 import { IPC } from '../shared/ipc'
 import { arr, bool, handle, obj, str } from './ipc'
@@ -36,6 +37,24 @@ function select(rawId: unknown, rawOpts: unknown): void {
   selection = { id, audio: bool(obj(rawOpts).audio), expires: Date.now() + SELECTION_TTL_MS }
 }
 
+/**
+ * A CPU-bound game keeps every core busy at normal priority. Chromium's capture loop (browser process), WebRTC
+ * (renderer) and the encoder (GPU process) then wait for the scheduler; the capture loop also halves its rate when a
+ * frame takes long (max_cpu_consumption_percentage=50), so a 720p60 share left at 5–36 fps. Above normal they preempt
+ * the game for the ~1 core they use: 49–56 fps, game fps unchanged (docs/benchmarks/game-capture.md).
+ * shortcut: never lowered back when the share stops (main gets no stop signal, and our idle processes cost nothing);
+ * add a bridge call that restores NORMAL if a share-free session ever needs it.
+ */
+function boostForCapture(): void {
+  for (const m of app.getAppMetrics()) {
+    try {
+      setPriority(m.pid, constants.priority.PRIORITY_ABOVE_NORMAL)
+    } catch (e) {
+      log.warn('capture priority not raised', m.type, String(e))
+    }
+  }
+}
+
 export function initCapture(): void {
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
     const pick = selection
@@ -51,6 +70,7 @@ export function initCapture(): void {
     }
     const audio = pick.audio && request.audioRequested
     log.info('display media granted', pick.id, audio ? 'with system audio' : 'video only')
+    boostForCapture()
     callback({ video: { id: pick.id, name: '' }, ...(audio ? { audio: 'loopback' as const } : {}) })
   })
 

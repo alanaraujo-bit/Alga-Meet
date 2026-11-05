@@ -27,15 +27,17 @@ function Respiro({ small }: { small: boolean }) {
   return (
     <span ref={ref} className={s.aura} aria-hidden data-cosmetic="aura_ha_respiro">
       {!small && (
-        <svg className={s.respiroOut} viewBox="-50 -50 100 100">
-          {/* Brightest at 11 h, the light of the whole collection. */}
-          <linearGradient id={g} x1="0.12" y1="0.05" x2="0.88" y2="0.95">
-            <stop offset="0" stopColor={HA.lilac} />
-            <stop offset="0.5" stopColor={HA.lilac} stopOpacity="0.42" />
-            <stop offset="1" stopColor={HA.indigoLight} stopOpacity="0.3" />
-          </linearGradient>
-          <circle r="49.3" fill="none" stroke={`url(#${g})`} strokeWidth="1" vectorEffect="non-scaling-stroke" />
-        </svg>
+        <span className={s.respiroOut}>
+          <svg className={s.ringArt} viewBox="-50 -50 100 100">
+            {/* Brightest at 11 h, the light of the whole collection. */}
+            <linearGradient id={g} x1="0.12" y1="0.05" x2="0.88" y2="0.95">
+              <stop offset="0" stopColor={HA.lilac} />
+              <stop offset="0.5" stopColor={HA.lilac} stopOpacity="0.42" />
+              <stop offset="1" stopColor={HA.indigoLight} stopOpacity="0.3" />
+            </linearGradient>
+            <circle r="49.3" fill="none" stroke={`url(#${g})`} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          </svg>
+        </span>
       )}
       <span className={s.inner} />
     </span>
@@ -68,22 +70,24 @@ function Prisma({ size }: { size: number }) {
   const p = (deg: number) => [r * Math.cos((deg * Math.PI) / 180), r * Math.sin((deg * Math.PI) / 180)].map((v) => v.toFixed(2))
   return (
     <span ref={ref} className={s.aura} aria-hidden data-cosmetic="aura_ha_prisma">
-      <svg ref={ring} className={s.prisma} viewBox="-50 -50 100 100">
-        {PRISM.map(([c, o], i) => {
-          const [x1, y1] = p(-90 + i * 90)
-          const [x2, y2] = p(i * 90)
-          const [c2, o2] = PRISM[(i + 1) % 4]!
-          return (
-            <g key={i}>
-              <linearGradient id={`${g}${i}`} gradientUnits="userSpaceOnUse" x1={x1} y1={y1} x2={x2} y2={y2}>
-                <stop offset="0" stopColor={c} stopOpacity={o} />
-                <stop offset="1" stopColor={c2} stopOpacity={o2} />
-              </linearGradient>
-              <path d={`M${x1} ${y1}A${r} ${r} 0 0 1 ${x2} ${y2}`} fill="none" stroke={`url(#${g}${i})`} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-            </g>
-          )
-        })}
-      </svg>
+      <span className={s.prisma}>
+        <svg ref={ring} className={`${s.ringArt} ${s.turning}`} viewBox="-50 -50 100 100">
+          {PRISM.map(([c, o], i) => {
+            const [x1, y1] = p(-90 + i * 90)
+            const [x2, y2] = p(i * 90)
+            const [c2, o2] = PRISM[(i + 1) % 4]!
+            return (
+              <g key={i}>
+                <linearGradient id={`${g}${i}`} gradientUnits="userSpaceOnUse" x1={x1} y1={y1} x2={x2} y2={y2}>
+                  <stop offset="0" stopColor={c} stopOpacity={o} />
+                  <stop offset="1" stopColor={c2} stopOpacity={o2} />
+                </linearGradient>
+                <path d={`M${x1} ${y1}A${r} ${r} 0 0 1 ${x2} ${y2}`} fill="none" stroke={`url(#${g}${i})`} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+              </g>
+            )
+          })}
+        </svg>
+      </span>
     </span>
   )
 }

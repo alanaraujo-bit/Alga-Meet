@@ -44,17 +44,18 @@ function Halo({ size, motion }: { size: number; motion: Motion }) {
           <stop offset="1" stopColor={HA.porcelain} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={h.glint.d} {...NS} stroke={`url(#${g}glint)`} strokeWidth="2.25" strokeLinecap="round" />
+      <path d={h.glint.d} {...NS} stroke={`url(#${g}glint)`} strokeWidth="2.5" strokeLinecap="round" />
     </svg>
   )
   return (
     <Svg id="deco_ha_halo_vidro" motion={h.small ? 'rest' : motion} layer={glint}>
       <defs>
         {/* Porcelain where the 11 h light hits, silver in the body, the indigo refracted low on the left. */}
+        {/* In context (list, popover, stage) the 2026-11-01 review read it as a grey ring: the glass got denser. */}
         <linearGradient id={`${g}rim`} gradientUnits="userSpaceOnUse" x1={gx1} y1={gy1} x2={gx2} y2={gy2}>
-          <stop offset="0" stopColor={HA.porcelain} stopOpacity={h.small ? 0.85 : 0.55} />
-          <stop offset="0.5" stopColor={HA.silver} stopOpacity={h.small ? 0.5 : 0.2} />
-          <stop offset="1" stopColor={HA.indigoLight} stopOpacity={h.small ? 0.85 : 0.45} />
+          <stop offset="0" stopColor={HA.porcelain} stopOpacity={h.small ? 0.9 : 0.72} />
+          <stop offset="0.5" stopColor={HA.silver} stopOpacity={h.small ? 0.55 : 0.3} />
+          <stop offset="1" stopColor={HA.indigoLight} stopOpacity={h.small ? 0.9 : 0.66} />
         </linearGradient>
         {/* The tube's outer edge catches the light: bright at 11 h, gone by 3 h and 6 h. */}
         <linearGradient id={`${g}edge`} gradientUnits="userSpaceOnUse" x1="-34" y1="-42" x2="30" y2="38">
@@ -74,7 +75,7 @@ function Halo({ size, motion }: { size: number; motion: Motion }) {
         <>
           <path d={h.filete.d} {...NS} stroke={`url(#${g}inner)`} strokeWidth="1" strokeLinecap="round" />
           <path d={h.edge.d} {...NS} stroke={`url(#${g}edge)`} strokeWidth="0.75" strokeLinecap="round" />
-          <path d={h.caustic.d} {...NS} stroke={HA.lilac} strokeOpacity="0.55" strokeWidth="1.25" strokeLinecap="round" />
+          <path d={h.caustic.d} {...NS} stroke={HA.lilac} strokeOpacity="0.72" strokeWidth="1.25" strokeLinecap="round" />
         </>
       )}
     </Svg>

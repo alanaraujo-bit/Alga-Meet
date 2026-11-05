@@ -20,15 +20,34 @@
   will-change: opacity;
 }
 
-/* HA-16 Respiro: a 1 px lilac ring 5 px out, brightest at 11 h, breathing out 5 % with the voice. */
+/*
+ * Ring art never reads the voice: it sits in an HTML wrapper that alone follows --speak (opacity/transform on its
+ * own layer), and `--speak: 0` cuts the cascade there. Otherwise every envelope write restyled the whole SVG subtree
+ * (Prisma: 22 elements per tile per frame), a stream of short-lived Blink style objects that kept renderer memory
+ * ~150 MB up until a late GC (docs/benchmarks/cosmetics-perf.md).
+ */
+.ringArt {
+  --speak: 0;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.turning {
+  will-change: transform;
+}
+
+/*
+ * HA-16 Respiro: a 1 px lilac ring 5 px out, brightest at 11 h, breathing out 5 % with the voice. The breath moves in
+ * 1 % steps (≈ 1 px on a 96 px tile): a scale that changed every frame re-rastered the ring every frame and was the
+ * single largest memory cost on the stage (+65 MB); stepped, the transform only changes a few times per syllable.
+ */
 .respiroOut {
   position: absolute;
   inset: -6px;
-  width: calc(100% + 12px);
-  height: calc(100% + 12px);
-  overflow: visible;
-  opacity: min(1, calc(var(--speak, 0) * 1.2));
-  transform: scale(calc(1 + 0.05 * var(--speak, 0)));
+  opacity: min(1, calc(var(--speak, 0) * 1.5));
+  transform: scale(calc(1 + round(var(--speak, 0) * 0.05, 0.01)));
   will-change: transform, opacity;
 }
 
@@ -36,11 +55,8 @@
 .prisma {
   position: absolute;
   inset: -2px;
-  width: calc(100% + 4px);
-  height: calc(100% + 4px);
-  overflow: visible;
   opacity: min(1, calc(var(--speak, 0) * 2.2));
-  will-change: transform, opacity;
+  will-change: opacity;
 }
 
 /* HA-18 Ondas: pooled 1 px rings, sent out by the speak callback (Web Animations: transform + opacity). */
@@ -155,7 +171,7 @@
   box-shadow: 0 0 0 2px rgba(97, 99, 208, 0.7);
 }
 .cinema::before {
-  --c: rgba(247, 248, 248, 0.6);
+  --c: rgba(247, 248, 248, 0.8);
   content: '';
   position: absolute;
   inset: -5.5px;

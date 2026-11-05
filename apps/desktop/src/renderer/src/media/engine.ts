@@ -32,7 +32,7 @@ import { HEVC_MIN_SIDE, aboveContract, availablePresets, clampPreset, contentSet
 import { VoiceGraph, VoiceProcessor, captureConstraints } from './processing'
 import { playCue, setCueOutput, startRing, stopRing, type Cue, type RingKind } from './sounds'
 import { stallStep, type StallState } from './stall'
-import { StatsDelta, audioIn, audioOut, videoIn, videoOut } from './stats'
+import { StatsDelta, audioIn, audioOut, diagnoseSend, videoIn, videoOut, type VideoOutStats } from './stats'
 import { initialState, patch, useMedia, type ConnectionState, type MediaState, type DeviceInfo, type ParticipantView, type Quality, type StreamQuality } from './store'
 import type { GateReport } from './vad-gate.worklet'
 
@@ -134,7 +134,7 @@ class MediaEngine {
   private audioEls = new Set<HTMLMediaElement>()
   private viewerEls = new Map<string, Set<HTMLVideoElement>>()
   /** `declared`: the preset of the video publication (the SFU keeps its layers; an in-place re-cap changes `preset` only). */
-  private screenPub: { video: LocalTrackPublication; audio: LocalTrackPublication | null; preset: ScreenPreset; declared: ScreenPreset; cpuLimited: boolean[]; sourceId: string | null; codec: VideoCodecId; want: VideoCodecId } | null = null
+  private screenPub: { video: LocalTrackPublication; audio: LocalTrackPublication | null; preset: ScreenPreset; declared: ScreenPreset; cpuLimited: boolean[]; recent: VideoOutStats[]; sourceId: string | null; codec: VideoCodecId; want: VideoCodecId } | null = null
   /** Presets this machine sustains (probeEncoder); the conservative software list until the probe answers. */
   private capable: ScreenPreset[] = availablePresets({ hardware: false })
   /** Presets the user's plan allows (join response, token attribute, Me.plan); null = unknown. */
@@ -178,6 +178,12 @@ class MediaEngine {
   labNoE2ee = false
   /** Lab only: HEVC layer floor (0 lets a too-small HEVC share out, to exercise the viewer-side fallback). */
   hevcMinSide = HEVC_MIN_SIDE
+  /**
+   * Capture frame rate over the preset's. Chromium's capture loop re-arms a whole-millisecond timer after each frame
+   * and runs 1–2 ms late, so asking for 60 delivered 54–57 fps; 72 delivers ~60 and the encodings' maxFramerate keeps
+   * what is sent at the preset (docs/benchmarks/game-capture.md). Lab only: 1 = ask for the preset's fps.
+   */
+  captureHeadroom = 1.2
   /** Codecs this client failed to decode in this session: no longer advertised, so senders switch away from them. */
   private brokenDecoders = new Set<VideoCodecId>()
   /** Per watched stream: consecutive stats ticks with bytes arriving and no picture. */
@@ -626,7 +632,7 @@ class MediaEngine {
     this.deltas.clear()
     const init = initialState()
     useMedia.setState({ participants: {}, viewers: {}, local: null })
-    patch('screen', { active: false, stats: null, sourceId: null })
+    patch('screen', { active: false, stats: null, send: null, sourceId: null })
     patch('self', { speaking: false, level: 0, levelDb: init.self.levelDb, gateOpen: false, quality: 'unknown', serverMuted: false })
   }
 
@@ -1092,6 +1098,11 @@ class MediaEngine {
 
   // ───────────────────────────── screen share (publisher) ─────────────────────────────
 
+  private captureRate(fps: number): ConstrainDouble {
+    const f = Math.round(fps * this.captureHeadroom)
+    return { ideal: f, max: f }
+  }
+
   getScreenSources() {
     return bridge()?.screen?.getSources?.(['screen', 'window']) ?? Promise.resolve([])
   }
@@ -1102,7 +1113,7 @@ class MediaEngine {
       // Without the native picker (bridge not ready) getDisplayMedia uses whatever handler main installed.
       if (screen?.select && sourceId) await screen.select(sourceId, { audio })
       return navigator.mediaDevices.getDisplayMedia({
-        video: { width: { max: width }, height: { max: height }, frameRate: { ideal: preset.fps, max: preset.fps } },
+        video: { width: { max: width }, height: { max: height }, frameRate: this.captureRate(preset.fps) },
         // restrictOwnAudio: loopback without our own process tree, so viewers don't hear the call echoed (decision 0002).
         audio: audio ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, restrictOwnAudio: true } : false,
         systemAudio: audio ? 'include' : 'exclude',
@@ -1155,11 +1166,11 @@ class MediaEngine {
       const top = this.presetFor(live, preset)
       if (top !== preset) {
         const v = stream.getVideoTracks()[0]!
-        await v.applyConstraints({ width: { max: top.width }, height: { max: top.height }, frameRate: { ideal: top.fps, max: top.fps } }).catch(() => undefined)
+        await v.applyConstraints({ width: { max: top.width }, height: { max: top.height }, frameRate: this.captureRate(top.fps) }).catch(() => undefined)
         frameSizes.set(v, fit(sizeOf(v), top))
       }
       const pub = await this.publishScreen(room, stream, top, contentType, live)
-      this.screenPub = { ...pub, preset: top, declared: top, cpuLimited: [], sourceId: opts.sourceId ?? null, codec: live, want: codec }
+      this.screenPub = { ...pub, preset: top, declared: top, cpuLimited: [], recent: [], sourceId: opts.sourceId ?? null, codec: live, want: codec }
       if (top !== preset) patch('screen', { preset: top.id })
       for (const el of this.ownEls) pub.video.track?.attach(el)
       patch('screen', { active: true, sourceId: opts.sourceId ?? null })
@@ -1234,7 +1245,7 @@ class MediaEngine {
       this.prefs.set({ encoderSustain: recordSustain(this.prefs.get().encoderSustain, cur.preset.id, cur.cpuLimited) })
       void this.probeEncoder()
     }
-    patch('screen', { active: false, stats: null, sourceId: null })
+    patch('screen', { active: false, stats: null, send: null, sourceId: null })
     if (!silent) this.cue('streamStop')
   }
 
@@ -1345,7 +1356,7 @@ class MediaEngine {
         // Chromium shares one capture device per source: a second capture of it only gets frames up to the size/fps
         // the first one runs at (measured: 720p → 1080p stayed 1280×720). Going up, raise the live track first.
         if (preset.height > cur.preset.height || preset.fps > cur.preset.fps) {
-          await video.applyConstraints({ width: { max: preset.width }, height: { max: preset.height }, frameRate: { ideal: preset.fps, max: preset.fps } }).catch(() => undefined)
+          await video.applyConstraints({ width: { max: preset.width }, height: { max: preset.height }, frameRate: this.captureRate(preset.fps) }).catch(() => undefined)
         }
         const stream = await this.capture(cur.sourceId, false, preset)
         if (this.screenPub !== cur) return stream.getTracks().forEach((t) => t.stop())
@@ -1364,13 +1375,14 @@ class MediaEngine {
         old.stop()
       } else {
         // An injected stream (lab patterns): only the frame rate can follow, the encoder caps below do the rest.
-        await video.applyConstraints({ frameRate: { ideal: preset.fps, max: preset.fps } }).catch(() => undefined)
+        await video.applyConstraints({ frameRate: this.captureRate(preset.fps) }).catch(() => undefined)
       }
       const size = sizeOf(video)
       vtrack.publishOptions = { ...vtrack.publishOptions, ...layerOptions(preset, size.width, size.height, codec) }
       await applyEncodings(vtrack, preset, size.width ?? preset.width, size.height ?? preset.height)
       cur.preset = preset
       cur.cpuLimited = []
+      cur.recent = []
       patch('screen', { preset: preset.id })
       this.syncCodecSoon() // the new ladder may not suit the codec (HEVC_MIN_SIDE)
     }
@@ -1395,14 +1407,14 @@ class MediaEngine {
       if (cur.sourceId) {
         // Same as recap(): the live capture of this source caps a new one at its own size/fps; raise it first.
         if (preset.height > cur.preset.height || preset.fps > cur.preset.fps) {
-          await old.track?.mediaStreamTrack.applyConstraints({ width: { max: preset.width }, height: { max: preset.height }, frameRate: { ideal: preset.fps, max: preset.fps } }).catch(() => undefined)
+          await old.track?.mediaStreamTrack.applyConstraints({ width: { max: preset.width }, height: { max: preset.height }, frameRate: this.captureRate(preset.fps) }).catch(() => undefined)
         }
         video = (await this.capture(cur.sourceId, false, preset)).getVideoTracks()[0]!
       }
       else {
         // Injected stream or no picker bridge: a clone of the live capture (same source, nothing to pick).
         video = old.track!.mediaStreamTrack.clone()
-        await video.applyConstraints({ width: { max: preset.width }, height: { max: preset.height }, frameRate: { ideal: preset.fps, max: preset.fps } }).catch(() => undefined)
+        await video.applyConstraints({ width: { max: preset.width }, height: { max: preset.height }, frameRate: this.captureRate(preset.fps) }).catch(() => undefined)
       }
       if (this.screenPub !== cur || this.room !== room) return video.stop()
       let vpub: LocalTrackPublication
@@ -1415,7 +1427,7 @@ class MediaEngine {
       // Stopped or left meanwhile: the new publication goes too.
       if (this.screenPub !== cur || this.room !== room) return this.dropScreenTracks(room, [vpub])
       for (const el of this.ownEls) old.track?.detach(el), vpub.track?.attach(el)
-      Object.assign(cur, { video: vpub, preset, declared: preset, cpuLimited: [], codec: live })
+      Object.assign(cur, { video: vpub, preset, declared: preset, cpuLimited: [], recent: [], codec: live })
       patch('screen', { preset: preset.id })
       // The SFU announces the new track only once its media flows: dropped earlier, viewers saw the share end
       // (measured). Wait for the first viewer to move over, or REPUBLISH_OVERLAP_MS when nobody watches.
@@ -1725,10 +1737,22 @@ class MediaEngine {
       if (t) audio[rp.identity] = audioIn(this.delta(`a:${rp.identity}`).next(await t.getRTCStatsReport()))
     }
     let screenStats = null
-    if (this.screenPub?.video.track) {
-      screenStats = videoOut(this.delta('screen').next(await this.screenPub.video.track.getRTCStatsReport()))
+    let send = null
+    const pub = this.screenPub
+    if (pub?.video.track) {
+      screenStats = videoOut(this.delta('screen').next(await pub.video.track.getRTCStatsReport()))
       const top = screenStats?.layers[0]
-      if (top && top.fps > 0) this.screenPub.cpuLimited.push(top.qualityLimitationReason === 'cpu')
+      if (top && top.fps > 0) pub.cpuLimited.push(top.qualityLimitationReason === 'cpu')
+      if (screenStats) pub.recent = [...pub.recent.slice(-4), screenStats]
+      // fps cap per rid, as LiveKit's computeVideoEncodings names the layers (q, h, f from the lowest; the middle one
+      // only from 960 px). Not getParameters(): it would void a concurrent dynacast setParameters' transaction.
+      const size = sizeOf(pub.video.track.mediaStreamTrack)
+      const side = Math.max(size.width ?? 0, size.height ?? 0)
+      const ladder = simulcastFor(pub.preset, size.width, size.height)
+      const sent = side >= 960 && ladder.length > 1 ? [ladder[0]!, ladder[1]!, pub.preset] : side >= 480 ? [ladder[0]!, pub.preset] : [pub.preset]
+      const caps = Object.fromEntries(sent.map((l, i) => [['q', 'h', 'f'][i]!, l.fps]))
+      const surface = pub.sourceId?.startsWith('window:') ? 'window' : pub.sourceId ? 'screen' : null
+      send = diagnoseSend(pub.recent, caps, pub.preset.fps, useMedia.getState().screen.contentType === 'motion', surface)
     }
     const viewers = { ...useMedia.getState().viewers }
     for (const id of Object.keys(viewers)) {
@@ -1747,7 +1771,7 @@ class MediaEngine {
       for (const [id, a] of Object.entries(audio)) if (participants[id]) participants[id] = { ...participants[id]!, audio: a }
       return { local, participants, viewers }
     })
-    patch('screen', { stats: screenStats })
+    patch('screen', { stats: screenStats, send })
   }
 
   // ───────────────────────────── misc ─────────────────────────────
