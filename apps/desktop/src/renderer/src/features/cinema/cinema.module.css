@@ -1,0 +1,25 @@
+/* Subtitles: look of the approved mockup (docs/design/cinema/mockups/mockups.css .subtitle). */
+.subtitles {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 8%;
+  text-align: center;
+  pointer-events: none;
+  font-family: var(--font-ui);
+  font-weight: 510;
+  letter-spacing: -0.012em;
+  color: var(--text-primary);
+  text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, 0.9);
+  white-space: pre-wrap;
+  transition: bottom var(--dur-base, 160ms) cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+.P { font-size: 20px; line-height: 28px; }
+.M { font-size: 25px; line-height: 34px; }
+.G { font-size: 32px; line-height: 42px; }
+@media (prefers-reduced-motion: reduce) {
+  .subtitles { transition: none; }
+}
