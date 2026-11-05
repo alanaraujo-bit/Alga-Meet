@@ -1,7 +1,7 @@
 import { X, type Glyph } from '@/ui/icons'
 import { motion } from 'motion/react'
 import { useEffect, useRef, type ReactNode } from 'react'
-import { Icon, IconButton, Kbd } from '@/ui'
+import { Icon, IconButton } from '@/ui'
 import { focusables } from '@/ui/floating'
 import { EASE_IN, EASE_OUT_QUART } from '@/ui/motion'
 import s from './settings.module.css'
@@ -111,8 +111,8 @@ export function SettingsFrame<Id extends string>({
           <header className={s.header}>
             <h2 className={s.title}>{heading ?? title}</h2>
             <span className={s.close}>
+              {/* The shortcut is in the button's tooltip; a permanent "Esc" chip under it was noise (wave 9 review). */}
               <IconButton icon={X} label={closeLabel} shortcut="Esc" size="lg" onClick={onClose} />
-              <Kbd>Esc</Kbd>
             </span>
           </header>
           {children}

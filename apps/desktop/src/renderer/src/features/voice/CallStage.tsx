@@ -586,6 +586,8 @@ function SelfLive() {
       preset: st.screen.preset,
       hw: st.screen.hardwareEncoder,
       layer: st.screen.stats?.layers.filter((l) => l.fps > 0).sort((a, b) => b.width - a.width)[0] ?? null,
+      // Why the share leaves below its frame rate (media/stats.ts diagnoseSend), in words the streamer can act on.
+      limit: st.screen.send?.reason ?? null,
     })),
   )
   const notice = useVoice((st) => st.streamNotice)
@@ -606,10 +608,16 @@ function SelfLive() {
             {sc.layer ? `${sc.layer.width}×${sc.layer.height} · ${Math.round(sc.layer.fps)} fps · ${t.stats.kbps(sc.layer.bitrateKbps)}` : sc.preset}
             {sc.hw !== null && ` · ${sc.hw ? t.stage.hw : t.stage.sw}`}
           </span>
-          {left > 0 && notice && (
+          {left > 0 && notice ? (
             <span className={s.selfLiveNotice} role="status">
               {notice.text}
             </span>
+          ) : (
+            sc.limit && (
+              <span className={s.selfLiveNotice} role="status">
+                {sc.limit}
+              </span>
+            )
           )}
         </span>
         <span className={s.selfLiveActions}>

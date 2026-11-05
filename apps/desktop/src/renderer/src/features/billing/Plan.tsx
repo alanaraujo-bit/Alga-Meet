@@ -195,6 +195,8 @@ function PlusHome({ catalog, me }: { catalog: BillingCatalog; me: BillingMe }) {
   const accents = catalog.products.filter((x) => x.cosmeticType === 'app_accent' && ACCENTS[x.id] && usable(x.id))
   const monthly = catalog.products.filter((x) => x.includedIn?.includes('plus') && x.includedFrom && Date.parse(x.includedFrom) <= Date.now())
   const equipped = useData((x) => x.me?.cosmetics)
+  // The sample speaks with your own face (photo or Eco): the account, not the billing record, is a user.
+  const self = useData((x) => x.me)
   return (
     <>
       <Group title={t.plus.wardrobe} description={t.plus.wardrobeLine}>
@@ -211,7 +213,7 @@ function PlusHome({ catalog, me }: { catalog: BillingCatalog; me: BillingMe }) {
           value={equipped?.voiceAura ?? null}
           options={[{ id: null, label: t.plus.auraDefault }, ...auras.map((x) => ({ id: x.id, label: x.name }))]}
           render={(id) => (
-            <SpeakingSample user={me as never} size={56} aura={(id ?? undefined) as CosmeticId | undefined} level={demoLevel(id ? id.length * 0.31 : 0)} className={p.auraSample}>
+            <SpeakingSample user={self ?? { id: 'me', displayName: '', avatarUrl: null }} size={56} aura={(id ?? undefined) as CosmeticId | undefined} level={demoLevel(id ? id.length * 0.31 : 0)} className={p.auraSample}>
               <span className={p.auraPill}>
                 <AuraGlyph id={(id ?? undefined) as CosmeticId | undefined} />
               </span>

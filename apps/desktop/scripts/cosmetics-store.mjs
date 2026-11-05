@@ -156,7 +156,8 @@ async function launch(u, { extra = [], width = 1440, height = 900 } = {}) {
     shell.openExternal = async (url) => void globalThis.__opened.push(url)
   })
   const page = await app.firstWindow()
-  page.on('pageerror', (e) => console.error('  pageerror:', e.message))
+  // The first stack frames say where, not only what (a bare message is hard to trace in a minified bundle).
+  page.on('pageerror', (e) => console.error('  pageerror:', e.message, (e.stack ?? '').split(String.fromCharCode(10)).slice(1, 4).join(' | ')))
   await app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0]?.setContentSize(w, h), [width, height])
   await page.waitForLoadState('domcontentloaded')
   await page.evaluate((t) => window.alga.auth.setToken(t), u.token)
@@ -433,11 +434,14 @@ try {
       await page.getByRole('navigation', { name: 'Espaços' }).getByRole('button', { name: /Hora Azul/ }).first().click()
       await sleep(800)
       await page.getByRole('button', { name: new RegExp(voice.name) }).first().click()
+      // Since 0.1.6 the first click only looks into the room (lobby); "Entrar" joins.
+      await page.getByRole('button', { name: /^Entrar/ }).first().click()
       await sleep(4000)
       await api(U.rafa.token, 'POST', '/billing/try-on', { productId: 'deco_ha_fita_seda' })
       await sleep(1500)
       await shot(page, 'tryon-stage')
-      await page.getByRole('complementary', { name: 'Membros' }).getByRole('button', { name: /Rafa Moreira/ }).click()
+      // In a call the stage replaces the member list: open Rafa's profile from the room's people in the sidebar.
+      await page.getByRole('button', { name: /Rafa Moreira/ }).first().click()
       await sleep(900)
       await shot(page, 'tryon-popover')
       await page.keyboard.press('Escape')
