@@ -1,5 +1,33 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-05 noite (2) — Sala de Cinema — motor (Plano 1) (branch `feat/sala-de-cinema`, NÃO mesclada)
+- **O que é:** o motor da Sala de Cinema (spec `docs/superpowers/specs/2026-11-05-sala-de-cinema-design.md`): ffmpeg
+  LGPL no main (sonda, peças fMP4 sem recompressão de vídeo, áudio convertido quando precisa), enxame P2P próprio
+  (data channels DTLS, super-seed, hash por peça, cache em OPFS), relógio pelo gateway, player MSE com sincronia por
+  `requestVideoFrameCallback`, som do filme com ducking, legendas SRT/ASS, e um palco de desenvolvimento (`CinemaDev`).
+  O cinema fica ligado no servidor fora de produção.
+- **Números do §8** (`docs/benchmarks/cinema-engine.md`, lab `apps/desktop/scripts/cinema-lab.mjs` com 2–4 janelas reais):
+  - **Passa na rede local:** primeiro frame 2,8 s; sincronia p95 25–33 ms (nunca > 125 ms); pausa no mesmo frame
+    em 8/8, ≤ 231 ms depois do instante agendado; entrar no meio 1,2–3,8 s; play agendado em ±1 frame; troca de áudio
+    sem mexer no vídeo; quem projeta envia 1,1× o filme (a terceira pessoa recebe 95–99 % de amigos).
+  - **Reprova:** instalador **+48,6 MiB** (meta ≤ 40 MB; o ffmpeg LGPL genérico comprime para 39,7 MiB sozinho);
+    **rede emulada** (RTT 40 ms, upload de quem projeta 12–20 Mbps): primeiro frame 17–38 s e, com 1 % de perda,
+    ~2,5 Mbps por conexão (o data channel não aguenta um gargalo saturado nem perda aleatória alta); **travamentos com
+    4 pessoas e upload de 1,5× o bitrate**: com 1 % de perda a sala ficou parada 343 s de 560, com 0,1 % 118 s de 300
+    (zero na rede local). Primeiro frame com 0,1 % de perda: 9,1 s. RAM: o cinema soma 354–597 MiB à chamada (passa).
+  - **Não medido aqui:** eco com caixa de som, internet real entre casas, relay, sessão de 2 h.
+- **Corrigido na Task 15:** quem projeta não perde o arquivo num `cinema_hello` lento; aviso quando a E2EE falha com
+  alguém sentado; índice do áudio padrão antes dos extras (primeiro frame 6,7 → 2,8 s); quem entra no meio não pausa a
+  sala nos primeiros 10 s; legenda ASS quebrada no app construído (worker do JASSUB não empacotado) + trava no
+  `check-package.mjs`; escolha da rota do som do filme no painel S.
+- **Falta:**
+  - **Plano 2 — experiência** (ficha bonita, foyer, luzes, timeline social, miniplayer, atalhos, acessibilidade, nova versão do desktop).
+  - **Teste com o dono** (filme dele 1080p e 4K, amigo em outra casa, eco com caixa de som nas duas rotas):
+    `docs/qa/2026-11-05-cinema-teste-com-o-dono.md`.
+  - **Relay (coturn no `home-server`) não implantado:** este PC fica numa sub-rede da casa que não alcança o servidor de casa
+    (192.168.1.110).
+  - Ritmo do pré-carregamento / mais conexões por par (rede emulada) e um ffmpeg LGPL mínimo (instalador).
+
 ## 2026-11-05 noite — Loja (pacote C) e transmissão de jogos terminadas (release v0.1.8)
 - **Origem:** o trabalho que estava parado sem commit no checkout principal desde 01/11 (agentes interrompidos). Foi salvo
   como commit (`f02c590`) e terminado na branch `feat/store-media`. Cópia de segurança do WIP em `refs/backup/wip-2026-11-05c`.
