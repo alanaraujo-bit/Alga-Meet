@@ -1,5 +1,38 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-05 tarde (2) — Instalador, atualização e desinstalação próprios (branch `feat/installer`, NÃO publicada)
+- **O que muda:** o NSIS continua fazendo o trabalho (arquivos, registro, atalhos, atualização silenciosa do
+  electron-updater). O que a pessoa vê é a nossa janela, `alga-setup-ui.exe`:
+  - Rust + WebView2, em `apps/desktop/native/setup-ui`.
+  - A página fica em `apps/desktop/src/setup`, com o mesmo `Eco.tsx` do app e embutida num HTML só.
+  - A ligação é feita em `build/installer.nsh`.
+  - Sem o runtime do WebView2, tudo volta ao NSIS padrão.
+- **Instalar** (um clique, por usuário):
+  - O logo vira o Eco na abertura.
+  - O progresso é real: bytes extraídos e copiados.
+  - "Monte seu Eco enquanto isso": o app veste o Eco escolhido no primeiro login, se a conta ainda não tem um (`setup-eco.json` em userData).
+  - "Tudo pronto" abre o app sozinho.
+- **Atualizar:** um card pequeno aparece só no "reiniciar e atualizar" (`--force-run`). Atualização feita ao fechar o app fica invisível.
+- **Desinstalar:** a entrada do Windows (`UninstallString`) abre a janela.
+  - Escolha de apagar ou não os dados deste PC.
+  - O Eco perde a cor e dorme enquanto os arquivos saem.
+  - "Antes de ir: por que está saindo?": 7 motivos e uma nota opcional, anônimo.
+    - Envio: `POST /feedback/uninstall`, 5 por hora por IP, **migração 0016**, retenção de 6 meses.
+    - Leitura: `GET /admin/uninstall-feedback`, só admin, com contagem por motivo e as notas.
+  - Com `/S`, a mesma entrada repassa ao desinstalador real em silêncio: é o que o electron-updater roda nas próximas atualizações.
+- **Pasta:** instalações novas continuam em `%LOCALAPPDATA%\Programs\Alga Meet` (`preInit`). Sem isso, o modo de um clique usaria `@algadesktop`.
+- **Verificado com um instalador de identidade de teste ("Alga Meet Sandbox")**, sem tocar o app real do dono:
+  - instalação nova, vestindo o Eco;
+  - atualização do assistente antigo (0.1.89, igual ao de hoje) para o novo, que fica na mesma pasta;
+  - atualização do novo para o novo, com o repasse silencioso saindo com código 0;
+  - desinstalação pela janela, com o questionário;
+  - desinstalação silenciosa, sem sobras.
+  - Testes: servidor 256, desktop 334, shared 17.
+- **Cuidados de release:**
+  - O `alga-verify` resolve `@alga/*` pelo checkout principal: faça o merge na main **antes** do build.
+  - O `npm run dist` agora compila também o `setup-ui` e precisa de `cargo` e do rc.exe do Windows SDK.
+  - Uma vez o makensis falhou sem repetir: se acontecer, rode de novo.
+
 ## 2026-11-05 tarde — Fundamentos + Eco publicados (main `bcef309`, release v0.1.6)
 - **Eco, o mascote** (`docs/brand/mascote/eco.md`): substitui as iniciais em todo avatar sem foto. Desenho vetorial único
   (`ui/eco/Eco.tsx`), estados (`idle`, `blink`, `hop`, `talking`, `listening`, `muted`, `connecting`, `streaming`, `sleeping`, `error`,

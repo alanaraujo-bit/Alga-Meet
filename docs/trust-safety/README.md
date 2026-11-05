@@ -274,6 +274,7 @@ analisado para não destruir prova. Ver as pendências.
 | Recursos decididos | 6 meses depois da decisão | Job |
 | Medidas na conta | Enquanto a conta existir. 6 meses depois do expurgo | Job |
 | Exportações | Zip apagado aos 7 dias. A linha, aos 30 | Job |
+| "Por que está saindo?" (`uninstall_feedback`: motivo, nota opcional, versão; sem conta e sem IP) | 6 meses | Job |
 | Conta pedida para exclusão | 7 dias de carência, ou 30 dias quando a declaração de idade é abaixo de 16 | Job |
 | Prova em quarentena | Até a autoridade confirmar o recebimento | Equipe (`receiptConfirmed`) |
 | Registro da quarentena (hash, ids, protocolo) | Sem prazo | — |
