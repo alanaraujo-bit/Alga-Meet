@@ -1,7 +1,7 @@
 {
   "name": "@alga/desktop",
   "productName": "Alga Meet",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Alga Meet — voz, transmissão de tela e comunidades.",
   "author": "Alga",
@@ -13,7 +13,7 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json",
     "test": "vitest run",
-    "dist": "node scripts/build-activity.mjs && electron-vite build && electron-builder --win --publish never",
+    "dist": "node scripts/build-activity.mjs && electron-vite build && electron-builder --win --publish never && node scripts/check-package.mjs",
     "screenshot": "node scripts/screenshot.mjs"
   },
   "dependencies": {
