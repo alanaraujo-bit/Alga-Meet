@@ -171,6 +171,11 @@ export const metrics = {
   e2eeCommits: r.counter('alga_e2ee_commits_total', 'Commits received, by result (accepted | rejected).'),
   e2eeResyncs: r.counter('alga_e2ee_resyncs_total', 'E2EE_RESYNC_REQUIRED sent, by reason (reset = the DS restarted a stuck group).'),
 
+  // Sala de Cinema (src/cinema.ts).
+  cinemaSessions: r.counter('alga_cinema_sessions_total', 'cinema_open by result (opened | disabled | not_in_call | forbidden | not_found | exists).'),
+  cinemaSeats: r.gauge('alga_cinema_seats', 'Seated users across live cinema sessions.'),
+  cinemaEnded: r.counter('alga_cinema_ended_total', 'Cinema sessions ended, by reason (host_ended | host_left | moderator | call_empty | channel_gone).'),
+
   // Database (src/db/index.ts wraps the driver's query function).
   dbQueryDuration: r.histogram('alga_db_query_duration_seconds', 'Database query time by driver and statement kind.', LATENCY),
   dbQueryErrors: r.counter('alga_db_query_errors_total', 'Database queries that failed, by driver and statement kind.'),

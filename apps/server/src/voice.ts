@@ -75,6 +75,8 @@ export class Voice {
    * hooks it to remove their MLS leaf at once, without waiting for LiveKit's webhook.
    */
   onLeave: (userId: string, channelId: string) => void = () => {}
+  /** Channels about to be deleted (before their per-user onLeave calls): Cinema ends their sessions as channel_gone. */
+  onDrop: (channelIds: string[]) => void = () => {}
   /** Same moments as onLeave, with the whole state: src/activity records voice_sessions from it (D7, growth-plan §4.5). */
   onSessionEnd: (s: VoiceState, leftAt: Date) => void = () => {}
   /** src/e2ee.ts sets it when the Delivery Service is up: without it no call is E2EE. */
@@ -321,6 +323,7 @@ export class Voice {
 
   /** Channel/space being deleted: forget its states and close the LiveKit rooms. `audience` is computed before deletion. */
   async dropChannels(channelIds: string[], audience: string[]): Promise<void> {
+    this.onDrop(channelIds)
     for (const s of this.all()) {
       if (!channelIds.includes(s.channelId)) continue
       this.states.delete(s.userId)

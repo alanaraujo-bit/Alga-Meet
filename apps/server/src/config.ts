@@ -94,6 +94,10 @@ const EnvSchema = z
     CASA_CINEMA: bool,
     /** Sala de Cinema (src/cinema.ts). Default: on outside production; staging sets CINEMA=true explicitly. */
     CINEMA: z.enum(['true', 'false', '1', '0']).optional().transform((v) => (v === undefined ? undefined : v === 'true' || v === '1')),
+    /** Cinema ICE: comma-separated STUN/TURN URLs; TURN credentials are TURN REST (HMAC-SHA1 of the shared secret, coturn static-auth-secret). Without the secret only STUN is offered. */
+    CINEMA_STUN_URLS: z.string().optional(),
+    CINEMA_TURN_URLS: z.string().optional(),
+    CINEMA_TURN_SECRET: z.string().min(1).optional(),
     /** Makes RegisterBody.birthDate and termsVersion mandatory outside production (production always requires them). */
     REQUIRE_BIRTHDATE: bool,
     /** Where the published Termos/Política/Diretrizes live (GET /legal links). */
@@ -192,7 +196,7 @@ export interface Config {
   metricsToken: string | undefined
   /** src/e2ee.ts. `dsSeed`: Ed25519 seed of the Delivery Service's external-sender key. */
   e2ee: { dsSeed: Buffer; mlsPkg: string }
-  cinema: { enabled: boolean }
+  cinema: { enabled: boolean; stunUrls: string[]; turnUrls: string[]; turnSecret: string | undefined }
 }
 
 export interface BillingConfig {
@@ -221,6 +225,8 @@ export type StorageConfig =
   | { driver: 's3'; endpoint: string; bucket: string; region: string; accessKeyId: string; secretAccessKey: string; pathStyle: boolean }
 
 const urlHost = (host: string) => (host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host.includes(':') ? `[${host}]` : host)
+
+const urlList = (v: string | undefined): string[] => (v ?? '').split(',').map((x) => x.trim()).filter(Boolean)
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   const parsed = EnvSchema.safeParse(env)
@@ -281,6 +287,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     legal: { requireBirthDate: e.NODE_ENV === 'production' || e.REQUIRE_BIRTHDATE, url: e.LEGAL_URL.replace(/\/+$/, '') },
     metricsToken: e.METRICS_TOKEN,
     e2ee: { dsSeed: e.E2EE_DS_KEY ? Buffer.from(e.E2EE_DS_KEY, 'base64') : randomBytes(32), mlsPkg: e.E2EE_MLS_PKG },
-    cinema: { enabled: e.CINEMA ?? e.NODE_ENV !== 'production' },
+    cinema: {
+      enabled: e.CINEMA ?? e.NODE_ENV !== 'production',
+      stunUrls: urlList(e.CINEMA_STUN_URLS), turnUrls: urlList(e.CINEMA_TURN_URLS), turnSecret: e.CINEMA_TURN_SECRET,
+    },
   }
 }
