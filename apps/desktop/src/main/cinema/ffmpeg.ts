@@ -24,12 +24,24 @@ export function ffmpegBins(): FfmpegBins {
 
 export type FfmpegCheck = { ok: true; version: string } | { ok: false; reason: 'missing' | 'blocked' | 'crashed'; detail: string }
 
+/** Cap on the stdout/stderr tail returned by runTool (chars). */
+export const TOOL_TAIL_MAX = 64 * 1024
+/** After a kill, wait this long for the process to exit before force-killing its tree. */
+const KILL_GRACE_MS = 2000
+
 export interface RunOpts {
   timeoutMs: number
   signal?: AbortSignal
+  /** When set, stdout is delivered line by line and NOT accumulated: the returned `stdout` is ''. */
   onStdoutLine?: (line: string) => void
 }
 
+const tail = (acc: string, chunk: string): string => {
+  const all = acc + chunk
+  return all.length > TOOL_TAIL_MAX ? all.slice(all.length - TOOL_TAIL_MAX) : all
+}
+
+/** Returned stdout/stderr are only the last TOOL_TAIL_MAX chars. Timeout/abort reject (reason kept) only once the child is gone. */
 export function runTool(bin: string, args: readonly string[], opts: RunOpts): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     if (opts.signal?.aborted) return reject(new Error('aborted'))
@@ -38,16 +50,24 @@ export function runTool(bin: string, args: readonly string[], opts: RunOpts): Pr
     let stderr = ''
     let pending = ''
     let settled = false
-    const done = (fn: () => void) => {
+    let killReason: string | null = null
+    let hard: NodeJS.Timeout | undefined
+    const finish = (fn: () => void) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
+      clearTimeout(hard)
       opts.signal?.removeEventListener('abort', onAbort)
       fn()
     }
     const kill = (why: string) => {
+      if (killReason || settled) return
+      killReason = why
       child.kill()
-      done(() => reject(new Error(why)))
+      hard = setTimeout(() => {
+        if (child.pid !== undefined) spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, shell: false, stdio: 'ignore' }).on('error', () => {})
+        finish(() => reject(new Error(why)))
+      }, KILL_GRACE_MS)
     }
     const timer = setTimeout(() => kill('timeout'), opts.timeoutMs)
     const onAbort = () => kill('aborted')
@@ -60,20 +80,25 @@ export function runTool(bin: string, args: readonly string[], opts: RunOpts): Pr
         // Best effort: the process may already be gone or the OS may refuse.
       }
     }
-    child.stdout.on('data', (d: Buffer) => {
-      const text = d.toString('utf8')
-      stdout += text
-      if (!opts.onStdoutLine) return
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (text: string) => {
+      if (killReason || settled) return
+      if (!opts.onStdoutLine) {
+        stdout = tail(stdout, text)
+        return
+      }
       pending += text
       const parts = pending.split(/\r?\n/)
       pending = parts.pop() ?? ''
       for (const l of parts) opts.onStdoutLine(l)
     })
-    child.stderr.on('data', (d: Buffer) => (stderr += d.toString('utf8')))
-    child.on('error', (err) => done(() => reject(err)))
+    child.stderr.on('data', (text: string) => (stderr = tail(stderr, text)))
+    child.on('error', (err) => finish(() => reject(err)))
     child.on('close', (code) => {
+      if (killReason) return finish(() => reject(new Error(killReason!)))
       if (pending && opts.onStdoutLine) opts.onStdoutLine(pending)
-      done(() => resolve({ code: code ?? -1, stdout, stderr }))
+      finish(() => resolve({ code: code ?? -1, stdout, stderr }))
     })
   })
 }
@@ -88,7 +113,8 @@ export async function checkFfmpeg(args: readonly string[] = ['-version']): Promi
   } catch (err) {
     const e = err as NodeJS.ErrnoException
     if (e.code === 'ENOENT') return { ok: false, reason: 'missing', detail: e.message }
-    if (e.code === 'EPERM' || e.code === 'EACCES' || e.code === 'UNKNOWN') return { ok: false, reason: 'blocked', detail: e.message }
+    // UNKNOWN/EFTYPE: Windows refuses to load the exe. Antivirus quarantine and a corrupt file look the same and are fixed the same way.
+    if (['EPERM', 'EACCES', 'UNKNOWN', 'EFTYPE'].includes(e.code ?? '')) return { ok: false, reason: 'blocked', detail: `bloqueado pelo antivírus ou arquivo corrompido (${e.code})` }
     return { ok: false, reason: 'crashed', detail: e.message }
   }
 }

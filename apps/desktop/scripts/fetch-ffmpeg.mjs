@@ -34,7 +34,7 @@ try {
   writeFileSync(zipPath, zip)
   // bsdtar ships with Windows 10+ and reads zip; args as an array, no shell.
   const members = [...BIN_FILES.map((f) => `${DIR}/bin/${f}`), `${DIR}/LICENSE.txt`]
-  const x = spawnSync(join(process.env.SystemRoot ?? 'C:\Windows', 'System32', 'tar.exe'), ['-xf', zipPath, '-C', tmp, ...members], { stdio: 'inherit' })
+  const x = spawnSync(join(process.env.SystemRoot ?? 'C:/Windows', 'System32', 'tar.exe'), ['-xf', zipPath, '-C', tmp, ...members], { stdio: 'inherit' })
   if (x.status !== 0) throw new Error('tar extraction failed')
 
   const conf = spawnSync(join(tmp, DIR, 'bin', 'ffmpeg.exe'), ['-buildconf'], { encoding: 'utf8' })
