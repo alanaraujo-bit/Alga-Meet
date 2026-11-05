@@ -39,6 +39,26 @@ describe('checkFfmpeg', () => {
   })
 })
 
+describe('checkFfmpeg detail', () => {
+  it('keeps the END of stderr (slice(-300)), not the start', async () => {
+    const args = fake('process.stderr.write("A".repeat(500)+"THE_END");process.exit(3)')
+    const r = await checkFfmpeg(args)
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.detail.endsWith('THE_END')).toBe(true)
+      expect(r.detail.length).toBeLessThanOrEqual('exit 3: '.length + 300)
+    }
+  })
+  it('keeps e.message in the blocked detail', async () => {
+    const bad = join(dir, 'bad2.exe')
+    writeFileSync(bad, 'not an exe')
+    setFfmpegBinsForTest({ ffmpeg: bad, ffprobe: 'x' })
+    const r = await checkFfmpeg()
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.detail).toContain('spawn')
+  })
+})
+
 describe('runTool', () => {
   const node = process.execPath
   it('times out and kills', async () => {
@@ -65,6 +85,17 @@ describe('runTool', () => {
     const r = await runTool(node, ['-e', 'for(let i=0;i<50000;i++)process.stderr.write("line "+i+" "+"x".repeat(90)+String.fromCharCode(10))'], { timeoutMs: 20_000 })
     expect(r.stderr.length).toBeLessThanOrEqual(TOOL_TAIL_MAX)
     expect(r.stderr.trimEnd().endsWith('line 49999 ' + 'x'.repeat(90))).toBe(true)
+  })
+  it('caps the pending line buffer when a line never ends', async () => {
+    const lines: string[] = []
+    await runTool(node, ['-e', 'process.stdout.write("x".repeat(300000));process.stdout.write(String.fromCharCode(10)+"ok"+String.fromCharCode(10))'], { timeoutMs: 10_000, onStdoutLine: (l) => lines.push(l) })
+    expect(lines.length).toBeGreaterThanOrEqual(2)
+    expect(lines.every((l) => l.length <= TOOL_TAIL_MAX)).toBe(true)
+    expect(lines.at(-1)).toBe('ok')
+  })
+  it('honors a larger tailMax', async () => {
+    const r = await runTool(node, ['-e', 'process.stdout.write("y".repeat(200000))'], { timeoutMs: 10_000, tailMax: 1024 * 1024 })
+    expect(r.stdout.length).toBe(200000)
   })
   it('does not accumulate stdout when onStdoutLine is given', async () => {
     const r = await runTool(node, ['-e', 'console.log("a")'], { timeoutMs: 5000, onStdoutLine: () => {} })

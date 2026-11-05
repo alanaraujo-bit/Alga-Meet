@@ -34,17 +34,20 @@ export interface RunOpts {
   signal?: AbortSignal
   /** When set, stdout is delivered line by line and NOT accumulated: the returned `stdout` is ''. */
   onStdoutLine?: (line: string) => void
+  /** Cap on the returned stdout/stderr tail and on one unterminated line (default TOOL_TAIL_MAX). ffprobe JSON of big files needs more. */
+  tailMax?: number
 }
 
-const tail = (acc: string, chunk: string): string => {
+const tail = (acc: string, chunk: string, max: number): string => {
   const all = acc + chunk
-  return all.length > TOOL_TAIL_MAX ? all.slice(all.length - TOOL_TAIL_MAX) : all
+  return all.length > max ? all.slice(all.length - max) : all
 }
 
 /** Returned stdout/stderr are only the last TOOL_TAIL_MAX chars. Timeout/abort reject (reason kept) only once the child is gone. */
 export function runTool(bin: string, args: readonly string[], opts: RunOpts): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     if (opts.signal?.aborted) return reject(new Error('aborted'))
+    const max = opts.tailMax ?? TOOL_TAIL_MAX
     const child = spawn(bin, [...args], { windowsHide: true, shell: false })
     let stdout = ''
     let stderr = ''
@@ -65,7 +68,7 @@ export function runTool(bin: string, args: readonly string[], opts: RunOpts): Pr
       killReason = why
       child.kill()
       hard = setTimeout(() => {
-        if (child.pid !== undefined) spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, shell: false, stdio: 'ignore' }).on('error', () => {})
+        if (child.pid !== undefined) spawn(`${process.env.SystemRoot ?? 'C:/Windows'}/System32/taskkill.exe`, ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, shell: false, stdio: 'ignore' }).on('error', () => {})
         finish(() => reject(new Error(why)))
       }, KILL_GRACE_MS)
     }
@@ -85,15 +88,17 @@ export function runTool(bin: string, args: readonly string[], opts: RunOpts): Pr
     child.stdout.on('data', (text: string) => {
       if (killReason || settled) return
       if (!opts.onStdoutLine) {
-        stdout = tail(stdout, text)
+        stdout = tail(stdout, text, max)
         return
       }
       pending += text
       const parts = pending.split(/\r?\n/)
       pending = parts.pop() ?? ''
+      // A line that never ends must not grow without bound: keep only its last `max` chars.
+      if (pending.length > max) pending = pending.slice(pending.length - max)
       for (const l of parts) opts.onStdoutLine(l)
     })
-    child.stderr.on('data', (text: string) => (stderr = tail(stderr, text)))
+    child.stderr.on('data', (text: string) => (stderr = tail(stderr, text, max)))
     child.on('error', (err) => finish(() => reject(err)))
     child.on('close', (code) => {
       if (killReason) return finish(() => reject(new Error(killReason!)))
@@ -107,14 +112,14 @@ export function runTool(bin: string, args: readonly string[], opts: RunOpts): Pr
 export async function checkFfmpeg(args: readonly string[] = ['-version']): Promise<FfmpegCheck> {
   try {
     const r = await runTool(ffmpegBins().ffmpeg, args, { timeoutMs: 5000 })
-    if (r.code !== 0) return { ok: false, reason: 'crashed', detail: `exit ${r.code}: ${r.stderr.slice(0, 300)}` }
+    if (r.code !== 0) return { ok: false, reason: 'crashed', detail: `exit ${r.code}: ${r.stderr.slice(-300)}` }
     const m = /ffmpeg version (\S+)/.exec(r.stdout)
     return m?.[1] ? { ok: true, version: m[1] } : { ok: false, reason: 'crashed', detail: 'unexpected output' }
   } catch (err) {
     const e = err as NodeJS.ErrnoException
     if (e.code === 'ENOENT') return { ok: false, reason: 'missing', detail: e.message }
     // UNKNOWN/EFTYPE: Windows refuses to load the exe. Antivirus quarantine and a corrupt file look the same and are fixed the same way.
-    if (['EPERM', 'EACCES', 'UNKNOWN', 'EFTYPE'].includes(e.code ?? '')) return { ok: false, reason: 'blocked', detail: `bloqueado pelo antivírus ou arquivo corrompido (${e.code})` }
+    if (['EPERM', 'EACCES', 'UNKNOWN', 'EFTYPE'].includes(e.code ?? '')) return { ok: false, reason: 'blocked', detail: `bloqueado pelo antivírus ou arquivo corrompido (${e.code}): ${e.message}` }
     return { ok: false, reason: 'crashed', detail: e.message }
   }
 }
