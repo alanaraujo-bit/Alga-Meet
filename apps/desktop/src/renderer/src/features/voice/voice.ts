@@ -6,6 +6,7 @@ import { voiceJoin } from '@/store/actions'
 import { useData } from '@/store/data'
 import { displayName } from '@/store/selectors'
 import { onDispatch, useSession } from '@/store/session'
+import { startSoundboard } from '../soundboard/store'
 import { useUi } from '@/store/ui'
 import { toast } from '@/ui'
 import type { Corner } from './layout'
@@ -223,6 +224,7 @@ export function startVoiceSync(): () => void {
       // Ringback ends when someone answers or the call drops.
       if (ringbackTimer && (Object.keys(s.participants).length > 0 || s.connection.state === 'idle' || s.connection.state === 'disconnected')) stopRingback()
     }),
+    startSoundboard(),
     // One aggregate call-quality report per session, only with the user's consent (Me.telemetryOptIn).
     startCallTelemetry(() => useData.getState().me?.telemetryOptIn === true),
     // Me.plan (READY, ME_UPDATE) is the other source of the plan's presets; the engine dedupes.

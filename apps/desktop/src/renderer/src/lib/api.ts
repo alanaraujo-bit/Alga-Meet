@@ -8,6 +8,8 @@ export class ApiRequestError extends Error {
     readonly fields?: Record<string, string>,
     /** Suspended/banned account (403 on login, or a session that raced the action). */
     readonly restriction?: AccountRestriction,
+    /** Soundboard 429: how long to wait and which limit (cooldown | channel_busy | burst). */
+    readonly retry?: { afterMs: number; reason?: string },
   ) {
     super(message)
   }
@@ -17,6 +19,8 @@ let token: string | null = null
 export const setApiToken = (t: string | null): void => {
   token = t
 }
+/** Authorization header for raw fetches (binary downloads such as soundboard audio). */
+export const authHeaders = (): Record<string, string> => (token ? { authorization: `Bearer ${token}` } : {})
 
 /** `X-Alga-Client: <version>; <os>` labels this device in Sessões; left out when main does not report the OS. */
 export const clientHeader = (c: { version?: string; osVersion?: string } | undefined): string | null =>
@@ -43,7 +47,8 @@ export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   const data = (await res.json().catch(() => null)) as (T & Partial<ApiError>) | null
   if (!res.ok) {
     const e = data?.error
-    throw new ApiRequestError(res.status, e?.code ?? 'internal', e?.message ?? `Erro inesperado (HTTP ${res.status}).`, e?.fields, e?.restriction)
+    throw new ApiRequestError(res.status, e?.code ?? 'internal', e?.message ?? `Erro inesperado (HTTP ${res.status}).`, e?.fields, e?.restriction,
+      e?.retryAfterMs !== undefined ? { afterMs: e.retryAfterMs, reason: e.reason } : undefined)
   }
   return data as T
 }
