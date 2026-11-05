@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   factories: [] as { closed: boolean; cbs: Record<string, (e: unknown) => void> }[],
   piece: new Uint8Array(0) as Uint8Array | null,
   probeGate: null as Promise<void> | null,
+  startError: null as string | null,
 }))
 
 vi.mock('electron', () => ({
@@ -40,11 +41,14 @@ vi.mock('./pieces', () => ({
   PieceFactory: class {
     s = { closed: false, cbs: {} as Record<string, (e: unknown) => void> }
     constructor(public opts: unknown) { h.factories.push(this.s) }
-    start() {}
+    start() { if (h.startError) throw new Error(h.startError) }
     ensure() {}
     addAudio() {}
     setPlayhead() {}
-    async addSubtitle(p: string) { return { id: 0, lang: null, title: p, format: 'vtt', external: true } }
+    async addSubtitle(p: string) {
+      if (p.includes('bad')) throw new Error(`cannot read ${p}`)
+      return { id: 0, lang: null, title: p, format: 'vtt', external: true }
+    }
     async init() { return h.piece }
     async piece() { return h.piece }
     onPieces(cb: (e: unknown) => void) { this.s.cbs.pieces = cb; return () => {} }
@@ -70,7 +74,7 @@ const probed = async () => {
   const r = await call(IPC.cinemaProbe, fileId)
   return { fileId, r }
 }
-beforeEach(() => { h.emitted.length = 0; h.factories.length = 0; h.probeGate = null })
+beforeEach(() => { h.emitted.length = 0; h.factories.length = 0; h.probeGate = null; h.startError = null })
 
 describe('cinema ipc', () => {
   it('unknown fileId rejects (invoke) and throws (send)', async () => {
@@ -188,11 +192,22 @@ describe('cinema ipc', () => {
     const sent = JSON.stringify(h.emitted)
     expect(sent).toContain('<arquivo>')
     expect(sent.toLowerCase()).not.toContain('alga-cinema-ipc')
-    h.picks.push(join(dir, 'gone.mkv'))
     const err = await call(IPC.cinemaFromDrop, join(dir, 'gone.mkv')).catch((e: Error) => e)
     expect(err).toBeInstanceOf(Error)
     expect(String((err as Error).message).toLowerCase()).not.toContain('alga-cinema-ipc')
     expect(fileId).toBeTruthy()
+  })
+
+  it('start and addSubtitle errors are redacted too, the subtitle file path included', async () => {
+    const { fileId } = await probed()
+    h.startError = `cannot open ${movie}`
+    const e1 = await call(IPC.cinemaStart, fileId, 0, []).catch((e: Error) => e)
+    expect(String((e1 as Error).message)).toBe('cannot open <arquivo>')
+    const sub = 'D:\\Legendas Pessoais\\bad.srt'
+    h.picks.push(sub)
+    const e2 = await call(IPC.cinemaAddSubtitle, fileId).catch((e: Error) => e)
+    expect(e2).toBeInstanceOf(Error)
+    expect(String((e2 as Error).message)).not.toContain('Legendas Pessoais')
   })
 
   it('fromDrop rejects UNC and device paths', async () => {

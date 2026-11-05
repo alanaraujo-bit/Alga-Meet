@@ -141,7 +141,9 @@ export function registerCinemaIpc(): void {
 
   handle(IPC.cinemaStart, (id, startS, audioIds) => {
     const f = factory(id)
-    f.start(seconds(startS), arr(audioIds, 16).map((a) => int(a, 0, 999)))
+    const at = seconds(startS)
+    const audio = arr(audioIds, 16).map((a) => int(a, 0, 999))
+    return safe(entry(id).path, () => f.start(at, audio))
   })
   on(IPC.cinemaEnsure, (id, t, at) => factory(id).ensure(track(t), seconds(at)))
   on(IPC.cinemaAddAudio, (id, a) => factory(id).addAudio(int(a, 0, 999)))
@@ -153,7 +155,8 @@ export function registerCinemaIpc(): void {
     const win = mainWindow()
     const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
     const path = r.canceled ? undefined : r.filePaths[0]
-    return path ? safe(entry(id).path, () => f.addSubtitle(path)) : null
+    // Both the video's and the subtitle file's own path are redacted.
+    return path ? safe(entry(id).path, () => safe(path, () => f.addSubtitle(path))) : null
   })
 
   handle(IPC.cinemaInit, async (id, t) => exact(await safe(entry(id).path, async () => factory(id).init(track(t)))))

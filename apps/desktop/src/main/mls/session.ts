@@ -285,7 +285,9 @@ export class E2eeSession {
     c.members = parseMembers((await this.deps.mls('members')) as string, c.ownLeaf)
     // Never lets a cinema failure block the media keys below: cinemaTag just answers null for this epoch.
     try {
-      c.cinemaKeys.set(c.epoch, (await this.deps.mls('export_secret', CINEMA_LABEL, utf8(c.channelId), 32)) as Uint8Array)
+      const key = (await this.deps.mls('export_secret', CINEMA_LABEL, utf8(c.channelId), 32)) as Uint8Array
+      c.cinemaKeys.get(c.epoch)?.fill(0) // a key replaced for the same epoch is zeroed, like the expired ones below
+      c.cinemaKeys.set(c.epoch, key)
     } catch (err) {
       this.deps.log('e2ee: cinema key export failed', { err: err instanceof Error ? err.message : String(err) })
     }
