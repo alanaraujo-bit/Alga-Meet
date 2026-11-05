@@ -51,7 +51,8 @@ export function ChatView({ channelId, aside }: { channelId: string; aside?: Reac
   // Typing anywhere in the conversation goes to the composer.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return
+      // defaultPrevented: someone took the key (the cinema's shortcuts in a DM call)
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return
       const el = document.activeElement
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable)) return
       if (document.querySelector('[role="dialog"], [role="menu"]')) return

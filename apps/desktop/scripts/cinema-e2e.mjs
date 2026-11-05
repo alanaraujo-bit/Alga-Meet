@@ -296,9 +296,12 @@ await check('Sincronia tocando (rVFC, A − B)', async () => {
   return metrics.playing
 })
 
-await check('Painel S nas duas janelas', async () => {
+await check('Painel S nas duas janelas; o atalho chega já tomado (defaultPrevented) aos ouvintes de bolha, como o do chat de DM', async () => {
+  // a bubble-phase window listener, like ChatView's "type anywhere → composer", must see the key as taken
+  await pb.evaluate(() => window.addEventListener('keydown', (e) => { if (e.key === 's') window.__sTaken = e.defaultPrevented }, { once: true }))
   await pa.keyboard.press('s')
   await pb.keyboard.press('s')
+  if ((await pb.evaluate(() => window.__sTaken)) !== true) throw new Error('S reached the bubble phase untaken')
   await until(async () => (await statsText(pa)).includes('Relógio') && (await statsText(pb)).includes('Relógio'), 'stats panels')
   await sleep(1500)
   metrics.statsPlayingA = await statsText(pa)
@@ -388,7 +391,7 @@ await check('Cota do gateway: < 300 frames cinema_* por 60 s em cada janela', as
 })
 
 await check('A encerra: os dois veem o resumo', async () => {
-  await pa.getByRole('button', { name: 'Encerrar sessão' }).click()
+  await pa.getByRole('button', { name: 'Encerrar sessão' }).first().click()
   await until(async () => (await pb.getByText('Sessão encerrada').count()) > 0, 'summary on B', 10_000)
 })
 

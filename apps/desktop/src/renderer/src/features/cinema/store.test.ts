@@ -1,6 +1,6 @@
 import type { CinemaPieceMeta, CinemaSessionView, Dispatch } from '@alga/shared'
-import { CINEMA_ITEMS_PER_FRAME } from '@alga/shared'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME } from '@alga/shared'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const CH = '0190a0a0-0000-7000-8000-00000000c0c0'
 const SID = '0190a0a0-0000-7000-8000-000000005e55'
@@ -71,7 +71,8 @@ const bridge = {
 }
 vi.stubGlobal('window', { alga: { cinema: bridge, e2ee: { cinemaTag: async () => null } } })
 
-const { handleCinemaDispatch, useCinema, resetCinema } = await import('./store')
+const { handleCinemaDispatch, onMediaChange, useCinema, resetCinema } = await import('./store')
+const { useMedia } = await import('@/media/store')
 const { openFromFile, openSession } = await import('./actions')
 const { t } = await import('./strings')
 
@@ -93,6 +94,7 @@ const ops = () => sent.map((f) => f.op)
 
 beforeEach(() => {
   resetCinema()
+  useMedia.setState({ connection: { state: 'connected', channelId: CH }, e2ee: { state: 'off', epoch: null } } as never)
   sent.length = 0
   engine.swarms.length = 0
   engine.meshes.length = 0
@@ -212,9 +214,186 @@ describe('host', () => {
       await vi.advanceTimersByTimeAsync(1000)
       expect(frames()).toEqual([])
       await vi.advanceTimersByTimeAsync(1100)
-      expect(frames().map((f) => [f.track, f.from, f.items.length])).toEqual([['v', 250, 8], ['a0', 0, 2]])
+      expect(frames().map((f) => [f.track, f.from, f.items.length]).sort()).toEqual([['a0', 0, 2], ['v', 250, 8]])
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+// ---- fix round 1 ------------------------------------------------------------------------------------------------------
+
+const hostView = (over: Partial<CinemaSessionView> = {}) => view({ hostId: 'me', seats: [{ userId: 'me', status: 'preparing', aheadS: 0, direct: true }], ...over })
+const meta = (i: number): CinemaPieceMeta => [i * 4, 4, 1000, 'c'.repeat(64)]
+const pieceFrames = () => sent.filter((f) => f.op === 'cinema_pieces') as { track: string; from: number; items: CinemaPieceMeta[] }[]
+/** The host's file is open and its session confirmed (the factory started). */
+async function hosting(): Promise<void> {
+  bridge.probe.mockResolvedValueOnce({ film, warnings: [], next: [] })
+  await openFromFile()
+  openSession('Duna')
+  dispatch({ t: 'CINEMA_STATE', d: hostView() })
+  await vi.advanceTimersByTimeAsync(0)
+}
+
+describe('index budget and repair (host)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('8 tracks producing every 250 ms: at most 120 cinema_pieces frames per minute in all, never a gap (server rule from <= length)', async () => {
+    await hosting()
+    const tracks = ['v', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6']
+    const made = new Map(tracks.map((tr) => [tr, 0]))
+    const server = new Map<string, number>()
+    const apply = (f: { track: string; from: number; items: unknown[] }) => {
+      const len = server.get(f.track) ?? 0
+      expect(f.from).toBeLessThanOrEqual(len) // else the server answers `invalid`
+      server.set(f.track, Math.max(len, f.from + f.items.length))
+    }
+    sent.length = 0
+    for (let ms = 0; ms < 60_000; ms += 250) {
+      for (const tr of tracks) {
+        const n = made.get(tr)!
+        bridge.emitPieces!({ fileId: 'f1', track: tr, from: n, items: [meta(n)] })
+        made.set(tr, n + 1)
+      }
+      await vi.advanceTimersByTimeAsync(250)
+    }
+    expect(pieceFrames().length).toBeLessThanOrEqual(120)
+    pieceFrames().forEach(apply)
+    sent.length = 0
+    await vi.advanceTimersByTimeAsync(120_000) // the backlog drains through the same budget
+    pieceFrames().forEach(apply)
+    for (const tr of tracks) expect(server.get(tr)).toBe(made.get(tr))
+  })
+
+  it('a new gateway session resends the whole index once the session is confirmed; a refused (invalid) frame too, not in a loop', async () => {
+    await hosting()
+    bridge.emitPieces!({ fileId: 'f1', track: 'v', from: 0, items: [meta(0), meta(1), meta(2)] })
+    await vi.advanceTimersByTimeAsync(2000)
+    bridge.emitPieces!({ fileId: 'f1', track: 'v', from: 3, items: [meta(3)] }) // accepted by send(), lost with the socket
+    await vi.advanceTimersByTimeAsync(2000)
+    sent.length = 0
+    dispatch({ t: 'READY', d: {} })
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(pieceFrames()).toEqual([]) // not before the session is confirmed
+    dispatch({ t: 'CINEMA_STATE', d: hostView({ playback: { ...view().playback, seq: 3 } }) })
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(pieceFrames().map((f) => [f.track, f.from, f.items.length])).toEqual([['v', 0, 4]])
+    sent.length = 0
+    dispatch({ t: 'CINEMA_ERROR', d: { op: 'cinema_pieces', reason: 'invalid', sessionId: SID } })
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(pieceFrames()).toEqual([]) // repaired a moment ago
+    await vi.advanceTimersByTimeAsync(30_000)
+    dispatch({ t: 'CINEMA_ERROR', d: { op: 'cinema_pieces', reason: 'invalid', sessionId: SID } })
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(pieceFrames().map((f) => [f.track, f.from, f.items.length])).toEqual([['v', 0, 4]])
+    expect(useCinema.getState().error).toBeNull()
+  })
+})
+
+describe('session gone while the gateway was down', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('hello answered not_found: session, engine and the host factory go, busy cleared, no error shown', async () => {
+    await hosting()
+    dispatch({ t: 'READY', d: {} })
+    dispatch({ t: 'CINEMA_ERROR', d: { op: 'cinema_hello', reason: 'not_found' } })
+    expect(useCinema.getState()).toMatchObject({ session: null, busy: false, error: null, mine: { seated: false } })
+    expect(engine.swarms[0].close).toHaveBeenCalled()
+    expect(bridge.close).toHaveBeenCalledWith('f1')
+  })
+
+  it('an older server that answers nothing: dropped 5 s after hello', async () => {
+    dispatch({ t: 'CINEMA_STATE', d: view() })
+    await vi.advanceTimersByTimeAsync(0)
+    dispatch({ t: 'READY', d: {} })
+    await vi.advanceTimersByTimeAsync(4000)
+    expect(useCinema.getState().session).not.toBeNull()
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(useCinema.getState().session).toBeNull()
+    expect(engine.swarms[0].close).toHaveBeenCalled()
+  })
+
+  it('an open still on its way survives a not_found hello', async () => {
+    bridge.probe.mockResolvedValueOnce({ film, warnings: [], next: [] })
+    await openFromFile()
+    openSession('Duna')
+    dispatch({ t: 'CINEMA_ERROR', d: { op: 'cinema_hello', reason: 'not_found' } })
+    expect(bridge.close).not.toHaveBeenCalled()
+    dispatch({ t: 'CINEMA_STATE', d: hostView() })
+    expect(bridge.start).toHaveBeenCalledWith('f1', 0, [0])
+  })
+})
+
+describe('media drop (host)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+  const conn = (state: string, channelId: string | null = CH) => ({ state, channelId })
+
+  it('a media disconnect keeps the file; back in the call the new host swarm serves from it again; leaving closes it', async () => {
+    await hosting()
+    useMedia.setState({ connection: conn('disconnected') } as never)
+    onMediaChange(conn('disconnected'), conn('connected'))
+    expect(bridge.close).not.toHaveBeenCalled()
+    expect(engine.swarms[0].close).toHaveBeenCalled() // the seat's engine stops meanwhile
+    useMedia.setState({ connection: conn('connected') } as never)
+    onMediaChange(conn('connected'), conn('connecting'))
+    expect(sent.at(-1)).toEqual({ op: 'cinema_hello' })
+    dispatch({ t: 'CINEMA_STATE', d: hostView({ playback: { ...view().playback, seq: 2, reason: 'user' } }) }) // hostBack re-seats me
+    await vi.advanceTimersByTimeAsync(0)
+    expect(engine.swarms).toHaveLength(2)
+    expect((engine.swarms[1].opts as { source?: unknown }).source).toBeTypeOf('function')
+    onMediaChange(conn('idle', null), conn('connected'))
+    expect(bridge.close).toHaveBeenCalledWith('f1')
+  })
+
+  it('still dropped after CINEMA_HOST_AWAY_MS: the file closes', async () => {
+    await hosting()
+    useMedia.setState({ connection: conn('disconnected') } as never)
+    onMediaChange(conn('disconnected'), conn('connected'))
+    await vi.advanceTimersByTimeAsync(CINEMA_HOST_AWAY_MS - 1000)
+    expect(bridge.close).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(bridge.close).toHaveBeenCalledWith('f1')
+    expect(useCinema.getState().session).toBeNull()
+  })
+
+  it('leaving the call with the film sheet open closes its file', async () => {
+    bridge.probe.mockResolvedValueOnce({ film, warnings: [], next: [] })
+    await openFromFile()
+    onMediaChange(conn('idle', null), conn('connected'))
+    expect(useCinema.getState().draft).toBeNull()
+    expect(bridge.close).toHaveBeenCalledWith('f1')
+  })
+})
+
+describe('E2EE gating of the mesh', () => {
+  it('establishing: no mesh, signals wait; active: a tagged mesh, synced before the buffered signal', async () => {
+    useMedia.setState({ e2ee: { state: 'establishing', epoch: null } } as never)
+    dispatch({ t: 'CINEMA_STATE', d: view() })
+    await flush()
+    dispatch({ t: 'CINEMA_SIGNAL', d: { sessionId: SID, from: 'ana', signal: { kind: 'ice', candidates: ['c'] } } })
+    expect(engine.swarms).toHaveLength(1)
+    expect(engine.meshes).toHaveLength(0)
+    useMedia.setState({ e2ee: { state: 'active', epoch: 7 } } as never)
+    expect(engine.meshes).toHaveLength(1)
+    expect((engine.meshes[0].opts as { e2ee: { epoch(): number } | null }).e2ee?.epoch()).toBe(7)
+    expect(engine.meshes[0].calls).toEqual(['sync', 'signal'])
+  })
+
+  it('establishing then failed: never a mesh (an untagged one would trust the server)', async () => {
+    useMedia.setState({ e2ee: { state: 'establishing', epoch: null } } as never)
+    dispatch({ t: 'CINEMA_STATE', d: view() })
+    await flush()
+    useMedia.setState({ e2ee: { state: 'failed', epoch: null } } as never)
+    useMedia.setState({ e2ee: { state: 'off', epoch: null } } as never)
+    expect(engine.meshes).toHaveLength(0)
+  })
+
+  it('off from the start: an untagged mesh', async () => {
+    dispatch({ t: 'CINEMA_STATE', d: view() })
+    await flush()
+    expect((engine.meshes[0].opts as { e2ee: unknown }).e2ee).toBeNull()
   })
 })

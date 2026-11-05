@@ -24,7 +24,7 @@ function techChip(f: CinemaFilm): string {
   const res = f.height >= 2000 ? '4K' : f.height >= 1000 ? '1080p' : f.height >= 700 ? '720p' : `${f.height}p`
   const codec = { h264: 'H.264', hevc: 'HEVC', av1: 'AV1', vp9: 'VP9' }[f.videoCodec]
   const hdr = f.hdr === 'sdr' ? '' : ` · ${f.hdr === 'dv8' ? 'Dolby Vision' : f.hdr.toUpperCase()}`
-  return `Nativo · ${res}${hdr} · ${codec}`
+  return `${t.native} · ${res}${hdr} · ${codec}`
 }
 const trackLabel = (x: { lang: string | null; title: string | null }, i: number) => t.trackName(x.lang, x.title, i)
 
@@ -37,13 +37,13 @@ export function CinemaNotices() {
       {error && (
         <div className={`${styles.notice} ${styles.noticeError}`}>
           <span>{error}</span>
-          <button type="button" className={styles.ib} aria-label="Fechar" onClick={act.dismissError}><Icon icon={X} size={14} /></button>
+          <button type="button" className={styles.ib} aria-label={t.close} onClick={act.dismissError}><Icon icon={X} size={14} /></button>
         </div>
       )}
       {notices.map((n) => (
         <div key={n} className={styles.notice}>
           <span>{n}</span>
-          <button type="button" className={styles.ib} aria-label="Fechar" onClick={() => act.dismissNotice(n)}><Icon icon={X} size={14} /></button>
+          <button type="button" className={styles.ib} aria-label={t.close} onClick={() => act.dismissNotice(n)}><Icon icon={X} size={14} /></button>
         </div>
       ))}
     </div>
@@ -72,7 +72,7 @@ export function CinemaCard({ channel }: { channel: Channel }) {
         <span>
           <b>{ended.title}</b> · {t.ended[ended.reason]} · {t.endedSummary(length(ended.summary.watchedS), ended.summary.reactions)}
         </span>
-        <button type="button" className={styles.ib} aria-label="Fechar" onClick={() => useCinema.setState({ ended: null })}><Icon icon={X} size={14} /></button>
+        <button type="button" className={styles.ib} aria-label={t.close} onClick={() => useCinema.setState({ ended: null })}><Icon icon={X} size={14} /></button>
       </div>
     )
   }
@@ -240,7 +240,7 @@ export function CinemaDev({ channel }: { channel: Channel }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return
       const el = e.target as HTMLElement | null
-      if (el?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return
+      if (el?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], [role="listbox"]')) return
       if (e.key === ' ' && el?.closest('button')) return // the focused button takes its own Space
       const k = keys.current
       const pr = useCinema.getState().prefs
@@ -263,8 +263,9 @@ export function CinemaDev({ channel }: { channel: Channel }) {
       }
       e.preventDefault()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    // capture phase: handled keys are taken before the DM chat's "type anywhere → composer" sees them (it skips defaultPrevented)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [])
 
   const ready = session.seats.filter((x) => x.status === 'ready').length
@@ -290,7 +291,7 @@ export function CinemaDev({ channel }: { channel: Channel }) {
         <span className={styles.title}>{film.title}</span>
         <span className={styles.chip}>{techChip(film)}</span>
         <span className={styles.by}><Icon icon={FilmStrip} size={14} /> {t.projecting(hostName)}</span>
-        <span className={styles.sync} title={`${ready} de ${session.seats.length}`}><i /> {t.stage.inSync} · {ready} de {session.seats.length}</span>
+        <span className={styles.sync} title={t.seatsOf(ready, session.seats.length)}><i /> {t.stage.inSync} · {t.seatsOf(ready, session.seats.length)}</span>
         {isHost
           ? <Button size="sm" variant="secondary-danger" onClick={act.end}>{t.stage.end}</Button>
           : <Button size="sm" variant="ghost" onClick={() => act.seat(false)}>{t.standUp}</Button>}
@@ -353,7 +354,7 @@ export function CinemaDev({ channel }: { channel: Channel }) {
       <div className={styles.seats} role="group" aria-label={t.stage.seats}>
         {session.seats.map((x) => (
           <span key={x.userId} className={styles.seat} data-status={x.status}>
-            <i /> {names[x.userId] ?? t.someone} <small>{t.stage.status[x.status]}{x.direct ? '' : ' · relay'}</small>
+            <i /> {names[x.userId] ?? t.someone} <small>{t.stage.status[x.status]}{x.direct ? '' : t.relay}</small>
           </span>
         ))}
       </div>
@@ -410,7 +411,7 @@ function StatsPanel({ names }: { names: Record<string, string> }) {
     [t.stats.relay, stats?.relayed.length ? stats.relayed.map((id) => names[id] ?? id).join(', ') : t.stats.none],
     [t.stats.cache, stats?.cache ? `${stats.cache.kind.toUpperCase()} · ${n1(stats.cache.capGB)} GB` : '—'],
     [t.stats.audio, stats?.audioTrack ?? '—'],
-    [t.stats.seats, session.seats.map((x) => `${names[x.userId] ?? '?'}: ${t.stage.status[x.status]} ${n1(x.aheadS)} s${x.direct ? '' : ' (relay)'}`).join(' · ')],
+    [t.stats.seats, session.seats.map((x) => `${names[x.userId] ?? '?'}: ${t.stage.status[x.status]} ${n1(x.aheadS)} s${x.direct ? '' : t.relay}`).join(' · ')],
   ]
   return (
     <div className={styles.stats} aria-label={t.stage.stats}>

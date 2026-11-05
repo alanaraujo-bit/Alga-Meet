@@ -6,7 +6,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
 import { useData } from '@/store/data'
 import { Icon, MenuButton, Spinner, Tooltip, useEnvelope } from '@/ui'
-import { openFromFile, seat } from '../cinema/actions'
+import { end as endCinema, openFromFile, seat } from '../cinema/actions'
 import { useCinema } from '../cinema/store'
 import { t as cinemaT } from '../cinema/strings'
 import { openSettings } from '../settings/store'
@@ -59,7 +59,7 @@ export function ControlsDock({ channel }: { channel: Channel }) {
   const [sbAnchor, setSbAnchor] = useState<HTMLElement | null>(null)
   useLayoutEffect(() => setSbAnchor(sbOpen ? sbButton.current : null), [sbOpen])
   // Cinema (ruling R30: always offered; a server without it answers "Cinema desligado neste servidor").
-  const cinema = useCinema(useShallow((st) => ({ open: !!st.session, seated: st.mine.seated, busy: st.busy })))
+  const cinema = useCinema(useShallow((st) => ({ open: !!st.session, seated: st.mine.seated, busy: st.busy, host: !!st.session && st.session.hostId === meId })))
 
   return (
     <div ref={dock} className={s.dock} role="toolbar" aria-label="Controles da chamada">
@@ -103,12 +103,12 @@ export function ControlsDock({ channel }: { channel: Channel }) {
       </MenuButton>
       <CallButton
         icon={FilmStrip}
-        label={cinema.seated ? cinemaT.standUp : cinema.open ? cinemaT.sitHere : cinemaT.button}
+        label={cinema.host ? cinemaT.stage.end : cinema.seated ? cinemaT.standUp : cinema.open ? cinemaT.sitHere : cinemaT.button}
         hint={cinema.open ? undefined : cinemaT.buttonHint}
         on={cinema.seated}
         aria-pressed={cinema.seated}
         disabled={!connected || cinema.busy}
-        onClick={() => (cinema.open ? seat(!cinema.seated) : void openFromFile())}
+        onClick={() => (cinema.host ? endCinema() : cinema.open ? seat(!cinema.seated) : void openFromFile())}
       />
       {channel.spaceId && (
         <CallButton

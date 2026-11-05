@@ -66,6 +66,12 @@ export const t = {
     invalid: 'O cinema recusou este pedido.',
     stale: '',
   } satisfies Record<CinemaErrorReason, string>,
+  engineFailed: 'Não deu para abrir a sessão neste PC. Saia e sente de novo.',
+  close: 'Fechar',
+  /** Tech chip: the video is the file's own (never re-encoded). */
+  native: 'Nativo',
+  seatsOf: (ready: number, all: number) => `${ready} de ${all}`,
+  relay: ' · relay',
   factoryError: 'O Alga parou de preparar uma parte do vídeo. Tentando de novo ao pular.',
   playerFailed: 'Seu PC não conseguiu tocar este vídeo.',
   unsupported: { video_codec: 'Seu PC não decodifica o vídeo deste filme.', audio_codec: 'Seu PC não decodifica esta faixa de áudio.' } as Record<string, string>,
