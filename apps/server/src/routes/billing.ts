@@ -40,7 +40,7 @@ export async function billingPublicRoutes(app: FastifyInstance, { billing }: Ctx
     hook.addContentTypeParser('application/json', { parseAs: 'string', bodyLimit: 64 * 1024 }, (_req, body, done) => done(null, body))
     // Server-to-server and signature-checked; generous ceiling per IP because providers retry in bursts.
     hook.post<{ Params: { provider: string } }>('/billing/webhooks/:provider', { config: perMinute(600) }, async (req) => {
-      const provider = ['sandbox', 'mercadopago'].includes(req.params.provider) ? req.params.provider : 'other'
+      const provider = ['sandbox', 'mercadopago', 'stripe'].includes(req.params.provider) ? req.params.provider : 'other'
       let outcome = 'error'
       try {
         const { duplicate } = await billing.handleWebhook(req.params.provider, {

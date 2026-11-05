@@ -76,11 +76,16 @@ const EnvSchema = z
     /** Base of the links in e-mails: `<base>/verify-email?token=…`, `<base>/reset-password?token=…`. */
     EMAIL_LINK_URL: z.url().default('algameet://auth'),
     /** none = payments off (checkout 503). Default: sandbox in development/test, none in production. sandbox is refused in production. */
-    BILLING_PROVIDER: z.enum(['none', 'sandbox', 'mercadopago']).optional(),
+    BILLING_PROVIDER: z.enum(['none', 'sandbox', 'mercadopago', 'stripe']).optional(),
     MP_ACCESS_TOKEN: z.string().min(1).optional(),
     /** "Assinatura secreta" of the webhook (Suas integrações > Webhooks): HMAC key of `x-signature`. */
     MP_WEBHOOK_SECRET: z.string().min(1).optional(),
     MP_API_URL: z.url().default('https://api.mercadopago.com'),
+    /** sk_test_… on staging, sk_live_… in production (Stripe Dashboard > Developers > API keys). */
+    STRIPE_SECRET_KEY: z.string().min(1).optional(),
+    /** whsec_… of the webhook endpoint (docs/infra/stripe.md): HMAC key of `Stripe-Signature`. */
+    STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+    STRIPE_API_URL: z.url().default('https://api.stripe.com'),
     /** Page the provider sends the buyer back to after paying (https; e.g. a site page that opens algameet://). */
     BILLING_RETURN_URL: z.url().optional(),
     /** Casa Cinema (1080p60 for a Casa's streams): off until the bandwidth deal; refused in production (not built). */
@@ -136,6 +141,14 @@ const EnvSchema = z
     if (env.NODE_ENV === 'production' && env.CASA_CINEMA) {
       ctx.addIssue({ code: 'custom', path: ['CASA_CINEMA'], message: 'Casa Cinema needs the bandwidth deal, the 60 h/month meter and the voice preset grant (growth-plan §2.3); none is built' })
     }
+    if (env.BILLING_PROVIDER === 'stripe') {
+      for (const k of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'BILLING_RETURN_URL'] as const) {
+        if (!env[k]) ctx.addIssue({ code: 'custom', path: [k], message: 'required with BILLING_PROVIDER=stripe' })
+      }
+      if (env.BILLING_RETURN_URL && !env.BILLING_RETURN_URL.startsWith('https://')) {
+        ctx.addIssue({ code: 'custom', path: ['BILLING_RETURN_URL'], message: 'must be https://' })
+      }
+    }
     if (env.BILLING_PROVIDER === 'mercadopago') {
       for (const k of ['MP_ACCESS_TOKEN', 'MP_WEBHOOK_SECRET', 'BILLING_RETURN_URL'] as const) {
         if (!env[k]) ctx.addIssue({ code: 'custom', path: [k], message: 'required with BILLING_PROVIDER=mercadopago' })
@@ -178,7 +191,7 @@ export interface Config {
 }
 
 export interface BillingConfig {
-  provider: 'none' | 'sandbox' | 'mercadopago'
+  provider: 'none' | 'sandbox' | 'mercadopago' | 'stripe'
   /** HMAC key of sandbox webhooks and checkout links; random per process (dev/test only). */
   sandboxSecret: string
   /** CASA_CINEMA: list the Cinema perk (dev/staging only for now). */
@@ -186,6 +199,8 @@ export interface BillingConfig {
   /** mercadopago only. */
   returnUrl: string
   mercadopago?: { accessToken: string; webhookSecret: string; apiUrl: string }
+  /** stripe only. */
+  stripe?: { secretKey: string; webhookSecret: string; apiUrl: string }
 }
 
 /** `autoVerify`: ALGA_AUTO_VERIFY_EMAIL (staging only, console driver only). */
@@ -250,6 +265,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       returnUrl: e.BILLING_RETURN_URL ?? 'https://algameet.com.br/billing/return',
       ...(e.BILLING_PROVIDER === 'mercadopago'
         ? { mercadopago: { accessToken: e.MP_ACCESS_TOKEN!, webhookSecret: e.MP_WEBHOOK_SECRET!, apiUrl: e.MP_API_URL.replace(/\/+$/, '') } }
+        : {}),
+      ...(e.BILLING_PROVIDER === 'stripe'
+        ? { stripe: { secretKey: e.STRIPE_SECRET_KEY!, webhookSecret: e.STRIPE_WEBHOOK_SECRET!, apiUrl: e.STRIPE_API_URL.replace(/\/+$/, '') } }
         : {}),
     },
     legal: { requireBirthDate: e.NODE_ENV === 'production' || e.REQUIRE_BIRTHDATE, url: e.LEGAL_URL.replace(/\/+$/, '') },

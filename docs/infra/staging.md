@@ -20,7 +20,7 @@
 | Voz e transmissão | Não há SFU com UDP (`LIVEKIT_URL` aponta para `sfu.pending.invalid`; `/ready` mostra `livekit: fail`) | VM em São Paulo ou LiveKit Cloud (ver `deploy.md`) — **decisão/custo do dono** |
 | E-mail real | `EMAIL_DRIVER=console` + `ALGA_ALLOW_CONSOLE_EMAIL=1` (e-mails ficam em arquivo no container) | Conta Resend + domínio verificado |
 | Verificação de e-mail real | Sem provedor; **`ALGA_AUTO_VERIFY_EMAIL=1` ligado** (d036bcb): contas novas nascem verificadas — verificado de fora: convite 201. Manter cadastro restrito a convidados enquanto estiver ligado | Conta Resend → desligar a flag |
-| Pagamentos | `BILLING_PROVIDER=none` | Credenciais de teste do Mercado Pago |
+| Pagamentos | `BILLING_PROVIDER=none` | Chaves de teste do Stripe (`docs/infra/stripe.md`) |
 | Domínio próprio | usando `*.up.railway.app` | Comprar domínio e apontar DNS |
 
 ## Como publicar uma nova versão

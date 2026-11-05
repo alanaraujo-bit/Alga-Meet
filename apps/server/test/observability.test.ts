@@ -141,7 +141,7 @@ describe('instrumentation', () => {
     expect((await postWebhook(s.app, s.config, joined)).status).toBe(200)
     expect((await postWebhook(s.app, s.config, joined, 'not-the-livekit-secret-0123456789abcdef')).status).toBe(401)
     expect((await s.app.inject({ method: 'POST', url: '/api/v1/billing/webhooks/sandbox', headers: { 'content-type': 'application/json' }, payload: '{}' })).statusCode).toBe(401)
-    expect((await s.app.inject({ method: 'POST', url: '/api/v1/billing/webhooks/stripe', headers: { 'content-type': 'application/json' }, payload: '{}' })).statusCode).toBe(404)
+    expect((await s.app.inject({ method: 'POST', url: '/api/v1/billing/webhooks/paypal', headers: { 'content-type': 'application/json' }, payload: '{}' })).statusCode).toBe(404)
     let limited = 0
     for (let i = 0; i < 11; i++) if ((await api(s.app, 'PATCH', '/users/@me', { token: u.token, body: {} })).status === 429) limited++
     expect(limited).toBe(1)

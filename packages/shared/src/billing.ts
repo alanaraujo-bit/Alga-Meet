@@ -163,7 +163,7 @@ export interface Collection {
   waves: CollectionWave[]
 }
 
-export type BillingProviderId = 'sandbox' | 'mercadopago'
+export type BillingProviderId = 'sandbox' | 'mercadopago' | 'stripe'
 
 export interface BillingProviderInfo {
   id: BillingProviderId

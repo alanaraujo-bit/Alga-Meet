@@ -280,7 +280,7 @@ export const products = pgTable('products', {
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
 
-const providerCol = (name: string) => text(name, { enum: ['sandbox', 'mercadopago'] })
+const providerCol = (name: string) => text(name, { enum: ['sandbox', 'mercadopago', 'stripe'] })
 const currencyCol = (name: string) => text(name, { enum: ['BRL', 'USD'] })
 
 export const subscriptions = pgTable('subscriptions', {

@@ -36,6 +36,7 @@ import {
   plusBadgeOf, planSummary, productById, spaceUpgradePerks,
 } from './catalog.js'
 import { MercadoPagoProvider } from './mercadopago.js'
+import { StripeProvider } from './stripe.js'
 import { TryOns } from './tryon.js'
 import {
   SandboxProvider, safeEqualHex,
@@ -122,6 +123,7 @@ export function createProvider(config: Config): PaymentProvider | null {
       notificationUrl: `${config.publicUrl}/api/v1/billing/webhooks/mercadopago`,
     })
   }
+  if (b.provider === 'stripe' && b.stripe) return new StripeProvider({ ...b.stripe, returnUrl: b.returnUrl })
   return null
 }
 
