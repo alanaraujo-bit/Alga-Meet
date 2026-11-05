@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CINEMA_REACTIONS, CinemaClientFrameSchema, positionAt, type CinemaPlayback } from './cinema.js'
+import { CINEMA_ITEMS_PER_FRAME, CINEMA_MAX_FRAME_BYTES, CINEMA_REACTIONS, CinemaClientFrameSchema, positionAt, type CinemaPlayback } from './cinema.js'
 import { uuidv7 } from './ids.js'
 
 const pb = (o: Partial<CinemaPlayback> = {}): CinemaPlayback => ({
@@ -57,8 +57,8 @@ describe('CinemaClientFrameSchema', () => {
     expect(parse(bad(ok.cinema_time, { c: Infinity }))).toBe(false)
   })
   it('limits pieces', () => {
-    expect(parse(bad(ok.cinema_pieces, { items: Array(200).fill(piece) }))).toBe(true)
-    expect(parse(bad(ok.cinema_pieces, { items: Array(201).fill(piece) }))).toBe(false)
+    expect(parse(bad(ok.cinema_pieces, { items: Array(120).fill(piece) }))).toBe(true)
+    expect(parse(bad(ok.cinema_pieces, { items: Array(121).fill(piece) }))).toBe(false)
     expect(parse(bad(ok.cinema_pieces, { items: [[-2, 0, 1000, 'a'.repeat(64)]] }))).toBe(false)
     expect(parse(bad(ok.cinema_pieces, { items: [[0, -1, 1000, 'a'.repeat(64)]] }))).toBe(false)
     expect(parse(bad(ok.cinema_pieces, { items: [[0, 0, 0, 'a'.repeat(64)]] }))).toBe(false)
@@ -66,6 +66,12 @@ describe('CinemaClientFrameSchema', () => {
     expect(parse(bad(ok.cinema_pieces, { items: [[0, 0, 1, 'A'.repeat(64)]] }))).toBe(false)
     expect(parse(bad(ok.cinema_pieces, { items: [[0, 0, 1, 'a'.repeat(63)]] }))).toBe(false)
     expect(parse(bad(ok.cinema_pieces, { from: -1 }))).toBe(false)
+  })
+  it('fits a worst-case piece batch in the frame cap', () => {
+    const items = Array(CINEMA_ITEMS_PER_FRAME).fill([7199.999, 4.004, 67108864, 'a'.repeat(64)])
+    const frame = { op: 'cinema_pieces', sessionId: id, track: 'a31', from: 0, items }
+    expect(parse(frame)).toBe(true)
+    expect(JSON.stringify(frame).length).toBeLessThan(CINEMA_MAX_FRAME_BYTES)
   })
   it('validates track ids', () => {
     for (const t of ['a0', 'a1', 's3', 'poster', 'thumbs', 'v']) expect(parse(bad(ok.cinema_pieces, { track: t }))).toBe(true)

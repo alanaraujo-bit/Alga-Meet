@@ -26,7 +26,8 @@ export const CINEMA_STATUS_INTERVAL_MS = 2_000
 export const CINEMA_FRAME_LIMIT = 300
 /** Raw size of one cinema_* gateway frame (same as the general limit). */
 export const CINEMA_MAX_FRAME_BYTES = 16 * 1024
-export const CINEMA_ITEMS_PER_FRAME = 200
+/** Sized so a worst-case cinema_pieces frame (~95 B per item) stays under CINEMA_MAX_FRAME_BYTES. */
+export const CINEMA_ITEMS_PER_FRAME = 120
 export const CINEMA_REACTIONS = ['😂', '😱', '😍', '😭', '🔥', '👏'] as const
 export const CINEMA_REACTION_RATE = { perSecond: 1, burst: 5 } as const
 /** Lifetime of the TURN credentials handed out with a session. */
