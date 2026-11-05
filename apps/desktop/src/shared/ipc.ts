@@ -61,4 +61,11 @@ export const IPC = {
   e2eeSend: 'alga:e2ee:send', // event
   e2eeKey: 'alga:e2ee:key', // event
   e2eeEpoch: 'alga:e2ee:epoch', // event
+
+  activityCurrent: 'alga:activity:current', // invoke
+  activityChanged: 'alga:activity:changed', // event
+  activityGetShare: 'alga:activity:get-share', // invoke
+  activitySetShare: 'alga:activity:set-share', // invoke
+  activityApps: 'alga:activity:apps', // invoke
+  activitySetAppShown: 'alga:activity:set-app-shown', // invoke
 } as const

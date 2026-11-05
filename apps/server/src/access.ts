@@ -186,9 +186,21 @@ export async function coMemberIds(db: Db, userId: string): Promise<string[]> {
 
 /** Friends + space co-members: who sees this user's presence. */
 export async function presenceAudience(db: Db, userId: string): Promise<string[]> {
-  const friends = await db.select({ id: relationships.targetId }).from(relationships)
-    .where(and(eq(relationships.userId, userId), eq(relationships.type, 'friend')))
-  return [...new Set([...friends.map((f) => f.id), ...await coMemberIds(db, userId)])]
+  const [friends, blocks] = await Promise.all([
+    db.select({ id: relationships.targetId }).from(relationships)
+      .where(and(eq(relationships.userId, userId), eq(relationships.type, 'friend'))),
+    blockedWith(db, userId),
+  ])
+  return [...new Set([...friends.map((f) => f.id), ...await coMemberIds(db, userId)])].filter((id) => !blocks.has(id))
+}
+
+/** Everyone `userId` blocked or was blocked by: presence (status, activity, custom status) never crosses a block. */
+export async function blockedWith(db: Db, userId: string): Promise<Set<string>> {
+  const rows = await db.select({ a: relationships.userId, b: relationships.targetId }).from(relationships).where(and(
+    eq(relationships.type, 'blocked'),
+    or(eq(relationships.userId, userId), eq(relationships.targetId, userId)),
+  ))
+  return new Set(rows.map((r) => (r.a === userId ? r.b : r.a)))
 }
 
 /** Everyone who may hold a copy of this user's public profile (relationships, co-members, DM partners). */

@@ -1,6 +1,6 @@
-import type { DispatchOf, DispatchType, PresenceStatus, StatusPreference } from '@alga/shared'
+import { liveStatus, sameActivity, type Activity, type CustomStatus, type RecentActivity, type DispatchOf, type DispatchType, type Presence, type PresenceStatus, type StatusPreference } from '@alga/shared'
 import { eq, inArray } from 'drizzle-orm'
-import { presenceAudience } from '../access.js'
+import { blockedWith, presenceAudience } from '../access.js'
 import type { Db } from '../db/index.js'
 import { users } from '../db/schema.js'
 import { metrics } from '../metrics.js'
@@ -17,9 +17,25 @@ export interface Conn {
 
 type Payload<T extends DispatchType> = DispatchOf<T> | ((userId: string) => DispatchOf<T> | undefined)
 
+const RECENT_WINDOW_MS = 14 * 24 * 3600_000
+const RECENT_MAX = 6
+/** A recent entry plus what it takes to count a session once: its startedAt and the total before it. */
+type Recent = RecentActivity & { since: number; base: number }
+/** Shorter than this is a glance, not something they did. */
+const RECENT_MIN_MS = 60_000
+
 /** In-process connection registry and fan-out. shortcut: single instance only; add Redis pub/sub to scale out. */
 export class Hub {
   private readonly byUser = new Map<string, Set<Conn>>()
+  /** Rich presence per user, owned by the socket that set it (last writer wins across devices). Memory only. */
+  private readonly activities = new Map<string, { activity: Activity; conn: Conn }>()
+  /** Custom status per user, kept until their last socket closes (the client sends it again on every READY). */
+  private readonly customs = new Map<string, CustomStatus>()
+  /**
+   * Finished activities per user (ProfileExtras.recent). shortcut: memory only, so a restart forgets them; move to
+   * a table if "Atividade recente" proves worth keeping across deploys.
+   */
+  private readonly recent = new Map<string, Recent[]>()
   /** Set during shutdown: sockets are going away because of us, not because users left. */
   closing = false
 
@@ -38,7 +54,80 @@ export class Hub {
     if (!set?.delete(conn)) return false
     if (set.size) return false
     this.byUser.delete(conn.userId)
+    this.customs.delete(conn.userId)
     return true
+  }
+
+  /** Sets (or clears, with null) the user's activity. Returns whether what others see changed. */
+  setActivity(conn: Conn, activity: Activity | null): boolean {
+    const prev = this.activities.get(conn.userId)
+    // Another device saying "nothing here" does not end what this one is doing.
+    if (!activity && prev && prev.conn !== conn) return false
+    if (prev && !(activity && activity.name === prev.activity.name && activity.startedAt === prev.activity.startedAt)) this.remember(conn.userId, prev.activity)
+    if (activity) this.activities.set(conn.userId, { activity, conn })
+    else this.activities.delete(conn.userId)
+    return !sameActivity(prev?.activity, activity)
+  }
+
+  /** Clears the activity if `conn` set it (its socket is closing). Returns whether it did. */
+  dropActivity(conn: Conn): boolean {
+    const prev = this.activities.get(conn.userId)
+    if (prev?.conn !== conn) return false
+    this.remember(conn.userId, prev.activity)
+    this.activities.delete(conn.userId)
+    return true
+  }
+
+  /** Returns whether it changed. */
+  setCustom(userId: string, status: CustomStatus | null): boolean {
+    const prev = JSON.stringify(this.customs.get(userId) ?? null)
+    if (status) this.customs.set(userId, status)
+    else this.customs.delete(userId)
+    return prev !== JSON.stringify(status)
+  }
+
+  /** Recent finished activities, newest first, without anything older than the window. */
+  recentOf(userId: string, now = Date.now()): RecentActivity[] {
+    return this.liveRecent(userId, now).map(({ since: _s, base: _b, ...r }) => r)
+  }
+
+  private liveRecent(userId: string, now: number): Recent[] {
+    return (this.recent.get(userId) ?? []).filter((r) => now - r.lastAt < RECENT_WINDOW_MS)
+  }
+
+  /** Drops what aged out of the window (call periodically): memory stays bounded by the active users. */
+  pruneRecent(now = Date.now()): void {
+    for (const userId of this.recent.keys()) {
+      const live = this.liveRecent(userId, now)
+      if (live.length) this.recent.set(userId, live)
+      else this.recent.delete(userId)
+    }
+  }
+
+  private remember(userId: string, a: Activity, now = Date.now()): void {
+    const spent = now - a.startedAt
+    if (spent < RECENT_MIN_MS) return
+    const list = this.liveRecent(userId, now)
+    const old = list.find((r) => r.name === a.name && r.kind === a.kind)
+    // The same session seen twice (a reconnect resends it) replaces its share instead of adding it again.
+    const base = old && old.since === a.startedAt ? old.base : (old?.totalMs ?? 0)
+    const entry: Recent = {
+      kind: a.kind, name: a.name, lastAt: now, totalMs: Math.min(RECENT_WINDOW_MS, base + spent), since: a.startedAt, base,
+      ...(a.icon && { icon: a.icon }), ...(a.steamAppId && { steamAppId: a.steamAppId }),
+    }
+    this.recent.set(userId, [entry, ...list.filter((r) => r !== old)].slice(0, RECENT_MAX))
+  }
+
+  activityOf(userId: string): Activity | undefined {
+    return this.activities.get(userId)?.activity
+  }
+
+  /** The Presence others see: the activity rides along only while the user is visible. */
+  presence(userId: string, status: PresenceStatus): Presence {
+    if (status === 'offline') return { userId, status }
+    const activity = this.activityOf(userId)
+    const custom = liveStatus(this.customs.get(userId))
+    return { userId, status, ...(activity && { activity }), ...(custom && { custom }) }
   }
 
   isOnline(userId: string): boolean {
@@ -119,20 +208,22 @@ export async function broadcastPresence(db: Db, hub: Hub, userId: string, status
     if (!u) return
     status = effectiveStatus(u.pref, hub.isOnline(userId))
   }
-  hub.dispatch(await presenceAudience(db, userId), 'PRESENCE_UPDATE', { userId, status })
+  hub.dispatch(await presenceAudience(db, userId), 'PRESENCE_UPDATE', hub.presence(userId, status))
 }
 
 /** Makes `a` and `b` see each other's current presence (after a friendship or a shared space begins). */
-export async function exchangePresence(db: Db, hub: Hub, a: string, bs: string[]): Promise<void> {
+export async function exchangePresence(db: Db, hub: Hub, a: string, bs0: string[]): Promise<void> {
+  const blocks = await blockedWith(db, a)
+  const bs = bs0.filter((b) => !blocks.has(b))
   const ids = [a, ...bs]
   const rows = await db.select({ id: users.id, pref: users.statusPreference }).from(users).where(inArray(users.id, ids))
   const prefs = new Map(rows.map((r) => [r.id, r.pref]))
   const statusOf = (id: string) => effectiveStatus(prefs.get(id) ?? 'online', hub.isOnline(id))
   const aStatus = statusOf(a)
-  if (aStatus !== 'offline') hub.dispatch(bs, 'PRESENCE_UPDATE', { userId: a, status: aStatus })
+  if (aStatus !== 'offline') hub.dispatch(bs, 'PRESENCE_UPDATE', hub.presence(a, aStatus))
   for (const b of bs) {
     const s = statusOf(b)
-    if (s !== 'offline') hub.dispatch([a], 'PRESENCE_UPDATE', { userId: b, status: s })
+    if (s !== 'offline') hub.dispatch([a], 'PRESENCE_UPDATE', hub.presence(b, s))
   }
 }
 

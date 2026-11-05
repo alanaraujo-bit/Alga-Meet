@@ -16,6 +16,7 @@ import { LiveNow } from '../voice/LiveNow'
 import { roomLevelNow, useLevelGetter } from '../voice/levels'
 import { joinVoice, openCall } from '../voice/voice'
 import { UserPanel } from './UserPanel'
+import { ActivityBadge } from '../activity/Activity'
 import { t } from './strings'
 import s from './shell.module.css'
 
@@ -252,6 +253,7 @@ function VoiceUser({ userId, channelId, spaceId, muted, deaf, server, live }: { 
       <Avatar user={user} size={20} glowRef={glow} decorative />
       <span className={s.rowName}>{name}</span>
       {live && <span className={s.live}>{t.space.live}</span>}
+      <ActivityBadge userId={userId} />
       <span className={s.voiceFlags}>
         {server ? (
           <Tooltip content={t.space.serverMuted}>

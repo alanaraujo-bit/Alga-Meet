@@ -46,6 +46,7 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  *                                                          not owned, 400 `fields.<slot>` unknown id or wrong slot;
  *                                                          ME_UPDATE + USER_UPDATE with PublicUser.cosmetics; 10/min)
  * GET    /users/:id                                      -> PublicUser
+ * GET    /users/:id/profile                              -> ProfileExtras (activity.ts; 60/min)
  * GET    /relationships                                  -> Relationship[]
  * POST   /relationships            FriendRequestBody     -> Relationship   (send request by username)
  * PUT    /relationships/:userId    PutRelationshipBody   -> Relationship   (accept / block)

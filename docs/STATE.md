@@ -1,5 +1,13 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-05 madrugada — Atividade em tempo real + perfil (branch `feat/presence`, NÃO mesclada)
+Worktree `D:\PROJETOS\alga-presence`. Rich presence (detector nativo sem dependência nova; jogo/app com ícone, capa Steam,
+tempo ao vivo), "Ativo agora" em Amigos, status personalizado com validade (balão no perfil), perfil completo (agora,
+recente, membro/amigos desde, amigos/espaços em comum, nota privada), Configurações → Atividade (apps detectados com
+interruptor). Servidor só em memória, **sem migração**. Verificado: servidor 234 testes, desktop 297, E2E real 16/16
+(`apps/desktop/scripts/activity-shots.mjs`). Design, decisões e cuidados de merge: `docs/superpowers/specs/2026-11-05-rich-presence-and-profile-design.md`.
+Estudo do Discord (só web; o Windows negou controle da janela do Discord): `docs/research/discord-profile-study.md`.
+
 ## HANDOFF — 2026-11-01 tarde (pausa pedida pelo dono para economizar tokens)
 **Fechado hoje:** site v2 (7 momentos; Lighthouse celular 93/93/99 nos níveis A/B/C) **publicado no Vercel: https://alga-meet.vercel.app** (projeto `alga-meet`, time `aionixdev`, deploy estático pré-construído — passos em `apps/site/README.md`); nomes da sala de voz escolhidos pelo dono; onda de design 9 + UI de E2EE (9 commits, 274 testes; autocrítica r4 7,5 Linear / 6,5 desejo — **falta crítica independente r5**); pacote D1 retenção no servidor (eventos/RSVP/lembretes, `voice_sessions`, resumo semanal, "Semanas juntos", e-mail de atividade com consentimento; 226 testes em PGlite e PG 18; contrato e notas para o D2 em `docs/retention/server.md`; rascunho do diff da Política em `docs/legal/politica-diff-pacote-d.md`); **Release v0.1.2** (ver "Release pública").
 

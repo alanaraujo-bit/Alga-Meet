@@ -1,5 +1,5 @@
 import type {
-  Channel, Dispatch, Me, Member, Message, PresenceStatus, PublicUser, ReadState, Relationship, Role, Space, VoiceState,
+  Activity, Channel, CustomStatus, Dispatch, Me, Member, Message, PresenceStatus, PublicUser, ReadState, Relationship, Role, Space, VoiceState,
 } from '@alga/shared'
 import { create } from 'zustand'
 
@@ -16,6 +16,10 @@ export interface DataState {
   me: Me | null
   users: Record<string, PublicUser>
   presences: Record<string, PresenceStatus>
+  /** userId -> what they are doing now (rich presence; your own lives in features/activity/store). */
+  activities: Record<string, Activity>
+  /** userId -> custom status (yours lives in features/activity/status). */
+  customs: Record<string, CustomStatus>
   spaces: Record<string, Space>
   /** Space rail order. */
   spaceOrder: string[]
@@ -51,6 +55,8 @@ const empty = {
   me: null,
   users: {},
   presences: {},
+  activities: {},
+  customs: {},
   spaces: {},
   spaceOrder: [],
   channels: {},
@@ -66,6 +72,17 @@ const empty = {
 } satisfies Omit<DataState, 'apply' | 'upsertMessages' | 'removeMessage' | 'setMessagesLoading' | 'setSendFailed' | 'setUpload' | 'markRead' | 'reset'>
 
 const byId = <T extends { id: string }>(xs: T[]): Record<string, T> => Object.fromEntries(xs.map((x) => [x.id, x]))
+/**
+ * People no longer a friend nor in any shared space stop sending us presence (the server's audience): drop what we
+ * last heard (status, activity, custom status) so a frozen "Jogando…" does not linger on their profile.
+ */
+function forgetUnseen(s: Pick<DataState, 'me' | 'relationships' | 'members' | 'presences' | 'activities' | 'customs'>, ids: string[]) {
+  const gone = ids.filter((id) => id !== s.me?.id && s.relationships[id]?.type !== 'friend' && !Object.values(s.members).some((m) => m[id]))
+  if (!gone.length) return {}
+  const drop = <T,>(rec: Record<string, T>) => Object.fromEntries(Object.entries(rec).filter(([k]) => !gone.includes(k)))
+  return { presences: drop(s.presences), activities: drop(s.activities), customs: drop(s.customs) }
+}
+
 const omit = <T>(rec: Record<string, T>, key: string): Record<string, T> => {
   const { [key]: _, ...rest } = rec
   return rest
@@ -164,6 +181,8 @@ export const useData = create<DataState>()((set, get) => ({
           me: r.user,
           users,
           presences: Object.fromEntries(r.presences.map((p) => [p.userId, p.status])),
+          activities: Object.fromEntries(r.presences.flatMap((p) => (p.activity ? [[p.userId, p.activity]] : []))),
+          customs: Object.fromEntries(r.presences.flatMap((p) => (p.custom ? [[p.userId, p.custom]] : []))),
           spaces: Object.fromEntries(r.spaces.map(({ channels: _c, roles: _r, members: _m, ...sp }) => [sp.id, sp])),
           spaceOrder: r.spaces.map((sp) => sp.id),
           channels,
@@ -182,14 +201,20 @@ export const useData = create<DataState>()((set, get) => ({
       case 'USER_UPDATE':
         return set({ users: { ...s.users, [ev.d.id]: ev.d } })
       case 'PRESENCE_UPDATE':
-        return set({ presences: { ...s.presences, [ev.d.userId]: ev.d.status } })
+        return set({
+          presences: { ...s.presences, [ev.d.userId]: ev.d.status },
+          activities: ev.d.activity ? { ...s.activities, [ev.d.userId]: ev.d.activity } : omit(s.activities, ev.d.userId),
+          customs: ev.d.custom ? { ...s.customs, [ev.d.userId]: ev.d.custom } : omit(s.customs, ev.d.userId),
+        })
       case 'RELATIONSHIP_UPSERT':
         return set({
           relationships: { ...s.relationships, [ev.d.user.id]: ev.d },
           users: { ...s.users, [ev.d.user.id]: ev.d.user },
         })
-      case 'RELATIONSHIP_REMOVE':
-        return set({ relationships: omit(s.relationships, ev.d.userId) })
+      case 'RELATIONSHIP_REMOVE': {
+        const next = { ...s, relationships: omit(s.relationships, ev.d.userId) }
+        return set({ relationships: next.relationships, ...forgetUnseen(next, [ev.d.userId]) })
+      }
       case 'SPACE_CREATE': {
         const { channels: chs, roles: rs, members: ms, ...sp } = ev.d
         const users = { ...s.users }
@@ -212,6 +237,7 @@ export const useData = create<DataState>()((set, get) => ({
           spaceOrder: s.spaceOrder.filter((x) => x !== id),
           channels: Object.fromEntries(Object.entries(s.channels).filter(([, c]) => c.spaceId !== id)),
           members: omit(s.members, id),
+          ...forgetUnseen({ ...s, members: omit(s.members, id) }, Object.keys(s.members[id] ?? {})),
           roles: omit(s.roles, id),
           voiceStates: Object.fromEntries(Object.entries(s.voiceStates).filter(([, v]) => v.spaceId !== id)),
         })
@@ -222,8 +248,12 @@ export const useData = create<DataState>()((set, get) => ({
           members: { ...s.members, [ev.d.spaceId]: { ...s.members[ev.d.spaceId], [ev.d.user.id]: ev.d } },
           users: { ...s.users, [ev.d.user.id]: ev.d.user },
         })
-      case 'MEMBER_REMOVE':
-        return set({ members: { ...s.members, [ev.d.spaceId]: omit(s.members[ev.d.spaceId] ?? {}, ev.d.userId) } })
+      case 'MEMBER_REMOVE': {
+        const members = { ...s.members, [ev.d.spaceId]: omit(s.members[ev.d.spaceId] ?? {}, ev.d.userId) }
+        // Me leaving: everyone of that space may be out of reach now.
+        const who = ev.d.userId === s.me?.id ? Object.keys(s.members[ev.d.spaceId] ?? {}) : [ev.d.userId]
+        return set({ members, ...forgetUnseen({ ...s, members }, who) })
+      }
       case 'ROLE_UPSERT':
         return set({ roles: { ...s.roles, [ev.d.spaceId]: { ...s.roles[ev.d.spaceId], [ev.d.id]: ev.d } } })
       case 'ROLE_DELETE': {

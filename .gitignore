@@ -9,6 +9,8 @@ release/
 infra/livekit/bin/
 # Rust build output. native/mls/pkg (WASM + glue) is committed; npm run verify:mls checks it matches the sources.
 native/mls/target/
+# Activity helper exe, compiled by apps/desktop/scripts/build-activity.mjs.
+apps/desktop/build/bin/
 apps/server/data/
 .vite/
 coverage/

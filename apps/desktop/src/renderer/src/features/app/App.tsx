@@ -14,6 +14,8 @@ import { AccountGate, needsGate } from '../trust/Gate'
 import { RestrictedScreen } from '../trust/Restricted'
 import { BootSplash } from './BootSplash'
 import { startDeepLinks } from './deepLinks'
+import { startActivitySync } from '../activity/store'
+import { startStatusSync } from '../activity/custom'
 import { routeStreamNotice } from '../voice/voice'
 import { TitleBar } from './TitleBar'
 import s from './app.module.css'
@@ -32,6 +34,8 @@ export function App() {
   }, [])
   // Signed in or not: links are held until the screen that uses them exists.
   useEffect(() => startDeepLinks(), [])
+  useEffect(() => startActivitySync(), [])
+  useEffect(() => startStatusSync(), [])
   useEffect(() => startZoomKeys(), [])
 
   // Media engine notices (device unplugged, fallback to standard noise suppression…) surface as toasts; the ones
