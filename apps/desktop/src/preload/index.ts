@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import type { AlgaBridge, AppConfig, HotkeyBinding, Unsubscribe } from '../shared/bridge'
+import type { AlgaBridge, AppConfig, DetectedApp, HotkeyBinding, LocalActivity, Unsubscribe } from '../shared/bridge'
 import { IPC } from '../shared/ipc'
 
 // Every argument is rebuilt as plain data here (no prototypes, functions or DOM objects cross);
@@ -18,6 +18,19 @@ function subscribe<T>(channel: string, cb: (value: T) => void): Unsubscribe {
 
 const nums = (v: unknown): number[] => (Array.isArray(v) ? v.map(Number) : [])
 const chord = (b: Pick<HotkeyBinding, 'keys' | 'mouseButtons'>) => ({ keys: nums(b?.keys), mouseButtons: nums(b?.mouseButtons) })
+
+/** Rebuild an activity from main as plain data (only the known fields cross). */
+const plainActivity = (a: LocalActivity | null): LocalActivity | null =>
+  a && {
+    kind: a.kind,
+    name: String(a.name),
+    startedAt: Number(a.startedAt),
+    key: String(a.key),
+    ...(typeof a.icon === 'string' && { icon: a.icon }),
+    ...(typeof a.steamAppId === 'number' && { steamAppId: a.steamAppId }),
+  }
+const plainApps = (l: DetectedApp[]): DetectedApp[] =>
+  (Array.isArray(l) ? l : []).map((a) => ({ key: String(a.key), name: String(a.name), kind: a.kind, lastSeen: Number(a.lastSeen), shown: a.shown === true, ...(typeof a.icon === 'string' && { icon: a.icon }) }))
 
 const bridge: AlgaBridge = {
   config,
@@ -104,6 +117,15 @@ const bridge: AlgaBridge = {
     onFrameKey: (cb) => subscribe(IPC.e2eeKey, cb),
     onEpoch: (cb) => subscribe(IPC.e2eeEpoch, cb),
     verificationCode: (channelId, userId) => ipcRenderer.invoke(IPC.e2eeCode, String(channelId), userId === undefined ? null : String(userId)),
+  },
+
+  activity: {
+    current: async () => plainActivity(await ipcRenderer.invoke(IPC.activityCurrent)),
+    onChange: (cb) => subscribe<LocalActivity | null>(IPC.activityChanged, (a) => cb(plainActivity(a))),
+    getShare: () => ipcRenderer.invoke(IPC.activityGetShare),
+    setShare: (on) => ipcRenderer.invoke(IPC.activitySetShare, on === true),
+    apps: async () => plainApps(await ipcRenderer.invoke(IPC.activityApps)),
+    setAppShown: (key, shown) => ipcRenderer.invoke(IPC.activitySetAppShown, String(key), shown === true),
   },
 
   app: {

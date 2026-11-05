@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { app, ipcMain, shell } from 'electron'
 import type { AppConfig } from '../shared/bridge'
 import { IPC } from '../shared/ipc'
+import { registerActivityIpc, startActivity, stopActivity } from './activity'
 import { initCapture } from './capture'
 import { receiveDeepLink, registerDeepLinkIpc, trackDeepLinkPage } from './deep-links'
 import { registerHotkeyIpc, stopHotkeys } from './hotkeys'
@@ -102,6 +103,7 @@ function registerAppIpc(): void {
   registerNotificationIpc()
   registerDeepLinkIpc()
   registerE2eeIpc()
+  registerActivityIpc()
 }
 
 if (!app.requestSingleInstanceLock()) app.quit()
@@ -119,6 +121,7 @@ else {
     createTray()
     initPower()
     initUpdater()
+    startActivity()
     // Signed in from a previous run: pre-warm E2EE now (the worker and key packages must be ready before a join).
     void getToken().then((t) => t && startE2ee(apiUrl, t))
   })
@@ -126,6 +129,7 @@ else {
   app.on('will-quit', () => {
     stopHotkeys() // the hook thread would otherwise keep the process alive
     stopE2ee()
+    stopActivity() // kills the helper process
     destroyTray()
     log.info('quit')
   })

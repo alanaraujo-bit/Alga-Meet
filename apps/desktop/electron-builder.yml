@@ -25,6 +25,9 @@ extraResources:
   # Tray/notification images as real files (resources/assets), see src/main/assets.ts.
   - from: build/runtime
     to: assets
+  # Activity helper (native/activity/AlgaActivity.cs, built by scripts/build-activity.mjs), run by src/main/activity.ts.
+  - from: build/bin
+    to: bin
   # E2EE: MLS WASM + its wasm-bindgen glue (native/mls/build.sh), loaded from resources/mls by src/main/mls/host.ts,
   # and the notices of the crates compiled into it (MIT/Apache/BSD texts, MPL-2.0 source links).
   - from: ../../native/mls/pkg
