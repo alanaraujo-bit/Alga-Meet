@@ -125,6 +125,7 @@ export const t = {
     here: 'Você está aqui',
     call: 'Chamada',
     join: (name: string) => `Entrar em ${name}`,
+    look: (name: string) => `Ver quem está em ${name}`,
     more: (n: number) => `+${n}`,
     streaming: 'ao vivo',
   },

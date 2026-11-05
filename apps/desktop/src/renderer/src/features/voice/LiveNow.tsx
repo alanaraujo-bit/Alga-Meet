@@ -5,6 +5,7 @@ import { channelTitle, liveRooms, voiceMembers, type LiveRoom } from '@/store/se
 import { Avatar, Button, Tooltip, useSpeakingGlow, VoiceDot } from '@/ui'
 import { useLevelGetter } from './levels'
 import { t } from './strings'
+import { useUi } from '@/store/ui'
 import { joinVoice, openCall } from './voice'
 import s from './chrome.module.css'
 
@@ -30,14 +31,14 @@ export function LiveNow() {
 function LiveRow({ room }: { room: LiveRoom }) {
   const title = useData((st) => channelTitle(st, room.channel))
   const here = useMedia((st) => st.connection.channelId === room.channel.id && st.connection.state !== 'idle')
-  const go = () => {
-    openCall(room.channel.id)
-    if (!here) void joinVoice(room.channel.id)
-  }
+  const open = useUi((st) => (st.view.kind === 'space' || st.view.kind === 'dm') && st.view.channelId === room.channel.id)
+  // Same rule as the channel list: a click looks into the room, a click on the room you are looking at enters it.
+  const go = () => (open && !here ? void joinVoice(room.channel.id) : openCall(room.channel.id))
   const where = room.spaceName ?? t.live.call
+  const action = here ? t.live.here : open ? t.live.join(title) : t.live.look(title)
   return (
-    <Tooltip content={here ? t.panel.open : t.live.join(title)} side="right">
-      <button type="button" className={`${s.liveRow2} ${here ? s.liveMine : ''}`} onClick={go} aria-label={`${title}, ${where}. ${here ? t.live.here : t.live.join(title)}`}>
+    <Tooltip content={here ? t.panel.open : open ? t.live.join(title) : t.live.look(title)} side="right">
+      <button type="button" className={`${s.liveRow2} ${here ? s.liveMine : ''}`} onClick={go} aria-label={`${title}, ${where}. ${action}`}>
         <AvatarStack ids={room.people.map((p) => p.userId)} channelId={room.channel.id} />
         <span className={s.liveText2}>
           <span className={s.liveName}>{title}</span>

@@ -113,6 +113,8 @@ No ar em https://alga-meet.vercel.app (projeto `alga-meet`, time `aionixdev`). P
 
 ```bash
 PUBLIC_SITE_URL=https://alga-meet.vercel.app npm run build -w apps/site
-cd apps/site && rm -rf .vercel/output && mkdir -p .vercel/output && cp -r dist .vercel/output/static && echo '{"version":3}' > .vercel/output/config.json
+cd apps/site && rm -rf .vercel/output && mkdir -p .vercel/output && cp -r dist .vercel/output/static && echo '{"version":3,"routes":[{"handle":"filesystem"},{"src":"^/i/[0-9A-Za-z]{1,32}/?$","dest":"/i/index.html"}]}' > .vercel/output/config.json
 vercel deploy --prebuilt --prod --yes
 ```
+
+**Convites (`/i/<código>`):** a rota acima manda todo link de convite para `src/pages/i/index.astro`, que lê o código do caminho, mostra quem chamou e para qual espaço (prévia pública `GET /invites/:code` da API em `PUBLIC_API_URL`, padrão: staging) e oferece "Abrir no Alga Meet" (`algameet://invite/<código>`) e o download. A API precisa aceitar a origem do site em `CORS_ORIGINS` (`https://alga-meet.vercel.app`); sem isso a página continua funcionando, só que sem o nome de quem chamou. Em `astro preview` não há a rota: use `/i/?c=<código>`.

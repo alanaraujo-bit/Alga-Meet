@@ -1,5 +1,5 @@
 import type { Invite } from '@alga/shared'
-import { Check, Copy, Hash, Users, Volume2 } from '@/ui/icons'
+import { Check, Copy, Hash, MessageCircle, Users, Volume2 } from '@/ui/icons'
 import { useEffect, useState, type FormEvent } from 'react'
 import { ApiRequestError } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
@@ -379,6 +379,16 @@ function InviteModal({ open, onClose, spaceId }: { open: boolean; onClose: () =>
         />
         {state.invite && <span className={`${s.expiryLabel} tnum`} style={{ marginLeft: 'auto' }}>{t.invite.code(state.invite.code)}</span>}
       </div>
+      {/* In Brazil the group lives on WhatsApp: the invite goes there ready to send. */}
+      <Button
+        variant="secondary"
+        full
+        icon={MessageCircle}
+        disabled={!state.invite}
+        onClick={() => void window.alga?.app?.openExternal(`https://wa.me/?text=${encodeURIComponent(t.invite.whatsappText(space?.name ?? '', link))}`)}
+      >
+        {t.invite.whatsapp}
+      </Button>
     </Modal>
   )
 }

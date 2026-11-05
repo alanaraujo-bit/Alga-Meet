@@ -1,0 +1,157 @@
+---
+// /i/<code>: the page an invite link opens (WhatsApp, Discord, anywhere). Static: the Vercel output routes
+// /i/<code> to this file (README, "Publicar") and the code is read from the path (or ?c=<code> in a local preview).
+// It shows who called you and to which space (public invite preview, no account needed), then: open in the app
+// (algameet://invite/<code>), or download it first. Everything from the API goes in as text, never as HTML.
+import Base from '../../layouts/Base.astro';
+import Logo from '../../components/Logo.astro';
+import { downloadNote, downloadUrl } from '../../data/links';
+const api = (import.meta.env.PUBLIC_API_URL || 'https://api-staging-b3ea.up.railway.app').replace(/\/+$/, '');
+---
+<Base title="Você foi chamado · Alga Meet" description="Um amigo te chamou para o Alga Meet: voz que soa de perto, tela em 1080p e chat para o seu grupo.">
+  <main class="inv" data-api={api}>
+    <a href="/" class="mark" aria-label="Alga Meet, página inicial"><Logo height={22} /></a>
+    <section class="card" aria-live="polite">
+      <div class="faces" aria-hidden="true">
+        <span class="face" data-face hidden></span>
+        <span class="tile" data-tile>A</span>
+      </div>
+      <p class="lead" data-lead>Você foi chamado para o Alga Meet</p>
+      <h1 data-space>Um grupo te espera</h1>
+      <p class="meta" data-meta></p>
+      <div class="actions">
+        <a class="btn btn-primary btn-lg" data-open href="/">Abrir no Alga Meet</a>
+        <a class="btn btn-ghost btn-lg" href={downloadUrl}>Baixar para Windows</a>
+      </div>
+      <ol class="steps">
+        <li>Ainda não tem o app? Baixe e instale (Windows 10 ou 11, leva um minuto).</li>
+        <li>Volte aqui e toque em <strong>Abrir no Alga Meet</strong>: você cria a conta e já cai no grupo.</li>
+      </ol>
+      <p class="code" data-code-row hidden>Ou, no app, use <strong>Entrar com convite</strong> e cole o código <code data-code></code></p>
+    </section>
+    <p class="note">{downloadNote}</p>
+  </main>
+</Base>
+
+<script>
+  const root = document.querySelector<HTMLElement>('[data-api]')!;
+  const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+  const fromPath = location.pathname.split('/').filter(Boolean)[1] ?? '';
+  const code = (fromPath || new URLSearchParams(location.search).get('c') || '').trim();
+  const valid = /^[0-9A-Za-z]{1,32}$/.test(code);
+
+  const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((w) => [...w][0] ?? '').join('').toUpperCase() || 'A';
+  const hue = (id: string) => [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+  const set = (sel: string, text: string) => ($(sel).textContent = text);
+
+  if (!valid) {
+    set('[data-lead]', 'Este link de convite está incompleto.');
+    set('[data-space]', 'Peça o link de novo para quem te chamou.');
+    $('[data-open]').setAttribute('aria-disabled', 'true');
+  } else {
+    $('[data-open]').setAttribute('href', `algameet://invite/${code}`);
+    set('[data-code]', code);
+    $('[data-code-row]').hidden = false;
+    fetch(`${root.dataset.api}/api/v1/invites/${code}`, { headers: { accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((inv: { space: { id: string; name: string; iconUrl: string | null }; memberCount: number; inviter?: { displayName: string; avatarUrl: string | null } }) => {
+        document.title = `${inv.space.name} · Alga Meet`;
+        set('[data-lead]', inv.inviter ? `${inv.inviter.displayName} te chamou para` : 'Você foi chamado para');
+        set('[data-space]', inv.space.name);
+        set('[data-meta]', inv.memberCount === 1 ? '1 pessoa já está lá' : `${inv.memberCount} pessoas já estão lá`);
+        const tile = $('[data-tile]');
+        tile.style.setProperty('--h', String(hue(inv.space.id)));
+        if (inv.space.iconUrl) {
+          const img = new Image();
+          img.alt = '';
+          img.src = inv.space.iconUrl;
+          img.onerror = () => (tile.textContent = initials(inv.space.name));
+          tile.replaceChildren(img);
+        } else tile.textContent = initials(inv.space.name);
+        if (inv.inviter) {
+          const face = $('[data-face]');
+          face.textContent = initials(inv.inviter.displayName);
+          face.hidden = false;
+          if (inv.inviter.avatarUrl) {
+            const img = new Image();
+            img.alt = '';
+            img.src = inv.inviter.avatarUrl;
+            img.onload = () => face.replaceChildren(img);
+          }
+        }
+        root.classList.add('ready');
+      })
+      .catch((status) => {
+        // 404 = expired or used up; anything else (offline, CORS) keeps the generic invite, which still works.
+        if (status === 404) {
+          set('[data-lead]', 'Este convite não vale mais.');
+          set('[data-space]', 'Peça um link novo para quem te chamou.');
+          $('[data-open]').setAttribute('aria-disabled', 'true');
+        }
+      });
+  }
+</script>
+
+<style>
+  .inv {
+    min-height: 100svh;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 24px;
+    padding: 48px 16px;
+    background: radial-gradient(900px 520px at 50% -10%, rgba(139, 142, 247, 0.14), transparent 70%), var(--bg-0);
+  }
+  .mark { opacity: 0.9; }
+  .card {
+    width: min(460px, 100%);
+    display: grid;
+    gap: 10px;
+    padding: 32px;
+    border-radius: 20px;
+    background: #121214;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), inset 0 0 0 1px var(--line-2), inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 40px 100px rgba(0, 0, 0, 0.5);
+    animation: rise 420ms var(--ease-out) both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+  .faces { display: flex; align-items: center; margin-bottom: 8px; }
+  .face, .tile {
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    font-weight: 600;
+    color: var(--text-1);
+  }
+  .face {
+    position: relative;
+    z-index: 1;
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    background: #24252a;
+    box-shadow: 0 0 0 4px #121214;
+  }
+  .tile {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: oklch(0.32 0.06 var(--h, 279));
+    color: oklch(0.92 0.05 var(--h, 279));
+    font-size: 17px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+  .face:not([hidden]) + .tile { margin-left: -12px; }
+  .face :global(img), .tile :global(img) { width: 100%; height: 100%; object-fit: cover; }
+  .lead { color: var(--text-3); font-size: 15px; }
+  h1 { color: var(--text-1); font-size: 30px; line-height: 1.15; letter-spacing: -0.025em; text-wrap: balance; }
+  .meta { color: var(--text-3); font-size: 14px; min-height: 1.4em; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .actions .btn { flex: 1 1 180px; justify-content: center; }
+  [aria-disabled='true'] { opacity: 0.45; pointer-events: none; }
+  .steps { margin: 14px 0 0; padding-left: 20px; color: var(--text-3); font-size: 14px; display: grid; gap: 6px; }
+  .steps strong, .code strong { color: var(--text-2); font-weight: 600; }
+  .code { color: var(--text-3); font-size: 13px; margin-top: 6px; }
+  .code code { color: var(--text-1); font-family: ui-monospace, 'Cascadia Code', monospace; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.06); }
+  .note { color: var(--text-4); font-size: 12px; text-align: center; max-width: 460px; }
+  @media (prefers-reduced-motion: reduce) { .card { animation: none; } }
+</style>

@@ -13,7 +13,7 @@ export const t = {
     title: 'Entrar em um espaço',
     description: 'Cole o link ou o código do convite que você recebeu.',
     label: 'Link ou código do convite',
-    placeholder: 'alga.meet/i/k3yZ9q ou k3yZ9q',
+    placeholder: 'alga-meet.vercel.app/i/k3yZ9q ou k3yZ9q',
     submit: 'Entrar no espaço',
     looking: 'Procurando convite…',
     invalid: 'Esse não parece um convite válido.',
@@ -49,6 +49,9 @@ export const t = {
     error: 'Não foi possível gerar o convite.',
     retry: 'Tentar de novo',
     code: (c: string) => `Código: ${c}`,
+    whatsapp: 'Enviar no WhatsApp',
+    /** The ready-made message: short, warm, and the link last so WhatsApp shows its preview. */
+    whatsappText: (space: string, link: string) => `Bora pro Alga Meet? Entra no ${space} pelo meu convite: ${link}`,
   },
   menu: {
     ownerCantLeave: 'Você é o dono',
