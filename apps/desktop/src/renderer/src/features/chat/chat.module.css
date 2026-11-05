@@ -318,6 +318,15 @@ button.author:hover {
   color: var(--danger);
   font: var(--type-meta);
 }
+/* Waiting for the connection: calm, not red (nothing is wrong with what you wrote). */
+.queued {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1_5);
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
 .failedAction {
   color: var(--text-secondary);
   font-weight: var(--w-medium);

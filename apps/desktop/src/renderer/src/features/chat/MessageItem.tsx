@@ -1,5 +1,5 @@
 import type { Message } from '@alga/shared'
-import { Copy, CornerUpLeft, MoreHorizontal, Pencil, SmilePlus, Trash2, AlertCircle } from '@/ui/icons'
+import { Copy, CornerUpLeft, MoreHorizontal, Pencil, SmilePlus, Trash2, AlertCircle, Clock } from '@/ui/icons'
 import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { create } from 'zustand'
 import { copyText } from '@/lib/clipboard'
@@ -152,7 +152,20 @@ export const MessageItem = memo(function MessageItem({
           )
         )}
         {m.attachments.length > 0 && <Attachments message={m} />}
-        {failed && (
+        {failed === true ? (
+          // No connection: not an error you caused. It waits, and goes out by itself when the link is back.
+          <div className={s.queued} role="status">
+            <Icon icon={Clock} size={14} />
+            {t.queued}
+            <button type="button" className={s.failedAction} onClick={() => retrySend(m.channelId, m.id).catch(() => undefined)}>
+              {t.retryNow}
+            </button>
+            <span className={s.failedSep}>·</span>
+            <button type="button" className={s.failedAction} onClick={() => discardSend(m.channelId, m.id)}>
+              {t.discard}
+            </button>
+          </div>
+        ) : failed && (
           <div className={s.failed} role="alert">
             <Icon icon={AlertCircle} size={14} />
             {t.failed}

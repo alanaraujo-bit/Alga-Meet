@@ -8,7 +8,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { assertDmNotBlocked, channelAudience, requireChannel, type ChannelAccess } from '../access.js'
 import type { Ctx } from '../app.js'
-import type { Db } from '../db/index.js'
+import { isUniqueViolation, type Db } from '../db/index.js'
 import { attachments, channels, messages, reactions, readStates, type MessageRow } from '../db/schema.js'
 import { HttpError, badRequest, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
 import { planSummary } from '../billing/catalog.js'
@@ -123,12 +123,18 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
     const access = await requireChannel(db, idParam(req.params.id), me, Permission.SEND_MESSAGES | (multipart ? Permission.ATTACH_FILES : 0))
     textOnly(access)
     await assertDmNotBlocked(db, access, me)
-    if (!multipart) return send(me, access, parse(SendMessageBody, req.body), [])
+    if (!multipart) {
+      const body = parse(SendMessageBody, req.body)
+      return (await already(me, access.channel.id, body.nonce)) ?? send(me, access, body, [])
+    }
     const { payload, spooled } = await readUpload(req)
     let stored: string[] = []
     try {
       const body = parse(SendMessageWithAttachmentsBody, payload)
       if (!body.content && !spooled.length) throw invalid({ content: 'Envie um texto ou ao menos um arquivo.' })
+      // A retry of a send that already went through: answer with it, store nothing.
+      const dup = await already(me, access.channel.id, body.nonce)
+      if (dup) return dup
       const now = Date.now()
       const prepared = await Promise.all(spooled.map(async (f, i) => {
         const info = await inspect(f.path)
@@ -150,6 +156,19 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
 
   interface Prepared { id: string; key: string; filename: string; contentType: string; size: number; width?: number; height?: number }
 
+  /**
+   * Sends are idempotent per (channel, author, nonce): when the response is lost (connection drop) and the client
+   * retries, it gets the message already saved instead of posting a copy. The client generates a fresh nonce per send.
+   */
+  async function already(me: string, channelId: string, nonce: string | undefined): Promise<Message | null> {
+    if (!nonce) return null
+    const [row] = await db.select().from(messages)
+      .where(and(eq(messages.channelId, channelId), eq(messages.authorId, me), eq(messages.nonce, nonce)))
+    if (!row) return null
+    const [view] = await messageViews(db, [row])
+    return messageFor({ ...view!, nonce }, me, fileUrl)
+  }
+
   async function send(me: string, access: ChannelAccess, body: SendMessageBody, prepared: Prepared[]): Promise<Message> {
     const channelId = access.channel.id
     if (body.replyToId) {
@@ -160,9 +179,9 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
     const audience = await channelAudience(db, access.channel, access.recipientIds)
     const mentioned = mentionedIds(body.content).filter((id) => id !== me && audience.includes(id))
     const id = uuidv7()
-    const [row] = await db.transaction(async (tx) => {
+    const insert = () => db.transaction(async (tx) => {
       const inserted = await tx.insert(messages).values({
-        id, channelId, authorId: me, content: body.content, replyToId: body.replyToId ?? null,
+        id, channelId, authorId: me, content: body.content, replyToId: body.replyToId ?? null, nonce: body.nonce ?? null,
       }).returning()
       if (prepared.length) {
         await tx.insert(attachments).values(prepared.map((f) => ({
@@ -184,6 +203,16 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
       }
       return inserted
     })
+    let row: MessageRow | undefined
+    try {
+      ;[row] = await insert()
+    } catch (err) {
+      // Two copies of the same send raced past already(): the loser answers with the winner's message.
+      const dup = body.nonce && isUniqueViolation(err) ? await already(me, channelId, body.nonce) : null
+      if (!dup) throw err
+      if (prepared.length) await files.abandon(prepared.map((f) => f.key))
+      return dup
+    }
     const [view] = await messageViews(db, [row!])
     const withNonce = { ...view!, ...(body.nonce !== undefined ? { nonce: body.nonce } : {}) }
     hub.dispatch(audience, 'MESSAGE_CREATE', (uid) => messageFor(withNonce, uid, fileUrl))

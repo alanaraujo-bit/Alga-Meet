@@ -7,6 +7,7 @@ import { api, ApiRequestError, upload } from '@/lib/api'
 import { errorText } from '@/lib/errors'
 import { localKind } from '@/lib/files'
 import { useData } from './data'
+import { useSession } from './session'
 
 /**
  * Server mutations. Realtime echoes arrive via the gateway and are applied by the data store;
@@ -107,6 +108,49 @@ export function discardSend(channelId: string, nonce: string): void {
   release(nonce)
   useData.getState().setSendFailed(nonce, false)
   useData.getState().removeMessage(channelId, nonce)
+}
+
+/**
+ * Sends that failed for lack of connection (`sendFailures[nonce] === true`) go out again on their own, oldest first,
+ * when the realtime link is back or Windows says we are online. Repeating is safe: the server answers a retried nonce
+ * with the message it already saved (no copies). A refusal with a reason (`string`) waits for the person.
+ * shortcut: the queue lives in memory; closing the app drops what was still waiting (persist it if that shows up).
+ */
+let flushing = false
+export async function flushQueuedSends(): Promise<void> {
+  if (flushing) return
+  flushing = true
+  try {
+    const st = useData.getState()
+    // uuidv7 nonces sort by creation time: the conversation keeps its order.
+    const queued = Object.entries(st.sendFailures).filter(([, v]) => v === true).map(([nonce]) => nonce).sort()
+    for (const nonce of queued) {
+      const channelId = Object.keys(st.messages).find((c) => st.messages[c]?.byId[nonce])
+      if (!channelId) {
+        useData.getState().setSendFailed(nonce, false)
+        continue
+      }
+      try {
+        await retrySend(channelId, nonce)
+      } catch {
+        break // still offline: the next reconnect tries again
+      }
+    }
+  } finally {
+    flushing = false
+  }
+}
+
+export function startSendQueue(): () => void {
+  const flush = () => void flushQueuedSends()
+  window.addEventListener('online', flush)
+  const off = useSession.subscribe((s, p) => {
+    if (s.gateway === 'ready' && p.gateway !== 'ready') flush()
+  })
+  return () => {
+    window.removeEventListener('online', flush)
+    off()
+  }
 }
 
 /**

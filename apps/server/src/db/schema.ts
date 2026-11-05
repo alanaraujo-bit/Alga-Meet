@@ -195,8 +195,11 @@ export const messages = pgTable('messages', {
   replyToId: uuid('reply_to_id'),
   createdAt: ts('created_at').notNull().defaultNow(),
   editedAt: ts('edited_at'),
+  /** The client's send id: a retried send (response lost, reconnect) returns the saved message instead of a copy. */
+  nonce: text('nonce'),
 }, (t) => [
   index('messages_channel_id_id_idx').on(t.channelId, t.id),
+  uniqueIndex('messages_channel_author_nonce_uq').on(t.channelId, t.authorId, t.nonce),
   foreignKey({ columns: [t.replyToId], foreignColumns: [t.id] }).onDelete('set null'),
 ])
 

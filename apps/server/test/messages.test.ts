@@ -37,6 +37,28 @@ describe('messages', () => {
     gwBob.close()
   })
 
+  it('a retried send (same nonce) returns the saved message, never a copy; concurrent retries too', async () => {
+    const { alice, bob, text } = await setup()
+    const first = await send(alice.token, text.id, { content: 'só uma vez', nonce: 'retry-1' })
+    const again = await send(alice.token, text.id, { content: 'só uma vez', nonce: 'retry-1' })
+    expect(again.status).toBe(200)
+    expect(again.body).toMatchObject({ id: first.body.id, nonce: 'retry-1' })
+    const raced = await Promise.all([1, 2, 3].map(() => send(alice.token, text.id, { content: 'corrida', nonce: 'race-1' })))
+    expect(raced.every((r) => r.status === 200)).toBe(true)
+    expect(new Set(raced.map((r) => r.body.id)).size).toBe(1)
+    // The same nonce from someone else is their own message; no nonce means no dedupe.
+    const bobs = await send(bob.token, text.id, { content: 'meu', nonce: 'retry-1' })
+    expect(bobs.body.id).not.toBe(first.body.id)
+    const a = await send(alice.token, text.id, { content: 'sem nonce' })
+    const b = await send(alice.token, text.id, { content: 'sem nonce' })
+    expect(a.body.id).not.toBe(b.body.id)
+    const history = (await api<Message[]>(s.app, 'GET', `/channels/${text.id}/messages`, { token: bob.token })).body
+    expect(history.filter((m) => m.content === 'só uma vez')).toHaveLength(1)
+    expect(history.filter((m) => m.content === 'corrida')).toHaveLength(1)
+    // History never exposes anyone's send ids.
+    expect(history.some((m) => 'nonce' in m)).toBe(false)
+  })
+
   it('rejects messages in voice channels, empty content and unknown replies', async () => {
     const { alice, text, voice } = await setup()
     expect((await send(alice.token, voice.id, { content: 'x' })).status).toBe(400)

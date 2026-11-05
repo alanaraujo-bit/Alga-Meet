@@ -14,6 +14,8 @@ export const t = {
   editHint: { esc: 'Esc', cancel: 'para cancelar', enter: 'Enter', save: 'para salvar' },
   sending: 'Enviando…',
   failed: 'Não enviada.',
+  queued: 'Sem conexão. Ela sai sozinha assim que a conexão voltar.',
+  retryNow: 'Tentar agora',
   retry: 'Tentar de novo',
   discard: 'Descartar',
   unread: 'Novas',
