@@ -79,7 +79,7 @@ mkdir -p caddy_data
 ok "livekit.yaml e caddy.yaml gerados"
 
 # --- 6. Start ---------------------------------------------------------------------------------------------------
-docker compose pull --quiet livekit caddy duckdns "${PROFILE[@]}"
+docker compose "${PROFILE[@]}" pull --quiet livekit caddy duckdns $([ "$TURN" = 1 ] && echo coturn)
 docker compose build --quiet upnp
 docker compose "${PROFILE[@]}" up -d --remove-orphans
 for _ in $(seq 30); do

@@ -80,6 +80,7 @@ services:
       - |
         [ -n "$$CINEMA_TURN_SECRET" ] || { echo "CINEMA_TURN_SECRET empty: refusing to start"; exit 1; }
         ip=$$(getent ahostsv4 "$$REALM" | awk 'NR==1 {print $$1}')
+        [ -n "$$ip" ] || { echo "cannot resolve $$REALM: refusing to start without the public IP (external-ip and hairpin deny)"; exit 1; }
         echo "$$ip" > /tmp/ext-ip
         exec turnserver -c /etc/coturn/turnserver.conf --realm="$$REALM" --static-auth-secret="$$CINEMA_TURN_SECRET" \
           $${ip:+--external-ip="$$ip" --denied-peer-ip="$$ip"}
