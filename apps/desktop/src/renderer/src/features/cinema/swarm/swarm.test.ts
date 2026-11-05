@@ -9,13 +9,20 @@ import { HIGH_WATER, Swarm, type ChannelLike } from './swarm'
  * A ChannelLike over a Node MessageChannel. It models bufferedAmount, counts chunk payload bytes, logs what is sent,
  * and can hold outgoing messages (an uploader stuck on a slow link) until release().
  */
-interface FakeChannel extends ChannelLike { bufferedAmount: number; payload: number; peak: number; log: WireMsg[]; hold: boolean; release(): void }
+interface FakeChannel extends ChannelLike {
+  bufferedAmount: number; payload: number; peak: number; log: WireMsg[]; hold: boolean; release(): void
+  /** Bandwidth model on the fake clock: sends queue up; flush() delivers what `bytesPerS` allows since the last flush. */
+  throttle(bytesPerS: number): void; flush(): void
+}
 const open: MessagePort[] = []
 function link(): [FakeChannel, FakeChannel] {
   const { port1, port2 } = new MessageChannel()
   open.push(port1, port2)
   const end = (port: MessagePort): FakeChannel => {
     const held: ArrayBuffer[] = []
+    let rate = 0
+    let budget = 0
+    let last = 0
     const deliver = (d: ArrayBuffer) => {
       port.postMessage(d)
       setImmediate(() => {
@@ -32,12 +39,25 @@ function link(): [FakeChannel, FakeChannel] {
         if (m?.t === 'chunk') ch.payload += m.data.byteLength
         ch.bufferedAmount += d.byteLength
         ch.peak = Math.max(ch.peak, ch.bufferedAmount)
-        if (ch.hold) held.push(d)
+        if (ch.hold || rate) held.push(d)
         else deliver(d)
       },
       release() {
         ch.hold = false
         for (const d of held.splice(0)) deliver(d)
+      },
+      throttle(bytesPerS: number) {
+        rate = bytesPerS
+        last = Date.now()
+      },
+      flush() {
+        budget += ((Date.now() - last) * rate) / 1000
+        last = Date.now()
+        while (held.length && held[0]!.byteLength <= budget) {
+          budget -= held[0]!.byteLength
+          deliver(held.shift()!)
+        }
+        if (!held.length) budget = 0
       },
       close() { port.close() },
     }
@@ -98,9 +118,9 @@ function raw(s: Swarm, id: string, f: Film, onReq?: (m: Extract<WireMsg, { t: 'r
   const [ch, side] = link()
   const r = {
     ch, side, reqs: [] as Extract<WireMsg, { t: 'req' }>[], cancels: [] as number[], msgs: [] as WireMsg[], done: [] as number[],
-    serve(n: number, v: number, o: { chunks?: number; bytes?: Uint8Array } = {}) {
+    serve(n: number, v: number, o: { chunks?: number; from?: number; bytes?: Uint8Array } = {}) {
       const b = o.bytes ?? f.bytes[n]!
-      for (let off = 0, i = 0; off < b.length && i < (o.chunks ?? Infinity); off += CHUNK_BYTES, i++) {
+      for (let i = 0, off = (o.from ?? 0) * CHUNK_BYTES; off < b.length && i < (o.chunks ?? Infinity); off += CHUNK_BYTES, i++) {
         ch.send(encode({ t: 'chunk', track: 'v', n, v, offset: off, total: b.length, data: b.subarray(off, off + CHUNK_BYTES) }))
       }
     },
@@ -117,6 +137,8 @@ function raw(s: Swarm, id: string, f: Film, onReq?: (m: Extract<WireMsg, { t: 'r
   return r
 }
 type Raw = ReturnType<typeof raw>
+const ver = (f: Film, n: number) => verOf(f.index[n]![3])
+const peerOf = (s: Swarm, id: string) => (s as unknown as { peers: Map<string, { strikes: number[] }> }).peers.get(id)!
 const fakeClock = () => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] }) // timers the swarm uses; I/O stays real
 
 afterEach(async () => {
@@ -337,6 +359,147 @@ describe('Swarm', () => {
     vi.advanceTimersByTime(4_000)
     await until(() => got.size === f.bytes.length)
     expect(s.cancels).toEqual(expect.arrayContaining(s.reqs.filter((r) => !r.urgent).map((r) => r.n)))
+  })
+
+  it('3 friends fully connected, host link ~8 s per piece: repeats wait for a confirmed holder, host uploads ≤ 1.25×', async () => {
+    fakeClock()
+    const f = await film(12, 500_000)
+    f.index.forEach((m, n) => { if (n > 0) { m[0] = (n - 1) * 30; m[1] = 30 } }) // 30 s pieces: only n1 is critical at 0
+    const h = host(f)
+    const fs = [friend(f), friend(f), friend(f)]
+    const gots = fs.map(count)
+    const ids = ['A', 'B', 'C']
+    const links = fs.map((s, i) => connect(h, 'H', s, ids[i]!)[0])
+    for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) connect(fs[i]!, ids[i]!, fs[j]!, ids[j]!)
+    for (const l of links) l.throttle(62_500) // a 500 kB piece ≈ 8 s from the host
+    const done = () => gots.every((g) => g.size === f.bytes.length)
+    for (let i = 0; i < 600 && !done(); i++) {
+      vi.advanceTimersByTime(500)
+      for (const l of links) l.flush()
+      await sleep(3)
+    }
+    await until(done)
+    const ratio = links.reduce((s, l) => s + l.payload, 0) / f.total
+    console.info(`[throttled] host sent ${ratio.toFixed(2)}× the film`)
+    expect(ratio).toBeLessThanOrEqual(1.25) // a repeat served while the first friend is still downloading: ≈ 1.33×
+    for (const s of fs) expect(peerOf(s, 'H').strikes).toEqual([]) // a busy host is not a silent one
+  }, 30_000)
+
+  it('the host answers none to a peer asking again for a piece it already sent, urgent or not, until it is cancelled', async () => {
+    const f = await film(6)
+    const r = raw(host(f), 'R', f)
+    const req = (urgent: boolean) => r.ch.send(encode({ t: 'req', track: 'v', n: 4, v: ver(f, 4), urgent }))
+    req(false)
+    await until(() => r.done.length === 1)
+    req(true)
+    await until(() => r.msgs.some((m) => m.t === 'none' && m.n === 4))
+    r.ch.send(encode({ t: 'cancel', track: 'v', n: 4 }))
+    req(true)
+    await until(() => r.done.length === 2)
+    expect(r.done).toEqual([4, 4])
+  })
+
+  it('a peer still sending bytes is not timed out for requests queued behind them', async () => {
+    fakeClock()
+    const f = await film(4, 600_000)
+    const a = friend(f)
+    const got = count(a)
+    const s = raw(a, 'S', f, (m, r) => { if (m.n === 0) r.serve(0, m.v) })
+    s.ch.send(encode(haveAll(f)))
+    await until(() => s.reqs.filter((r) => r.n >= 1 && r.n <= 3).length === 3)
+    for (const n of [1, 2, 3]) {
+      for (let i = 0; i < 3; i++) { // one chunk every 5 s: n3 waits 30 s for its first byte
+        vi.advanceTimersByTime(5_000)
+        s.serve(n, ver(f, n), { from: i, chunks: 1 })
+        await sleep(20)
+      }
+    }
+    await until(() => [1, 2, 3].every((n) => got.has(n)))
+    expect(s.cancels).toEqual([])
+    expect(peerOf(a, 'S').strikes).toEqual([])
+  })
+
+  it('duplicate chunks are not progress: the flight still times out and the piece comes from elsewhere', async () => {
+    fakeClock()
+    const f = await film(8)
+    const a = friend(f)
+    const got = count(a)
+    connect(host(f), 'H', a, 'A')
+    const s = raw(a, 'S', f, (m, r) => r.serve(m.n, m.v, { chunks: 1 }))
+    s.ch.send(encode({ t: 'have', track: 'v', bits: bitsOf([5]) })) // S holds only n5 (prefetch: asked of the friend)
+    await until(() => s.reqs.some((r) => r.n === 5))
+    for (let i = 0; i < 4; i++) {
+      vi.advanceTimersByTime(5_000)
+      s.serve(5, ver(f, 5), { chunks: 1 }) // the same first chunk again
+      await sleep(20)
+    }
+    await until(() => got.has(5))
+    expect(s.cancels).toContain(5)
+    expect(sameBytes(await a.get('v', 5), f.bytes[5]!)).toBe(true)
+  })
+
+  it('a digest that rejects is handled: the piece is fetched again', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const f = await film(3)
+    const a = friend(f)
+    const got = count(a)
+    vi.spyOn(crypto.subtle, 'digest').mockRejectedValueOnce(new Error('digest failed'))
+    connect(host(f), 'H', a, 'A')
+    await until(() => got.size === f.bytes.length)
+    for (let n = 0; n < f.bytes.length; n++) expect(sameBytes(await a.get('v', n), f.bytes[n]!)).toBe(true)
+    expect(warn.mock.calls.some((w) => String(w[0]).includes('could not verify'))).toBe(true)
+  })
+
+  it('a write that never finishes: after 30 s its piece is dropped, the slot freed, and later pieces still land', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    fakeClock()
+    const f = await film(4)
+    const inner = memoryCache()
+    let stuck = false
+    const cache: PieceCache = { ...inner, put: (k, b) => { if (k === 'v:1' && !stuck) { stuck = true; return new Promise(() => {}) } return inner.put(k, b) } }
+    const a = friend(f, { cache })
+    const got = count(a)
+    const [, aSide] = connect(host(f), 'H', a, 'A')
+    await until(() => stuck && got.has(0))
+    await sleep(50)
+    expect(got.size).toBe(1) // every later store waits behind the stuck one
+    vi.advanceTimersByTime(31_000)
+    await until(() => got.size === f.bytes.length)
+    expect(aSide.log.some((m) => m.t === 'cancel' && m.n === 1)).toBe(true)
+    expect(warn).toHaveBeenCalled()
+  })
+
+  it('close() does not hang on a write that never finishes', async () => {
+    const f = await film(1)
+    const inner = memoryCache()
+    let putting = false
+    const a = friend(f, { cache: { ...inner, put: () => { putting = true; return new Promise(() => {}) } } })
+    connect(host(f), 'H', a, 'A')
+    await until(() => putting)
+    await inner.put('v:9', new ArrayBuffer(3))
+    const t = performance.now()
+    await a.close()
+    expect(performance.now() - t).toBeLessThan(2_000)
+    expect(inner.bytes()).toBe(0)
+  })
+
+  it('re-announces what it holds even when deleting an evicted piece throws', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const f = await film(8)
+    f.index.forEach((m, n) => { if (n > 0) { m[0] = (n - 1) * 300; m[1] = 300 } })
+    const inner = memoryCache()
+    let threw = false
+    const cache: PieceCache = { ...inner, delete: async (k) => { if (!threw) { threw = true; throw new Error('delete failed') } return inner.delete(k) } }
+    const a = friend(f, { cache, capBytes: 1_000 + 4 * 300_000 })
+    const got = count(a)
+    connect(host(f), 'H', a, 'A')
+    const b = raw(a, 'B', f)
+    await until(() => got.size === 5)
+    a.setPlayhead(1_500)
+    await until(() => threw && got.has(6))
+    const haves = b.msgs.filter((m): m is Extract<WireMsg, { t: 'have' }> => m.t === 'have').map((m) => [...setOf(m.bits)].sort())
+    expect(haves[0]).toEqual([0, 2, 3, 4]) // n1 dropped, announced although its delete threw
+    expect(warn).toHaveBeenCalled()
   })
 
   it('stays within capBytes, evicting pieces more than 10 min behind first, and tells peers what it dropped', async () => {

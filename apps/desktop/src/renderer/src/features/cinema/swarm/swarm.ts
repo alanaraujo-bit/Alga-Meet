@@ -11,7 +11,14 @@ export const LOW_WATER = 128 * 1024
 const MAX_INFLIGHT = 12
 /** Requests a peer may queue with us; more are answered `none` (bounds upload memory and abuse). */
 const MAX_UPLOAD_QUEUE = 4
+/** A download times out when its source sent no byte at all for this long (a strike against the source)… */
 const REQ_TIMEOUT_MS = 15_000
+/** …or when the source keeps sending other pieces but nothing of this one for this long (no strike). */
+const STALE_MS = 60_000
+/** A whole piece still being verified or written after this long is dropped (a stuck OPFS write). */
+const DONE_TIMEOUT_MS = 30_000
+/** close() waits this long at most for a write in progress. */
+const CLOSE_WAIT_MS = 1_000
 /** A `none` keeps us from asking that peer for that piece this long (or until it announces it again). */
 const REFUSED_MS = 5_000
 /** Host: a piece turned down for super-seed is served if the same peer asks again this soon (it can't reach the holder). */
@@ -38,7 +45,7 @@ export interface ChannelLike {
 
 type Source = (track: CinemaTrackId, n: number) => Promise<ArrayBuffer | null>
 interface Upload { track: CinemaTrackId; n: number; v: number; urgent: boolean; buf: ArrayBuffer | null; off: number }
-/** `at` = last chunk; `done` = every byte is in (being verified/stored): later chunks for it are ignored. */
+/** `at` = last accepted chunk (request time before); `done` = every byte is in (being verified/stored): later chunks are ignored. */
 interface Flight { peer: string; track: CinemaTrackId; n: number; start: number; at: number; got: number; done: boolean }
 interface Peer {
   id: string; ch: ChannelLike; has: Map<CinemaTrackId, Set<number>>
@@ -48,7 +55,11 @@ interface Peer {
   refused: Map<string, number>
   /** Host side: pieces turned down for this peer (super-seed), key -> when. */
   declined: Map<string, number>
+  /** Host side: pieces sent or queued to this peer (also in `has`) that it has not confirmed with got/have yet. */
+  sending: Map<CinemaTrackId, Set<number>>
   strikes: number[]; backoffUntil: number
+  /** When it last sent us a byte we took. */
+  lastByte: number
   queue: Upload[]; loading: boolean; bytesIn: number; mbps: number
 }
 
@@ -96,8 +107,8 @@ export class Swarm {
   addPeer(id: string, ch: ChannelLike): void {
     this.removePeer(id)
     const p: Peer = {
-      id, ch, has: new Map(), banned: new Set(), refused: new Map(), declined: new Map(), strikes: [], backoffUntil: 0,
-      queue: [], loading: false, bytesIn: 0, mbps: 0,
+      id, ch, has: new Map(), banned: new Set(), refused: new Map(), declined: new Map(), sending: new Map(), strikes: [],
+      backoffUntil: 0, lastByte: 0, queue: [], loading: false, bytesIn: 0, mbps: 0,
     }
     this.peers.set(id, p)
     ch.bufferedAmountLowThreshold = LOW_WATER
@@ -201,7 +212,9 @@ export class Swarm {
     clearInterval(this.timer)
     for (const id of [...this.peers.keys()]) this.removePeer(id)
     this.cbs.clear()
-    await this.storing
+    let timer: ReturnType<typeof setTimeout> | undefined
+    await Promise.race([this.storing, new Promise((r) => { timer = setTimeout(r, CLOSE_WAIT_MS) })]) // a stuck write can't hold close
+    clearTimeout(timer)
     await this.opts.cache.clear()
   }
 
@@ -209,9 +222,18 @@ export class Swarm {
 
   private onMessage(p: Peer, m: WireMsg): void {
     if (!this.index.has(m.track)) return // only this film's tracks: bounds what a peer can make us keep
-    if (m.t === 'have') p.has.set(m.track, setOf(m.bits))
-    else if (m.t === 'got') {
+    if (m.t === 'have') {
+      const held = setOf(m.bits)
+      // the host's marks for pieces still on their way to this peer stay until it confirms or cancels them
+      const sent = p.sending.get(m.track)
+      for (const n of sent ?? []) {
+        if (held.has(n)) sent?.delete(n)
+        else held.add(n)
+      }
+      p.has.set(m.track, held)
+    } else if (m.t === 'got') {
       setIn(p.has, m.track).add(m.n)
+      p.sending.get(m.track)?.delete(m.n)
       p.refused.delete(pieceKey(m.track, m.n))
     } else if (m.t === 'none') {
       const k = pieceKey(m.track, m.n)
@@ -220,7 +242,7 @@ export class Swarm {
     } else if (m.t === 'req') return this.serve(p, m.track, m.n, m.v, m.urgent)
     else if (m.t === 'cancel') {
       p.queue = p.queue.filter((u) => u.track !== m.track || u.n !== m.n)
-      if (this.opts.isHost) p.has.get(m.track)?.delete(m.n)
+      if (this.opts.isHost) this.unmark(p, m.track, m.n)
       return this.pump(p)
     } else return this.onChunk(p, m)
     this.schedule()
@@ -231,15 +253,20 @@ export class Swarm {
     const meta = this.index.get(track)?.[n]
     if (!meta || verOf(meta[3]) !== v || !this.mine.get(track)?.has(n) || p.queue.length >= MAX_UPLOAD_QUEUE) return this.ctl(p, { t: 'none', track, n })
     if (this.opts.isHost) {
-      // super-seed, unless it is urgent for them or asked again (they can't reach the friend who has it)
+      // already sent to them (or theirs): no pulling the same piece twice until a cancel, have or reconnect clears it
+      if (p.has.get(track)?.has(n)) return this.ctl(p, { t: 'none', track, n })
       const k = pieceKey(track, n)
       const now = Date.now()
-      if (!urgent && now - (p.declined.get(k) ?? -Infinity) >= REPEAT_MS && !hostShouldSend(this.view(), p.id, track, n)) {
+      // super-seed, unless it is urgent for them, or a repeat once another friend has confirmed the piece: a requester
+      // that could reach that friend asks it instead, so the repeat means it can't
+      const repeat = now - (p.declined.get(k) ?? -Infinity) < REPEAT_MS && this.confirmedElsewhere(p, track, n)
+      if (!urgent && !repeat && !hostShouldSend(this.view(), p.id, track, n)) {
         p.declined.set(k, now)
         return this.ctl(p, { t: 'none', track, n })
       }
       p.declined.delete(k)
       setIn(p.has, track).add(n) // count it as theirs from now on
+      setIn(p.sending, track).add(n)
     }
     // urgent pieces go before queued prefetch; a head already being sent keeps going
     const u: Upload = { track, n, v, urgent, buf: null, off: 0 }
@@ -276,7 +303,7 @@ export class Swarm {
           p.queue.shift()
           this.ctl(p, { t: 'none', track: u.track, n: u.n })
           if (!buf && this.mine.get(u.track)?.delete(u.n)) this.announce(u.track) // evicted (host: the factory dropped it)
-          if (this.opts.isHost) p.has.get(u.track)?.delete(u.n)
+          if (this.opts.isHost) this.unmark(p, u.track, u.n)
         }
       }
       this.pump(p)
@@ -290,30 +317,34 @@ export class Swarm {
     // unsolicited, already whole, or an old version still in the pipe
     if (!f || f.peer !== p.id || f.done || !meta || m.v !== verOf(meta[3])) return
     if (m.total !== meta[2]) return this.reject(p, f, 'size')
-    f.at = Date.now()
-    f.got += m.data.byteLength
-    p.bytesIn += m.data.byteLength
-    this.down += m.data.byteLength
-    if (p.id === this.opts.hostId) this.fromHost += m.data.byteLength
-    else this.fromPeers += m.data.byteLength
     const whole = this.asm.add(p.id, k, m.offset, m.total, m.data)
-    if (!whole) return
+    if (whole === false) return // a repeated chunk is not progress
+    const len = m.data.byteLength
+    f.at = p.lastByte = Date.now()
+    f.got += len
+    p.bytesIn += len
+    this.down += len
+    if (p.id === this.opts.hostId) this.fromHost += len
+    else this.fromPeers += len
+    if (whole === true) return
     f.done = true
-    void this.complete(p, f, meta, whole)
+    void this.complete(p, f, meta, whole) // handles its own failures
   }
 
   private async complete(p: Peer, f: Flight, meta: CinemaPieceMeta, whole: Uint8Array<ArrayBuffer>): Promise<void> {
     const k = pieceKey(f.track, f.n)
-    const hex = hexOf(await crypto.subtle.digest('SHA-256', whole))
-    if (this.closed || this.inflight.get(k) !== f) return // cancelled or superseded meanwhile
-    if (hex !== meta[3]) return this.reject(p, f, 'hash')
-    const step = this.storing.then(() => this.store(f, whole))
-    this.storing = step.catch(() => {})
+    let stage: 'verify' | 'cache' = 'verify'
     try {
+      const hex = hexOf(await crypto.subtle.digest('SHA-256', whole))
+      if (this.closed || this.inflight.get(k) !== f) return // cancelled or superseded meanwhile
+      if (hex !== meta[3]) return this.reject(p, f, 'hash')
+      stage = 'cache'
+      const step = this.storing.then(() => this.store(f, whole))
+      this.storing = step.catch(() => {})
       await step
     } catch (e) {
-      console.warn(`[cinema] could not cache ${k}`, e)
-      this.cap = Math.min(this.cap, this.opts.cache.bytes()) // storage is smaller than planned: live within what fits
+      console.warn(`[cinema] could not ${stage} ${k}`, e)
+      if (stage === 'cache') this.cap = Math.min(this.cap, this.opts.cache.bytes()) // storage is smaller than planned
       if (this.inflight.get(k) === f) this.cancelFlight(k) // the cancel undoes the uploader's "they have it" mark
       this.schedule()
     }
@@ -372,6 +403,18 @@ export class Swarm {
     if (f && p) this.ctl(p, { t: 'cancel', track: f.track, n: f.n })
   }
 
+  /** Host: forgets that `p` has (or is getting) piece n. */
+  private unmark(p: Peer, track: CinemaTrackId, n: number): void {
+    p.has.get(track)?.delete(n)
+    p.sending.get(track)?.delete(n)
+  }
+
+  /** Host: a friend other than `p` has confirmed (got/have) that it holds piece n. */
+  private confirmedElsewhere(p: Peer, track: CinemaTrackId, n: number): boolean {
+    for (const q of this.peers.values()) if (q !== p && q.has.get(track)?.has(n) && !q.sending.get(track)?.has(n)) return true
+    return false
+  }
+
   /** Tells every peer what we hold for `track` now (after dropping pieces). */
   private announce(track: CinemaTrackId): void {
     const bits = bitsOf(this.mine.get(track) ?? [])
@@ -388,7 +431,7 @@ export class Swarm {
       p.banned.delete(k)
       p.refused.delete(k)
       // the host knows nobody has the new version yet; a friend's old `has` is fixed by a `none` and its next `got`
-      if (this.opts.isHost) p.has.get(track)?.delete(n)
+      if (this.opts.isHost) this.unmark(p, track, n)
     }
   }
 
@@ -407,14 +450,17 @@ export class Swarm {
     }
     victims.sort((a, b) => b[0] - a[0])
     const touched = new Set<CinemaTrackId>()
-    for (const [, track, n, size] of victims) {
-      if (over <= 0) break
-      this.mine.get(track)?.delete(n)
-      touched.add(track)
-      await this.opts.cache.delete(pieceKey(track, n))
-      over -= size
+    try {
+      for (const [, track, n, size] of victims) {
+        if (over <= 0) break
+        this.mine.get(track)?.delete(n)
+        touched.add(track)
+        await this.opts.cache.delete(pieceKey(track, n))
+        over -= size
+      }
+    } finally {
+      for (const track of touched) this.announce(track)
     }
-    for (const track of touched) this.announce(track)
   }
 
   private ctl(p: Peer, m: WireMsg): void {
@@ -496,18 +542,26 @@ export class Swarm {
     this.upMbps = ewma(this.upMbps, this.up)
     this.down = this.up = 0
     for (const [k, f] of this.inflight) {
+      if (f.done) {
+        if (now - f.at < DONE_TIMEOUT_MS) continue
+        console.warn(`[cinema] ${k} stuck verifying or writing: dropped`)
+        this.cancelFlight(k)
+        this.storing = Promise.resolve() // later pieces stop waiting behind the stuck write
+        continue
+      }
       const p = this.peers.get(f.peer)
       const m = this.index.get(f.track)?.[f.n]
-      if (f.done || !p || !m) continue
-      const timedOut = now - f.at >= REQ_TIMEOUT_MS
+      if (!p || !m) continue
+      const silent = now - Math.max(f.start, p.lastByte) >= REQ_TIMEOUT_MS // nothing at all from that peer
+      const stale = now - f.at >= STALE_MS // busy with other pieces, never this one
       // a critical download that will miss the playhead moves (once) to another holder
-      const late = !timedOut && !this.moved.has(k) && isCritical(m, this.playheadS) &&
+      const late = !silent && !stale && !this.moved.has(k) && isCritical(m, this.playheadS) &&
         isLate(m, f.got, (now - f.start) / 1000, this.playheadS) && this.otherHolder(p, f.track, f.n)
-      if (!timedOut && !late) continue
+      if (!silent && !stale && !late) continue
       this.cancelFlight(k)
       p.refused.set(k, now)
-      if (timedOut) this.strike(p, now)
-      else this.moved.add(k)
+      if (silent) this.strike(p, now)
+      else if (late) this.moved.add(k)
     }
     this.schedule()
   }
