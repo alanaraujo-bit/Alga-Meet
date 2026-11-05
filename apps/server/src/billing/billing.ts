@@ -14,7 +14,7 @@ import {
   type EquippedCosmetics, type Gift, type GiftBody, type Order, type PlanId, type PlanSummary, type PlusPassBody,
   type PlusStatus, type Product, type PutCosmeticsBody, type Quote, type Subscription,
 } from '@alga/shared'
-import { and, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, notInArray, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import { isBlockedBetween, profileAudience, spaceMemberIds } from '../access.js'
 import type { Config } from '../config.js'
@@ -182,6 +182,8 @@ export class Billing {
   private timer: NodeJS.Timeout | undefined
   private sweeping: Promise<number> | undefined
   private lastSweepAt: Date | undefined
+  /** Founder accounts resolved from ALGA_OWNER_EMAILS by each sweep (verified e-mails only). */
+  private owners = new Set<string>()
   readonly tryOns: TryOns
 
   constructor(
@@ -968,7 +970,7 @@ export class Billing {
   private async recompute(tx: Tx, userId: string, now: Date): Promise<Change | null> {
     // Payment rows of purged accounts move to the "removed user" (src/privacy.ts): they never grant anything again.
     if (userId === REMOVED_USER_ID) return null
-    const [u] = await tx.select({ plan: users.plan, cosmetics: users.cosmetics, plusSince: users.plusSince }).from(users)
+    const [u] = await tx.select({ plan: users.plan, cosmetics: users.cosmetics, plusSince: users.plusSince, createdAt: users.createdAt }).from(users)
       .where(eq(users.id, userId)).for('update')
     if (!u) return null
     const subs = (await tx.select().from(subscriptions).where(eq(subscriptions.userId, userId))).filter((s) => this.counts(s.provider))
@@ -981,8 +983,14 @@ export class Billing {
       .where(and(eq(gifts.recipientId, userId), eq(gifts.status, 'accepted'), eq(orders.status, 'paid')))
 
     const desired = new Map<string, Desired>()
-    const plan: PlanId = (cover?.best.planId as PlanId | undefined) ?? 'free'
-    if (cover) {
+    const owner = this.owners.has(userId)
+    const plan: PlanId = owner ? 'plus' : (cover?.best.planId as PlanId | undefined) ?? 'free'
+    if (owner) {
+      // The founder's account: Plus and every cosmetic in the catalog, for good, whatever was or wasn't paid.
+      const forever = { source: 'grant' as const, sourceId: userId, expiresAt: null }
+      desired.set('plan:plus', { kind: 'plan', ...forever })
+      for (const p of PRODUCTS) if (p.kind === 'cosmetic') desired.set(p.id, { kind: 'cosmetic', ...forever })
+    } else if (cover) {
       const until = { source: 'subscription' as const, sourceId: cover.best.id, expiresAt: new Date(cover.until) }
       desired.set(`plan:${plan}`, { kind: 'plan', ...until })
       for (const p of includedIn(plan, now.getTime())) desired.set(p.id, { kind: 'cosmetic', ...until })
@@ -993,7 +1001,8 @@ export class Billing {
       for (const sku of o.items) desired.set(sku, { kind: 'cosmetic', source: 'order', sourceId: o.id, expiresAt: null })
     }
     // Badge base: while a paid Plus (not a pass) is active, now − summed Plus time; stable as time passes.
-    const plusSince = cover && plan === 'plus' && cover.best.kind !== 'pass' ? new Date(now.getTime() - tenureMs(subs, now.getTime())) : null
+    const plusSince = owner ? u.createdAt
+      : cover && plan === 'plus' && cover.best.kind !== 'pass' ? new Date(now.getTime() - tenureMs(subs, now.getTime())) : null
 
     const current = await tx.select().from(entitlements).where(eq(entitlements.userId, userId))
     const same = current.length === desired.size && current.every((c) => {
@@ -1127,6 +1136,13 @@ export class Billing {
     // Safety net: anything whose derived expiry passed gets rebuilt even if no status changed.
     const lapsed = await this.db.selectDistinct({ userId: entitlements.userId }).from(entitlements).where(lte(entitlements.expiresAt, now))
     const ids = new Set([...ended, ...lapsed].map((r) => r.userId))
+    // The founder's accounts: an owner who just verified (or a newly configured e-mail) gets everything on this pass.
+    const emails = this.config.billing.ownerEmails
+    const owners = emails.length ? await this.db.select({ id: users.id }).from(users)
+      .where(and(inArray(sql`lower(${users.email})`, emails), isNotNull(users.emailVerifiedAt))) : []
+    if (owners.length !== this.owners.size) this.log.info({ owners: owners.length, configured: emails.length }, 'billing: founder accounts')
+    this.owners = new Set(owners.map((o) => o.id))
+    for (const id of this.owners) ids.add(id)
     // First sweep after a start (the catalog may have changed: retired items, a new wardrobe item) or a wardrobe
     // item arriving now: rebuild every user who holds something.
     const wardrobe = PRODUCTS.some((p) => p.includedFrom && (!prev || (new Date(p.includedFrom) > prev && new Date(p.includedFrom) <= now)))

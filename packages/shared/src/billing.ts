@@ -250,7 +250,8 @@ export interface Entitlement {
   /** `plan:<planId>` or a cosmetic product id. */
   sku: string
   kind: 'plan' | 'cosmetic'
-  source: 'subscription' | 'order'
+  /** grant = the founder's account (server ALGA_OWNER_EMAILS): everything, for good. */
+  source: 'subscription' | 'order' | 'grant'
   /** null = owned for good (bought); otherwise usable until then. */
   expiresAt: string | null
 }

@@ -366,7 +366,7 @@ export const entitlements = pgTable('entitlements', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   sku: text('sku').notNull(),
   kind: text('kind', { enum: ['plan', 'cosmetic'] }).notNull(),
-  source: text('source', { enum: ['subscription', 'order'] }).notNull(),
+  source: text('source', { enum: ['subscription', 'order', 'grant'] }).notNull(),
   sourceId: uuid('source_id').notNull(),
   expiresAt: ts('expires_at'),
 }, (t) => [primaryKey({ columns: [t.userId, t.sku] })])

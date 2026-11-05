@@ -77,6 +77,8 @@ const EnvSchema = z
     EMAIL_LINK_URL: z.url().default('algameet://auth'),
     /** none = payments off (checkout 503). Default: sandbox in development/test, none in production. sandbox is refused in production. */
     BILLING_PROVIDER: z.enum(['none', 'sandbox', 'mercadopago', 'stripe']).optional(),
+    /** The founder's accounts (comma-separated e-mails, verified only): Plus and every cosmetic, for good. Set in the host, never in git. */
+    ALGA_OWNER_EMAILS: z.string().default(''),
     MP_ACCESS_TOKEN: z.string().min(1).optional(),
     /** "Assinatura secreta" of the webhook (Suas integrações > Webhooks): HMAC key of `x-signature`. */
     MP_WEBHOOK_SECRET: z.string().min(1).optional(),
@@ -196,6 +198,8 @@ export interface BillingConfig {
   sandboxSecret: string
   /** CASA_CINEMA: list the Cinema perk (dev/staging only for now). */
   casaCinema: boolean
+  /** ALGA_OWNER_EMAILS, lowercased (Billing.recompute grants these accounts everything). */
+  ownerEmails: string[]
   /** mercadopago only. */
   returnUrl: string
   mercadopago?: { accessToken: string; webhookSecret: string; apiUrl: string }
@@ -262,6 +266,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       provider: e.BILLING_PROVIDER ?? (e.NODE_ENV === 'production' ? 'none' : 'sandbox'),
       sandboxSecret: randomBytes(32).toString('hex'),
       casaCinema: e.CASA_CINEMA,
+      ownerEmails: e.ALGA_OWNER_EMAILS.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
       returnUrl: e.BILLING_RETURN_URL ?? 'https://algameet.com.br/billing/return',
       ...(e.BILLING_PROVIDER === 'mercadopago'
         ? { mercadopago: { accessToken: e.MP_ACCESS_TOKEN!, webhookSecret: e.MP_WEBHOOK_SECRET!, apiUrl: e.MP_API_URL.replace(/\/+$/, '') } }

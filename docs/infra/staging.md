@@ -23,6 +23,9 @@
 | Pagamentos | `BILLING_PROVIDER=none` | Chaves de teste do Stripe (`docs/infra/stripe.md`) |
 | Domínio próprio | usando `*.up.railway.app` | Comprar domínio e apontar DNS |
 
+## Conta do dono (tudo liberado)
+`ALGA_OWNER_EMAILS` (variável do serviço `api`, e-mails separados por vírgula; **nunca no git**, o repositório é público): contas com esse e-mail **verificado** têm Plus e todos os cosméticos para sempre (`source: grant`), aplicado pela varredura de billing (até 1 min após subir ou após verificar o e-mail). O log `billing: founder accounts` mostra quantas foram encontradas. Vale igual em produção: defina a mesma variável lá.
+
 ## Como publicar uma nova versão
 ```bash
 railway up --service api --environment staging --detach
