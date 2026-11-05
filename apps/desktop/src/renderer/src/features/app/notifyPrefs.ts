@@ -29,9 +29,12 @@ export const useSilenced = (spaceId: string): boolean => useNotify((st) => level
 const keyFor = (userId: string) => `alga.notify.${userId}`
 let timer: ReturnType<typeof setTimeout> | undefined
 
+/** The account whose choices are in the store; nothing is written for anyone else (no empty state over saved prefs). */
+let loadedFor: string | null = null
+
 function save(): void {
   const me = useData.getState().me?.id
-  if (!me) return
+  if (!me || me !== loadedFor) return
   const { levels, muted } = useNotify.getState()
   localStorage.setItem(keyFor(me), JSON.stringify({ levels, muted }))
 }
@@ -75,20 +78,30 @@ export function unmute(id: string): void {
 
 const isLevel = (v: unknown): v is NotifyLevel => v === 'all' || v === 'mentions' || v === 'none'
 
-/** On every READY: this account's saved choices (a malformed entry is dropped, never trusted). */
+/** This account's saved choices (a malformed entry is dropped, never trusted). */
+function load(userId: string): void {
+  let raw: unknown = null
+  try {
+    raw = JSON.parse(localStorage.getItem(keyFor(userId)) ?? 'null')
+  } catch {
+    raw = null
+  }
+  const r = (raw && typeof raw === 'object' ? raw : {}) as { levels?: unknown; muted?: unknown }
+  const levels = Object.fromEntries(Object.entries((r.levels as Record<string, unknown>) ?? {}).filter(([, v]) => isLevel(v))) as Record<string, NotifyLevel>
+  const muted = Object.fromEntries(Object.entries((r.muted as Record<string, unknown>) ?? {}).filter(([, v]) => typeof v === 'number' && Number.isFinite(v))) as Record<string, number>
+  loadedFor = userId
+  useNotify.setState({ levels, muted })
+  prune()
+}
+
+/**
+ * Loads now for the signed-in account (the shell mounts after the first READY, so that one has already passed) and
+ * again on every READY (another account signed in on this PC).
+ */
 export function startNotifyPrefs(): () => void {
+  const me = useData.getState().me?.id
+  if (me) load(me)
   return onDispatch((d) => {
-    if (d.t !== 'READY') return
-    let raw: unknown = null
-    try {
-      raw = JSON.parse(localStorage.getItem(keyFor(d.d.user.id)) ?? 'null')
-    } catch {
-      raw = null
-    }
-    const r = (raw && typeof raw === 'object' ? raw : {}) as { levels?: unknown; muted?: unknown }
-    const levels = Object.fromEntries(Object.entries((r.levels as Record<string, unknown>) ?? {}).filter(([, v]) => isLevel(v))) as Record<string, NotifyLevel>
-    const muted = Object.fromEntries(Object.entries((r.muted as Record<string, unknown>) ?? {}).filter(([, v]) => typeof v === 'number' && Number.isFinite(v))) as Record<string, number>
-    useNotify.setState({ levels, muted })
-    prune()
+    if (d.t === 'READY' && d.d.user.id !== loadedFor) load(d.d.user.id)
   })
 }

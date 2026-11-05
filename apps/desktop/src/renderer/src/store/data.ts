@@ -161,12 +161,16 @@ export const useData = create<DataState>()((set, get) => ({
         const roles: DataState['roles'] = {}
         const channels: Record<string, Channel> = byId(r.privateChannels)
         for (const sp of r.spaces) Object.assign(channels, byId(sp.channels))
-        // READY has no messages: keep loaded history only where nothing was missed while offline.
+        // READY has no messages: keep loaded history only where nothing was missed while offline. Unsent copies
+        // (optimistic, id === nonce) always stay: they are the send queue, and a list holding only them reloads its history.
         const messages = Object.fromEntries(
-          Object.entries(s.messages).filter(([cid, list]) => {
-            const last = channels[cid]?.lastMessageId
+          Object.entries(s.messages).flatMap(([cid, list]): [string, MessageList][] => {
+            if (!channels[cid]) return []
+            const last = channels[cid].lastMessageId
             const newest = list.ids.findLast((id) => list.byId[id]?.nonce !== id)
-            return !!channels[cid] && (!last || (!!newest && newest >= last))
+            if (!last || (!!newest && newest >= last)) return [[cid, list]]
+            const unsent = list.ids.filter((id) => list.byId[id]?.nonce === id)
+            return unsent.length ? [[cid, { ids: unsent, byId: Object.fromEntries(unsent.map((id) => [id, list.byId[id]!])), hasMoreBefore: true, loading: false }]] : []
           }),
         )
         const users: Record<string, PublicUser> = { ...authorsOf(Object.values(messages).flatMap((l) => Object.values(l.byId))), ...byId(r.users) }

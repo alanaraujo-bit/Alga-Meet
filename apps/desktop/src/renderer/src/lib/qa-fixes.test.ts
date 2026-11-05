@@ -64,6 +64,18 @@ describe('message authors stay known users (banned / departed)', () => {
     expect(useData.getState().messages.geral?.ids).toEqual(['0002'])
     expect(displayName(useData.getState(), 'caio', S)).toBe('Caio Prado')
   })
+
+  it('a reconnect READY that drops stale history keeps the unsent copies (the send queue)', () => {
+    const d = useData.getState()
+    d.apply({ t: 'READY', d: ready('ana', []) })
+    const unsent = (nonce: string): Message => ({ ...message(nonce, user('ana', 'Ana')), nonce })
+    d.upsertMessages('geral', [message('0001', user('caio', 'Caio Prado')), unsent('0003'), unsent('0004')])
+    // While offline someone posted 0005: the cached list is stale and goes, the two waiting sends stay.
+    d.apply({ t: 'READY', d: { ...ready('ana', []), spaces: [{ ...ready('ana', []).spaces[0]!, channels: [{ ...channel, lastMessageId: '0005' }] }] } })
+    const list = useData.getState().messages.geral!
+    expect(list.ids).toEqual(['0003', '0004'])
+    expect(list.hasMoreBefore).toBe(true) // the history reloads around them
+  })
 })
 
 describe('UI zoom steps (Ctrl+= / Ctrl+- / Ctrl+0)', () => {

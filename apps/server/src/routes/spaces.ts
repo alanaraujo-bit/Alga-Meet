@@ -97,7 +97,9 @@ export function invitePublicRoutes(app: FastifyInstance, { db }: Ctx): void {
     const found = await loadInvite(db, codeParam(req.params.code))
     if (!found || !usable(found.invite)) throw notFound('Convite inválido ou expirado.')
     const [inviter] = await db.select().from(users).where(eq(users.id, found.invite.inviterId))
-    return { ...(await inviteView(db, found.invite, found.space)), ...(inviter ? { inviter: publicUser(inviter) } : {}) }
+    // Public endpoint: only a name and a face, never the username, bio or cosmetics.
+    const face = inviter ? (({ id, displayName, avatarUrl }) => ({ id, displayName, avatarUrl }))(publicUser(inviter)) : null
+    return { ...(await inviteView(db, found.invite, found.space)), ...(face ? { inviter: face } : {}) }
   })
 }
 

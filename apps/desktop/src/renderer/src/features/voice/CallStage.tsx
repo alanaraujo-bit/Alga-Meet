@@ -1,11 +1,11 @@
-import type { Channel } from '@alga/shared'
+import { Permission, type Channel } from '@alga/shared'
 import { ArrowLeftRight, BarChart3, Headphones, Mic, Minimize, MonitorUp, MoreHorizontal, PictureInPicture2, Scan, ShieldOff, Square, Volume2, WifiOff, X, Signal, type Glyph } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia, type StreamQuality } from '@/media'
 import { useData } from '@/store/data'
-import { channelTitle, displayName, voiceMembers } from '@/store/selectors'
+import { can, channelTitle, displayName, spacePermissions, voiceMembers } from '@/store/selectors'
 import { Avatar, Button, contextMenuHandler, Icon, IconButton, Popover, SegmentedControl, Spinner, Switch, Tooltip, useEnvelope, usePersonHue, type AvatarSize } from '@/ui'
 import type { IconSize } from '@/ui/Icon'
 import { EASE_IN_OUT_CUBIC, EASE_OUT_QUART } from '@/ui/motion'
@@ -54,6 +54,9 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
   const here = conn.channelId === channel.id && conn.state !== 'idle'
   const live = here && (conn.state === 'connecting' || conn.state === 'connected' || conn.state === 'reconnecting')
   const joining = useVoice((st) => st.joining === channel.id)
+  // Full = the others fill it (the server does not count you), and moderators who can move people still get in.
+  const mover = useData((st) => !!channel.spaceId && can(spacePermissions(st, channel.spaceId), Permission.MOVE_MEMBERS))
+  const full = !!channel.userLimit && !mover && people.filter((p) => p.userId !== meId).length >= channel.userLimit
 
   // Watching is opt-in and costs bandwidth: leaving the call's stage keeps one stream for the mini-player
   // (the one in focus, else the first) and stops the rest.
@@ -119,7 +122,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
       {live ? (
         <ControlsDock channel={channel} />
       ) : (
-        <LobbyDock channel={channel} joining={joining} full={!!channel.userLimit && people.length >= channel.userLimit} />
+        <LobbyDock channel={channel} joining={joining} full={full} />
       )}
     </section>
   )

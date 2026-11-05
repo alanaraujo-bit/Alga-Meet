@@ -52,12 +52,17 @@ const release = (nonce: string) => {
  * On failure the copy stays in place, flagged in `sendFailures` (with the server's reason when there is one),
  * until retried or discarded.
  */
+/** Sends with a request in flight: a manual "Tentar agora" and the automatic queue never post the same one twice at once. */
+const sending = new Set<string>()
+
 export async function sendMessage(channelId: string, content: string, replyToId?: string, retryNonce?: string, files?: OutgoingFile[]): Promise<void> {
   const d = useData.getState()
   const me = d.me
   if (!me) return
   // v7 so the optimistic copy sorts after existing history.
   const nonce = retryNonce ?? uuidv7()
+  if (sending.has(nonce)) return
+  sending.add(nonce)
   if (files?.length) outbox.set(nonce, files)
   const out = outbox.get(nonce) ?? []
   const attachments: Attachment[] = out.map((f, i) => ({
@@ -90,10 +95,14 @@ export async function sendMessage(channelId: string, content: string, replyToId?
   } catch (e) {
     // The gateway echo may have reconciled it already (response lost, message saved).
     if (useData.getState().messages[channelId]?.byId[nonce]) {
-      useData.getState().setSendFailed(nonce, e instanceof ApiRequestError && e.status !== 0 ? errorText(e) : true)
+      // No connection or too fast (429): it waits in the queue. Any other refusal carries its reason and waits for you.
+      const transient = !(e instanceof ApiRequestError) || e.status === 0 || e.status === 429
+      useData.getState().setSendFailed(nonce, transient ? true : errorText(e))
+      if (transient) retryLater(e instanceof ApiRequestError ? e.retry?.afterMs : undefined)
     } else release(nonce)
     throw e
   } finally {
+    sending.delete(nonce)
     useData.getState().setUpload(nonce, null)
   }
 }
@@ -121,19 +130,21 @@ export async function flushQueuedSends(): Promise<void> {
   if (flushing) return
   flushing = true
   try {
-    const st = useData.getState()
     // uuidv7 nonces sort by creation time: the conversation keeps its order.
-    const queued = Object.entries(st.sendFailures).filter(([, v]) => v === true).map(([nonce]) => nonce).sort()
+    const queued = Object.entries(useData.getState().sendFailures).filter(([, v]) => v === true).map(([nonce]) => nonce).sort()
     for (const nonce of queued) {
+      const st = useData.getState()
+      if (st.sendFailures[nonce] !== true || sending.has(nonce)) continue // sent, discarded or being sent meanwhile
       const channelId = Object.keys(st.messages).find((c) => st.messages[c]?.byId[nonce])
       if (!channelId) {
-        useData.getState().setSendFailed(nonce, false)
+        st.setSendFailed(nonce, false)
         continue
       }
       try {
         await retrySend(channelId, nonce)
-      } catch {
-        break // still offline: the next reconnect tries again
+      } catch (e) {
+        // Still no connection (or rate limited): stop here and keep the order; retryLater() comes back for the rest.
+        if (!(e instanceof ApiRequestError) || e.status === 0 || e.status === 429) break
       }
     }
   } finally {
@@ -141,11 +152,30 @@ export async function flushQueuedSends(): Promise<void> {
   }
 }
 
+/** Backoff while the queue waits and the realtime link stays up (a failed upload, a 429): 3 s, 10 s, 30 s, then every minute. */
+const BACKOFF_MS = [3_000, 10_000, 30_000, 60_000]
+let backoff = 0
+let backoffTimer: ReturnType<typeof setTimeout> | undefined
+function retryLater(afterMs?: number): void {
+  if (backoffTimer) return
+  const wait = Math.max(afterMs ?? 0, BACKOFF_MS[Math.min(backoff++, BACKOFF_MS.length - 1)]!)
+  backoffTimer = setTimeout(() => {
+    backoffTimer = undefined
+    if (useSession.getState().gateway === 'ready') void flushQueuedSends().then(() => {
+      if (!Object.values(useData.getState().sendFailures).includes(true)) backoff = 0
+    })
+  }, wait)
+}
+
 export function startSendQueue(): () => void {
-  const flush = () => void flushQueuedSends()
+  // After READY is applied (the status flips first, in the same tick): the lists it keeps are the ones the queue reads.
+  const flush = () => setTimeout(() => void flushQueuedSends(), 0)
   window.addEventListener('online', flush)
   const off = useSession.subscribe((s, p) => {
-    if (s.gateway === 'ready' && p.gateway !== 'ready') flush()
+    if (s.gateway === 'ready' && p.gateway !== 'ready') {
+      backoff = 0
+      flush()
+    }
   })
   return () => {
     window.removeEventListener('online', flush)

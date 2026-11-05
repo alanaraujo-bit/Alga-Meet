@@ -1,6 +1,6 @@
 import type { Invite } from '@alga/shared'
 import { Check, Copy, Hash, MessageCircle, Users, Volume2 } from '@/ui/icons'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiRequestError } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
 import { errorText, fieldErrors } from '@/lib/errors'
@@ -144,13 +144,21 @@ function JoinSpaceModal({ open, onClose, initial }: { open: boolean; onClose: ()
   const inv = preview.state === 'ok' ? preview.invite! : null
   const already = !!(inv && spaces[inv.space.id])
 
-  // Came from "create your account to join": the account was the yes, so enter right away (once).
+  // Came from "create your account to join" with this very invite: the account was the yes, so enter right away (once).
   useEffect(() => {
-    if (!open || !inv || !useDeepLink.getState().autoJoin) return
-    useDeepLink.setState({ autoJoin: false })
-    void submit()
+    if (!open || !inv) return
+    const code = useDeepLink.getState().autoJoinCode
+    if (!code) return
+    useDeepLink.setState({ autoJoinCode: null })
+    if (code === inv.code) void submit()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once per preview
   }, [open, inv])
+  // Closing the dialog (not merely being closed) or a dead invite also ends the "join without asking" promise.
+  const wasOpen = useRef(open)
+  useEffect(() => {
+    if ((wasOpen.current && !open) || (open && preview.state === 'error')) useDeepLink.setState({ autoJoinCode: null })
+    wasOpen.current = open
+  }, [open, preview.state])
 
   const submit = async (e?: FormEvent) => {
     e?.preventDefault()

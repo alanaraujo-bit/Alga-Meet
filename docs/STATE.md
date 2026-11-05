@@ -1,5 +1,31 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-05 manhã — Fundamentos do backlog da pesquisa Discord (branch `feat/fundamentals`, NÃO mesclada nem publicada)
+Worktree `D:\PROJETOS\alga-presence`, a partir da main `ffb4ec2`. Itens P0 de `docs/research/discord/04-prioritized-backlog.md`
+(a pesquisa em si está no checkout principal, ainda não commitada):
+- **BL-05 Olhar a sala antes de entrar:** o 1º clique na sala de voz (barra lateral e "Agora" da Home) abre o lobby (quem está, o
+  que cada um faz, "Ninguém te vê aqui ainda"); o 2º clique, duplo clique ou Enter entra. Barra do lobby no lugar da barra da
+  chamada: mic, áudio, teste de mic opcional (o anel acende), ajustes e "Entrar"; "Sala cheia" no limite. Botões "Entrar"
+  explícitos (Ativo agora, cabeçalho do chat) continuam entrando direto.
+- **BL-07 Notificação calma:** nível por espaço (Todas / Só @menções / Silenciado) com padrão adaptativo (≤ 10 membros: todas;
+  maior: menções), "Silenciar por 1 hora", silenciar canal e DM. Silenciado não mostra ponto, não notifica e não conta na barra
+  de tarefas; a @menção continua visível no app. Guardado no PC por conta (atalho anotado em `notifyPrefs.ts`).
+- **BL-06 Sem ações implícitas:** conferido, sem mudança ("digitando" só com texto; Esc não marca lido).
+- **BL-02 Mensagem que sempre chega, uma vez:** envio idempotente por nonce no servidor (**migração 0014**, coluna + índice único);
+  falha de rede vira "Sem conexão. Ela sai sozinha…" e reenvia sozinha ao reconectar. A fila vive na memória (atalho anotado).
+- **BL-04 Convite → dentro em segundos:** prévia pública do convite traz quem convidou; tela de cadastro com o rosto de quem chamou
+  e o espaço, começando em "Criar conta"; criar a conta ali = aceitar (entra sozinho). Convite aberto já logado continua pedindo
+  confirmação.
+- **Links de convite que abrem (achado novo, era P0 escondido):** os links apontavam para `alga.meet`, que não existe, e o site não
+  tinha `/i/`. Agora: página `apps/site/src/pages/i` (quem chamou, abrir no app, baixar, código) e links do app para
+  `https://alga-meet.vercel.app/i/<código>`; "Enviar no WhatsApp" no convite. **Para valer:** publicar o site com a rota do README
+  e pôr `https://alga-meet.vercel.app` em `CORS_ORIGINS` do staging.
+Verificado: servidor 251 testes, desktop 328, typecheck limpo; E2E real 18/18 (`apps/desktop/scripts/fundamentals-shots.mjs`, API
+de QA :4360, voz simulada por webhook do LiveKit) e página de convite em Chromium contra a API de QA. Prints:
+`docs/screenshots/2026-11-05-fundamentals-*`. **Publicar** = deploy do servidor (migração 0014 roda no boot), release 0.1.6 no
+`alga-verify`, deploy do site e o `CORS_ORIGINS`. Não feito (depende do dono): BL-01 parecer jurídico, BL-08 auditoria da loja
+(pacote C não commitado), BL-03 motor de mídia (trabalho de mídia não commitado).
+
 ## 2026-11-05 madrugada — Atividade em tempo real + perfil (branch `feat/presence`, NÃO mesclada)
 Worktree `D:\PROJETOS\alga-presence`. Rich presence (detector nativo sem dependência nova; jogo/app com ícone, capa Steam,
 tempo ao vivo), "Ativo agora" em Amigos, status personalizado com validade (balão no perfil), perfil completo (agora,

@@ -137,12 +137,24 @@ export function LobbyDock({ channel, joining, full }: { channel: Channel; joinin
   const dock = useRef<HTMLDivElement>(null)
   useToastClearance(dock)
   const join = useRef<HTMLButtonElement>(null)
+  const alive = useRef(true)
+  const started = useRef(false)
   useEffect(() => {
+    alive.current = true
     // Leaving by keyboard (Desconectar) removes the focused call dock: the keyboard lands on Entrar, not on <body>.
     if (document.activeElement === document.body) join.current?.focus()
     // The test belongs to this screen: leaving it, or joining (the call takes the mic), ends it.
-    return () => void (useMedia.getState().micTest.active && media.stopMicTest())
+    return () => {
+      alive.current = false
+      if (started.current || useMedia.getState().micTest.active) void media.stopMicTest()
+    }
   }, [])
+  // A test that finishes opening the mic after this screen is gone (Testar, then Entrar right away) is closed at once.
+  const startTest = async () => {
+    started.current = true
+    await media.startMicTest({ loopback: false })
+    if (!alive.current) void media.stopMicTest()
+  }
   return (
     <div ref={dock} className={s.dock} role="toolbar" aria-label={t.lobby.toolbar}>
       <CallButton
@@ -169,7 +181,7 @@ export function LobbyDock({ channel, joining, full }: { channel: Channel; joinin
         pressed={testing}
         on={testing}
         disabled={!self.mic}
-        onClick={() => void (testing ? media.stopMicTest() : media.startMicTest({ loopback: false }))}
+        onClick={() => void (testing ? media.stopMicTest() : startTest())}
       />
       <CallButton icon={Settings2} label={t.dock.settings} onClick={() => openSettings('voice')} />
       <span className={s.dockSep} />

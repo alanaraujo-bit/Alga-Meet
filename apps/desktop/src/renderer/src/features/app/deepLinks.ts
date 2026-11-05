@@ -9,14 +9,14 @@ import { t } from './strings'
 /**
  * algameet:// links waiting for the right screen: the reset token for the reset form (signed out) and the invite
  * code for the join preview (after sign-in). Tokens/codes are bearer secrets: kept in memory only, never logged.
- * `autoJoin`: the person signed in or created the account on the sign-in screen *because of* this invite, so the
- * join happens without asking again. An invite opened while already signed in still asks first (a stranger's link
- * must never pull you into a space on one click).
+ * `autoJoinCode`: the person signed in or created the account on the sign-in screen *because of* this invite, so that
+ * one invite joins without asking again (and only that one: cleared on use, on close, on error and on sign-out). An
+ * invite opened while already signed in still asks first (a stranger's link must never pull you into a space on one click).
  */
-export const useDeepLink = create<{ resetToken: string | null; inviteCode: string | null; autoJoin: boolean }>()(() => ({
+export const useDeepLink = create<{ resetToken: string | null; inviteCode: string | null; autoJoinCode: string | null }>()(() => ({
   resetToken: null,
   inviteCode: null,
-  autoJoin: false,
+  autoJoinCode: null,
 }))
 
 async function handle(link: DeepLink): Promise<void> {
@@ -40,7 +40,8 @@ async function handle(link: DeepLink): Promise<void> {
 export function startDeepLinks(): () => void {
   // Signed in from the sign-in screen (not a saved session) while an invite waits: that sign-in was the yes.
   const offAuth = useSession.subscribe((s, p) => {
-    if (s.phase === 'signed_in' && p.phase === 'signed_out' && useDeepLink.getState().inviteCode) useDeepLink.setState({ autoJoin: true })
+    if (s.phase === 'signed_in' && p.phase === 'signed_out') useDeepLink.setState({ autoJoinCode: useDeepLink.getState().inviteCode })
+    if (s.phase === 'signed_out' && p.phase !== 'signed_out') useDeepLink.setState({ autoJoinCode: null })
   })
   const dl = window.alga?.deepLinks
   if (!dl) return offAuth

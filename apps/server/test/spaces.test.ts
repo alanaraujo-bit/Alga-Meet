@@ -128,7 +128,7 @@ describe('invites', () => {
     expect(preview.body.space).toMatchObject({ id: space.id, name: 'Público' })
     // A new person sees who called them: the inviter's public profile only (no e-mail).
     expect(preview.body.inviter).toMatchObject({ id: owner.user.id, displayName: owner.user.displayName })
-    expect(preview.body.inviter).not.toHaveProperty('email')
+    expect(Object.keys(preview.body.inviter!).sort()).toEqual(['avatarUrl', 'displayName', 'id'])
 
     const gwOwner = await connect(s.port, owner.token)
     const gwJoiner = await connect(s.port, joiner.token)

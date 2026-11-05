@@ -220,20 +220,29 @@ await sleep(2500)
 const composer = page.locator('[data-composer]')
 await composer.click()
 const offline = `Mandei sem internet ${run}`
+const offline2 = `E mais uma ${run}`
 await composer.fill(offline)
 await page.keyboard.press('Enter')
+await sleep(400)
+await composer.fill(offline2)
+await page.keyboard.press('Enter')
 await sleep(2000)
-check(await page.getByText('Sem conexão. Ela sai sozinha').isVisible().catch(() => false), 'a send without connection waits calmly (not a red error)')
+const waiting = () => page.getByText('Sem conexão. Ela sai sozinha').count()
+check((await waiting()) === 2, 'both sends without connection wait calmly (not a red error)')
 await shot(page, 'queued')
 await Q.startApi()
+// A friend posts before this app reconnects: its cached history is now stale and READY drops it (the queue must stay).
+await call('POST', `/channels/${text.id}/messages`, { content: 'voltou a net aí?', nonce: `n-${run}-2` }, bia.token)
 let gone = false
 for (let i = 0; i < 60 && !gone; i++) {
   await sleep(1000)
-  gone = !(await page.getByText('Sem conexão. Ela sai sozinha').isVisible().catch(() => false))
+  gone = (await waiting()) === 0
 }
-check(gone, 'the waiting message went out by itself when the connection came back')
+check(gone, 'the waiting messages went out by themselves when the connection came back')
 const history = await call('GET', `/channels/${text.id}/messages`, undefined, alan.token)
-check(history.filter((m) => m.content === offline).length === 1, 'and it exists exactly once on the server')
+check(history.filter((m) => m.content === offline).length === 1 && history.filter((m) => m.content === offline2).length === 1, 'both waiting messages exist exactly once on the server (a friend posted meanwhile)')
+const shown = await page.locator('main').getByText(offline2).count().catch(() => 0)
+check(shown === 1, 'and the second one is on screen once, after the reloaded history')
 await shot(page, 'sent-after-reconnect')
 
 // 4. A new person arrives through a friend's invite (BL-04).
