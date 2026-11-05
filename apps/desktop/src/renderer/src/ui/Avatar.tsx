@@ -1,6 +1,8 @@
 import type { PresenceStatus } from '@alga/shared'
 import { useEffect, useId, useState, type RefObject } from 'react'
 import s from './Avatar.module.css'
+import { Eco } from './eco/Eco'
+import { ecoBackdrop, ecoFor } from './eco/ecoRules'
 
 export type AvatarSize = 16 | 20 | 24 | 32 | 36 | 40 | 48 | 56 | 64 | 80 | 88 | 96 | 112 | 128
 
@@ -90,7 +92,9 @@ export function Avatar({
   // Remember which URL failed, so a new avatar gets a fresh try.
   const [brokenUrl, setBrokenUrl] = useState<string | null>(null)
   const broken = !!user.avatarUrl && brokenUrl === user.avatarUrl
-  const hue = hueFor(user.id)
+  const photo = !!user.avatarUrl && !broken
+  // No photo: the person's own Eco (born from their id; their accent color, if they chose one, wins).
+  const eco = photo ? null : { ...ecoFor(user.id), ...(user.accentColor && /^#[0-9a-f]{6}$/i.test(user.accentColor) ? { accent: user.accentColor } : {}) }
   const showDot = presence && DOT[size] > 0
   const label = decorative ? undefined : presence ? `${user.displayName}, ${PRESENCE_LABEL[presence]}` : user.displayName
   return (
@@ -101,17 +105,8 @@ export function Avatar({
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <span
-        className={s.face}
-        style={{
-          // Neutral #26272b-like disc with a whisper of the person's hue (C .02): calm, still recognizable.
-          background: user.accentColor ?? `oklch(0.29 0.02 ${hue})`,
-          color: user.accentColor ? '#fff' : `oklch(0.86 0.03 ${hue})`,
-          fontSize: Math.max(8, Math.round(size * 0.38)),
-        }}
-      >
-        {/* At 20px and below initials are noise: the color disc alone identifies. */}
-        {user.avatarUrl && !broken ? <img src={user.avatarUrl} alt="" draggable={false} onError={() => setBrokenUrl(user.avatarUrl)} /> : size > 20 ? initials(user.displayName) : null}
+      <span className={s.face} style={{ background: eco ? ecoBackdrop(eco.accent) : undefined }}>
+        {eco ? <Eco spec={eco} framing="avatar" size={size} /> : <img src={user.avatarUrl!} alt="" draggable={false} onError={() => setBrokenUrl(user.avatarUrl)} />}
       </span>
       {(speaking || glowRef || glow) && <span ref={glowRef} className={s.glow} />}
       {showDot && (

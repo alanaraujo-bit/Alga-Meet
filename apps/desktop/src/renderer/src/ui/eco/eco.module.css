@@ -1,0 +1,57 @@
+/* Eco's few movements: short loops on the face only (the body never moves except the success hop). */
+.barA,
+.barB {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: meter 520ms steps(4, end) infinite alternate;
+}
+.barB {
+  animation-duration: 440ms;
+  animation-delay: -180ms;
+}
+@keyframes meter {
+  from {
+    transform: scaleY(0.35);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* Connecting: one eye light sweeping the visor. */
+.scan {
+  animation: scan 1.2s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate;
+}
+@keyframes scan {
+  to {
+    transform: translateX(24px);
+  }
+}
+
+/* Idle: a blink every few seconds (only where the Eco is shown big; avatars do not animate). */
+.blink {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+:global(.eco-alive) .blink {
+  animation: blink 4.6s infinite;
+}
+@keyframes blink {
+  0%,
+  94%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barA,
+  .barB,
+  .scan,
+  :global(.eco-alive) .blink {
+    animation: none;
+  }
+}
