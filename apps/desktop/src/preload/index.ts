@@ -137,6 +137,7 @@ const bridge: AlgaBridge = {
     setTrayAnimation: (enabled) => ipcRenderer.invoke(IPC.appSetTrayAnimation, enabled === true),
     openExternal: (url) => ipcRenderer.invoke(IPC.appOpenExternal, String(url)),
     openLogs: () => ipcRenderer.invoke(IPC.appOpenLogs),
+    takeSetupEco: () => ipcRenderer.invoke(IPC.appTakeSetupEco),
     quit: () => ipcRenderer.send(IPC.appQuit),
   },
 }

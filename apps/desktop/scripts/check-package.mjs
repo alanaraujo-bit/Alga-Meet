@@ -2,6 +2,7 @@
 // electron-updater's own dependencies (built in a worktree whose node_modules was a folder of per-package
 // junctions), so auto-update died silently on every install. Walks package.json `dependencies` from the app root
 // with Node's resolution order (nearest node_modules first). Optional and peer dependencies are not required.
+import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join, sep } from 'node:path'
 
@@ -40,3 +41,10 @@ if (missing.length) {
   process.exit(1)
 }
 console.log(`app.asar: ${seen.size - 1} runtime packages, all dependencies present`)
+
+// The uninstall entry points at the setup window (build/installer.nsh): without it "Desinstalar" would do nothing.
+const setupUi = join(archive, '..', 'bin', 'alga-setup-ui.exe')
+if (!existsSync(setupUi)) {
+  console.error(`missing ${setupUi}: run scripts/build-setup-ui.mjs before electron-builder`)
+  process.exit(1)
+}

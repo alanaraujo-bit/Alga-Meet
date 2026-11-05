@@ -14,6 +14,7 @@ import { AccountGate, needsGate } from '../trust/Gate'
 import { RestrictedScreen } from '../trust/Restricted'
 import { BootSplash } from './BootSplash'
 import { startDeepLinks } from './deepLinks'
+import { startSetupEco } from './setupEco'
 import { startActivitySync } from '../activity/store'
 import { startStatusSync } from '../activity/custom'
 import { startSendQueue } from '@/store/actions'
@@ -39,6 +40,7 @@ export function App() {
   useEffect(() => startStatusSync(), [])
   useEffect(() => startSendQueue(), [])
   useEffect(() => startZoomKeys(), [])
+  useEffect(() => startSetupEco(), [])
 
   // Media engine notices (device unplugged, fallback to standard noise suppression…) surface as toasts; the ones
   // about your stream go on your tile while the call is on screen.

@@ -51,6 +51,7 @@ export const IPC = {
   appSetTrayAnimation: 'alga:app:set-tray-animation', // invoke
   appOpenExternal: 'alga:app:open-external', // invoke
   appOpenLogs: 'alga:app:open-logs', // invoke
+  appTakeSetupEco: 'alga:app:take-setup-eco', // invoke
   appQuit: 'alga:app:quit', // send
 
   e2eeStatus: 'alga:e2ee:status', // invoke

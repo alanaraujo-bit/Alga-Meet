@@ -331,19 +331,21 @@ export const Eco = memo(function Eco({
       focusable="false"
     >
       <g className={s.lift} style={{ transform: `translateY(${lift}px)` }}>
-        <HairBack hair={hair} a={a} dark={dark} />
-        <path d={BODY} fill={GRAPHITE} stroke={a} strokeWidth="3.5" strokeLinejoin="round" />
-        <path d={HOOD} fill={HOOD_FILL} />
-        <path d={HOOD_EDGE} fill="none" stroke={a} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M24 90 C29 93 34 93.5 39.5 92.5" fill="none" stroke={a} strokeWidth="3.2" strokeLinecap="round" />
-        <path d="M76 90 C71 93 66 93.5 60.5 92.5" fill="none" stroke={a} strokeWidth="3.2" strokeLinecap="round" />
-        <HairFrame hair={hair} a={a} dark={dark} />
-        <rect x="28" y="55" width="44" height="22" rx="11" fill={VISOR} />
-        {BEHIND.has(accessory) && <Accessory kind={accessory} a={a} />}
-        <path d={ANT_L} fill={a} className={s.ant} style={{ transform: `rotate(${turnL}deg)`, transformOrigin: `${46 - bx}px ${41 - by}px` }} />
-        <path d={ANT_R} fill={a} className={s.ant} style={{ transform: `rotate(${turnR}deg)`, transformOrigin: `${54 - bx}px ${41 - by}px` }} />
-        <HairFront hair={hair} a={a} dark={dark} />
-        {!BEHIND.has(accessory) && accessory !== 'mask' && accessory !== 'shades' && <Accessory kind={accessory} a={a} />}
+        <g data-part="dress"><HairBack hair={hair} a={a} dark={dark} /></g>
+        <path data-part="body" d={BODY} fill={GRAPHITE} stroke={a} strokeWidth="3.5" strokeLinejoin="round" />
+        <path data-part="hood" d={HOOD} fill={HOOD_FILL} />
+        <path data-part="edge" d={HOOD_EDGE} fill="none" stroke={a} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path data-part="edge" d="M24 90 C29 93 34 93.5 39.5 92.5" fill="none" stroke={a} strokeWidth="3.2" strokeLinecap="round" />
+        <path data-part="edge" d="M76 90 C71 93 66 93.5 60.5 92.5" fill="none" stroke={a} strokeWidth="3.2" strokeLinecap="round" />
+        <g data-part="dress"><HairFrame hair={hair} a={a} dark={dark} /></g>
+        <rect data-part="visor" x="28" y="55" width="44" height="22" rx="11" fill={VISOR} />
+        {BEHIND.has(accessory) && <g data-part="dress"><Accessory kind={accessory} a={a} /></g>}
+        <path data-part="ant" d={ANT_L} fill={a} className={s.ant} style={{ transform: `rotate(${turnL}deg)`, transformOrigin: `${46 - bx}px ${41 - by}px` }} />
+        <path data-part="ant" d={ANT_R} fill={a} className={s.ant} style={{ transform: `rotate(${turnR}deg)`, transformOrigin: `${54 - bx}px ${41 - by}px` }} />
+        <g data-part="dress"><HairFront hair={hair} a={a} dark={dark} /></g>
+        {!BEHIND.has(accessory) && accessory !== 'mask' && accessory !== 'shades' && <g data-part="dress"><Accessory kind={accessory} a={a} /></g>}
+        {/* data-part marks the pieces for choreography (the installer draws the Eco out of the logo). */}
+        <g data-part="eyes">
         {accessory === 'shades' ? (
           <>
             <Accessory kind="shades" a={a} />
@@ -358,6 +360,7 @@ export const Eco = memo(function Eco({
         ) : (
           <Eyes state={state} eyes={spec.eyes} color={eye} />
         )}
+        </g>
         {state === 'sleeping' && <path d="M78 30 h7 l-7 8 h7 M88 20 h5 l-5 6 h5" fill="none" stroke={a} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
       </g>
     </svg>

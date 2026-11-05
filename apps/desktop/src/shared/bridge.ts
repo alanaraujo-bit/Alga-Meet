@@ -271,6 +271,8 @@ export interface AlgaBridge {
     openExternal(url: string): Promise<void>
     /** Opens the logs folder in Explorer. */
     openLogs(): Promise<void>
+    /** The Eco dressed in the setup window during the install (unvalidated; null when none). Read once. */
+    takeSetupEco(): Promise<unknown>
     quit(): void
   }
 }

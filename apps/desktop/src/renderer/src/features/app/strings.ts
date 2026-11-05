@@ -3,6 +3,7 @@ const offlineText = (s: number | null) => (s === null || s <= 0 ? 'Sem conexão.
 
 export const t = {
   live: 'Você está transmitindo',
+  setupEco: 'Seu Eco chegou. Dá para mudar em Configurações › Minha conta.',
   stopLive: 'Parar',
   appName: 'Alga Meet',
   search: 'Buscar ou ir para…',

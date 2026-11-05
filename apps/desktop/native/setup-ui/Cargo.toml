@@ -1,0 +1,29 @@
+[package]
+name = "alga-setup-ui"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Alga Meet's own install / update / uninstall window (WebView2), driven by the NSIS installer."
+
+[[bin]]
+name = "alga-setup-ui"
+path = "src/main.rs"
+
+[dependencies]
+tao = "0.34"
+wry = "0.53"
+serde_json = "1"
+
+[dependencies.windows-sys]
+version = "0.60"
+features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Environment"]
+
+[build-dependencies]
+winresource = "0.1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

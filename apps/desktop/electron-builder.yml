@@ -1,4 +1,4 @@
-# Alga Meet — Windows installer (NSIS, per-user, assisted). See docs/decisions/0003-distribution-signing-updates.md.
+# Alga Meet — Windows installer (NSIS one-click, per-user, with our own setup window). See docs/decisions/0003-distribution-signing-updates.md.
 appId: com.alga.meet # must match app.setAppUserModelId in src/main/index.ts
 productName: Alga Meet
 copyright: Copyright © 2026 Alga
@@ -61,20 +61,18 @@ win:
   #   certificateProfileName: "<profile>"
 
 nsis:
-  oneClick: false
-  perMachine: false # per-user install in %LOCALAPPDATA%\Programs, no admin/UAC
+  # One click, per-user in %LOCALAPPDATA%\Programs, no admin/UAC. The window people see is ours (native/setup-ui,
+  # started by build/installer.nsh); NSIS keeps doing files, registry, shortcuts and electron-updater's updates.
+  oneClick: true
+  perMachine: false
   allowElevation: false
-  allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
   shortcutName: Alga Meet
   uninstallDisplayName: Alga Meet
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
-  installerSidebar: build/installer-sidebar.bmp
-  uninstallerSidebar: build/installer-sidebar.bmp
-  installerHeader: build/installer-header.bmp
-  include: build/installer.nsh # asks on uninstall whether to remove personal data (default: keep)
+  include: build/installer.nsh
   # One bundled language = pt-BR UI with no language prompt (multiLanguageInstaller: false would force en_US).
   installerLanguages: [pt_BR]
   language: "1046"

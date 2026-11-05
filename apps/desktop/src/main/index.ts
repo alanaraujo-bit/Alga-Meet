@@ -1,5 +1,6 @@
 import './chromium-flags'
 import { cpus, release } from 'node:os'
+import { readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, ipcMain, shell } from 'electron'
 import type { AppConfig } from '../shared/bridge'
@@ -96,6 +97,7 @@ function registerAppIpc(): void {
     const err = await shell.openPath(logDir())
     if (err) log.warn('openLogs failed', err)
   })
+  handle(IPC.appTakeSetupEco, () => takeSetupEco())
   on(IPC.appQuit, () => app.quit())
   registerWindowIpc()
   registerTrayIpc()
@@ -136,4 +138,16 @@ else {
   app.on('window-all-closed', () => app.quit())
   // E2E hook for scripts/verify-native.mjs (Playwright electronApp.evaluate); absent in normal runs.
   if (process.env.ALGA_E2E === '1') Object.assign(globalThis, { __alga: { trayState, require } })
+}
+
+/** The Eco dressed in the setup window while the app installed (native/setup-ui writes it next to our data). */
+function takeSetupEco(): unknown {
+  const file = join(app.getPath('userData'), 'setup-eco.json')
+  try {
+    const eco = (JSON.parse(readFileSync(file, 'utf8')) as { eco?: unknown }).eco ?? null
+    rmSync(file, { force: true })
+    return eco
+  } catch {
+    return null
+  }
 }
