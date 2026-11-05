@@ -1,4 +1,4 @@
-import { ActivitySchema, E2EE_FRAME_LIMIT, E2eeClientFrameSchema, GatewayClose, clampActivity, type ClientFrame, type ReadyPayload } from '@alga/shared'
+import { ActivitySchema, CustomStatusSchema, E2EE_FRAME_LIMIT, E2eeClientFrameSchema, GatewayClose, clampActivity, type ClientFrame, type ReadyPayload } from '@alga/shared'
 import { eq, inArray } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import type { WebSocket } from 'ws'
@@ -33,6 +33,7 @@ const ClientFrameSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('heartbeat') }),
   z.object({ op: z.literal('presence'), status: z.enum(['online', 'idle', 'dnd', 'invisible']) }),
   z.object({ op: z.literal('activity'), activity: ActivitySchema.nullable() }),
+  z.object({ op: z.literal('custom_status'), status: CustomStatusSchema.nullable() }),
   z.object({
     op: z.literal('voice_state'),
     selfMute: z.boolean(), selfDeaf: z.boolean(), streaming: z.boolean(), video: z.boolean(),
@@ -172,6 +173,9 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
           if (hub.setActivity(conn, frame.activity && clampActivity(frame.activity))) {
             await stateOps.run(`activity:${userId}`, () => broadcastPresence(db, hub, userId))
           }
+          break
+        case 'custom_status':
+          if (hub.setCustom(userId, frame.status)) await stateOps.run(`activity:${userId}`, () => broadcastPresence(db, hub, userId))
           break
         case 'voice_state':
           await stateOps.run(`voice:${userId}`, () => voice.updateSelf(userId, {

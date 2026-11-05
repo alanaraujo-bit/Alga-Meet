@@ -1,5 +1,5 @@
 import type { StatusPreference } from '@alga/shared'
-import { Check, Copy, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Settings } from '@/ui/icons'
+import { Check, Copy, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Settings, Smile } from '@/ui/icons'
 import { useRef, useState } from 'react'
 import { media, useMedia } from '@/media'
 import { setStatus } from '@/store/actions'
@@ -11,8 +11,9 @@ import { openSettings } from '../settings/store'
 import { DecoratedAvatar, ProfileCard } from '../billing/Cosmetics'
 import { useLook } from '../billing/store'
 import { VoicePanel } from '../voice/VoicePanel'
-import { ActivityLine } from '../activity/Activity'
 import { OwnActivity } from '../activity/Own'
+import { openStatusEditor, PersonLine, StatusBubble, StatusEditorHost } from '../activity/Status'
+import { useCustomStatus } from '../activity/custom'
 import { errorText } from '@/lib/errors'
 import { copyText } from '@/lib/clipboard'
 import { t } from '../app/strings'
@@ -23,6 +24,7 @@ export function UserPanel() {
     <div className={s.dock}>
       <VoicePanel />
       <UserRow />
+      <StatusEditorHost />
     </div>
   )
 }
@@ -41,6 +43,7 @@ function UserRow() {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const btn = useRef<HTMLButtonElement>(null)
   const look = useLook(me?.id)
+  const custom = useCustomStatus(me?.id)
   if (!me) return null
 
   const pick = (p: StatusPreference) => {
@@ -66,7 +69,7 @@ function UserRow() {
             <span className={`${s.meStatus} ${s.meStatusWarn}`}>{t.userPanel.reconnecting}</span>
           ) : (
             <span className={s.meStatus}>
-              <ActivityLine userId={me.id} fallback={t.userPanel.status[me.statusPreference]} />
+              <PersonLine userId={me.id} fallback={t.userPanel.status[me.statusPreference]} />
             </span>
           )}
         </span>
@@ -90,6 +93,7 @@ function UserRow() {
 
       <Popover anchor={anchor} onClose={() => setAnchor(null)} side="top" align="start" gap={12} label={t.userPanel.setStatus} width={280}>
         <ProfileCard user={me} look={look} presence={presence}>
+          <StatusBubble userId={me.id} editable />
           <OwnActivity onNavigate={() => setAnchor(null)} />
         </ProfileCard>
         <div className={s.statusMenu} role="radiogroup" aria-label={t.userPanel.setStatus}>
@@ -110,6 +114,19 @@ function UserRow() {
             </button>
           ))}
           <Divider style={{ margin: '6px 0' }} />
+          <button
+            type="button"
+            className={s.statusItem}
+            onClick={() => {
+              setAnchor(null)
+              openStatusEditor()
+            }}
+          >
+            <span className={s.statusDot} style={{ marginTop: 2 }}>
+              <Icon icon={Smile} size={14} />
+            </span>
+            {custom ? 'Editar status personalizado' : 'Definir status personalizado'}
+          </button>
           <button
             type="button"
             className={s.statusItem}

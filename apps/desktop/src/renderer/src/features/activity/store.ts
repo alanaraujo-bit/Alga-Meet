@@ -93,6 +93,30 @@ function subscribeClock(cb: () => void): () => void {
 }
 export const useNow = (): number => useSyncExternalStore(subscribeClock, () => now)
 
+let slow = Date.now()
+const slowTicks = new Set<() => void>()
+let slowClock: ReturnType<typeof setInterval> | undefined
+function subscribeSlow(cb: () => void): () => void {
+  slowTicks.add(cb)
+  slowClock ??= setInterval(() => {
+    slow = Date.now()
+    slowTicks.forEach((t) => t())
+  }, 30_000)
+  return () => {
+    slowTicks.delete(cb)
+    if (!slowTicks.size) slowClock = void clearInterval(slowClock)
+  }
+}
+const noSubscribe = () => () => undefined
+/** A coarse clock (30 s) for expiries; `on` = false subscribes to nothing and returns 0. */
+export const useSlowNow = (on: boolean): number =>
+  useSyncExternalStore(on ? subscribeSlow : noSubscribe, () => {
+    if (!on) return 0
+    // Stable between calls (a snapshot must be), refreshed when it is older than one period.
+    if (Date.now() - slow > 30_000) slow = Date.now()
+    return slow
+  })
+
 // ── The icon's color (decoded once per icon) ──
 const tints = new Map<string, string | null>()
 const waiting = new Map<string, Promise<string | null>>()

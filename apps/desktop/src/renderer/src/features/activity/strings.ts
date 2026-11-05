@@ -3,7 +3,7 @@ export const t = {
   own: {
     pause: 'Pausar 1 h',
     hide: (name: string) => `Ocultar ${name}`,
-    hideShort: 'Ocultar app',
+    hideShort: 'Ocultar',
     settings: 'Privacidade',
     paused: (until: string) => `Atividade pausada até ${until}`,
     resume: 'Retomar',

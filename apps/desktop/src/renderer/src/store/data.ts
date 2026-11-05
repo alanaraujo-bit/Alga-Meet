@@ -1,5 +1,5 @@
 import type {
-  Activity, Channel, Dispatch, Me, Member, Message, PresenceStatus, PublicUser, ReadState, Relationship, Role, Space, VoiceState,
+  Activity, Channel, CustomStatus, Dispatch, Me, Member, Message, PresenceStatus, PublicUser, ReadState, Relationship, Role, Space, VoiceState,
 } from '@alga/shared'
 import { create } from 'zustand'
 
@@ -18,6 +18,8 @@ export interface DataState {
   presences: Record<string, PresenceStatus>
   /** userId -> what they are doing now (rich presence; your own lives in features/activity/store). */
   activities: Record<string, Activity>
+  /** userId -> custom status (yours lives in features/activity/status). */
+  customs: Record<string, CustomStatus>
   spaces: Record<string, Space>
   /** Space rail order. */
   spaceOrder: string[]
@@ -54,6 +56,7 @@ const empty = {
   users: {},
   presences: {},
   activities: {},
+  customs: {},
   spaces: {},
   spaceOrder: [],
   channels: {},
@@ -168,6 +171,7 @@ export const useData = create<DataState>()((set, get) => ({
           users,
           presences: Object.fromEntries(r.presences.map((p) => [p.userId, p.status])),
           activities: Object.fromEntries(r.presences.flatMap((p) => (p.activity ? [[p.userId, p.activity]] : []))),
+          customs: Object.fromEntries(r.presences.flatMap((p) => (p.custom ? [[p.userId, p.custom]] : []))),
           spaces: Object.fromEntries(r.spaces.map(({ channels: _c, roles: _r, members: _m, ...sp }) => [sp.id, sp])),
           spaceOrder: r.spaces.map((sp) => sp.id),
           channels,
@@ -189,6 +193,7 @@ export const useData = create<DataState>()((set, get) => ({
         return set({
           presences: { ...s.presences, [ev.d.userId]: ev.d.status },
           activities: ev.d.activity ? { ...s.activities, [ev.d.userId]: ev.d.activity } : omit(s.activities, ev.d.userId),
+          customs: ev.d.custom ? { ...s.customs, [ev.d.userId]: ev.d.custom } : omit(s.customs, ev.d.userId),
         })
       case 'RELATIONSHIP_UPSERT':
         return set({

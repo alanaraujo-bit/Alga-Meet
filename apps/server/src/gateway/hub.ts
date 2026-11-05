@@ -1,4 +1,4 @@
-import { sameActivity, type Activity, type DispatchOf, type DispatchType, type Presence, type PresenceStatus, type StatusPreference } from '@alga/shared'
+import { liveStatus, sameActivity, type Activity, type CustomStatus, type DispatchOf, type DispatchType, type Presence, type PresenceStatus, type StatusPreference } from '@alga/shared'
 import { eq, inArray } from 'drizzle-orm'
 import { presenceAudience } from '../access.js'
 import type { Db } from '../db/index.js'
@@ -22,6 +22,8 @@ export class Hub {
   private readonly byUser = new Map<string, Set<Conn>>()
   /** Rich presence per user, owned by the socket that set it (last writer wins across devices). Memory only. */
   private readonly activities = new Map<string, { activity: Activity; conn: Conn }>()
+  /** Custom status per user, kept until their last socket closes (the client sends it again on every READY). */
+  private readonly customs = new Map<string, CustomStatus>()
   /** Set during shutdown: sockets are going away because of us, not because users left. */
   closing = false
 
@@ -40,6 +42,7 @@ export class Hub {
     if (!set?.delete(conn)) return false
     if (set.size) return false
     this.byUser.delete(conn.userId)
+    this.customs.delete(conn.userId)
     return true
   }
 
@@ -58,14 +61,24 @@ export class Hub {
     return true
   }
 
+  /** Returns whether it changed. */
+  setCustom(userId: string, status: CustomStatus | null): boolean {
+    const prev = JSON.stringify(this.customs.get(userId) ?? null)
+    if (status) this.customs.set(userId, status)
+    else this.customs.delete(userId)
+    return prev !== JSON.stringify(status)
+  }
+
   activityOf(userId: string): Activity | undefined {
     return this.activities.get(userId)?.activity
   }
 
   /** The Presence others see: the activity rides along only while the user is visible. */
   presence(userId: string, status: PresenceStatus): Presence {
-    const activity = status === 'offline' ? undefined : this.activityOf(userId)
-    return activity ? { userId, status, activity } : { userId, status }
+    if (status === 'offline') return { userId, status }
+    const activity = this.activityOf(userId)
+    const custom = liveStatus(this.customs.get(userId))
+    return { userId, status, ...(activity && { activity }), ...(custom && { custom }) }
   }
 
   isOnline(userId: string): boolean {

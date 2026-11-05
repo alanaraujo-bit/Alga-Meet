@@ -75,3 +75,38 @@ describe('activity (rich presence)', () => {
     gwB.close()
   })
 })
+
+describe('custom status', () => {
+  it('rides presence with its expiry, is hidden while invisible, dropped when expired, and rejects junk', async () => {
+    const a = await register(s.app)
+    const b = await register(s.app)
+    await befriend(s.app, a, b)
+    const gwA = await connect(s.port, a.token)
+    const gwB = await connect(s.port, b.token)
+    const until = Date.now() + 3600_000
+    gwA.send({ op: 'custom_status', status: { text: 'Bora jogar?', emoji: '🎮', expiresAt: until } })
+    expect(await gwB.waitFor('PRESENCE_UPDATE', (p) => p.userId === a.user.id && !!p.custom)).toMatchObject({ custom: { text: 'Bora jogar?', emoji: '🎮', expiresAt: until } })
+    // Skin tones, ZWJ sequences and flags are one emoji.
+    gwA.send({ op: 'custom_status', status: { text: '', emoji: '👩🏽‍💻' } })
+    await gwB.waitFor('PRESENCE_UPDATE', (p) => p.userId === a.user.id && p.custom?.emoji === '👩🏽‍💻')
+    gwA.send({ op: 'custom_status', status: { text: 'Estudando', emoji: '🇧🇷' } })
+    await gwB.waitFor('PRESENCE_UPDATE', (p) => p.userId === a.user.id && p.custom?.emoji === '🇧🇷')
+
+    // An expired one is not served in READY.
+    gwA.send({ op: 'custom_status', status: { text: 'velho', expiresAt: Date.now() + 1200 } })
+    await gwB.waitFor('PRESENCE_UPDATE', (p) => p.userId === a.user.id && p.custom?.text === 'velho')
+    await new Promise((r) => setTimeout(r, 1500))
+    const late = await connect(s.port, b.token)
+    expect((await late.waitFor('READY')).presences.find((p) => p.userId === a.user.id)).not.toHaveProperty('custom')
+
+    gwA.send({ op: 'custom_status', status: { text: 'fica' } })
+    await gwB.waitFor('PRESENCE_UPDATE', (p) => p.userId === a.user.id && p.custom?.text === 'fica')
+    await api(s.app, 'PATCH', '/users/@me', { token: a.token, body: { statusPreference: 'invisible' } })
+    expect(await gwB.waitFor('PRESENCE_UPDATE', (p) => p.userId === a.user.id && p.status === 'offline')).not.toHaveProperty('custom')
+    await api(s.app, 'PATCH', '/users/@me', { token: a.token, body: { statusPreference: 'online' } })
+
+    gwA.send({ op: 'custom_status', status: { text: 'two emoji', emoji: '🎮x' } })
+    expect((await gwA.closed).code).toBe(GatewayClose.INVALID_PAYLOAD)
+    for (const g of [gwB, late]) g.close()
+  })
+})

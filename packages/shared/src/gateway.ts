@@ -2,7 +2,7 @@ import type {
   Channel, Invite, Me, Member, Message, Presence, PublicUser, ReadState, Relationship,
   Role, Space, SpaceSnapshot, StatusPreference, VoiceDisconnectReason, VoiceState,
 } from './models.js'
-import type { Activity } from './activity.js'
+import type { Activity, CustomStatus } from './activity.js'
 import type { Entitlements, Gift, SpaceUpgradeState } from './billing.js'
 import type { E2eeClientFrame, E2eeCommit, E2eeEpoch, E2eeProposals, E2eeResyncRequired, E2eeWelcome } from './e2ee.js'
 import type { RsvpStatus, SpaceEvent } from './events.js'
@@ -45,6 +45,8 @@ export type ClientFrame =
    * that set it closes. Send it again after every READY.
    */
   | { op: 'activity'; activity: Activity | null }
+  /** Own custom status (activity.ts), or null to clear. Same rules as `activity`, but kept until the last socket closes. */
+  | { op: 'custom_status'; status: CustomStatus | null }
   /** Self voice flags while connected to a voice channel. Ignored if not in voice. */
   | { op: 'voice_state'; selfMute: boolean; selfDeaf: boolean; streaming: boolean; video: boolean }
   /**

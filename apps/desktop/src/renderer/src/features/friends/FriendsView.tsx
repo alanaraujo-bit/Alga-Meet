@@ -16,7 +16,7 @@ import sh from '../shell/shell.module.css'
 import { t } from './strings'
 import { toastError } from '../auth/VerifyEmail'
 import s from './friends.module.css'
-import { ActivityLine } from '../activity/Activity'
+import { PersonLine } from '../activity/Status'
 import { ActiveNow } from '../activity/ActiveNow'
 
 export function FriendsView() {
@@ -187,7 +187,7 @@ function FriendRow({ rel }: { rel: Relationship }) {
           {u.displayName}
           <span className={s.username}>@{u.username}</span>
         </span>
-        <span className={`${s.sub} ${rel.type === 'incoming' ? s.subAccent : ''}`}>{rel.type === 'friend' ? <ActivityLine userId={u.id} fallback={sub} /> : sub}</span>
+        <span className={`${s.sub} ${rel.type === 'incoming' ? s.subAccent : ''}`}>{rel.type === 'friend' ? <PersonLine userId={u.id} fallback={sub} /> : sub}</span>
       </div>
       {/* Actions show on hover/focus; a request waiting on you keeps them visible. Accept ≠ decline in weight. */}
       <div className={`${s.actions} ${rel.type === 'incoming' ? s.actionsPinned : ''}`}>

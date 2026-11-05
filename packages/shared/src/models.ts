@@ -1,7 +1,7 @@
 /** Wire models shared by server and desktop. Timestamps are ISO-8601 strings. */
 import type { EquippedCosmetics, PlanSummary, PlusBadge, SpaceUpgradeState, TryOn } from './billing.js'
 import type { AgeBracket, StaffRole } from './trust-safety.js'
-import type { Activity } from './activity.js'
+import type { Activity, CustomStatus } from './activity.js'
 
 
 export type PresenceStatus = 'online' | 'idle' | 'dnd' | 'offline'
@@ -60,6 +60,8 @@ export interface Presence {
   status: PresenceStatus
   /** What they are doing right now (activity.ts). Omitted when nothing, and always while offline/invisible. */
   activity?: Activity
+  /** Their custom status (activity.ts), while visible and not expired. */
+  custom?: CustomStatus
 }
 
 export type RelationshipType = 'friend' | 'incoming' | 'outgoing' | 'blocked'

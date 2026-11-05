@@ -126,6 +126,7 @@ const sockets = friends.map((f, i) => {
     if (j.op === 'dispatch') events.push(j)
     if (j.t === 'READY') {
       ws.send(JSON.stringify({ op: 'activity', activity: cast[i] }))
+      if (i === 2) ws.send(JSON.stringify({ op: 'custom_status', status: { text: 'Virando a noite no código', emoji: '☕' } }))
       setInterval(() => ws.readyState === 1 && ws.send(JSON.stringify({ op: 'heartbeat' })), j.d.heartbeatIntervalMs * 0.8).unref()
     }
   }
@@ -144,7 +145,7 @@ const app = await electron.launch({
 const page = await app.firstWindow()
 await page.waitForLoadState('domcontentloaded')
 await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 900))
-await page.evaluate((t) => window.alga.auth.setToken(t), alan.token)
+await page.evaluate((t) => (localStorage.clear(), window.alga.auth.setToken(t)), alan.token)
 await page.reload()
 await page.waitForSelector('[aria-label="Membros"], nav, main', { timeout: 20_000 })
 await sleep(2500)
@@ -169,7 +170,7 @@ await shot('friends')
 await page.getByRole('button', { name: /Resenha/ }).first().click().catch(() => undefined)
 await sleep(1500)
 const members = page.getByRole('complementary', { name: 'Membros' })
-check(await members.getByText('Visual Studio Code').isVisible().catch(() => false), 'member list line shows the activity')
+check(await members.getByText('Counter-Strike 2').isVisible().catch(() => false), 'member list line shows the activity')
 await shot('members')
 await members.getByRole('button', { name: /Duda Reis/ }).click()
 await sleep(1400)
@@ -216,6 +217,29 @@ await sleep(1400)
 check(await page.getByRole('button', { name: 'Pausar 1 h' }).isVisible().catch(() => false), 'own popover offers pause / hide')
 check(await page.locator('[class*="userRow"]').getByText(/^Usando|^Jogando|^Programando|^Criando/).isVisible().catch(() => false), 'user panel line shows own activity')
 await shot('own')
+
+// 5. Custom status: the empty bubble invites, a preset fills it, a friend receives it, it shows everywhere.
+await page.getByRole('button', { name: 'Definir status' }).first().click()
+await sleep(700)
+await page.getByRole('button', { name: /Bora jogar\?/ }).click()
+await sleep(300)
+await shot('status-editor')
+await page.getByRole('button', { name: 'Salvar' }).click()
+let custom = null
+for (let i = 0; i < 20 && !custom; i++) {
+  await sleep(250)
+  custom = sockets[0].events.find((e) => e.t === 'PRESENCE_UPDATE' && e.d.userId === alan.id && e.d.custom?.text === 'Bora jogar?')
+}
+check(custom?.d.custom?.expiresAt > Date.now(), 'friend received own custom status with its expiry')
+check(await page.locator('[class*="userRow"]').getByText('Bora jogar?').isVisible().catch(() => false), 'user panel line shows the custom status')
+await page.locator('[class*="userRow"] button[aria-haspopup="dialog"]').first().click()
+await sleep(1200)
+await shot('own-status')
+await closePopups()
+await members.getByRole('button', { name: /Duda Reis/ }).click()
+await sleep(1400)
+check(await page.locator('[class*="bubble"]').getByText('Virando a noite no código').isVisible().catch(() => false), "a friend's bubble shows in their profile")
+await shot('profile-status')
 await closePopups()
 // Only the Calculator this run opened.
 spawnSync('powershell', ['-NoProfile', '-Command', `Get-Process CalculatorApp -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -gt [datetime]'${t0}' } | Stop-Process`], { windowsHide: true })

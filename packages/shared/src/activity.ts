@@ -40,3 +40,27 @@ export function sameActivity(a: Activity | null | undefined, b: Activity | null 
   if (!a || !b) return !a && !b
   return a.kind === b.kind && a.name === b.name && a.startedAt === b.startedAt && a.icon === b.icon && a.steamAppId === b.steamAppId
 }
+
+/**
+ * Custom status ("Status personalizado"): a line and/or an emoji the person chose, optionally until expiresAt. Like
+ * Discord, it lives in the presence (op `custom_status`): the client keeps it and sends it again after every READY,
+ * the server holds it in memory while they are online, and nobody sees it while they are offline or invisible.
+ */
+export const CUSTOM_STATUS_MAX = 80
+// One emoji (with skin tone / ZWJ / keycap / flag sequences), nothing else.
+const EMOJI_RE = /^(?:\p{Extended_Pictographic}|\p{Regional_Indicator}|[#*0-9]\uFE0F?\u20E3)(?:[\uFE0F\u200D\u20E3\u{1F3FB}-\u{1F3FF}]|\p{Extended_Pictographic}|\p{Regional_Indicator})*$/u
+// Text: no control characters and no bidi overrides (they could spoof the surrounding UI).
+const STATUS_TEXT_RE = /^[^\p{Cc}\u202A-\u202E\u2066-\u2069]*$/u
+
+export const CustomStatusSchema = z
+  .object({
+    text: z.string().trim().max(CUSTOM_STATUS_MAX).regex(STATUS_TEXT_RE),
+    emoji: z.string().max(32).regex(EMOJI_RE).optional(),
+    /** Epoch ms; omitted = until they clear it. */
+    expiresAt: z.number().int().positive().optional(),
+  })
+  .refine((s) => s.text.length > 0 || !!s.emoji, 'text or emoji')
+export type CustomStatus = z.infer<typeof CustomStatusSchema>
+
+export const liveStatus = (s: CustomStatus | null | undefined, now = Date.now()): CustomStatus | undefined =>
+  s && (!s.expiresAt || s.expiresAt > now) ? s : undefined
