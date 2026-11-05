@@ -163,6 +163,11 @@ export class Swarm {
     return this.get(track, 0)
   }
 
+  /** The track's index: position = n, generation order (look pieces up by startS for time order, R4). */
+  pieces(track: CinemaTrackId): readonly CinemaPieceMeta[] {
+    return this.index.get(track) ?? []
+  }
+
   /** Seconds held contiguously from the playhead on (pieces ordered by startS, R4). */
   aheadS(track: CinemaTrackId): number {
     const mine = this.mine.get(track)
