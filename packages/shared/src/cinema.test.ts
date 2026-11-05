@@ -68,8 +68,8 @@ describe('CinemaClientFrameSchema', () => {
     expect(parse(bad(ok.cinema_pieces, { from: -1 }))).toBe(false)
   })
   it('fits a worst-case piece batch in the frame cap', () => {
-    const items = Array(CINEMA_ITEMS_PER_FRAME).fill([7199.999, 4.004, 67108864, 'a'.repeat(64)])
-    const frame = { op: 'cinema_pieces', sessionId: id, track: 'a31', from: 0, items }
+    const items = Array(CINEMA_ITEMS_PER_FRAME).fill([1.2345678901234567e-308, 1.2345678901234567e-308, 67108864, 'a'.repeat(64)])
+    const frame = { op: 'cinema_pieces', sessionId: id, track: 'poster', from: 0, items }
     expect(parse(frame)).toBe(true)
     expect(JSON.stringify(frame).length).toBeLessThan(CINEMA_MAX_FRAME_BYTES)
   })
