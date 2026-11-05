@@ -86,6 +86,7 @@ function FriendList({ tab, q }: { tab: Exclude<FriendsTab, 'add'>; q: string }) 
     return (
       <EmptyState
         icon={tab === 'blocked' ? Ban : Users}
+        eco={tab === 'online' ? 'sleeping' : tab === 'blocked' ? 'muted' : 'idle'}
         title={e.title}
         actions={
           tab !== 'blocked' && (

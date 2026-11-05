@@ -174,7 +174,16 @@ await shot(page, 'lobby')
 await room.click()
 for (let i = 0; i < 20 && joins.length === 0; i++) await sleep(150)
 check(joins.length === 1, 'second click on the same room enters it (POST /voice/join)')
+await sleep(3500)
+// No SFU on the QA stack: the join fails and the call says so, with Eco's x-eyes.
+await shot(page, 'eco-voice-error')
+await page.getByRole('button', { name: 'Desconectar' }).first().click().catch(() => undefined)
+for (const f of [bia, caio]) {
+  await lkWebhook({ event: 'participant_left', id: `FUND_${run}_${++seq}`, createdAt: String(Math.floor(Date.now() / 1000)), room: { name: `ch_${voice.id}` }, participant: { identity: f.id } })
+}
 await sleep(1500)
+check(await page.getByText('Ninguém aqui ainda').isVisible().catch(() => false), 'an empty room shows Eco asleep ("Ninguém aqui ainda")')
+await shot(page, 'eco-empty-room')
 await page.keyboard.press('Escape')
 
 // 2. Calm notifications (BL-07): levels in the space menu, silence, channel mute.
@@ -285,6 +294,11 @@ await ecoGroup.getByRole('radio', { name: 'Trança' }).click()
 await pb.getByRole('radiogroup', { name: 'Acessório' }).getByRole('radio', { name: 'Choker' }).click()
 await sleep(400)
 await shot(pb, 'eco-editor')
+// Try-on: hovering an option dresses the big Eco before picking.
+await pb.getByRole('radiogroup', { name: 'Acessório' }).getByRole('radio', { name: 'Coroa' }).hover()
+await sleep(450)
+await shot(pb, 'eco-try-on')
+await pb.mouse.move(5, 5)
 await pb.getByRole('button', { name: 'Salvar meu Eco' }).click()
 await sleep(1200)
 const nina = await pb.evaluate(() => window.alga.auth.getToken?.())
@@ -292,12 +306,24 @@ const meNow = nina ? await call('GET', '/users/@me', undefined, nina) : null
 check(!meNow || (meNow.eco?.hair === 'braid' && meNow.eco?.accent === '#f07a9a'), 'her pick is saved on the account (rose, braid)')
 await pb.keyboard.press('Escape')
 await sleep(600)
+// Her Friends tab is empty (nobody online yet): Eco keeps it company.
+await pb.getByRole('button', { name: /^Conversas/ }).first().click().catch(() => undefined)
+await sleep(800)
+await pb.getByRole('button', { name: /amigos/i }).first().click().catch(() => undefined)
+await sleep(1000)
+await shot(pb, 'eco-friends-empty')
 // Alan's app got USER_UPDATE: open the members of the space and look at her row.
 await page.bringToFront()
 await spaceBtn.click()
 await sleep(1500)
 await shot(page, 'eco-friends-see')
 
+// The app opening while the server is unreachable: Eco on the splash, x-eyes.
+Q.stopApi()
+await sleep(1500)
+await pb.reload().catch(() => undefined)
+await sleep(4000)
+await shot(pb, 'eco-splash-offline')
 for (const ws of sockets) ws.close()
 await appB.close()
 await appA.close()

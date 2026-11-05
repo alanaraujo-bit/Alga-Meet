@@ -14,6 +14,7 @@ import { useEncodingGate, useTileCount } from '../billing/engine'
 import { useLook } from '../billing/store'
 import { personEntries } from '../shell/people'
 import { ActivityLine } from '../activity/Activity'
+import { Eco } from '@/ui/eco/Eco'
 import { ControlsDock, LobbyDock } from './ControlsDock'
 import { E2eeChip, MismatchBanner } from './E2ee'
 import { cardWidth, featuredWidth, seatWidth, stripTile, voiceLayout, type SeatSize } from './layout'
@@ -108,7 +109,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
         )}
         {here && conn.state === 'reconnecting' && (
           <div className={s.reconnect} role="status" aria-live="polite">
-            <Spinner size={12} />
+            <Eco state="connecting" framing="avatar" size={20} />
             <strong>{t.state.reconnecting}</strong>
             <span>{t.reconnectingShort}</span>
           </div>
@@ -210,6 +211,7 @@ function Notice({ title, children, action, dismiss }: { title: string; children:
   return (
     <div className={s.notice} role="status" aria-live="polite">
       <div className={s.noticeCard}>
+        <Eco state="error" size={72} />
         <span className={s.noticeTitle}>{title}</span>
         <p className={s.noticeBody}>{children}</p>
         {(action || dismiss) && (
@@ -238,7 +240,10 @@ function PreJoin({ channel, people, streaming, variant }: { channel: Channel; pe
   if (people.length === 0)
     return (
       <div className={s.empty}>
-        <span className={s.emptySeat} aria-hidden />
+        {/* An empty room: Eco asleep in it, waiting for the first voice. */}
+        <span className={`${s.emptyEco} eco-alive`} aria-hidden>
+          <Eco state="sleeping" size={112} />
+        </span>
         <h2 className={s.emptyTitle}>{t.stage.emptyTitle}</h2>
         <p className={s.emptyBody}>{t.stage.emptyBody}</p>
         {hint}

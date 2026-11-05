@@ -693,6 +693,14 @@
   padding: var(--s-8) var(--s-6);
   text-align: center;
 }
+/* Eco asleep in an empty room, on a faint floor light. */
+.emptyEco {
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--s-2);
+  padding-bottom: 6px;
+  background: radial-gradient(44% 12% at 50% 96%, rgba(139, 142, 247, 0.16), transparent 70%);
+}
 /* An empty seat: the shape of a face that is not there yet. */
 .emptySeat {
   width: 88px;

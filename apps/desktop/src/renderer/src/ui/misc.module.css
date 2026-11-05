@@ -285,3 +285,24 @@
     background: Highlight;
   }
 }
+
+/* Empty screens: Eco keeps them company, standing on a faint floor light; it arrives with a small rise. */
+.emptyEco {
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--s-2);
+  padding-bottom: 6px;
+  background: radial-gradient(42% 12% at 50% 96%, rgba(139, 142, 247, 0.16), transparent 70%);
+  animation: ecoIn 420ms var(--ease-out-quart) both;
+}
+@keyframes ecoIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .emptyEco {
+    animation: none;
+  }
+}

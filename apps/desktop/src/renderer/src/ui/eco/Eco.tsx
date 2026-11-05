@@ -326,7 +326,7 @@ export const Eco = memo(function Eco({
       aria-hidden
       focusable="false"
     >
-      <g transform={lift ? `translate(0 ${lift})` : undefined}>
+      <g className={s.lift} style={{ transform: `translateY(${lift}px)` }}>
         <HairBack hair={hair} a={a} dark={dark} />
         <path d={BODY} fill={GRAPHITE} stroke={a} strokeWidth="3.5" strokeLinejoin="round" />
         <path d={HOOD} fill={HOOD_FILL} />
@@ -336,8 +336,8 @@ export const Eco = memo(function Eco({
         <HairFrame hair={hair} a={a} dark={dark} />
         <rect x="28" y="55" width="44" height="22" rx="11" fill={VISOR} />
         {BEHIND.has(accessory) && <Accessory kind={accessory} a={a} />}
-        <path d={ANT_L} fill={a} transform={turnL ? `rotate(${turnL} 46 41)` : undefined} />
-        <path d={ANT_R} fill={a} transform={turnR ? `rotate(${turnR} 54 41)` : undefined} />
+        <path d={ANT_L} fill={a} className={s.ant} style={{ transform: `rotate(${turnL}deg)`, transformOrigin: '46px 41px' }} />
+        <path d={ANT_R} fill={a} className={s.ant} style={{ transform: `rotate(${turnR}deg)`, transformOrigin: '54px 41px' }} />
         <HairFront hair={hair} a={a} dark={dark} />
         {!BEHIND.has(accessory) && accessory !== 'mask' && accessory !== 'shades' && <Accessory kind={accessory} a={a} />}
         {accessory === 'shades' ? (

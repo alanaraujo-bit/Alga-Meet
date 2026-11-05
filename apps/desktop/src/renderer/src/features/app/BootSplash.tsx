@@ -2,11 +2,11 @@ import { motion } from 'motion/react'
 import { Button } from '@/ui'
 import { useSession } from '@/store/session'
 import { useRetryCountdown } from './ConnectionBanner'
-import { LogoMark } from './Logo'
+import { Eco } from '@/ui/eco/Eco'
 import { t } from './strings'
 import s from './app.module.css'
 
-/** Until the first READY: the mark, still, and the status line; failures are explained in place. */
+/** Until the first READY: Eco tuning in, and the status line; failures are explained in place. */
 export function BootSplash() {
   const phase = useSession((st) => st.phase)
   const gateway = useSession((st) => st.gateway)
@@ -14,8 +14,9 @@ export function BootSplash() {
   const failing = gateway === 'reconnecting'
   return (
     <motion.main className={s.splash} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.3, delay: 0.15 } }} aria-busy="true">
-      <span className={s.splashMark}>
-        <LogoMark size={44} />
+      {/* Eco tunes in while the app connects (its antennae are the logo); x-eyes while the server is unreachable. */}
+      <span className={`${s.splashMark} eco-alive`}>
+        <Eco state={failing ? 'error' : 'connecting'} size={104} />
       </span>
       <p className={`${s.splashText} tnum`} role="status" aria-live="polite">
         {failing ? t.splash.retrying(secs ?? 0) : phase === 'booting' ? t.splash.connecting : t.splash.loading}

@@ -1,12 +1,12 @@
 import { ECO_ACCENTS, ECO_ACCESSORIES, ECO_EYES, ECO_HAIR, type EcoSpec } from '@alga/shared'
 import { Shuffle } from '@/ui/icons'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { errorText } from '@/lib/errors'
 import { patchMe } from '@/store/actions'
 import { useData } from '@/store/data'
 import { Button, toast } from '@/ui'
 import { Eco } from '@/ui/eco/Eco'
-import { ecoBackdrop, ecoFor } from '@/ui/eco/ecoRules'
+import { ecoBackdrop, ecoFor, type EcoState } from '@/ui/eco/ecoRules'
 import { Group } from './Frame'
 import { t } from './strings'
 import s from './ecoEditor.module.css'
@@ -22,17 +22,34 @@ export function EcoEditor() {
   const me = useData((st) => st.me)
   const [draft, setDraft] = useState<EcoSpec | null>(null)
   const [busy, setBusy] = useState(false)
+  // Try before you pick: hovering or focusing an option dresses the big Eco; it "listens" while you browse and
+  // celebrates when you pick or save.
+  const [trying, setTrying] = useState<EcoSpec | null>(null)
+  const [mood, setMood] = useState<EcoState>('idle')
+  const moodTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(moodTimer.current), [])
+  const react = (m: EcoState, ms: number) => {
+    clearTimeout(moodTimer.current)
+    setMood(m)
+    moodTimer.current = setTimeout(() => setMood('idle'), ms)
+  }
   if (!me) return null
   const saved = me.eco ?? null
   const current: EcoSpec = draft ?? saved ?? ecoFor(me.id)
   const dirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(saved)
-  const set = (p: Partial<EcoSpec>) => setDraft({ ...current, ...p })
+  const set = (p: Partial<EcoSpec>) => {
+    setDraft({ ...current, ...p })
+    setTrying(null)
+    react('success', 700)
+  }
+  const shown = trying ?? current
 
   const save = async (eco: EcoSpec | null) => {
     setBusy(true)
     try {
       await patchMe({ eco })
       setDraft(null)
+      react('success', 1400)
       toast.success(eco ? t.eco.saved : t.eco.resetDone)
     } catch (e) {
       toast.error(errorText(e, t.eco.saveError))
@@ -42,7 +59,20 @@ export function EcoEditor() {
   }
 
   const option = (key: string, label: string, spec: EcoSpec, selected: boolean, onPick: () => void) => (
-    <button key={key} type="button" role="radio" aria-checked={selected} aria-label={label} title={label} className={s.option} onClick={onPick}>
+    <button
+      key={key}
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      aria-label={label}
+      title={label}
+      className={s.option}
+      onClick={onPick}
+      onPointerEnter={() => (setTrying(spec), setMood('listening'))}
+      onPointerLeave={() => (setTrying(null), setMood('idle'))}
+      onFocus={() => (setTrying(spec), setMood('listening'))}
+      onBlur={() => (setTrying(null), setMood('idle'))}
+    >
       <span className={s.optionFace} style={{ background: ecoBackdrop(spec.accent) }}>
         <Eco spec={spec} framing="avatar" size={44} />
       </span>
@@ -53,13 +83,13 @@ export function EcoEditor() {
     <Group title={t.eco.title} description={me.avatarUrl ? t.eco.withPhoto : t.eco.description}>
       <div className={s.editor}>
         <div className={s.stage}>
-          <div className={`${s.hero} eco-alive`} style={{ ['--accent' as string]: current.accent }}>
-            <Eco spec={current} framing="full" size={176} />
+          <div className={`${s.hero} eco-alive`} style={{ ['--accent' as string]: shown.accent }}>
+            <Eco spec={shown} state={mood} framing="full" size={176} />
           </div>
           <div className={s.sizes} aria-hidden>
             {[56, 32, 20].map((n) => (
-              <span key={n} className={s.mini} style={{ width: n, height: n, background: ecoBackdrop(current.accent) }}>
-                <Eco spec={current} framing="avatar" size={n} />
+              <span key={n} className={s.mini} style={{ width: n, height: n, background: ecoBackdrop(shown.accent) }}>
+                <Eco spec={shown} framing="avatar" size={n} />
               </span>
             ))}
           </div>
@@ -77,6 +107,10 @@ export function EcoEditor() {
                 className={s.swatch}
                 style={{ background: c }}
                 onClick={() => set({ accent: c })}
+                onPointerEnter={() => (setTrying({ ...current, accent: c }), setMood('listening'))}
+                onPointerLeave={() => (setTrying(null), setMood('idle'))}
+                onFocus={() => (setTrying({ ...current, accent: c }), setMood('listening'))}
+                onBlur={() => (setTrying(null), setMood('idle'))}
               />
             ))}
           </Picker>
@@ -88,7 +122,7 @@ export function EcoEditor() {
         </div>
       </div>
       <div className={s.actions}>
-        <Button variant="ghost" icon={Shuffle} onClick={() => setDraft({ accent: pick(ECO_ACCENTS), eyes: pick(ECO_EYES), hair: pick(ECO_HAIR), accessory: pick(ECO_ACCESSORIES) })}>
+        <Button variant="ghost" icon={Shuffle} onClick={() => set({ accent: pick(ECO_ACCENTS), eyes: pick(ECO_EYES), hair: pick(ECO_HAIR), accessory: pick(ECO_ACCESSORIES) })}>
           {t.eco.shuffle}
         </Button>
         {saved && (

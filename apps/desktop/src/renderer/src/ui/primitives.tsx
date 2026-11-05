@@ -1,6 +1,8 @@
 import type { Glyph } from './icons'
 import type { CSSProperties, ReactNode } from 'react'
 import { Icon } from './Icon'
+import { Eco } from './eco/Eco'
+import type { EcoState } from './eco/ecoRules'
 import s from './misc.module.css'
 
 export function Skeleton({ width, height = 12, radius, style }: { width?: number | string; height?: number; radius?: number; style?: CSSProperties }) {
@@ -19,21 +21,30 @@ export function Divider({ vertical, label, style }: { vertical?: boolean; label?
 
 export function EmptyState({
   icon,
+  eco = 'idle',
   title,
   children,
   actions,
 }: {
   icon?: Glyph
+  /** The mascot keeps an empty screen company (blinking); `false` falls back to the icon. */
+  eco?: EcoState | false
   title: string
   children?: ReactNode
   actions?: ReactNode
 }) {
   return (
     <div className={s.empty}>
-      {icon && (
-        <div className={s.emptyIcon}>
-          <Icon icon={icon} size={24} duotone />
+      {eco ? (
+        <div className={`${s.emptyEco} eco-alive`}>
+          <Eco state={eco} size={92} />
         </div>
+      ) : (
+        icon && (
+          <div className={s.emptyIcon}>
+            <Icon icon={icon} size={24} duotone />
+          </div>
+        )
       )}
       <h2 className={s.emptyTitle}>{title}</h2>
       {children && <p className={s.emptyBody}>{children}</p>}

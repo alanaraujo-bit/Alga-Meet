@@ -365,7 +365,7 @@ function QueueEmpty({ tab, open }: { tab: Tab; open: boolean }) {
     tab === 'reports' ? (open ? t.empty.reports : t.empty.done) : tab === 'appeals' ? (open ? t.empty.appeals : t.empty.done) : t.empty.quarantine
   return (
     <div className={s.empty}>
-      <EmptyState icon={tab === 'quarantine' ? FileLock2 : CheckCircle2} title={title}>
+      <EmptyState icon={tab === 'quarantine' ? FileLock2 : CheckCircle2} eco="success" title={title}>
         {body}
       </EmptyState>
     </div>
