@@ -30,10 +30,28 @@ export interface CinemaTimings {
 /** Bounds on what a host can make the server keep in memory. */
 const MAX_TRACKS = 128
 const MAX_PIECES_PER_TRACK = 20_000
+/** Stored piece items per session across tracks (a 2 h film at 4 s is about 1,800 pieces per track). */
+const MAX_PIECES_PER_SESSION = 50_000
 const MAX_SUBTITLES = 64
 /** Reactions are bucketed by media position into windows of this many seconds for the summary's peak. */
 const PEAK_BUCKET_S = 10
 const CONTROL_CHARS = /[\p{Cc}\u2028\u2029]/gu
+
+/** Untrusted text kept and re-broadcast by the server: no control characters, trimmed (HTML stays plain text for clients). */
+const cleanText = (v: string): string => v.replace(CONTROL_CHARS, '').trim()
+const cleanNullable = (v: string | null): string | null => (v === null ? null : cleanText(v) || null)
+
+/** The film with every free-text field cleaned; null when the title is empty after cleaning. */
+function cleanFilm(f: CinemaFilm): CinemaFilm | null {
+  const title = cleanText(f.title)
+  if (!title) return null
+  return {
+    ...f, title,
+    audio: f.audio.map((a) => ({ ...a, lang: cleanNullable(a.lang), title: cleanNullable(a.title) })),
+    subtitles: f.subtitles.map((x) => ({ ...x, lang: cleanNullable(x.lang), title: cleanNullable(x.title) })),
+    chapters: f.chapters.map((c) => ({ ...c, title: cleanText(c.title) })),
+  }
+}
 interface Seat {
   userId: string
   status: CinemaSeat['status']
@@ -191,9 +209,11 @@ export class Cinema {
     // The awaits above may have let another open or a leave through: check again.
     if (this.sessions.has(f.channelId)) return fail('exists')
     if (this.voice.stateOf(conn.userId)?.channelId !== f.channelId) return fail('not_in_call')
+    const film = cleanFilm(f.film)
+    if (!film) return fail('invalid')
     const now = Date.now()
     const s: Session = {
-      id: uuidv7(), channelId: f.channelId, hostId: conn.userId, film: f.film,
+      id: uuidv7(), channelId: f.channelId, hostId: conn.userId, film,
       playback: { playing: false, position: Math.min(f.startS, f.film.durationS), at: now, seq: 0, by: null, reason: 'foyer', waitingFor: [], countdown: false },
       options: { controlLock: false, waitForStalled: true },
       seats: new Map(), createdAt: now, everSeated: new Set(), pausedAt: now, noWait: new Set(), hostAway: false, awayFromFoyer: false,
@@ -314,6 +334,8 @@ export class Cinema {
     if (f.from > list.length || f.from + f.items.length > MAX_PIECES_PER_TRACK || (!s.pieces.has(f.track) && s.pieces.size >= MAX_TRACKS)) {
       return this.error(conn, f.op, 'invalid', s.id)
     }
+    const total = [...s.pieces.values()].reduce((n, l) => n + l.length, 0) + Math.max(0, f.from + f.items.length - list.length)
+    if (total > MAX_PIECES_PER_SESSION) return this.error(conn, f.op, 'invalid', s.id)
     list.splice(f.from, f.items.length, ...f.items)
     s.pieces.set(f.track, list)
     if (!f.items.length) return
@@ -330,14 +352,14 @@ export class Cinema {
     let film = s.film
     if (f.title !== undefined) {
       // The title is plain text for the clients to render; HTML in it stays text.
-      const title = f.title.replace(CONTROL_CHARS, '').trim()
-      if (!title || title.length > 120) return this.error(conn, f.op, 'invalid', s.id)
+      const title = cleanText(f.title)
+      if (!title) return this.error(conn, f.op, 'invalid', s.id)
       film = { ...film, title }
     }
     const sub = f.addSubtitle
     if (sub) {
       if (film.subtitles.length >= MAX_SUBTITLES || film.subtitles.some((x) => x.id === sub.id)) return this.error(conn, f.op, 'invalid', s.id)
-      film = { ...film, subtitles: [...film.subtitles, { ...sub, external: true }] }
+      film = { ...film, subtitles: [...film.subtitles, { ...sub, lang: cleanNullable(sub.lang), title: cleanNullable(sub.title), external: true }] }
     }
     s.film = film
     this.broadcast(s)

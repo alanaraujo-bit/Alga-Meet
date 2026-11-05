@@ -583,7 +583,72 @@ describe('cinema', () => {
     const st2 = await open(y)
     y.ga.send({ op: 'cinema_end', sessionId: st2.sessionId })
     expect(await y.gb.waitFor('CINEMA_STATE', (d) => 'ended' in d)).toMatchObject({ reason: 'host_ended' })
-    expect(Permission.MUTE_MEMBERS).toBeGreaterThan(0)
+  })
+
+  it('open cleans every free-text field of the film; a title empty after cleaning is invalid and opens nothing', async () => {
+    const x = await setup()
+    const dirty: CinemaFilm = {
+      ...film, title: '  Duna\u0007  ',
+      audio: [{ id: 1, lang: ' pt\u0007 ', title: '\u0007 ', sourceCodec: 'aac', channels: 2, out: 'copy', mime: 'audio/mp4', default: true }],
+      subtitles: [{ id: 2, lang: null, title: ' \u0008Legenda ', format: 'vtt', external: false }],
+      chapters: [{ startS: 0, title: '\u0007' }, { startS: 5, title: ' Fim\u0007 ' }],
+    }
+    x.ga.send({ op: 'cinema_open', channelId: x.voice.id, film: dirty, startS: 0 })
+    const st = await wait(x.ga, () => true)
+    expect(st.film.title).toBe('Duna')
+    expect(st.film.audio[0]).toMatchObject({ lang: 'pt', title: null })
+    expect(st.film.subtitles[0]).toMatchObject({ lang: null, title: 'Legenda' })
+    expect(st.film.chapters.map((c) => c.title)).toEqual(['', 'Fim'])
+
+    const y = await setup()
+    y.ga.send({ op: 'cinema_open', channelId: y.voice.id, film: { ...film, title: '\u0007\u0008' }, startS: 0 })
+    expect(await y.ga.waitFor('CINEMA_ERROR')).toMatchObject({ op: 'cinema_open', reason: 'invalid' })
+    await sleep(150)
+    expect(y.ga.events.some((e) => e.t === 'CINEMA_STATE')).toBe(false)
+    expect(s.app.ctx.cinema.sessionOf(y.voice.id)).toBeUndefined()
+  })
+
+  it('film addSubtitle cleans title and lang', async () => {
+    const x = await setup()
+    const st = await open(x)
+    x.ga.send({ op: 'cinema_film', sessionId: st.sessionId, addSubtitle: { id: 3, lang: '\u0007', title: ' Ext\u0008 ', format: 'ass', external: true } })
+    const g = await wait(x.ga, (d) => d.film.subtitles.length === 1)
+    expect(g.film.subtitles[0]).toMatchObject({ id: 3, lang: null, title: 'Ext' })
+  })
+
+  it('stored piece items are capped per session across tracks', async () => {
+    const x = await setup()
+    const st = await open(x)
+    await seat(x.gb, st.sessionId, x.b.user.id)
+    // Frames are limited per socket (and 20,000 items per track): three sockets for the host, one track each.
+    const socks = [x.ga, (await connect(s.port, x.a.token))!, (await connect(s.port, x.a.token))!]
+    const tracks = ['v', 'a1', 'a2'] as const
+    const N = CINEMA_ITEMS_PER_FRAME
+    const frames = 138 // 3 tracks x 138 x 120 = 49,680 items
+    for (let i = 0; i < frames; i++) {
+      socks.forEach((g, k) => g.send({ op: 'cinema_pieces', sessionId: st.sessionId, track: tracks[k], from: i * N, items: run(i * N, N) }))
+      if (i % 10 === 9) await sleep(15) // the gateway drops a socket whose write buffer passes 1 MiB: let the reader drain
+    }
+    for (const tr of tracks) await x.gb.waitFor('CINEMA_PIECES', (d) => d.track === tr && d.from === (frames - 1) * N, 10_000)
+    // 49,680 stored; two more full frames reach 49,920, the next would pass 50,000.
+    for (const k of [0, 1]) x.ga.send({ op: 'cinema_pieces', sessionId: st.sessionId, track: 'v', from: (frames + k) * N, items: run((frames + k) * N, N) })
+    await x.gb.waitFor('CINEMA_PIECES', (d) => d.track === 'v' && d.from === (frames + 1) * N)
+    x.ga.send({ op: 'cinema_pieces', sessionId: st.sessionId, track: 'v', from: (frames + 2) * N, items: run((frames + 2) * N, N) })
+    expect(await x.ga.waitFor('CINEMA_ERROR')).toMatchObject({ op: 'cinema_pieces', reason: 'invalid' })
+    // Nothing was stored by the refused frame: exactly 80 more still fit.
+    x.ga.send({ op: 'cinema_pieces', sessionId: st.sessionId, track: 'v', from: (frames + 2) * N, items: run((frames + 2) * N, 80) })
+    await x.gb.waitFor('CINEMA_PIECES', (d) => d.track === 'v' && d.items.length === 80)
+    await sleep(100)
+    expect(x.ga.events.filter((e) => e.t === 'CINEMA_ERROR')).toHaveLength(1)
+  })
+
+  it('a member holding only MOVE_MEMBERS can end the session as moderator', async () => {
+    const x = await setup()
+    x.gb.send({ op: 'cinema_open', channelId: x.voice.id, film, startS: 0 })
+    const st = await wait(x.gb, () => true)
+    await s.app.ctx.db.update(roles).set({ permissions: Permission.MOVE_MEMBERS }).where(eq(roles.spaceId, x.space.id))
+    x.gc.send({ op: 'cinema_end', sessionId: st.sessionId })
+    expect(await x.gb.waitFor('CINEMA_STATE', (d) => 'ended' in d)).toMatchObject({ ended: true, reason: 'moderator' })
   })
 
   it('deleting the channel ends the session as channel_gone', async () => {
