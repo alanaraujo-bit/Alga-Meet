@@ -39,6 +39,8 @@ export default defineConfig({
   base: './',
   resolve: { alias: { '@': resolve(__dirname, 'src/renderer/src') } },
   plugins: [react(), singleFile()],
+  // Where the uninstall answer goes: the same API the release build points the app at.
+  define: { __ALGA_API__: JSON.stringify((process.env.MAIN_VITE_API_URL || 'https://api-staging-b3ea.up.railway.app').replace(/\/+$/, '')) },
   server: { port: 5199, strictPort: true },
   build: {
     outDir: resolve(__dirname, 'native/setup-ui/web'),

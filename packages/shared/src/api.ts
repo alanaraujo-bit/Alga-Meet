@@ -399,6 +399,26 @@ export interface AuthResponse {
   deletionCanceled?: boolean
 }
 
+/**
+ * "Por que está saindo?": the optional question in the uninstall window (apps/desktop/src/setup). Anonymous on
+ * purpose: no account, no IP; a fixed reason and, if the person wants, a short note.
+ */
+export const UNINSTALL_REASONS = ['not_using', 'friends_elsewhere', 'audio_video', 'performance', 'missing_feature', 'reinstalling', 'other'] as const
+export type UninstallReason = (typeof UNINSTALL_REASONS)[number]
+export const UninstallFeedbackBody = z.object({
+  reason: z.enum(UNINSTALL_REASONS),
+  note: z.string().trim().max(280).optional(),
+  version: z.string().regex(/^\d{1,3}\.\d{1,3}\.\d{1,3}$/).optional(),
+})
+export type UninstallFeedbackBody = z.infer<typeof UninstallFeedbackBody>
+/** GET /admin/uninstall-feedback: why people left over the last `days`, most common first, and the latest notes. */
+export interface UninstallFeedbackSummary {
+  days: number
+  total: number
+  byReason: { reason: UninstallReason; count: number }[]
+  notes: { reason: UninstallReason; note: string; version: string | null; at: string }[]
+}
+
 export const PatchMeBody = z.object({
   displayName: z.string().trim().min(1).max(32).optional(),
   username: username.optional(),

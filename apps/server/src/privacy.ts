@@ -16,7 +16,7 @@ import type { Ctx } from './app.js'
 import { revokeAllSessions, sha256Hex } from './auth.js'
 import {
   accessLogs, accountActions, activityDays, activityEmails, activitySettings, appeals, attachments, channelRecipients, channels,
-  consentRecords, dataExports, deletedAccounts, eventRsvps, events, memberRoles, messages, orders, reactions, relationships,
+  consentRecords, dataExports, deletedAccounts, eventRsvps, events, memberRoles, messages, orders, reactions, relationships, uninstallFeedback,
   reports, roles, sessions, spaceMembers, spaces, subscriptions, users, voiceNotifyPrefs, voiceSessions, voiceWeekly, weeklyRecaps,
   type DataExportRow, type UserRow,
 } from './db/schema.js'
@@ -436,6 +436,7 @@ export class Privacy {
     const held = db.select({ id: users.id }).from(users).where(isNotNull(users.legalHoldAt))
     await db.delete(accessLogs).where(and(lt(accessLogs.at, cutoff), notInArray(accessLogs.userId, held)))
     await db.delete(deletedAccounts).where(lt(deletedAccounts.deletedAt, cutoff))
+    await db.delete(uninstallFeedback).where(lt(uninstallFeedback.createdAt, cutoff))
     // Closed cases 6 months after the decision; csam ones only by hand (they follow the authority's case).
     await db.delete(reports).where(and(ne(reports.status, 'open'), lt(reports.resolvedAt, cutoff), ne(reports.reason, 'csam')))
     await db.delete(appeals).where(and(ne(appeals.status, 'open'), lt(appeals.decidedAt, cutoff)))

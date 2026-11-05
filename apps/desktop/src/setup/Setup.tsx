@@ -1,9 +1,9 @@
-import { ECO_ACCENTS, ECO_ACCESSORIES, ECO_EYES, ECO_HAIR, type EcoSpec } from '@alga/shared'
+import { ECO_ACCENTS, ECO_ACCESSORIES, ECO_EYES, ECO_HAIR, UNINSTALL_REASONS, type EcoSpec, type UninstallReason } from '@alga/shared'
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { Eco } from '@/ui/eco/Eco'
 import { BRAND_ECO, type EcoState } from '@/ui/eco/ecoRules'
 import { t as settingsText } from '@/features/settings/strings'
-import { boot, hold, live, onHost, send, startDemo, type HostEvent, type Phase } from './bridge'
+import { boot, hold, live, onHost, send, sendUninstallReason, startDemo, type HostEvent, type Phase } from './bridge'
 import { t } from './strings'
 
 const names = settingsText.eco
@@ -327,6 +327,8 @@ function Uninstall() {
   const [deleteData, setDeleteData] = useState(false)
   const [going, setGoing] = useState(false)
   const [hover, setHover] = useState<'stay' | 'go' | null>(null)
+  const [reason, setReason] = useState<UninstallReason | null>(null)
+  const [sent, setSent] = useState(false)
 
   const cancel = () => leave(() => send({ type: 'close' }))
   const confirm = () => {
@@ -339,29 +341,32 @@ function Uninstall() {
     addEventListener('keydown', onKey)
     return () => removeEventListener('keydown', onKey)
   })
-  // Done: say goodbye, then close by itself.
+  // Done: say goodbye, then close by itself, unless an answer is half written.
   useEffect(() => {
-    if (done === true) {
-      const id = setTimeout(() => leave(() => send({ type: 'close' })), 9000)
+    if (done === true && (!reason || sent)) {
+      const id = setTimeout(() => leave(() => send({ type: 'close' })), sent ? 5000 : 12000)
       return () => clearTimeout(id)
     }
-  }, [done, leave])
+  }, [done, leave, reason, sent])
 
   // The Eco listens while you decide, droops as its files go, and falls asleep at the end; its color drains with them.
-  const state: EcoState = done === true ? 'sleeping' : done === false ? 'error' : going ? (p > 0.45 ? 'muted' : 'idle') : hover === 'go' ? 'muted' : hover === 'stay' ? 'success' : 'listening'
+  const state: EcoState = sent && reason === 'reinstalling' ? 'success' : done === true ? 'sleeping' : done === false ? 'error' : going ? (p > 0.45 ? 'muted' : 'idle') : hover === 'go' ? 'muted' : hover === 'stay' ? 'success' : 'listening'
   const drain = done === true ? 1 : going ? Math.min(1, p) : 0
 
   return (
     <Card size="medium" aura={`color-mix(in srgb, ${BRAND_ECO.accent} ${Math.round(100 - drain * 85)}%, #2a2a33)`} leaving={leaving} onClose={going && done === null ? undefined : cancel} closeLabel={done ? t.close : t.uninstall.cancel}>
-      <div className="hero heroShort">
+      <div className={`hero heroShort ${going ? 'heroSmall' : ''}`}>
         <div className="floor" style={{ opacity: 1 - drain * 0.8 }} />
         <div className="eco-alive drain" style={{ ['--drain' as string]: drain }}>
-          <Eco state={state} framing="full" size={142} />
+          <Eco state={state} framing="full" size={going ? 92 : 142} />
         </div>
       </div>
       <div className="body in">
-        <h1 className="title">{done === true ? t.uninstall.doneTitle : done === false ? t.uninstall.failedTitle : going ? t.uninstall.going : t.uninstall.title}</h1>
-        <p className="sub">{done === true ? t.uninstall.doneSub : done === false ? t.uninstall.failedHint : t.uninstall.sub}</p>
+        <h1 className="title">
+          {done === true ? (reason === 'reinstalling' ? t.uninstall.doneSoon : t.uninstall.doneTitle) : done === false ? t.uninstall.failedTitle : going ? t.uninstall.going : t.uninstall.title}
+        </h1>
+        {(!going || (done !== null && (sent || done === false))) && <p className="sub">{done === true ? t.uninstall.doneSub : done === false ? t.uninstall.failedHint : t.uninstall.sub}</p>}
+        {going && done !== false && <Survey reason={reason} sent={sent} onPick={setReason} onSend={(note) => (sendUninstallReason(reason!, note), setSent(true))} />}
         {!going && (
           <label className="toggle">
             <input type="checkbox" checked={deleteData} onChange={(e) => setDeleteData(e.target.checked)} />
@@ -385,12 +390,40 @@ function Uninstall() {
           ) : done === null ? (
             <Meter p={p} done={false} label={t.uninstall.removing} />
           ) : (
-            <button type="button" className="ghost wide" onClick={() => leave(() => send({ type: 'close' }))} autoFocus>
+            // Never steal focus from a note being typed (Enter there sends the answer, not "Fechar").
+            <button type="button" className="ghost wide" onClick={() => leave(() => send({ type: 'close' }))} autoFocus={!reason || sent}>
               {t.close}
             </button>
           )}
         </footer>
       </div>
     </Card>
+  )
+}
+
+/** "Antes de ir": one tap on a reason, an optional line, and a thank-you. Never in the way of leaving. */
+function Survey({ reason, sent, onPick, onSend }: { reason: UninstallReason | null; sent: boolean; onPick: (r: UninstallReason) => void; onSend: (note: string) => void }) {
+  const [note, setNote] = useState('')
+  if (sent) return <p className="thanks" role="status">{t.survey.thanks}</p>
+  return (
+    <section className="survey" aria-label={t.survey.title}>
+      <span className="surveyTitle">{t.survey.title}</span>
+      <span className="surveyHint">{t.survey.hint}</span>
+      <div className="chips" role="radiogroup" aria-label={t.survey.title} onKeyDown={(e) => roving(e, (i) => onPick(UNINSTALL_REASONS[i]!), UNINSTALL_REASONS.length, reason ? UNINSTALL_REASONS.indexOf(reason) : 0)}>
+        {UNINSTALL_REASONS.map((r, i) => (
+          <button key={r} type="button" role="radio" aria-checked={reason === r} tabIndex={(reason ? reason === r : i === 0) ? 0 : -1} className="chip" onClick={() => onPick(r)}>
+            {t.survey.reasons[r]}
+          </button>
+        ))}
+      </div>
+      {reason && (
+        <form className="noteRow" onSubmit={(e) => (e.preventDefault(), onSend(note))}>
+          <input className="note" value={note} maxLength={280} placeholder={t.survey.note} onChange={(e) => setNote(e.target.value)} autoFocus />
+          <button type="submit" className="primary small">
+            {t.survey.send}
+          </button>
+        </form>
+      )}
+    </section>
   )
 }

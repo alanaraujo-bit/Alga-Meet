@@ -76,8 +76,8 @@
   ; "Desinstalar" in Windows opens our window. electron-builder's next update runs this same entry with
   ; "/S ... _?=<dir>": alga-setup-ui then forwards to the real uninstaller without a window (native/setup-ui).
   ${If} ${FileExists} "$INSTDIR\resources\bin\alga-setup-ui.exe"
-    WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" UninstallString '"$INSTDIR\resources\bin\alga-setup-ui.exe" --mode uninstall --dir "$INSTDIR"'
-    WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" QuietUninstallString '"$INSTDIR\resources\bin\alga-setup-ui.exe" --mode uninstall --dir "$INSTDIR" /S'
+    WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" UninstallString '"$INSTDIR\resources\bin\alga-setup-ui.exe" --mode uninstall --dir "$INSTDIR" --version ${VERSION}'
+    WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" QuietUninstallString '"$INSTDIR\resources\bin\alga-setup-ui.exe" --mode uninstall --dir "$INSTDIR" --version ${VERSION} /S'
   ${EndIf}
 !macroend
 

@@ -44,7 +44,7 @@ button {
   position: relative;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: clip;
   border-radius: 18px;
   background: #0c0c0f;
   box-shadow:
@@ -64,7 +64,7 @@ button {
 }
 .card.medium {
   width: 440px;
-  height: 500px;
+  height: 524px;
 }
 .card.small {
   width: 392px;
@@ -656,4 +656,100 @@ button {
   .body > * {
     transition: none;
   }
+}
+
+/* ── "Antes de ir" (uninstall survey) ─────────────── */
+.hero.heroSmall {
+  height: 112px;
+}
+.hero {
+  transition: height 420ms var(--ease-out-quart);
+}
+.survey {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  animation: rise 420ms var(--ease-out-quart) both;
+}
+.surveyTitle {
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+  text-align: center;
+}
+.surveyHint {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-align: center;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.chip {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+  transition:
+    background var(--dur-hover-out) var(--ease-out-quad),
+    box-shadow var(--dur-hover-out) var(--ease-out-quad),
+    color var(--dur-hover-out) var(--ease-out-quad),
+    transform var(--dur-fast) var(--ease-out-quad);
+}
+.chip:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+}
+.chip:active {
+  transform: scale(0.97);
+}
+.chip[aria-checked='true'] {
+  background: color-mix(in srgb, var(--accent-fill) 26%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--text-primary);
+}
+.noteRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  margin-top: 10px;
+  animation: rise 320ms var(--ease-out-quart) both;
+}
+.note {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+  font: var(--type-ui);
+  user-select: text;
+}
+.note::placeholder {
+  color: var(--text-tertiary);
+}
+.note:focus {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.primary.small {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font: var(--type-meta);
+  font-weight: var(--w-semibold);
+}
+.thanks {
+  margin-top: 18px;
+  color: var(--text-secondary);
+  text-align: center;
+  animation: rise 420ms var(--ease-out-quart) both;
 }

@@ -4,7 +4,7 @@
  * Opened in a plain browser (no host), the page runs a demo of the chosen mode (`?mode=install|update|uninstall`),
  * which is how its screens are reviewed.
  */
-import type { EcoSpec } from '@alga/shared'
+import type { EcoSpec, UninstallReason } from '@alga/shared'
 
 export type Mode = 'install' | 'update' | 'uninstall'
 /** preparing: closing a running app / removing the old version; files: writing the new ones; finishing: shortcuts. */
@@ -29,6 +29,9 @@ interface Boot {
   version: string
 }
 
+/** API base baked in at build (vite.setup.config.ts): where the uninstall answer goes. */
+declare const __ALGA_API__: string
+
 declare global {
   interface Window {
     __SETUP__?: Boot
@@ -46,6 +49,13 @@ export const boot: Boot = window.__SETUP__ ?? { mode: (query.get('mode') as Mode
 export function send(message: PageMessage): void {
   if (window.ipc) window.ipc.postMessage(JSON.stringify(message))
   else console.info('[setup]', message)
+}
+
+/** "Por que está saindo?": anonymous, best effort (offline is fine, the uninstall never waits on it). */
+export function sendUninstallReason(reason: UninstallReason, note: string): void {
+  const body = { reason, ...(note.trim() ? { note: note.trim().slice(0, 280) } : {}), ...(boot.version ? { version: boot.version } : {}) }
+  if (!live) return console.info('[setup] reason', body)
+  void fetch(`${__ALGA_API__}/api/v1/feedback/uninstall`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).catch(() => undefined)
 }
 
 const listeners = new Set<(e: HostEvent) => void>()

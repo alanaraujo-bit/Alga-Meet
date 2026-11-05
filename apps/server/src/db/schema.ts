@@ -821,3 +821,12 @@ export const jobRuns = pgTable('job_runs', {
 }, (t) => [primaryKey({ columns: [t.job, t.period] })])
 
 export type EventRow = typeof events.$inferSelect
+
+/** "Por que está saindo?" from the uninstall window: anonymous by design (no user, no IP), kept 6 months. */
+export const uninstallFeedback = pgTable('uninstall_feedback', {
+  id: uuid('id').primaryKey(),
+  reason: text('reason').notNull(),
+  note: text('note'),
+  appVersion: text('app_version'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+})

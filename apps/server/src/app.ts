@@ -35,6 +35,7 @@ import { reportPublicRoutes, reportRoutes } from './routes/reports.js'
 import { roleRoutes } from './routes/roles.js'
 import { invitePublicRoutes, spaceRoutes } from './routes/spaces.js'
 import { telemetryRoutes } from './routes/telemetry.js'
+import { feedbackPublicRoutes } from './routes/feedback.js'
 import { userRoutes } from './routes/users.js'
 import { livekitWebhookRoute, voiceRoutes } from './routes/voice.js'
 import { soundRoutes } from './routes/sounds.js'
@@ -175,6 +176,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     await billingPublicRoutes(api, ctx)
     privacyPublicRoutes(api, ctx)
     reportPublicRoutes(api, ctx)
+    feedbackPublicRoutes(api, ctx)
     await api.register(async (pub) => activityPublicRoutes(pub, ctx))
 
     await api.register(async (authed) => {

@@ -6,14 +6,15 @@ import {
   AccountActionBody, PatchAdminUserBody, PatchAppealBody, PatchQuarantineBody, PatchReportBody, QuarantineBody,
   REMOVED_USER_ID, uuidv7,
   type AccessLogEntry, type AccountAction, type AdminAppeal, type AdminReport, type QuarantinedFile, type StaffRole,
+  type UninstallFeedbackSummary, type UninstallReason,
 } from '@alga/shared'
-import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Ctx } from '../app.js'
 import { isRestricted } from '../auth.js'
 import {
-  accessLogs, accountActions, appeals, deletedAccounts, quarantinedFiles, reports, spaces, staffAuditLog, users,
+  accessLogs, accountActions, appeals, deletedAccounts, quarantinedFiles, reports, spaces, staffAuditLog, uninstallFeedback, users,
   type AppealRow, type ReportRow,
 } from '../db/schema.js'
 import { appealDecisionMail } from '../email-templates.js'
@@ -204,6 +205,23 @@ export function adminRoutes(app: FastifyInstance, ctx: Ctx): void {
   })
 
   // ---- access logs (Marco Civil art. 15: sigilo; admin only) ------------------------------------------------------
+
+  // ---- "Por que está saindo?" (uninstall window) -------------------------------------------------------------------
+
+  app.get('/admin/uninstall-feedback', { config: { staff: 'admin' } }, async (req): Promise<UninstallFeedbackSummary> => {
+    const q = parse(z.object({ days: z.coerce.number().int().min(1).max(180).default(30), limit: limitQ }), req.query)
+    const since = gte(uninstallFeedback.createdAt, new Date(Date.now() - q.days * 24 * 60 * 60 * 1000))
+    const counts = await db.select({ reason: uninstallFeedback.reason, count: sql<number>`count(*)::int` })
+      .from(uninstallFeedback).where(since).groupBy(uninstallFeedback.reason)
+    const notes = await db.select().from(uninstallFeedback).where(and(since, isNotNull(uninstallFeedback.note)))
+      .orderBy(desc(uninstallFeedback.createdAt)).limit(q.limit)
+    return {
+      days: q.days,
+      total: counts.reduce((n, c) => n + c.count, 0),
+      byReason: counts.sort((a, b) => b.count - a.count).map((c) => ({ reason: c.reason as UninstallReason, count: c.count })),
+      notes: notes.map((n) => ({ reason: n.reason as UninstallReason, note: n.note!, version: n.appVersion, at: n.createdAt.toISOString() })),
+    }
+  })
 
   app.get('/admin/access-logs', { config: { staff: 'admin' } }, async (req): Promise<AccessLogEntry[]> => {
     const q = parse(z.object({

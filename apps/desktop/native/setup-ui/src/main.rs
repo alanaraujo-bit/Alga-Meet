@@ -67,6 +67,25 @@ fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     let tail = command_line_tail();
     if args.iter().skip(1).any(|a| a.eq_ignore_ascii_case("/S")) {
+        // Started from inside the folder being removed (QuietUninstallString, winget): like NSIS's own uninstaller,
+        // hand over to a temp copy and return, so nothing there stays locked. Updates (--updated) need the real
+        // exit code and replace the folder anyway: those wait in place.
+        let updating = args.iter().any(|a| a == "--updated");
+        if let (Some(dir), Ok(me)) = (target_dir(&tail, &args), env::current_exe()) {
+            if me.starts_with(&dir) && !updating && !args.iter().any(|a| a == "--relocated") {
+                let copy = scratch().join(format!("alga-setup-ui-{}.exe", std::process::id()));
+                if fs::copy(&me, &copy).is_ok() {
+                    let mut cmd = Command::new(&copy);
+                    cmd.raw_arg("--relocated").raw_arg(format!("--after {}", std::process::id())).raw_arg(&tail);
+                    if cmd.spawn().is_ok() {
+                        return ExitCode::SUCCESS;
+                    }
+                }
+            }
+        }
+        if let Some(pid) = value(&args, "--after").and_then(|v| v.parse().ok()) {
+            wait_process(pid);
+        }
         let code = pass_through(&tail, &args);
         log(&format!("pass-through exit {code}"));
         return ExitCode::from(code.clamp(0, 255) as u8);
@@ -113,7 +132,7 @@ fn run(opts: Opts) -> ExitCode {
     let (w, h, title) = match opts.mode {
         Mode::Install => (488.0, 616.0, "Instalando o Alga Meet"),
         Mode::Update => (440.0, 200.0, "Atualizando o Alga Meet"),
-        Mode::Uninstall => (488.0, 548.0, "Desinstalar o Alga Meet"),
+        Mode::Uninstall => (488.0, 572.0, "Desinstalar o Alga Meet"),
     };
     let window = match WindowBuilder::new()
         .with_title(title)
@@ -385,13 +404,7 @@ fn uninstall(opts: Opts, delete_data: bool, proxy: EventLoopProxy<UserEvent>) {
 
 /// Silent path (`/S`): run the real NSIS uninstaller with the same command line, wait, return its exit code.
 fn pass_through(tail: &str, args: &[String]) -> i32 {
-    let dir = match tail.find("_?=") {
-        Some(i) => PathBuf::from(tail[i + 3..].trim()),
-        None => match value(args, "--dir") {
-            Some(d) => PathBuf::from(d),
-            None => return 2,
-        },
-    };
+    let Some(dir) = target_dir(tail, args) else { return 2 };
     let Some(real) = find_uninstaller(&dir) else { return 0 }; // nothing left to remove
     let tmp = scratch().join(format!("alga-uninstall-{}.exe", std::process::id()));
     if fs::copy(&real, &tmp).is_err() {
@@ -405,6 +418,14 @@ fn pass_through(tail: &str, args: &[String]) -> i32 {
     let code = cmd.status().ok().and_then(|s| s.code()).unwrap_or(2);
     let _ = fs::remove_file(&tmp);
     code
+}
+
+/// The install folder: NSIS's `_?=` (last, unquoted) or our `--dir`.
+fn target_dir(tail: &str, args: &[String]) -> Option<PathBuf> {
+    match tail.find("_?=") {
+        Some(i) => Some(PathBuf::from(tail[i + 3..].trim())),
+        None => value(args, "--dir").map(PathBuf::from),
+    }
 }
 
 fn find_uninstaller(dir: &Path) -> Option<PathBuf> {

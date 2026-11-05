@@ -113,6 +113,13 @@
       "when": 1793886878688,
       "tag": "0015_user_eco",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793891270269,
+      "tag": "0016_uninstall_feedback",
+      "breakpoints": true
     }
   ]
 }
