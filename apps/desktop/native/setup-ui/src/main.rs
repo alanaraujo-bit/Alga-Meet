@@ -63,6 +63,7 @@ enum UserEvent {
 }
 
 fn main() -> ExitCode {
+    sweep();
     let args: Vec<String> = env::args().collect();
     let tail = command_line_tail();
     if args.iter().skip(1).any(|a| a.eq_ignore_ascii_case("/S")) {
@@ -474,6 +475,20 @@ fn dir_size(dir: &Path) -> u64 {
             Err(_) => 0,
         })
         .sum()
+}
+
+/// Copies left in %TEMP%\AlgaMeetSetup by earlier runs (each run copies itself or the uninstaller there).
+/// The ones still running are locked and stay until a later run.
+fn sweep() {
+    let me = env::current_exe().ok();
+    let Ok(entries) = fs::read_dir(scratch()) else { return };
+    for p in entries.flatten().map(|e| e.path()) {
+        let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        let ours = (name.starts_with("alga-setup-ui-") || name.starts_with("alga-uninstall-")) && name.ends_with(".exe");
+        if ours && Some(&p) != me.as_ref() {
+            let _ = fs::remove_file(&p);
+        }
+    }
 }
 
 fn scratch() -> PathBuf {
