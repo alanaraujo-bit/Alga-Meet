@@ -1,7 +1,7 @@
 # Alga Meet — Estado do projeto
 
 ## 2026-11-05 madrugada — Atividade em tempo real + perfil (branch `feat/presence`, NÃO mesclada)
-Worktree `D:\PROJETOSlga-presence`. Rich presence (detector nativo sem dependência nova; jogo/app com ícone, capa Steam,
+Worktree `D:\PROJETOS\alga-presence`. Rich presence (detector nativo sem dependência nova; jogo/app com ícone, capa Steam,
 tempo ao vivo), "Ativo agora" em Amigos, status personalizado com validade (balão no perfil), perfil completo (agora,
 recente, membro/amigos desde, amigos/espaços em comum, nota privada), Configurações → Atividade (apps detectados com
 interruptor). Servidor só em memória, **sem migração**. Verificado: servidor 234 testes, desktop 297, E2E real 16/16
