@@ -2,6 +2,7 @@ import type {
   Channel, Invite, Me, Member, Message, Presence, PublicUser, ReadState, Relationship,
   Role, Space, SpaceSnapshot, StatusPreference, VoiceDisconnectReason, VoiceState,
 } from './models.js'
+import type { Activity } from './activity.js'
 import type { Entitlements, Gift, SpaceUpgradeState } from './billing.js'
 import type { E2eeClientFrame, E2eeCommit, E2eeEpoch, E2eeProposals, E2eeResyncRequired, E2eeWelcome } from './e2ee.js'
 import type { RsvpStatus, SpaceEvent } from './events.js'
@@ -39,6 +40,11 @@ export type ClientFrame =
   | { op: 'heartbeat' }
   /** Update own presence preference without a REST call. */
   | { op: 'presence'; status: StatusPreference }
+  /**
+   * Own rich presence (activity.ts), full current value or null. Throttled like `presence`; cleared when the socket
+   * that set it closes. Send it again after every READY.
+   */
+  | { op: 'activity'; activity: Activity | null }
   /** Self voice flags while connected to a voice channel. Ignored if not in voice. */
   | { op: 'voice_state'; selfMute: boolean; selfDeaf: boolean; streaming: boolean; video: boolean }
   /**

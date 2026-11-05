@@ -3,7 +3,7 @@
  * Implemented in src/preload (exposed as `window.alga`), consumed by src/renderer.
  * Everything crossing this boundary must be structured-cloneable.
  */
-import type { E2eeClientFrame } from '@alga/shared'
+import type { Activity, ActivityKind, E2eeClientFrame } from '@alga/shared'
 
 export type Unsubscribe = () => void
 
@@ -122,6 +122,28 @@ export interface E2eeStatus {
   call: { channelId: string; state: E2eeCallState; epoch: number } | null
 }
 
+// ---- Rich presence (src/main/activity; wire format in packages/shared/src/activity.ts) ------------------------------
+
+/** The activity this PC would share right now, with the app's stable key for per-app choices. */
+export interface LocalActivity extends Activity {
+  /** Lowercased executable file name ("code.exe"): the unit of "show / hide this app". */
+  key: string
+}
+
+/** An app seen in the foreground recently (Settings → Atividade lists them so people see exactly what is shared). */
+export interface DetectedApp {
+  key: string
+  name: string
+  /** Recognized kind; null = not recognized (hidden until the person turns it on; then shared as 'app'). */
+  kind: ActivityKind | null
+  /** PNG data URL of the app icon, when available. */
+  icon?: string
+  /** Epoch ms of the last time it was in the foreground. */
+  lastSeen: number
+  /** Whether it is shared when in use: recognized apps default to true, unrecognized ones to false. */
+  shown: boolean
+}
+
 export interface AlgaBridge {
   config: AppConfig
 
@@ -221,6 +243,21 @@ export interface AlgaBridge {
     onEpoch(cb: (e: E2eeEpochInfo) => void): Unsubscribe
     /** Call code (30 digits, the same for everyone in the call) or, with `userId`, the pairwise code (45 digits). */
     verificationCode(channelId: string, userId?: string): Promise<string | null>
+  }
+
+  /**
+   * Rich presence detection (Windows; elsewhere every call resolves to "nothing"). Only the app is detected, never
+   * window titles. Off = no detection runs at all.
+   */
+  activity: {
+    /** What to share now (sharing on, app shown, in use), or null. */
+    current(): Promise<LocalActivity | null>
+    onChange(cb: (a: LocalActivity | null) => void): Unsubscribe
+    getShare(): Promise<boolean>
+    setShare(on: boolean): Promise<void>
+    /** Recently seen apps, newest first (at most 30). */
+    apps(): Promise<DetectedApp[]>
+    setAppShown(key: string, shown: boolean): Promise<void>
   }
 
   app: {

@@ -1,4 +1,4 @@
-import { E2EE_FRAME_LIMIT, E2eeClientFrameSchema, GatewayClose, type ClientFrame, type ReadyPayload } from '@alga/shared'
+import { ActivitySchema, E2EE_FRAME_LIMIT, E2eeClientFrameSchema, GatewayClose, clampActivity, type ClientFrame, type ReadyPayload } from '@alga/shared'
 import { eq, inArray } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import type { WebSocket } from 'ws'
@@ -32,6 +32,7 @@ const ClientFrameSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('identify'), token: z.string().min(1).max(256) }),
   z.object({ op: z.literal('heartbeat') }),
   z.object({ op: z.literal('presence'), status: z.enum(['online', 'idle', 'dnd', 'invisible']) }),
+  z.object({ op: z.literal('activity'), activity: ActivitySchema.nullable() }),
   z.object({
     op: z.literal('voice_state'),
     selfMute: z.boolean(), selfDeaf: z.boolean(), streaming: z.boolean(), video: z.boolean(),
@@ -68,7 +69,7 @@ export async function buildReady(ctx: Ctx, user: UserRow): Promise<ReadyPayload>
     relationships,
     // Only non-offline presences are sent; clients default everyone else to offline.
     presences: prefRows
-      .map((r) => ({ userId: r.id, status: effectiveStatus(r.pref, hub.isOnline(r.id)) }))
+      .map((r) => hub.presence(r.id, effectiveStatus(r.pref, hub.isOnline(r.id))))
       .filter((p) => p.status !== 'offline'),
     voiceStates: voice.all().filter((s) => (s.spaceId ? spaceSet.has(s.spaceId) : privateSet.has(s.channelId))),
     readStates: reads.map((r) => ({ channelId: r.channelId, lastReadMessageId: r.lastReadMessageId, mentionCount: r.mentionCount })),
@@ -166,6 +167,12 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
             await afterMeUpdate(ctx, before, after!)
           })
           break
+        case 'activity':
+          // State is set at once; only the fan-out is throttled (it reads the latest value when it runs).
+          if (hub.setActivity(conn, frame.activity && clampActivity(frame.activity))) {
+            await stateOps.run(`activity:${userId}`, () => broadcastPresence(db, hub, userId))
+          }
+          break
         case 'voice_state':
           await stateOps.run(`voice:${userId}`, () => voice.updateSelf(userId, {
             selfMute: frame.selfMute, selfDeaf: frame.selfDeaf, streaming: frame.streaming, video: frame.video,
@@ -215,9 +222,12 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
       clearTimeout(timer)
       const c = conn
       conn = null
-      if (c && hub.remove(c) && !hub.closing) {
-        broadcastPresence(db, hub, c.userId, 'offline').catch((err: unknown) => log.error({ err: safeErr(err) }, 'presence broadcast failed'))
-      }
+      if (!c) return
+      const dropped = hub.dropActivity(c)
+      const last = hub.remove(c)
+      if (hub.closing || (!last && !dropped)) return
+      // Last socket → offline; another device still connected → same status, without this socket's activity.
+      broadcastPresence(db, hub, c.userId, last ? 'offline' : undefined).catch((err: unknown) => log.error({ err: safeErr(err) }, 'presence broadcast failed'))
     })
 
     socket.on('error', (err) => log.warn({ err: err.message }, 'gateway socket error'))

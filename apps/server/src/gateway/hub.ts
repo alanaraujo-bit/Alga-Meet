@@ -1,4 +1,4 @@
-import type { DispatchOf, DispatchType, PresenceStatus, StatusPreference } from '@alga/shared'
+import { sameActivity, type Activity, type DispatchOf, type DispatchType, type Presence, type PresenceStatus, type StatusPreference } from '@alga/shared'
 import { eq, inArray } from 'drizzle-orm'
 import { presenceAudience } from '../access.js'
 import type { Db } from '../db/index.js'
@@ -20,6 +20,8 @@ type Payload<T extends DispatchType> = DispatchOf<T> | ((userId: string) => Disp
 /** In-process connection registry and fan-out. shortcut: single instance only; add Redis pub/sub to scale out. */
 export class Hub {
   private readonly byUser = new Map<string, Set<Conn>>()
+  /** Rich presence per user, owned by the socket that set it (last writer wins across devices). Memory only. */
+  private readonly activities = new Map<string, { activity: Activity; conn: Conn }>()
   /** Set during shutdown: sockets are going away because of us, not because users left. */
   closing = false
 
@@ -39,6 +41,31 @@ export class Hub {
     if (set.size) return false
     this.byUser.delete(conn.userId)
     return true
+  }
+
+  /** Sets (or clears, with null) the user's activity. Returns whether what others see changed. */
+  setActivity(conn: Conn, activity: Activity | null): boolean {
+    const prev = this.activities.get(conn.userId)
+    if (activity) this.activities.set(conn.userId, { activity, conn })
+    else this.activities.delete(conn.userId)
+    return !sameActivity(prev?.activity, activity)
+  }
+
+  /** Clears the activity if `conn` set it (its socket is closing). Returns whether it did. */
+  dropActivity(conn: Conn): boolean {
+    if (this.activities.get(conn.userId)?.conn !== conn) return false
+    this.activities.delete(conn.userId)
+    return true
+  }
+
+  activityOf(userId: string): Activity | undefined {
+    return this.activities.get(userId)?.activity
+  }
+
+  /** The Presence others see: the activity rides along only while the user is visible. */
+  presence(userId: string, status: PresenceStatus): Presence {
+    const activity = status === 'offline' ? undefined : this.activityOf(userId)
+    return activity ? { userId, status, activity } : { userId, status }
   }
 
   isOnline(userId: string): boolean {
@@ -119,7 +146,7 @@ export async function broadcastPresence(db: Db, hub: Hub, userId: string, status
     if (!u) return
     status = effectiveStatus(u.pref, hub.isOnline(userId))
   }
-  hub.dispatch(await presenceAudience(db, userId), 'PRESENCE_UPDATE', { userId, status })
+  hub.dispatch(await presenceAudience(db, userId), 'PRESENCE_UPDATE', hub.presence(userId, status))
 }
 
 /** Makes `a` and `b` see each other's current presence (after a friendship or a shared space begins). */
@@ -129,10 +156,10 @@ export async function exchangePresence(db: Db, hub: Hub, a: string, bs: string[]
   const prefs = new Map(rows.map((r) => [r.id, r.pref]))
   const statusOf = (id: string) => effectiveStatus(prefs.get(id) ?? 'online', hub.isOnline(id))
   const aStatus = statusOf(a)
-  if (aStatus !== 'offline') hub.dispatch(bs, 'PRESENCE_UPDATE', { userId: a, status: aStatus })
+  if (aStatus !== 'offline') hub.dispatch(bs, 'PRESENCE_UPDATE', hub.presence(a, aStatus))
   for (const b of bs) {
     const s = statusOf(b)
-    if (s !== 'offline') hub.dispatch([a], 'PRESENCE_UPDATE', { userId: b, status: s })
+    if (s !== 'offline') hub.dispatch([a], 'PRESENCE_UPDATE', hub.presence(b, s))
   }
 }
 
