@@ -61,7 +61,8 @@ Também verificado: **E2EE** (ofertas/respostas com tag MLS em todas as conexõe
 ### Player no Electron
 
 - **Play agendado:** primeiro quadro 3–37 ms depois de `at`; erro contra a posição esperada (somando os 52 ms de
-  latência de saída do áudio, R28): **−14,3 a +0,3 ms** em 6 poltronas → dentro de ±1 frame (41,7 ms). Passa.
+  latência de saída do áudio, R28): **−14,3 a +0,3 ms** em 6 poltronas → dentro de ±1 frame (41,7 ms). Passa. Com 4 janelas e rede emulada (4 instâncias decodificando 1080p na mesma máquina): −1,2 a −59,1 ms; 2 de 6
+  poltronas passaram de 1 frame (−42 e −59 ms) no primeiro quadro, e o laço de sincronia as trouxe para < 20 ms em seguida.
 - **Pausa no frame exato:** em todas as 8 pausas (2 e 3 janelas) a posição final de cada poltrona é **exatamente** a
   posição calculada pelo servidor (diferença 0 frame); quem passou volta com um seek. Captura:
   `docs/screenshots/2026-11-05-cinema-lab-same-frame.jpg`.
