@@ -12,17 +12,20 @@ import s from './soundboard.module.css'
 
 interface TileSound { id: string; name: string; emoji: string | null; durationMs: number }
 
-/** Re-renders every frame while `active` (cooldown ring, progress bar), idle otherwise. */
-function useNow(active: boolean): number {
+/** Re-renders every frame until `until` (cooldown ring, progress bar), plus one timer render at the end: rAF can be
+ * throttled in a background window, and the tiles must never look ready while the store still says cooldown. */
+function useNow(until: number): number {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    if (!active) return
+    const left = until - Date.now()
+    if (left <= 0) return
     let raf = 0
     const tick = () => { setNow(Date.now()); raf = requestAnimationFrame(tick) }
     raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [active])
-  return active ? now : Date.now()
+    const end = setTimeout(() => { cancelAnimationFrame(raf); setNow(Date.now()) }, left + 16)
+    return () => { cancelAnimationFrame(raf); clearTimeout(end) }
+  }, [until])
+  return Date.now() < until ? now : Date.now()
 }
 
 export function SoundboardPanel({ anchor, onClose, channel }: { anchor: HTMLElement | null; onClose: () => void; channel: Channel }) {
@@ -47,8 +50,7 @@ function Panel({ channel }: { channel: Channel }) {
   const list = sounds ?? []
   const shown = useMemo(() => filterSounds(list, query), [list, query])
   const alga = useMemo(() => filterSounds([...ALGA_SOUNDS], query), [query])
-  const active = Date.now() < Math.max(sb.cooldownUntil, sb.mine?.until ?? 0)
-  const now = useNow(active)
+  const now = useNow(Math.max(sb.cooldownUntil, sb.mine?.until ?? 0))
   const clock: TileClock = { now, cooldownFrom: sb.cooldownFrom, cooldownUntil: sb.cooldownUntil, canUse, playingMine: sb.mine }
   const searchable = list.length + ALGA_SOUNDS.length > 12
 
@@ -161,21 +163,19 @@ function Tile({ sound, clock, onPlay, onPreview, manage }: {
         <span className={s.dur}>{t.duration(sound.durationMs)}</span>
       </button>
       <span className={s.fill} aria-hidden />
-      <div className={s.tools}>
-        <button type="button" className={s.tool} onClick={onPreview} aria-label={t.preview(sound.name)} title={t.preview(sound.name)}>
-          <Icon icon={Headphones} size={14} />
-        </button>
-        {manage && (
-          <>
-            <button type="button" className={s.tool} onClick={manage.rename} aria-label={`${t.rename}: ${sound.name}`} title={t.rename}>
-              <Icon icon={Pencil} size={14} />
-            </button>
-            <button type="button" className={`${s.tool} ${s.toolDanger}`} onClick={manage.remove} aria-label={`${t.remove}: ${sound.name}`} title={t.remove}>
-              <Icon icon={Trash2} size={14} />
-            </button>
-          </>
-        )}
-      </div>
+      <button type="button" className={`${s.tool} ${s.toolPreview}`} onClick={onPreview} aria-label={t.preview(sound.name)} title={t.preview(sound.name)}>
+        <Icon icon={Headphones} size={12} />
+      </button>
+      {manage && (
+        <div className={s.tools}>
+          <button type="button" className={s.tool} onClick={manage.rename} aria-label={`${t.rename}: ${sound.name}`} title={t.rename}>
+            <Icon icon={Pencil} size={12} />
+          </button>
+          <button type="button" className={`${s.tool} ${s.toolDanger}`} onClick={manage.remove} aria-label={`${t.remove}: ${sound.name}`} title={t.remove}>
+            <Icon icon={Trash2} size={12} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

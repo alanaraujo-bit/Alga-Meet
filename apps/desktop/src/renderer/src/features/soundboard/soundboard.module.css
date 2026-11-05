@@ -123,7 +123,7 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: var(--s-2) var(--s-2) var(--s-1_5);
+  padding: var(--s-4) var(--s-2) var(--s-1_5);
   border: 0;
   border-radius: inherit;
   background: none;
@@ -196,12 +196,21 @@
   transform: translateY(-2px);
   transition: opacity 120ms var(--ease-out-quad), transform 120ms var(--ease-out-quad);
 }
-.tile:hover .tools, .tile:focus-within .tools { opacity: 1; transform: none; }
+.tile:hover .tools, .tile:focus-within .tools, .tile:hover .toolPreview, .tile:focus-within .toolPreview { opacity: 1; transform: none; }
+.toolPreview {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 120ms var(--ease-out-quad), transform 120ms var(--ease-out-quad);
+}
 .tool {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border: 0;
   border-radius: var(--r-sm);
   background: rgba(15, 16, 17, 0.72);
@@ -315,7 +324,7 @@
 .mutedHint { padding-top: 0; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tile, .emoji, .tools, .search { transition: none; }
+  .tile, .emoji, .tools, .toolPreview, .search { transition: none; }
   .tile[data-state='playing'], .tile[data-state='playing'] .emoji { animation: none; }
   .tile:hover .emoji { transform: none; }
 }
