@@ -1,6 +1,21 @@
 # Alga Meet — Estado do projeto
 
-## 2026-11-05 manhã — Fundamentos do backlog da pesquisa Discord (branch `feat/fundamentals`, NÃO mesclada nem publicada)
+## 2026-11-05 tarde — Fundamentos + Eco publicados (main `bcef309`, release v0.1.6)
+- **Eco, o mascote** (`docs/brand/mascote/eco.md`): substitui as iniciais em todo avatar sem foto. Desenho vetorial único
+  (`ui/eco/Eco.tsx`), estados (`idle`, `blink`, `hop`, `talking`, `listening`, `muted`, `connecting`, `streaming`, `sleeping`, `error`,
+  `success`) usados na abertura do app, na sala vazia, na queda de conexão, nas telas vazias de Amigos e na pílula de reconexão.
+  **"Seu Eco"** em Configurações › Minha conta: 16 cores × 6 olhos × 7 cabelos × 16 acessórios (10.752 combinações, versões
+  femininas inclusas), provar passando o mouse, setas do teclado, salvo na conta (`users.eco`, **migração 0015**). Eco automático
+  neutro (sem cabelo nem acessório de gênero) nasce do id. Autor removido = Eco anônimo; DM em grupo = ícone de grupo.
+- **Convite com rosto:** a prévia pública e a página `https://alga-meet.vercel.app/i/<código>` mostram o Eco de quem convidou na
+  cor dele (cópia da paleta automática anotada na página).
+- **Publicado:** `feat/fundamentals` + `feat/eco` em fast-forward na main (WIP do pacote C/mídia preservado; `spaceMenu.ts`
+  mesclado em 3 vias; cópia nova em `refs/backup/wip-2026-11-05b`). Staging reimplantado (deploy `ad45ed54`, `/ready` ok, migrações
+  0014 e 0015 no boot) com `CORS_ORIGINS` incluindo o site. Site no Vercel com a rota `/i/`.
+- Verificado: servidor 253 testes, desktop 332, shared 17, typecheck limpo; revisão independente do Eco (10 achados, corrigidos);
+  E2E real 22/22 (`fundamentals-shots.mjs`); página de convite conferida em Chromium contra uma API simulada.
+
+## 2026-11-05 manhã — Fundamentos do backlog da pesquisa Discord (mesclado e publicado à tarde, ver acima)
 Worktree `D:\PROJETOS\alga-presence`, a partir da main `ffb4ec2`. Itens P0 de `docs/research/discord/04-prioritized-backlog.md`
 (a pesquisa em si está no checkout principal, ainda não commitada):
 - **BL-05 Olhar a sala antes de entrar:** o 1º clique na sala de voz (barra lateral e "Agora" da Home) abre o lobby (quem está, o
@@ -70,6 +85,8 @@ Estudo do heyparker.ai em `docs/research/site-reference-heyparker.md`. Seções:
 **Público:** https://github.com/alanaraujo-bit/Alga-Meet (decisão do dono). Antes do primeiro push o histórico foi reescrito (git filter-repo) trocando os dados reais da rede de casa por valores genéricos (IP público, rede local, nome/MAC do servidor, domínio DuckDNS, provedor). Valores reais ficam só em `docs/private/` (git-ignored). Hooks locais `pre-commit` + `commit-msg` (`.git/hooks/public_guard.py`, regras em `.git/info/public-replacements.txt`) bloqueiam commits que reintroduzam esses dados. Política: o Maestro faz push para `origin/main` depois de cada lote de commits verificados. Auto-update (`electron-builder.yml`) e Railway IaC apontam para esse repositório.
 
 ## Release pública
+**v0.1.6 (2026-11-05) — Eco, olhar antes de entrar, notificações calmas, convites que abrem.** https://github.com/alanaraujo-bit/Alga-Meet/releases/tag/v0.1.6 — build limpo de `bcef309` no `alga-verify`. Quem está na 0.1.5 recebe sozinho.
+
 **v0.1.5 (2026-11-05) — corrige o auto-update.** A 0.1.3 e a 0.1.4 saíram sem as dependências do `electron-updater` (e o `node-gyp-build` do `uiohook-napi`): foram geradas em worktrees cujo `node_modules` era uma pasta de junções por pacote, e o electron-builder não seguiu as dependências transitivas. Quem está nelas precisa instalar a 0.1.5 uma vez à mão. **Build de release só no `D:\PROJETOS\alga-verify`** (`node_modules` = uma junção para o do checkout principal), e o `npm run dist` agora falha se faltar dependência no `app.asar` (`scripts/check-package.mjs`).
 
 **v0.1.4 (beta fechado, 2026-11-05)**: https://github.com/alanaraujo-bit/Alga-Meet/releases/tag/v0.1.4 — merge de `feat/presence` sobre a 0.1.3 (soundboard), build limpo de `fe14a40` no worktree `alga-presence` (typecheck; 325 testes do desktop; servidor 249). Traz atividade em tempo real, status personalizado, "Ativo agora" e perfil completo. Staging reimplantado com o mesmo commit (deploy `4b6bb004`, `/ready` ok). O trabalho não commitado do pacote C/mídia continua no checkout principal (MemberList mesclado em 3 vias); cópia de segurança local em `refs/backup/wip-2026-11-05`.
