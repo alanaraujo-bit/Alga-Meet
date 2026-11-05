@@ -6,7 +6,9 @@
 ; src/setup page): started below for install and update, and registered as the uninstall entry. Without the
 ; WebView2 runtime nothing changes: NSIS's own progress window and questions.
 
-Var algaUi
+!ifndef BUILD_UNINSTALLER
+  Var algaUi ; install/update window mode, set in customInit (not in the uninstaller pass)
+!endif
 
 ; WebView2 Evergreen runtime present? (per-machine in either registry view, or per-user)
 !macro algaWebView2 _OUT
@@ -21,6 +23,17 @@ Var algaUi
   ${If} ${_OUT} == "0.0.0.0"
     StrCpy ${_OUT} ""
   ${EndIf}
+!macroend
+
+; Fresh installs go to %LOCALAPPDATA%\Programs\<product name>, like every assisted install before 0.1.7 (one-click
+; alone would use the npm name, "@algadesktop"). Installs that already exist keep their InstallLocation.
+!macro preInit
+  !ifndef BUILD_UNINSTALLER
+    ReadRegStr $R0 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
+    ${If} $R0 == ""
+      WriteRegExpandStr HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation "$LOCALAPPDATA\Programs\${PRODUCT_NAME}"
+    ${EndIf}
+  !endif
 !macroend
 
 ; Runs after $INSTDIR is known, before anything is touched. A double-click gets the install window; an

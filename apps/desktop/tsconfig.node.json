@@ -1,5 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "types": ["node", "electron-vite/node"], "lib": ["ES2023", "DOM"] },
-  "include": ["electron.vite.config.ts", "vite.setup.config.ts", "src/main", "src/preload", "src/shared", "scripts"]
+  "include": ["electron.vite.config.ts", "vite.setup.config.ts", "vitest.config.ts", "src/main", "src/preload", "src/shared", "scripts"]
 }
