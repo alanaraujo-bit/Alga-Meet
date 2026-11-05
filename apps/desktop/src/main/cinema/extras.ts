@@ -88,34 +88,36 @@ const CLIP_SHARE = 0.05
  * blown, the least blown). Brightness from a 64x36 grayscale copy of each candidate.
  */
 export async function makePoster(bins: FfmpegBins, path: string, videoIndex: number, durationS: number, out: string, signal?: AbortSignal): Promise<void> {
+  const v = `0:${videoIndex}`
+  const temp = [0.1, 0.25, 0.4].map((at, i) => ({ at, webp: `${out}.c${i}.webp`, gray: `${out}.c${i}.gray` }))
   const scored: { file: string; score: number }[] = []
-  for (const [i, at] of [0.1, 0.25, 0.4].entries()) {
-    const file = `${out}.c${i}.webp`
-    const gray = `${out}.c${i}.gray`
-    const v = `0:${videoIndex}`
-    try {
-      await ffmpeg(bins, [
-        '-ss', (durationS * at).toFixed(3), '-i', path,
-        '-map', v, '-frames:v', '1', '-vf', 'scale=960:-2', '-c:v', 'libwebp', '-quality', '80', file,
-        '-map', v, '-frames:v', '1', '-vf', 'scale=64:36,format=gray', '-f', 'rawvideo', gray,
-      ], QUICK_MS, signal)
-      const px = await readFile(gray)
-      if (px.length === 0) continue
-      let sum = 0
-      let blown = 0
-      for (const y of px) {
-        sum += y
-        if (y >= CLIP_LUMA) blown++
+  try {
+    for (const c of temp) {
+      try {
+        await ffmpeg(bins, [
+          '-ss', (durationS * c.at).toFixed(3), '-i', path,
+          '-map', v, '-frames:v', '1', '-vf', 'scale=960:-2', '-c:v', 'libwebp', '-quality', '80', c.webp,
+          '-map', v, '-frames:v', '1', '-vf', 'scale=64:36,format=gray', '-f', 'rawvideo', c.gray,
+        ], QUICK_MS, signal)
+        const px = await readFile(c.gray)
+        if (px.length === 0 || (await stat(c.webp)).size === 0) continue
+        let sum = 0
+        let blown = 0
+        for (const y of px) {
+          sum += y
+          if (y >= CLIP_LUMA) blown++
+        }
+        scored.push({ file: c.webp, score: blown / px.length > CLIP_SHARE ? -blown / px.length : sum / px.length })
+      } catch (e) {
+        if (signal?.aborted) throw e // a bad candidate is skipped; a cancelled poster is not
       }
-      scored.push({ file, score: blown / px.length > CLIP_SHARE ? -blown / px.length : sum / px.length })
-    } finally {
-      await rm(gray, { force: true })
     }
+    const best = scored.sort((a, b) => b.score - a.score)[0]
+    if (!best) throw new Error('no poster frame')
+    await rename(best.file, out)
+  } finally {
+    await Promise.all(temp.flatMap((c) => [rm(c.webp, { force: true }), rm(c.gray, { force: true })]))
   }
-  const best = scored.sort((a, b) => b.score - a.score)[0]
-  if (!best) throw new Error('no poster frame')
-  await rename(best.file, out)
-  await Promise.all(scored.slice(1).map((c) => rm(c.file, { force: true })))
 }
 
 /** WebP caps both sides at 16383 px. */

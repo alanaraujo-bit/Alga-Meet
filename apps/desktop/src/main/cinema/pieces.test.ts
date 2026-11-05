@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
@@ -30,17 +30,19 @@ async function waitFor(cond: () => boolean, what: string, ms = 30_000): Promise<
   }
 }
 
-async function make(file: string, opts: { budget?: number; readRate?: number; path?: string } = {}) {
+async function make(file: string, opts: { budget?: number; readRate?: number; path?: string; bins?: typeof bins } = {}) {
   setFfmpegBinsForTest(bins)
   const path = opts.path ?? fixture(file)
   const probe = await probeFile(path)
   if ('error' in probe) throw new Error(probe.error)
   const dir = sessionDir(root)
-  const f = new PieceFactory({ path, film: probe.film, videoStreamIndex: probe.videoStreamIndex, dir, budgetBytes: opts.budget ?? 1e12, bins, readRate: opts.readRate })
+  const f = new PieceFactory({ path, film: probe.film, videoStreamIndex: probe.videoStreamIndex, dir, budgetBytes: opts.budget ?? 1e12, bins: opts.bins ?? bins, readRate: opts.readRate })
   const index = new Map<CinemaTrackId, Map<number, CinemaPieceMeta>>()
   const errors: { track: CinemaTrackId; reason: string }[] = []
   const evicted: { track: CinemaTrackId; n: number[] }[] = []
+  let mediaEvents = 0
   f.onPieces((e: PieceEvent) => {
+    if (/^(v|a\d+)$/.test(e.track)) mediaEvents++
     const m = index.get(e.track) ?? new Map<number, CinemaPieceMeta>()
     e.items.forEach((it, i) => m.set(e.from + i, it))
     index.set(e.track, m)
@@ -56,7 +58,15 @@ async function make(file: string, opts: { budget?: number; readRate?: number; pa
     for (const [, m] of live(t)) if (m[0] <= end + 0.1 && m[0] + m[1] > end) end = m[0] + m[1]
     return end
   }
-  return { f, dir, film: probe.film, index, errors, evicted, media, live, gone, reach }
+  /** Live piece of `t` covering time `x`. */
+  const at = (t: CinemaTrackId, x: number) => live(t).find(([, m]) => m[0] <= x && x < m[0] + m[1])
+  /** No new media piece and no eviction for 1.2 s: the factory settled (no run/evict loop). */
+  const quiet = async () => {
+    const before = [mediaEvents, evicted.length]
+    await sleep(1200)
+    expect([mediaEvents, evicted.length]).toEqual(before)
+  }
+  return { f, dir, film: probe.film, index, errors, evicted, media, live, gone, reach, at, quiet }
 }
 
 const probeLines = (args: string[], file: string) =>
@@ -166,6 +176,8 @@ describe.skipIf(!ready)('PieceFactory on real fixtures', () => {
       expect([...s.index.get(t)!.keys()].sort((a, b) => a - b)).toEqual([...Array(s.index.get(t)!.size).keys()]) // dense n
     }
     expect(keyframes(fixture('h264-ac3-51.mkv')).map((k) => k.toFixed(2))).toContain(at('v', 15)![1][0].toFixed(2))
+    // Per-run segment names: a killed run that lingers cannot overwrite the next run's files.
+    expect(readdirSync(join(s.dir, 'v')).filter((f) => f.endsWith('.m4s')).every((f) => /^r\d+-\d+\.m4s$/.test(f))).toBe(true)
     expect(s.errors).toEqual([]) // includes: every run's init segment is byte-identical to piece 0
     await s.f.close()
   }, 60_000)
@@ -185,7 +197,7 @@ describe.skipIf(!ready)('PieceFactory on real fixtures', () => {
     s.f.start(0, [])
     await waitFor(() => s.media('v').length > 0, 'first video piece')
     s.f.setPlayhead(10)
-    await waitFor(() => s.reach('v', 10) > 19.8 && s.media('v').filter(([, m]) => m[0] + m[1] <= 10).every(([n]) => s.gone('v').has(n)), 'old pieces gone, rest generated')
+    await waitFor(() => !!s.at('v', 10) && s.media('v').filter(([, m]) => m[0] + m[1] <= 10).every(([n]) => s.gone('v').has(n)), 'old pieces gone, piece at 10 s')
     for (const [n, m] of s.media('v')) {
       if (m[0] + m[1] <= 10) expect(await s.f.piece('v', n)).toBeNull()
       else if (m[0] + m[1] > 10.1) expect((await s.f.piece('v', n))?.length).toBe(m[2])
@@ -193,8 +205,7 @@ describe.skipIf(!ready)('PieceFactory on real fixtures', () => {
     const first = s.media('v')[0]!
     expect(first[1][0] + first[1][1]).toBeLessThanOrEqual(10)
     expect(await s.f.init('v')).not.toBeNull()
-    // Needed again (seek back): regenerated under a NEW n, same bytes (copy is deterministic); far pieces make room.
-    const farthest = s.media('v').at(-1)!
+    // Needed again (seek back): regenerated under a NEW n, same bytes (copy is deterministic).
     s.f.setPlayhead(0)
     s.f.ensure('v', 0)
     await waitFor(() => s.live('v').some(([n, m]) => m[0] === 0 && n !== first[0]), 'regenerated piece at 0')
@@ -202,9 +213,100 @@ describe.skipIf(!ready)('PieceFactory on real fixtures', () => {
     expect(again[0]).toBeGreaterThan(first[0])
     expect(again[1]).toEqual(first[1])
     expect(s.gone('v').has(first[0])).toBe(true)
-    expect(s.gone('v').has(farthest[0])).toBe(true) // detached pieces ahead of the playhead make room
     expect(s.errors).toEqual([])
     await s.f.close()
+  }, 30_000)
+
+  it('budget full, ensure ahead of the playhead: the target piece is made once and kept, no churn', async () => {
+    const s = await make('h264-ac3-51.mkv', { budget: 1_000_000, readRate: 4 })
+    s.f.start(0, [])
+    await waitFor(() => s.media('v').length > 0, 'first video piece')
+    expect(s.reach('v')).toBeLessThan(11)
+    s.f.ensure('v', 15)
+    await waitFor(() => !!s.at('v', 15), 'piece at 15 s')
+    await s.quiet()
+    expect(s.at('v', 15)).toBeTruthy()
+    expect(s.media('v').length).toBeLessThanOrEqual(4)
+    expect(s.errors).toEqual([])
+    await s.f.close()
+  }, 30_000)
+
+  it('budget full, ensure behind the playhead: regenerated once under a new n and kept, playhead piece kept, no churn', async () => {
+    const s = await make('h264-ac3-51.mkv', { budget: 1_000_000 })
+    s.f.start(0, [])
+    await waitFor(() => s.media('v').length > 0, 'first video piece')
+    s.f.setPlayhead(10)
+    await waitFor(() => !!s.at('v', 10) && !s.at('v', 1), 'piece at 10 s, old pieces gone')
+    const old = s.media('v')[0]!
+    s.f.ensure('v', 1)
+    await waitFor(() => !!s.at('v', 1), 'piece at 1 s again')
+    await s.quiet()
+    expect(s.at('v', 1)![0]).toBeGreaterThan(old[0])
+    expect(s.at('v', 10)).toBeTruthy()
+    expect(s.errors).toEqual([])
+    await s.f.close()
+  }, 30_000)
+
+  it('budget full, addAudio: the new track still gets its first pieces at the playhead, no churn', async () => {
+    const s = await make('h264-ac3-51.mkv', { budget: 1_000_000 })
+    s.f.start(0, [])
+    await waitFor(() => s.media('v').length > 0, 'first video piece')
+    await sleep(300)
+    s.f.addAudio(0)
+    await waitFor(() => !!s.at('a0', 0.5), 'a0 at the playhead')
+    await s.quiet()
+    expect(s.at('a0', 0.5)).toBeTruthy()
+    expect(s.at('v', 0.5)).toBeTruthy()
+    expect(s.errors).toEqual([])
+    await s.f.close()
+  }, 30_000)
+
+  it('a failed run is retried once, then reported; a later ensure() still generates (the track is not capped)', async () => {
+    const b = { ...bins, ffmpeg: bins.ffprobe } // ffprobe refuses ffmpeg's arguments: exit != 0
+    const s = await make('h264-ac3-51.mkv', { bins: b })
+    s.f.start(0, [])
+    await waitFor(() => s.errors.some((e) => e.track === 'v'), 'v error')
+    await sleep(500)
+    expect(s.errors.filter((e) => e.track === 'v')).toHaveLength(1)
+    expect(s.media('v')).toEqual([])
+    b.ffmpeg = bins.ffmpeg
+    s.f.ensure('v', 0)
+    await waitFor(() => s.reach('v') > 19.8, 'v after the retry')
+    await s.f.close()
+  }, 30_000)
+
+  it('a run whose init segment differs from piece 0 is stopped and reported; none of its pieces go out', async () => {
+    const dir = mkdtempSync(join(root, 'swap-'))
+    const path = join(dir, 'film.mkv')
+    copyFileSync(fixture('h264-ac3-51.mkv'), path)
+    const s = await make('', { path, budget: 1_000_000, readRate: 2 })
+    s.f.start(0, [])
+    const has = (t: CinemaTrackId) => s.index.get(t)?.has(0) ?? false
+    await waitFor(() => s.media('v').length > 0 && has('poster') && has('thumbs'), 'first piece and extras')
+    // The budget stopped the run; once its ffmpeg is gone the file can be replaced by another film.
+    await waitFor(() => { try { copyFileSync(fixture('av1-opus-51.mkv'), path); return true } catch { return false } }, 'file swap')
+    s.f.setPlayhead(4)
+    await waitFor(() => s.errors.some((e) => e.track === 'v'), 'init error')
+    expect(s.errors.find((e) => e.track === 'v')!.reason).toMatch(/init segment changed/)
+    expect(s.media('v').map(([n]) => n)).toEqual([1])
+    await s.f.close()
+  }, 30_000)
+
+  it('addSubtitle: relative paths refused; close() waits for an in-flight one, nothing is written afterwards', async () => {
+    const s = await make('h264-ac3-51.mkv')
+    s.f.start(0, [])
+    // Relative to the cwd on the same drive (across drives path.relative is absolute); test-fixtures is gitignored.
+    const rel = join('test-fixtures', 'cinema', `${randomBytes(4).toString('hex')}.srt`)
+    writeFileSync(rel, '1\n00:00:01,000 --> 00:00:02,000\nx\n')
+    try {
+      expect(await s.f.addSubtitle(rel)).toBeNull()
+      const p = s.f.addSubtitle(join(process.cwd(), rel))
+      await s.f.close()
+      await p
+      expect(existsSync(s.dir)).toBe(false)
+    } finally {
+      rmSync(rel, { force: true })
+    }
   }, 30_000)
 
   it('truncated MKV: pieces up to the cut, then onError with a reason, nothing thrown', async () => {

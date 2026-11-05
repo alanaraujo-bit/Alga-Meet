@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -64,6 +64,14 @@ describe.skipIf(!ready)('extras on real fixtures', () => {
     expect(isWebp(out)).toBe(true)
     expect(size(out)).toBe('960,540')
     expect(existsSync(join(dir, 'poster.webp.c0.webp'))).toBe(false)
+  })
+  it('poster: a failed candidate is skipped, none left on disk; all failed -> throws, still clean', async () => {
+    const sub = mkdtempSync(join(dir, 'poster-'))
+    // A 120 s "duration" puts the 25 % and 40 % candidates past the end of the 20 s file.
+    await makePoster(bins, fixture('h264-ac3-51.mkv'), 0, 120, join(sub, 'p.webp'))
+    expect(isWebp(join(sub, 'p.webp'))).toBe(true)
+    await expect(makePoster(bins, fixture('h264-ac3-51.mkv'), 0, 1000, join(sub, 'q.webp'))).rejects.toThrow('no poster frame')
+    expect(readdirSync(sub)).toEqual(['p.webp'])
   })
   it('thumbs: WebP sprite, 10 columns of 160 px, one tile per 10 s', async () => {
     const out = join(dir, 'thumbs.webp')
