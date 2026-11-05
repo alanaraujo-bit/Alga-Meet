@@ -4,6 +4,10 @@ import type {
 } from './models.js'
 import type { Activity, CustomStatus } from './activity.js'
 import type { Entitlements, Gift, SpaceUpgradeState } from './billing.js'
+import type {
+  CinemaClientFrame, CinemaEndReason, CinemaErrorReason, CinemaPieceMeta, CinemaReaction, CinemaSessionView, CinemaSignal,
+  CinemaSummary, CinemaTrackId,
+} from './cinema.js'
 import type { E2eeClientFrame, E2eeCommit, E2eeEpoch, E2eeProposals, E2eeResyncRequired, E2eeWelcome } from './e2ee.js'
 import type { RsvpStatus, SpaceEvent } from './events.js'
 import type { SpaceSound } from './soundboard.js'
@@ -23,6 +27,15 @@ import type { SpaceSound } from './soundboard.js'
  * device named in `e2ee_join` (registered with POST /e2ee/devices by this session) and go only to that device's
  * sockets. Own quota: E2EE_FRAME_LIMIT frames per 60 s per socket, apart from the 120 above; up to E2EE_MAX_FRAME_BYTES
  * per frame (other ops: 16 KiB). Invalid e2ee frames close with 4003 like any other.
+ * Cinema (cinema.ts, docs/superpowers/specs/2026-11-05-sala-de-cinema-design.md §6.2): `cinema_*` ops and `CINEMA_*`
+ * dispatches run a synchronized watch party inside a voice call. One session per channel, at most CINEMA_MAX_SEATS
+ * seats; only users connected to the call may use them (else CINEMA_ERROR `not_in_call`). The host's `cinema_open`
+ * creates the session and `cinema_pieces` indexes the pieces it can serve (hash + size only, never media bytes);
+ * peers fetch pieces over their own RTCPeerConnections, negotiated with `cinema_signal` (relayed as CINEMA_SIGNAL, the
+ * server never reads it). Playback is a server-owned clock: `cinema_control` carries the client's last `seq` and is
+ * refused as `stale` when behind; accepted commands are stamped CINEMA_LEAD_MS ahead and fan out in CINEMA_STATE.
+ * `cinema_time` / CINEMA_PONG sample the clock offset. Own quota: CINEMA_FRAME_LIMIT frames per 60 s per socket, apart
+ * from the 120 above; reactions are rate limited (CINEMA_REACTION_RATE). Invalid cinema frames close with 4003.
  */
 
 export const GatewayClose = {
@@ -55,6 +68,12 @@ export type ClientFrame =
    * epoch 0), `e2ee_commit`, `e2ee_welcome_ack`, `e2ee_resync`. The server answers with E2EE_* dispatches only.
    */
   | E2eeClientFrame
+  /**
+   * Cinema (cinema.ts): `cinema_time`, `cinema_hello`, `cinema_open` (host), `cinema_pieces` (host), `cinema_film`
+   * (host: rename / add subtitle), `cinema_seat`, `cinema_status`, `cinema_control`, `cinema_options` (host),
+   * `cinema_signal`, `cinema_react`, `cinema_end` (host or moderator). The server answers with CINEMA_* dispatches only.
+   */
+  | CinemaClientFrame
 
 export interface ReadyPayload {
   user: Me
@@ -190,6 +209,21 @@ export type Dispatch =
   | { t: 'E2EE_EPOCH'; d: E2eeEpoch }
   /** Only to the device whose frame could not be applied (see E2EE_RESYNC_REASONS for what to do). */
   | { t: 'E2EE_RESYNC_REQUIRED'; d: E2eeResyncRequired }
+  /**
+   * Cinema (cinema.ts), to the users in voice in the session's channel: the full session view on every change (join,
+   * seat, status, playback command, options, film edit), or `ended: true` with the reason and the closing summary.
+   * Also the answer to `cinema_hello` (nothing when no session exists).
+   */
+  | { t: 'CINEMA_STATE'; d: CinemaSessionView | { channelId: string; sessionId: string; ended: true; reason: CinemaEndReason; summary: CinemaSummary } }
+  /** Piece index appended or overwritten by the host (`from` = first piece n); also replayed to a late joiner. */
+  | { t: 'CINEMA_PIECES'; d: { sessionId: string; track: CinemaTrackId; from: number; items: CinemaPieceMeta[] } }
+  /** Only to `to` of the matching `cinema_signal`; `from` is the sender's user id. */
+  | { t: 'CINEMA_SIGNAL'; d: { sessionId: string; from: string; signal: CinemaSignal } }
+  | { t: 'CINEMA_REACTION'; d: { sessionId: string; userId: string; emoji: CinemaReaction; position: number; at: number } }
+  /** Only to the socket that sent `cinema_time`: `c` echoes its clock, `s` is the server clock (ms). */
+  | { t: 'CINEMA_PONG'; d: { c: number; s: number } }
+  /** Only to the socket whose cinema_* frame was refused. */
+  | { t: 'CINEMA_ERROR'; d: { op: string; reason: CinemaErrorReason; sessionId?: string } }
 
 export type DispatchType = Dispatch['t']
 export type DispatchOf<T extends DispatchType> = Extract<Dispatch, { t: T }>['d']
