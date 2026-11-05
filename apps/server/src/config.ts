@@ -92,6 +92,8 @@ const EnvSchema = z
     BILLING_RETURN_URL: z.url().optional(),
     /** Casa Cinema (1080p60 for a Casa's streams): off until the bandwidth deal; refused in production (not built). */
     CASA_CINEMA: bool,
+    /** Sala de Cinema (src/cinema.ts). Default: on outside production; staging sets CINEMA=true explicitly. */
+    CINEMA: z.enum(['true', 'false', '1', '0']).optional().transform((v) => (v === undefined ? undefined : v === 'true' || v === '1')),
     /** Makes RegisterBody.birthDate and termsVersion mandatory outside production (production always requires them). */
     REQUIRE_BIRTHDATE: bool,
     /** Where the published Termos/Política/Diretrizes live (GET /legal links). */
@@ -190,6 +192,7 @@ export interface Config {
   metricsToken: string | undefined
   /** src/e2ee.ts. `dsSeed`: Ed25519 seed of the Delivery Service's external-sender key. */
   e2ee: { dsSeed: Buffer; mlsPkg: string }
+  cinema: { enabled: boolean }
 }
 
 export interface BillingConfig {
@@ -278,5 +281,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     legal: { requireBirthDate: e.NODE_ENV === 'production' || e.REQUIRE_BIRTHDATE, url: e.LEGAL_URL.replace(/\/+$/, '') },
     metricsToken: e.METRICS_TOKEN,
     e2ee: { dsSeed: e.E2EE_DS_KEY ? Buffer.from(e.E2EE_DS_KEY, 'base64') : randomBytes(32), mlsPkg: e.E2EE_MLS_PKG },
+    cinema: { enabled: e.CINEMA ?? e.NODE_ENV !== 'production' },
   }
 }

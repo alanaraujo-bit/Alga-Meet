@@ -1,4 +1,4 @@
-import { ActivitySchema, CustomStatusSchema, E2EE_FRAME_LIMIT, E2eeClientFrameSchema, GatewayClose, clampActivity, type ClientFrame, type ReadyPayload } from '@alga/shared'
+import { ActivitySchema, CINEMA_FRAME_LIMIT, CINEMA_MAX_FRAME_BYTES, CinemaClientFrameSchema, CustomStatusSchema, E2EE_FRAME_LIMIT, E2eeClientFrameSchema, GatewayClose, clampActivity, type ClientFrame, type ReadyPayload } from '@alga/shared'
 import { eq, inArray } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import type { WebSocket } from 'ws'
@@ -29,6 +29,7 @@ const MAX_BUFFERED_BYTES = 1024 * 1024
 const KNOWN_CLOSES = new Set([1000, 1001, 1005, 1006, 1011, ...Object.values(GatewayClose)])
 
 const ClientFrameSchema = z.discriminatedUnion('op', [
+  ...CinemaClientFrameSchema.options,
   z.object({ op: z.literal('identify'), token: z.string().min(1).max(256) }),
   z.object({ op: z.literal('heartbeat') }),
   z.object({ op: z.literal('presence'), status: z.enum(['online', 'idle', 'dnd', 'invisible']) }),
@@ -102,6 +103,7 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
     let windowStart = Date.now()
     let frames = 0
     let e2eeFrames = 0
+    let cinemaFrames = 0
 
     const close = (code: number, reason: string) => {
       if (socket.readyState === socket.OPEN || socket.readyState === socket.CONNECTING) socket.close(code, reason)
@@ -192,6 +194,20 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
         case 'e2ee_resync':
           await ctx.e2ee.handle(conn, frame)
           break
+        case 'cinema_time':
+        case 'cinema_hello':
+        case 'cinema_open':
+        case 'cinema_pieces':
+        case 'cinema_film':
+        case 'cinema_seat':
+        case 'cinema_status':
+        case 'cinema_control':
+        case 'cinema_options':
+        case 'cinema_signal':
+        case 'cinema_react':
+        case 'cinema_end':
+          await ctx.cinema.handle(conn, frame)
+          break
       }
     }
 
@@ -203,17 +219,19 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
       } catch {
         return close(GatewayClose.INVALID_PAYLOAD, 'invalid json')
       }
-      // e2ee_* frames (MLS handshakes, up to E2EE_MAX_FRAME_BYTES) have their own quota and size cap.
+      // e2ee_* frames (MLS handshakes, up to E2EE_MAX_FRAME_BYTES) and cinema_* frames have their own quota (cinema: 16 KiB cap).
       const op = (json as { op?: unknown } | null)?.op
       const e2ee = typeof op === 'string' && op.startsWith('e2ee_')
-      if (!e2ee && raw.length > MAX_FRAME_BYTES) return close(GatewayClose.INVALID_PAYLOAD, 'frame too large')
+      const cinema = typeof op === 'string' && op.startsWith('cinema_')
+      if (!e2ee && raw.length > (cinema ? CINEMA_MAX_FRAME_BYTES : MAX_FRAME_BYTES)) return close(GatewayClose.INVALID_PAYLOAD, 'frame too large')
       const now = Date.now()
       if (now - windowStart >= FRAME_WINDOW_MS) {
         windowStart = now
         frames = 0
         e2eeFrames = 0
+        cinemaFrames = 0
       }
-      const [n, limit] = e2ee ? [++e2eeFrames, E2EE_FRAME_LIMIT] : [++frames, FRAME_LIMIT]
+      const [n, limit] = e2ee ? [++e2eeFrames, E2EE_FRAME_LIMIT] : cinema ? [++cinemaFrames, CINEMA_FRAME_LIMIT] : [++frames, FRAME_LIMIT]
       if (n > limit) {
         if (n === limit + 1) metrics.rateLimited.inc({ route: 'gateway' })
         return close(GatewayClose.RATE_LIMITED, 'rate limited')
@@ -232,6 +250,7 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
       if (!c) return
       const dropped = hub.dropActivity(c)
       const last = hub.remove(c)
+      ctx.cinema.socketClosed(c)
       if (hub.closing || (!last && !dropped)) return
       // Last socket → offline; another device still connected → same status, without this socket's activity.
       broadcastPresence(db, hub, c.userId, last ? 'offline' : undefined).catch((err: unknown) => log.error({ err: safeErr(err) }, 'presence broadcast failed'))

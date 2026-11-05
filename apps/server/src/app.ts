@@ -10,6 +10,7 @@ import { Billing } from './billing/billing.js'
 import { maxPlanAttachmentBytes } from './billing/catalog.js'
 import type { Config } from './config.js'
 import { openDatabase, type Db } from './db/index.js'
+import { Cinema } from './cinema.js'
 import { E2ee } from './e2ee.js'
 import { Mailer, createEmailSender } from './email.js'
 import { HttpError, installErrorHandling, safeUrl } from './errors.js'
@@ -51,6 +52,7 @@ export interface Ctx {
   hub: Hub
   voice: Voice
   e2ee: E2ee
+  cinema: Cinema
   files: Files
   mail: Mailer
   billing: Billing
@@ -97,7 +99,9 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   await billing.syncCatalog()
   // trust/privacy take the whole Ctx (they use every other service); assigned right below.
   const e2ee = new E2ee(config, database.db, hub, voice, app.log)
-  const ctx = { config, db: database.db, hub, voice, e2ee, files, mail, billing, telemetry: new Telemetry(database.db, app.log), log: app.log } as Ctx
+  // After E2ee: both chain onto voice.onLeave.
+  const cinema = new Cinema(config, database.db, hub, voice, app.log)
+  const ctx = { config, db: database.db, hub, voice, e2ee, cinema, files, mail, billing, telemetry: new Telemetry(database.db, app.log), log: app.log } as Ctx
   ctx.trust = new TrustSafety(ctx)
   ctx.privacy = new Privacy(ctx)
   ctx.events = new Events(ctx)
@@ -127,6 +131,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     await billing.stop()
     voice.stop()
     e2ee.stop()
+    cinema.stop()
     await database.close()
   })
 
