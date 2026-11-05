@@ -7,6 +7,15 @@ process.stdin.on('data', (d) => (raw += d)).on('end', () => {
   if (process.stdout.isTTY) fail('stdout is a terminal; pipe it into ssh/a file so the secret is not printed')
   let v
   try { v = JSON.parse(raw) } catch { fail('stdin is not JSON (did `railway variables --json` fail? run `railway link`)') }
+  const secretOnly = process.argv.includes('--cinema-secret-only')
+  if (secretOnly) {
+    // Append mode (README §11): prints only the relay secret line, for `>> .env`; the existing .env is never rewritten.
+    const t = v.CINEMA_TURN_SECRET
+    if (!t || t.length < 32) fail('CINEMA_TURN_SECRET missing or shorter than 32 characters on this Railway service')
+    process.stdout.write(`CINEMA_TURN_SECRET=${t}\n`)
+    console.error('railway-env: wrote CINEMA_TURN_SECRET=(hidden)')
+    process.exit(0)
+  }
   const key = v.LIVEKIT_API_KEY, secret = v.LIVEKIT_API_SECRET
   if (!key || !secret) fail('LIVEKIT_API_KEY / LIVEKIT_API_SECRET not set on this Railway service')
   if (key === 'devkey' || secret.length < 32) fail('refusing the dev key pair or a secret shorter than 32 characters')

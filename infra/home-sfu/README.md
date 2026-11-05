@@ -88,6 +88,8 @@ Na Huawei: **Encaminhamento / Port Mapping / NAT → Port Mapping**, uma regra p
 | alga-ice-tcp | TCP | 7881 | 192.168.1.110 | 7881 |
 | alga-media | UDP | 7882 | 192.168.1.110 | 7882 |
 | alga-turn | UDP | 3478 | 192.168.1.110 | 3478 |
+| alga-cinema-turn | TCP e UDP | 3479 | 192.168.1.110 | 3479 |
+| alga-cinema-relay | UDP | 49160-49200 | 192.168.1.110 | 49160-49200 |
 
 - Não encaminhe 22 (SSH). Para acessar de fora, use Tailscale (já instalado no PC de desenvolvimento).
 - Se o provedor bloquear a porta 80 de entrada, o Caddy tenta o desafio TLS-ALPN pelo 443. Se o certificado não sair
@@ -311,7 +313,7 @@ Conferido em 2026-11-01 na documentação da Oracle
   `sa-saopaulo-1` ([Oracle Community](https://community.oracle.com/customerconnect/discussions/tagged/arm)). Tente
   outro horário ou um formato menor (1 OCPU/6 GB).
 
-Na VM, use este kit com `UPNP=0`. Libere as mesmas 5 portas em dois lugares:
+Na VM, use este kit com `UPNP=0`. Libere as mesmas 5 portas (mais 3479 TCP/UDP e 49160-49200/UDP se usar o relay da Sala de Cinema, §11) em dois lugares:
 - na **Security List** da VCN;
 - no firewall da própria VM (as imagens Ubuntu da Oracle vêm com regras iptables que bloqueiam quase tudo).
 
@@ -326,15 +328,19 @@ aceita credenciais do LiveKit. Por isso o kit tem um **coturn** (serviço `cotur
 |---|---|
 | Porta de escuta | **3479** TCP e UDP |
 | Portas de relay | **49160-49200/udp** (41 portas) |
-| Teto | **30 Mbps somando todos os relays** (`bps-capacity`/`max-bps` no `turnserver.conf`) |
+| Teto | **30 Mbps somando todos os relays** (`bps-capacity=3750000` bytes/s) e **10 Mbps por sessão** (`max-bps=1250000` bytes/s). O coturn conta em **bytes** por segundo. Cotas: 4 alocações por credencial, 12 no total |
 | Credenciais | TURN REST: usuário `<expiraUnix>:<idDoUsuario>`, senha `base64(HMAC-SHA1(segredo, usuário))`, emitidas pela API |
 | Segredo | `CINEMA_TURN_SECRET`, o mesmo na API (Railway) e no `.env` do servidor. Nunca no git |
 | Realm / IP | `<sub>.duckdns.org`; o IP público é lido desse nome ao subir, e o `ipwatch.sh` recria o coturn se mudar |
 
-- `denied-peer-ip` recusa toda faixa privada (10/8, 172.16/12, 192.168/16, 100.64/10, loopback, link-local, ULA): o
-  relay não vira porta para a rede da casa. `no-cli`, `no-multicast-peers` e `no-tcp-relay` também estão ligados.
+- `denied-peer-ip` recusa toda faixa privada (10/8, 172.16/12, 192.168/16, 100.64/10, 198.18/15, 192.0.0/24, loopback,
+  link-local) e **todo IPv6** (o relay é só IPv4). Também recusa o **IP público da própria casa**: o entrypoint lê o IP
+  do nome DuckDNS ao subir e o passa como `--denied-peer-ip`, então, se o roteador fizer NAT loopback, o relay não
+  alcança os serviços da casa por ele. Nada disso leva IP real para o git. O relay não vira porta para a rede da casa. `no-cli`, `no-multicast-peers` e `no-tcp-relay` também estão ligados.
 - O coturn não mascara IPs nos logs; eles rodam em 10 MB x 3 e não vão a lugar nenhum.
-- O serviço `upnp` abre 48 mapeamentos (as 7 portas fixas + 41 de relay, UPnP não tem faixa). Se o roteador recusar
+- **Opcional**: o `coturn` é um perfil do compose (`cinema`). Sem `CINEMA_TURN_SECRET` no `.env` o `install.sh` só avisa e
+  não o sobe; o SFU não depende dele.
+- Com o segredo, o serviço `upnp` abre 48 mapeamentos (5 do SFU + 3479 TCP/UDP + 41 de relay, UPnP não tem faixa); sem ele, 5. Se o roteador recusar
   tantos, encaminhe à mão as portas acima e ponha `UPNP=0` (§2).
 - Mesma limitação do TURN do LiveKit: sem NAT loopback no roteador, só o teste de fora de casa vale (§7).
 
@@ -346,13 +352,10 @@ No PC, na raiz do repositório, com o Railway CLI logado. O segredo nasce e viaj
 # 1. gera o segredo direto para o Railway e liga a feature no staging (3 variáveis; o Railway redeploya a API)
 node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))" | railway variable set -s api -e staging CINEMA_TURN_SECRET --stdin
 railway variable set -s api -e staging CINEMA=true CINEMA_TURN_URLS="turn:<sub>.duckdns.org:3479?transport=udp,turn:<sub>.duckdns.org:3479?transport=tcp"
-# 2. leva o segredo (e o resto do .env) do Railway para o servidor, sem mostrar
-railway variables -s api -e staging --json | node infra/home-sfu/railway-env.mjs | ssh <usuario>@<ip-do-servidor> "umask 077; mkdir -p ~/alga-sfu; cat > ~/alga-sfu/.env"
+# 2. acrescenta SÓ a linha CINEMA_TURN_SECRET ao .env existente do servidor (nunca reescreve o arquivo)
+railway variables -s api -e staging --json | node infra/home-sfu/railway-env.mjs --cinema-secret-only | ssh <usuario>@<ip-do-servidor> "umask 077; { echo; cat; } >> ~/alga-sfu/.env"
 ```
 
-- O passo 2 recria o `.env` do zero e apaga o que é só do servidor (`DUCKDNS_SUBDOMAIN`, `DUCKDNS_TOKEN`, `UPNP_URL`
-  etc.). Num servidor que já roda, faça antes `cp ~/alga-sfu/.env ~/alga-sfu/.env.bak` e depois reponha essas linhas
-  a partir do backup (§4), ou grave o passo 2 em outro arquivo e copie só a linha `CINEMA_TURN_SECRET`.
 - Confira só os nomes: `ssh <usuario>@<ip-do-servidor> "cut -d= -f1 ~/alga-sfu/.env"` deve listar `CINEMA_TURN_SECRET`.
 
 No servidor (ou por `ssh`), copie o kit (§5) e rode:
@@ -361,7 +364,7 @@ No servidor (ou por `ssh`), copie o kit (§5) e rode:
 cd ~/alga-sfu && bash install.sh && ./doctor.sh
 ```
 
-O `doctor.sh` deve mostrar `coturn ... 3479/udp responde`, `coturn anuncia o IP público` e 48 encaminhamentos UPnP.
+O `doctor.sh` deve mostrar `coturn ... 3479/udp responde`, `coturn anuncia o IP público` e 48 encaminhamentos UPnP. Sem o segredo no `.env`, o `install.sh` avisa e o coturn simplesmente não sobe.
 Teste o relay com um `turnutils_uclient` e uma credencial gerada como a API gera (`docker run --rm --network host
 coturn/coturn:4.7.0 turnutils_uclient -u <expiraUnix>:teste -w <credencial> -p 3479 -y <sub>.duckdns.org`).
 

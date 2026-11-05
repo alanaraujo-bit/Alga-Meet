@@ -34,7 +34,8 @@ aaaa=$(getent ahostsv6 "$DOMAIN" 2>/dev/null | awk '$1 !~ /^::ffff:/ {print $1; 
 
 echo "== Contêineres"
 docker compose ps --format '  {{.Service}}: {{.State}} {{.Health}}' 2>/dev/null || fail "docker compose indisponível"
-for s in livekit caddy duckdns upnp coturn; do
+turn_on=$([ -n "$(get CINEMA_TURN_SECRET)" ] && echo 1 || echo 0)   # coturn is optional (README §11)
+for s in livekit caddy duckdns upnp; do
   st=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q "$s" 2>/dev/null)" 2>/dev/null)
   [ "$st" = healthy ] || fail "$s: ${st:-parado} (docker compose logs --tail 30 $s)"
 done
@@ -51,9 +52,10 @@ if [ -f /etc/ufw/ufw.conf ] && grep -q '^ENABLED=yes' /etc/ufw/ufw.conf; then
 else echo "  ufw inativo"; fi
 
 echo "== Roteador (UPnP)"
+need=5; [ "$turn_on" = 1 ] && need=48   # 5 SFU ports + coturn 3479 tcp/udp + 41 relay ports
 maps=$(docker compose exec -T upnp upnpc -l 2>/dev/null | tr -d '\r' | grep "'alga-sfu'" || true)
 if [ "$(get UPNP)" = 0 ]; then echo "  UPNP=0: portas encaminhadas à mão (README §2)"
-elif [ "$(echo "$maps" | grep -c .)" -ge 48 ]; then pass "48 encaminhamentos UPnP ativos (inclui o coturn)"; echo "$maps" | sed 's/^/   /'
+elif [ "$(echo "$maps" | grep -c .)" -ge "$need" ]; then pass "$need encaminhamentos UPnP ativos"; echo "$maps" | sed 's/^/   /'
 else fail "encaminhamentos UPnP incompletos (docker compose logs upnp):"; echo "$maps" | sed 's/^/   /'; fi
 
 echo "== TLS (certificados Let's Encrypt)"
@@ -85,10 +87,15 @@ if [ -n "$pub4" ]; then
   else warn "sem NAT loopback (443: ${h1:-falhou}, 3478/udp: ${h2:-falhou}): TURN não vai funcionar; voz/tela seguem por 7882/udp e 7881/tcp. Teste de fora: README §7"; fi
 fi
 
-# coturn answers a STUN binding request without credentials; the relay itself needs a TURN REST credential (README).
-[ "$(stun 127.0.0.1 3479)" = ok ] && pass "coturn (Sala de Cinema) 3479/udp responde (local)" || fail "coturn 3479/udp não responde localmente (docker compose logs --tail 30 coturn)"
-ext=$(docker compose exec -T coturn cat /tmp/ext-ip 2>/dev/null | tr -d '\r')
-[ -n "$ext" ] && [ "$ext" = "$pub4" ] && pass "coturn anuncia o IP público ($ext)" || fail "coturn anuncia '${ext:-?}', IP público é ${pub4:-?} (./ipwatch.sh corrige)"
+# coturn (Sala de Cinema, optional): STUN binding request works without credentials; the relay needs a TURN REST one.
+if [ "$turn_on" = 1 ]; then
+  tid=$(docker ps -q --filter label=com.docker.compose.project=alga-sfu --filter label=com.docker.compose.service=coturn)
+  st=$([ -n "$tid" ] && docker inspect -f '{{.State.Health.Status}}' "$tid" 2>/dev/null)
+  [ "$st" = healthy ] && pass "coturn: contêiner saudável" || fail "coturn: ${st:-parado} (docker compose --profile cinema logs --tail 30 coturn)"
+  [ "$(stun 127.0.0.1 3479)" = ok ] && pass "coturn 3479/udp responde (local)" || fail "coturn 3479/udp não responde localmente"
+  ext=$([ -n "$tid" ] && docker exec "$tid" cat /tmp/ext-ip 2>/dev/null | tr -d '\r')
+  [ -n "$ext" ] && [ "$ext" = "$pub4" ] && pass "coturn anuncia o IP público ($ext)" || fail "coturn anuncia '${ext:-?}', IP público é ${pub4:-?} (./ipwatch.sh corrige)"
+else echo "  relay da Sala de Cinema (coturn): desligado (sem CINEMA_TURN_SECRET no .env, README §11)"; fi
 
 echo "== Sistema"
 rm=$(cat /proc/sys/net/core/rmem_max); wm=$(cat /proc/sys/net/core/wmem_max)

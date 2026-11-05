@@ -69,15 +69,20 @@ services:
     # Host network: a relay needs real ports and real source IPs for denied-peer-ip; the upnp service forwards them.
     # Secret and realm come from .env, never from a file. The public IP is learned at startup (DuckDNS name) and
     # ipwatch.sh recreates the container when it changes.
+    # Optional: profile "cinema", started by install.sh only when CINEMA_TURN_SECRET is in .env. Without the profile
+    # nothing here runs and nothing here can break the SFU (the secret is NOT required by compose).
+    # The home's own public IP is also denied as a peer (hairpin NAT would otherwise reach the home's services).
+    profiles: [cinema]
     image: coturn/coturn:4.7.0
     entrypoint:
       - /bin/sh
       - -c
       - |
+        [ -n "$$CINEMA_TURN_SECRET" ] || { echo "CINEMA_TURN_SECRET empty: refusing to start"; exit 1; }
         ip=$$(getent ahostsv4 "$$REALM" | awk 'NR==1 {print $$1}')
         echo "$$ip" > /tmp/ext-ip
         exec turnserver -c /etc/coturn/turnserver.conf --realm="$$REALM" --static-auth-secret="$$CINEMA_TURN_SECRET" \
-          $${ip:+--external-ip="$$ip"}
+          $${ip:+--external-ip="$$ip" --denied-peer-ip="$$ip"}
     restart: unless-stopped
     network_mode: host
     read_only: true
@@ -85,10 +90,17 @@ services:
     security_opt: [no-new-privileges:true]
     environment:
       REALM: "${DUCKDNS_SUBDOMAIN:?missing in .env}.duckdns.org"
-      CINEMA_TURN_SECRET: "${CINEMA_TURN_SECRET:?missing in .env (README, Relay da Sala de Cinema)}"
+      CINEMA_TURN_SECRET: "${CINEMA_TURN_SECRET:-}"
     volumes:
       - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
     tmpfs: [/tmp]
+    healthcheck:
+      # No tools needed: 3479 = 0x0D97 is listening on UDP (host network, so /proc/net is the host's).
+      test: ["CMD", "sh", "-c", "grep -qi ':0D97 ' /proc/net/udp /proc/net/udp6"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     logging: *logging
 
   duckdns:
@@ -133,6 +145,7 @@ services:
       UPNP: "${UPNP:-1}"
       UPNP_LAN_IP: "${UPNP_LAN_IP:-}"   # empty = this host's LAN IP (route to the internet)
       UPNP_URL: "${UPNP_URL:-}"         # IGD description URL; set when SSDP discovery is blocked (ufw)
+      CINEMA_RELAY: "${CINEMA_TURN_SECRET:+1}"   # coturn enabled: also map its ports (the secret itself is not read)
     volumes:
       - ./upnp.sh:/upnp.sh:ro
     tmpfs: [/tmp]

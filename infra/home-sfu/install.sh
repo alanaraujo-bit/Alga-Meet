@@ -34,7 +34,7 @@ ENV=$DIR/.env
 chmod 600 "$ENV"
 sed -i 's/\r$//' "$ENV"                     # created from Windows/PowerShell: strip CRLF, or the secret gets a \r
 get() { grep -m1 "^$1=" "$ENV" | cut -d= -f2- || true; }
-for k in LIVEKIT_API_KEY LIVEKIT_API_SECRET ALGA_API_URL DUCKDNS_SUBDOMAIN DUCKDNS_TOKEN CINEMA_TURN_SECRET; do
+for k in LIVEKIT_API_KEY LIVEKIT_API_SECRET ALGA_API_URL DUCKDNS_SUBDOMAIN DUCKDNS_TOKEN; do
   [ -n "$(get "$k")" ] || die "$k vazio ou ausente em .env (README §4)"
 done
 key=$(get LIVEKIT_API_KEY); api=$(get ALGA_API_URL); sub=$(get DUCKDNS_SUBDOMAIN)
@@ -49,11 +49,21 @@ DOMAIN=$sub.duckdns.org
 for kv in "ALGA_UID=$(id -u)" "ALGA_GID=$(id -g)"; do
   grep -q "^${kv%%=*}=" "$ENV" && sed -i "s/^${kv%%=*}=.*/$kv/" "$ENV" || echo "$kv" >> "$ENV"
 done
+# Cinema relay (coturn) is optional: only with CINEMA_TURN_SECRET (README §11). Without it the SFU is untouched.
+PROFILE=(); TURN=0
+if [ -n "$(get CINEMA_TURN_SECRET)" ]; then
+  [ "$(get CINEMA_TURN_SECRET | wc -c)" -gt 32 ] || die "CINEMA_TURN_SECRET com menos de 32 caracteres"
+  PROFILE=(--profile cinema); TURN=1
+else
+  warn "sem CINEMA_TURN_SECRET no .env: o relay da Sala de Cinema (coturn) não sobe (README §11)"
+fi
 ok ".env completo (modo 600), domínio $DOMAIN, API $api, chave $key"
 
 # --- 4. Ports free (unless it is this stack holding them) -------------------------------------------------------
 if [ -z "$(docker compose ps -q 2>/dev/null)" ]; then
-  busy=$(ss -Htlnu 2>/dev/null | awk '{print $1, $5}' | grep -E '^(tcp [^ ]*:(80|443|7881|3479)|udp [^ ]*:(7882|3478|3479))$' || true)
+  busy=$(ss -Htlnu 2>/dev/null | awk '{print $1, $5}' | grep -E '^(tcp [^ ]*:(80|443|7881)|udp [^ ]*:(7882|3478))$' || true)
+  [ "$TURN" = 0 ] || busy="$busy $(ss -Htlnu 2>/dev/null | awk '{print $1, $5}' | grep -E '^(tcp|udp) [^ ]*:3479$' || true)"
+  busy=${busy# }
   [ -z "$busy" ] || die "portas já em uso por outro serviço: $(echo $busy)"
   ok "portas 80, 443, 7881/tcp e 7882, 3478/udp livres"
 fi
@@ -69,9 +79,9 @@ mkdir -p caddy_data
 ok "livekit.yaml e caddy.yaml gerados"
 
 # --- 6. Start ---------------------------------------------------------------------------------------------------
-docker compose pull --quiet livekit caddy duckdns coturn
+docker compose pull --quiet livekit caddy duckdns "${PROFILE[@]}"
 docker compose build --quiet upnp
-docker compose up -d --remove-orphans
+docker compose "${PROFILE[@]}" up -d --remove-orphans
 for _ in $(seq 30); do
   [ "$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q livekit)" 2>/dev/null)" = healthy ] && break
   sleep 2

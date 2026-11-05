@@ -2,9 +2,13 @@
 # UPnP port mapper (runs in the `upnp` container, host network). Asks the router to forward the SFU ports to this
 # host, refreshes every 20 min (1 h lease), and deletes the mappings when the container stops (compose down/stop).
 set -u
-MAPS="80/TCP 443/TCP 7881/TCP 7882/UDP 3478/UDP 3479/TCP 3479/UDP"
-# coturn relay range (turnserver.conf min-port/max-port): one mapping per port, UPnP has no ranges.
-for p in $(seq 49160 49200); do MAPS="$MAPS $p/UDP"; done
+MAPS="80/TCP 443/TCP 7881/TCP 7882/UDP 3478/UDP"
+# coturn relay (only when CINEMA_TURN_SECRET is in .env): 3479 and its relay range (turnserver.conf min-port/max-port),
+# one mapping per port, UPnP has no ranges.
+if [ -n "${CINEMA_RELAY:-}" ]; then
+  MAPS="$MAPS 3479/TCP 3479/UDP"
+  for p in $(seq 49160 49200); do MAPS="$MAPS $p/UDP"; done
+fi
 total=$(echo $MAPS | wc -w)
 
 if [ "${UPNP:-1}" = 0 ]; then
