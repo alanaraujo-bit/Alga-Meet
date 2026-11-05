@@ -181,14 +181,15 @@ export class Cinema {
 
   // ---- ops ----------------------------------------------------------------------------------------------------------
 
+  /** No session in the caller's call → not_found: a client that missed the end (gateway down) drops what it still shows. */
   private async hello(conn: Conn): Promise<void> {
     const uid = conn.userId
     let s = this.sessionIn(uid)
-    if (!s) return
+    if (!s) return this.error(conn, 'cinema_hello', 'not_found')
     if (s.seats.has(uid) || (uid === s.hostId && s.hostAway)) {
       await this.loadBlocks(s, uid)
       s = this.sessionIn(uid)
-      if (!s) return
+      if (!s) return this.error(conn, 'cinema_hello', 'not_found')
     }
     const seat = s.seats.get(uid)
     if (seat) seat.conn = conn

@@ -379,6 +379,17 @@ describe('cinema', () => {
     } finally { s.app.ctx.cinema.timings.hostAwayMs = CINEMA_HOST_AWAY_MS }
   })
 
+  it('hello with no session in the caller call answers not_found (also after the session ended)', async () => {
+    const x = await setup()
+    x.gb.send({ op: 'cinema_hello' })
+    expect(await x.gb.waitFor('CINEMA_ERROR')).toEqual({ op: 'cinema_hello', reason: 'not_found' })
+    const st = await open(x)
+    x.ga.send({ op: 'cinema_end', sessionId: st.sessionId })
+    await x.gb.waitFor('CINEMA_STATE', (d) => 'ended' in d)
+    x.gb.send({ op: 'cinema_hello' })
+    expect(await x.gb.waitFor('CINEMA_ERROR')).toEqual({ op: 'cinema_hello', reason: 'not_found' })
+  })
+
   it('call_empty ends the session', async () => {
     const x = await setup()
     await open(x)
