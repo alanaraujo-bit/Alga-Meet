@@ -1,7 +1,7 @@
 {
   "name": "@alga/desktop",
   "productName": "Alga Meet",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": true,
   "description": "Alga Meet — voz, transmissão de tela e comunidades.",
   "author": "Alga",

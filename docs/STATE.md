@@ -1,5 +1,25 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-05 noite — Loja (pacote C) e transmissão de jogos terminadas (release v0.1.8)
+- **Origem:** o trabalho que estava parado sem commit no checkout principal desde 01/11 (agentes interrompidos). Foi salvo
+  como commit (`f02c590`) e terminado na branch `feat/store-media`. Cópia de segurança do WIP em `refs/backup/wip-2026-11-05c`.
+- **Pacote C:**
+  - Loja Hora Azul, provador (perfil e chamada), conjuntos, lista de desejos.
+  - Presentes com revelação, Plus v2 (guarda-roupa, selo, passes), Casa do espaço.
+  - **Correções:** a amostra de aura do Plus passava o registro de cobrança como usuário e quebrava com o Eco; tirado o `<Kbd>Esc</Kbd>` fixo das Configurações.
+  - O E2E (`scripts/cosmetics-store.mjs`) está todo verde, já ajustado ao lobby da 0.1.6.
+  - **Pagamentos seguem desligados no staging:** aviso na tela e compra desativada.
+- **Mídia:**
+  - A captura sobe a prioridade dos processos do app e pede 20 % de folga.
+  - Jogo pesado de CPU: 5–9 fps → 58–60 fps, com o jogo intacto.
+  - O cartão "Você está ao vivo" mostra o motivo quando a transmissão fica abaixo da meta (`diagnoseSend`, com teste).
+  - Relatório em `docs/benchmarks/game-capture.md`.
+  - **Limite conhecido:** a janela de um jogo em modo janela com tamanho ímpar cai no OpenH264. Próximo passo: arredondar a captura.
+- **Verificado:** shared 17, desktop 348, servidor 256; E2E fundamentos 22/22; E2E da loja verde; medições novas no `game-capture.json` (`after-cpu16`, `after-idle`).
+- **Fora do git de propósito (repositório público):**
+  - `docs/research/discord/` e `docs/research/mascots/`: análise de concorrente;
+  - `docs/brand/mascote/ref/` e os prompts e imagens do Gemini: imagens de terceiros.
+
 ## 2026-11-05 tarde (2) — Instalador, atualização e desinstalação próprios (branch `feat/installer`, NÃO publicada)
 - **O que muda:** o NSIS continua fazendo o trabalho (arquivos, registro, atalhos, atualização silenciosa do
   electron-updater). O que a pessoa vê é a nossa janela, `alga-setup-ui.exe`:
