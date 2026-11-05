@@ -10,6 +10,7 @@ import { useData } from '@/store/data'
 import { useUi, type ModalState } from '@/store/ui'
 import { Button, Icon, Modal, SegmentedControl, Spinner, TextField, toast } from '@/ui'
 import { initials } from '@/ui/Avatar'
+import { useDeepLink } from '../app/deepLinks'
 import { needsVerification, openVerifyEmail } from '../auth/VerifyEmail'
 import { t as ta } from '../auth/strings'
 import { finishOnboarding } from '../onboarding/Onboarding'
@@ -143,8 +144,16 @@ function JoinSpaceModal({ open, onClose, initial }: { open: boolean; onClose: ()
   const inv = preview.state === 'ok' ? preview.invite! : null
   const already = !!(inv && spaces[inv.space.id])
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
+  // Came from "create your account to join": the account was the yes, so enter right away (once).
+  useEffect(() => {
+    if (!open || !inv || !useDeepLink.getState().autoJoin) return
+    useDeepLink.setState({ autoJoin: false })
+    void submit()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once per preview
+  }, [open, inv])
+
+  const submit = async (e?: FormEvent) => {
+    e?.preventDefault()
     if (!inv) return
     if (already) {
       onClose()
@@ -197,7 +206,7 @@ function JoinSpaceModal({ open, onClose, initial }: { open: boolean; onClose: ()
                 <strong>{inv.space.name}</strong>
                 <span>
                   <Icon icon={Users} size={12} /> {t.join.members(inv.memberCount)}
-                  {users[inv.inviterId] && <> · {t.join.invitedBy(users[inv.inviterId]!.displayName)}</>}
+                  {(inv.inviter ?? users[inv.inviterId]) && <> · {t.join.invitedBy((inv.inviter ?? users[inv.inviterId])!.displayName)}</>}
                 </span>
                 {already && <span className={s.already}>{t.join.already}</span>}
               </div>

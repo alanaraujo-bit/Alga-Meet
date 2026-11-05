@@ -10,11 +10,11 @@ import { assertOutranks, channelAudience, memberPermissions, requireActor, requi
 import type { Ctx } from '../app.js'
 import { requireVerifiedEmail } from '../auth.js'
 import { isUniqueViolation, type Db } from '../db/index.js'
-import { channels, invites, roles, spaceBans, spaceMembers, spaces, type InviteRow, type SpaceRow } from '../db/schema.js'
+import { channels, invites, roles, spaceBans, spaceMembers, spaces, users, type InviteRow, type SpaceRow } from '../db/schema.js'
 import { badRequest, forbidden, idParam, invalid, notFound, parse } from '../errors.js'
 import { exchangePresence } from '../gateway/hub.js'
 import { perMinute, swapImageKeys } from './users.js'
-import { channelView, memberView, spaceSnapshots, spaceView } from '../views.js'
+import { channelView, memberView, publicUser, spaceSnapshots, spaceView } from '../views.js'
 
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
@@ -96,7 +96,8 @@ export function invitePublicRoutes(app: FastifyInstance, { db }: Ctx): void {
   app.get<{ Params: { code: string } }>('/invites/:code', { config: perMinute(30) }, async (req): Promise<Invite> => {
     const found = await loadInvite(db, codeParam(req.params.code))
     if (!found || !usable(found.invite)) throw notFound('Convite inválido ou expirado.')
-    return inviteView(db, found.invite, found.space)
+    const [inviter] = await db.select().from(users).where(eq(users.id, found.invite.inviterId))
+    return { ...(await inviteView(db, found.invite, found.space)), ...(inviter ? { inviter: publicUser(inviter) } : {}) }
   })
 }
 

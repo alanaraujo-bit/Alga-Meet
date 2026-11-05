@@ -11,7 +11,14 @@ export const t = {
     switchAction: 'Criar conta',
     forgot: 'Esqueci minha senha',
     resetDone: 'Senha trocada. Entre com a nova senha.',
-    invite: 'Você abriu um convite. Entre ou crie sua conta e ele abre em seguida.',
+    invite: 'Assim que você entrar, já cai lá dentro.',
+  },
+  /** The invite that brought someone here, above the form (InviteWelcome). */
+  invite: {
+    from: (name: string) => `${name} te chamou para`,
+    generic: 'Você foi chamado para',
+    members: (n: number) => (n === 1 ? '1 pessoa já está lá' : `${n} pessoas já estão lá`),
+    gone: 'Este convite não vale mais. Você ainda pode criar sua conta e pedir outro.',
   },
   forgot: {
     title: 'Redefinir senha',

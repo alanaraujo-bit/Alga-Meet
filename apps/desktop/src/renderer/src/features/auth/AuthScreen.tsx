@@ -1,13 +1,14 @@
-import { MIN_AGE, MIN_PASSWORD_LENGTH, ageOn } from '@alga/shared'
+import { MIN_AGE, MIN_PASSWORD_LENGTH, ageOn, type Invite } from '@alga/shared'
 import { AlertCircle, CheckCircle2, Info } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { ApiRequestError } from '@/lib/api'
 import { errorText, fieldErrors } from '@/lib/errors'
 import { parseEmailToken } from '@/lib/files'
-import { confirmPasswordReset, requestPasswordReset } from '@/store/actions'
+import { confirmPasswordReset, previewInvite, requestPasswordReset } from '@/store/actions'
 import { useSession } from '@/store/session'
-import { Button, Icon, TextField } from '@/ui'
+import { Avatar, Button, Icon, TextField } from '@/ui'
+import { hueFor, initials } from '@/ui/Avatar'
 import { EASE_OUT_QUART } from '@/ui/motion'
 import { useDeepLink } from '../app/deepLinks'
 import { LogoMark } from '../app/Logo'
@@ -44,6 +45,11 @@ export function AuthScreen() {
     go('reset')
   }, [resetToken])
   const invite = useDeepLink((x) => !!x.inviteCode)
+  // Whoever arrives through a friend's invite most likely has no account yet: start on "Criar conta".
+  useEffect(() => {
+    if (invite) setMode((m) => (m === 'login' ? 'register' : m))
+  }, [invite])
+  const welcome = invite && (mode === 'login' || mode === 'register')
   return (
     <main className={s.screen}>
       <AnimatePresence mode="wait" initial={false}>
@@ -54,9 +60,13 @@ export function AuthScreen() {
           animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: EASE_OUT_QUART } }}
           exit={{ opacity: 0, transition: { duration: 0.1 } }}
         >
-          <div className={s.mark}>
-            <LogoMark size={40} />
-          </div>
+          {welcome ? (
+            <InviteWelcome />
+          ) : (
+            <div className={s.mark}>
+              <LogoMark size={40} />
+            </div>
+          )}
           {mode === 'login' && <LoginForm resetDone={!!note.resetDone} invite={invite} onSwitch={() => go('register')} onForgot={() => go('forgot')} />}
           {mode === 'register' && <RegisterForm invite={invite} onSwitch={() => go('login')} />}
           {mode === 'forgot' && <ForgotForm onSent={(email) => go('reset', { sentTo: email })} onHaveCode={() => go('reset')} onBack={() => go('login')} />}
@@ -115,6 +125,60 @@ function FormInfo({ text }: { text: string }) {
       <Icon icon={Info} size={14} />
       <span>{text}</span>
     </div>
+  )
+}
+
+/**
+ * The invite that brought you here, in place of the mark: the friend's face over the space's tile, "Ana te chamou
+ * para · Galera", and how many are already there. The preview is public (no account needed).
+ */
+function InviteWelcome() {
+  const code = useDeepLink((x) => x.inviteCode)
+  const [inv, setInv] = useState<Invite | 'gone' | null>(null)
+  useEffect(() => {
+    if (!code) return setInv(null)
+    let live = true
+    previewInvite(code).then(
+      (i) => live && setInv(i),
+      () => live && setInv('gone'),
+    )
+    return () => {
+      live = false
+    }
+  }, [code])
+  if (!inv)
+    return (
+      <div className={s.mark}>
+        <LogoMark size={40} />
+      </div>
+    )
+  if (inv === 'gone')
+    return (
+      <div className={s.invite}>
+        <div className={s.mark} style={{ marginBottom: 0 }}>
+          <LogoMark size={40} />
+        </div>
+        <span className={s.inviteMeta}>{t.invite.gone}</span>
+      </div>
+    )
+  return (
+    <motion.div className={s.invite} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0, transition: { duration: 0.28, ease: EASE_OUT_QUART } }}>
+      <div className={s.inviteFaces} aria-hidden>
+        {inv.inviter && (
+          <span className={s.inviteFace}>
+            <Avatar user={inv.inviter} size={40} decorative />
+          </span>
+        )}
+        <span className={s.inviteTile} style={{ ['--tile-h' as string]: hueFor(inv.space.id) }}>
+          {inv.space.iconUrl ? <img src={inv.space.iconUrl} alt="" /> : initials(inv.space.name)}
+        </span>
+      </div>
+      <p className={s.inviteLead}>
+        {inv.inviter ? t.invite.from(inv.inviter.displayName) : t.invite.generic}
+        <strong>{inv.space.name}</strong>
+      </p>
+      <span className={s.inviteMeta}>{t.invite.members(inv.memberCount)}</span>
+    </motion.div>
   )
 }
 

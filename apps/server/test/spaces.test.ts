@@ -126,6 +126,9 @@ describe('invites', () => {
     const preview = await api<Invite>(s.app, 'GET', `/invites/${code}`) // no auth
     expect(preview.status).toBe(200)
     expect(preview.body.space).toMatchObject({ id: space.id, name: 'Público' })
+    // A new person sees who called them: the inviter's public profile only (no e-mail).
+    expect(preview.body.inviter).toMatchObject({ id: owner.user.id, displayName: owner.user.displayName })
+    expect(preview.body.inviter).not.toHaveProperty('email')
 
     const gwOwner = await connect(s.port, owner.token)
     const gwJoiner = await connect(s.port, joiner.token)

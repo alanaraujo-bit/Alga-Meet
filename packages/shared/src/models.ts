@@ -181,6 +181,8 @@ export interface Invite {
   maxUses: number
   expiresAt: string | null
   memberCount: number
+  /** Who sent it (public profile): only on the public preview (GET /invites/:code), so a new person sees a face. */
+  inviter?: PublicUser
 }
 
 export interface VoiceState {

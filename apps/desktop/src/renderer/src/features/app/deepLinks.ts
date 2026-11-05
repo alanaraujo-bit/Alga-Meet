@@ -9,8 +9,15 @@ import { t } from './strings'
 /**
  * algameet:// links waiting for the right screen: the reset token for the reset form (signed out) and the invite
  * code for the join preview (after sign-in). Tokens/codes are bearer secrets: kept in memory only, never logged.
+ * `autoJoin`: the person signed in or created the account on the sign-in screen *because of* this invite, so the
+ * join happens without asking again. An invite opened while already signed in still asks first (a stranger's link
+ * must never pull you into a space on one click).
  */
-export const useDeepLink = create<{ resetToken: string | null; inviteCode: string | null }>()(() => ({ resetToken: null, inviteCode: null }))
+export const useDeepLink = create<{ resetToken: string | null; inviteCode: string | null; autoJoin: boolean }>()(() => ({
+  resetToken: null,
+  inviteCode: null,
+  autoJoin: false,
+}))
 
 async function handle(link: DeepLink): Promise<void> {
   if (link.kind === 'invite') return useDeepLink.setState({ inviteCode: link.code })
@@ -31,9 +38,16 @@ async function handle(link: DeepLink): Promise<void> {
 
 /** Subscribe first, then take the link the app was started with (bridge contract). No-op on an older preload. */
 export function startDeepLinks(): () => void {
+  // Signed in from the sign-in screen (not a saved session) while an invite waits: that sign-in was the yes.
+  const offAuth = useSession.subscribe((s, p) => {
+    if (s.phase === 'signed_in' && p.phase === 'signed_out' && useDeepLink.getState().inviteCode) useDeepLink.setState({ autoJoin: true })
+  })
   const dl = window.alga?.deepLinks
-  if (!dl) return () => {}
+  if (!dl) return offAuth
   const off = dl.onLink((l) => void handle(l))
   void dl.takePending().then((l) => l && handle(l))
-  return off
+  return () => {
+    off()
+    offAuth()
+  }
 }
