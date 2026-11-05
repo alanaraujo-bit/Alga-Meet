@@ -36,6 +36,7 @@ import { invitePublicRoutes, spaceRoutes } from './routes/spaces.js'
 import { telemetryRoutes } from './routes/telemetry.js'
 import { userRoutes } from './routes/users.js'
 import { livekitWebhookRoute, voiceRoutes } from './routes/voice.js'
+import { soundRoutes } from './routes/sounds.js'
 import { createStorage } from './storage.js'
 import { Telemetry } from './telemetry.js'
 import { TrustSafety, restrictedError } from './trust-safety.js'
@@ -192,6 +193,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       voiceRoutes(authed, ctx)
       e2eeRoutes(authed, ctx)
       fileRoutes(authed, ctx)
+      soundRoutes(authed, ctx)
       billingRoutes(authed, ctx)
       privacyRoutes(authed, ctx)
       reportRoutes(authed, ctx)

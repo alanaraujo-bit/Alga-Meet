@@ -327,7 +327,11 @@ export type ApiErrorCode =
 
 export interface ApiError {
   /** `restriction`: only on 403s for a suspended/banned account (login, or a session that raced the action). */
-  error: { code: ApiErrorCode; message: string; fields?: Record<string, string>; restriction?: AccountRestriction }
+  error: {
+    code: ApiErrorCode; message: string; fields?: Record<string, string>; restriction?: AccountRestriction
+    /** `rate_limited` from the soundboard: wait this long; `reason` says which limit (SoundboardLimitReason). */
+    retryAfterMs?: number; reason?: string
+  }
 }
 
 /**

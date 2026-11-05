@@ -263,6 +263,23 @@ export const storageDeletions = pgTable('storage_deletions', {
 
 export type AttachmentRow = typeof attachments.$inferSelect
 
+/** Soundboard sounds of a space (WAV PCM16 mono 48 kHz, ≤ 5 s). A trigger queues the object when a row is deleted. */
+export const spaceSounds = pgTable('space_sounds', {
+  id: uuid('id').primaryKey(),
+  spaceId: uuid('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  emoji: text('emoji'),
+  storageKey: text('storage_key').notNull(),
+  durationMs: integer('duration_ms').notNull(),
+  /** Normalization gain the editor baked into the WAV (record only; players do not apply it). */
+  gainDb: real('gain_db').notNull().default(0),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+}, (t) => [index('space_sounds_space_id_idx').on(t.spaceId)])
+
+export type SpaceSoundRow = typeof spaceSounds.$inferSelect
+
 // ---- billing (src/billing/) ---------------------------------------------------------------------------------------
 
 /** Mirror of src/billing/catalog.ts, upserted at startup. Rows are never deleted (orders reference them): dropped SKUs go inactive. */

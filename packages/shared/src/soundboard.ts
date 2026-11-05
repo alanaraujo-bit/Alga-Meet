@@ -30,7 +30,8 @@ export interface SpaceSound {
   name: string
   emoji: string | null
   durationMs: number
-  createdBy: string
+  /** Null when the uploader deleted their account. */
+  createdBy: string | null
   createdAt: string
 }
 
