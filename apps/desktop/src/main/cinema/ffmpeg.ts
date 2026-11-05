@@ -96,7 +96,8 @@ export function runTool(bin: string, args: readonly string[], opts: RunOpts): Pr
       pending = parts.pop() ?? ''
       // A line that never ends must not grow without bound: keep only its last `max` chars.
       if (pending.length > max) pending = pending.slice(pending.length - max)
-      for (const l of parts) opts.onStdoutLine(l)
+      // Same cap for a line completed within this chunk (the newline can arrive together with the tail of a huge line).
+      for (const l of parts) opts.onStdoutLine(l.length > max ? l.slice(l.length - max) : l)
     })
     child.stderr.on('data', (text: string) => (stderr = tail(stderr, text, max)))
     child.on('error', (err) => finish(() => reject(err)))
