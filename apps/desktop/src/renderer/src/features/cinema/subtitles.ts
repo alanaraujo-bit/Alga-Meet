@@ -5,6 +5,17 @@ export interface Cue {
   text: string
 }
 
+/** Subtitle track piece 0 (ruling R27): UTF-8 JSON; pieces 1..k hold the font files named in `fonts[].piece`. */
+export interface SubtitleManifest {
+  format: 'vtt' | 'ass'
+  text: string
+  fonts: Array<{ name: string; piece: number }>
+}
+
+export function parseManifest(piece0: ArrayBuffer): SubtitleManifest {
+  return JSON.parse(new TextDecoder().decode(piece0)) as SubtitleManifest
+}
+
 // hh:mm:ss,mmm | mm:ss.mmm (hours optional in VTT); comma or dot decimals.
 const TIME = String.raw`(?:(\d+):)?(\d{1,2}):(\d{2})[,.](\d{1,3})`
 const ARROW = new RegExp(String.raw`^\s*${TIME}\s*-->\s*${TIME}`)

@@ -15,6 +15,10 @@ import { useLook } from '../billing/store'
 import { personEntries } from '../shell/people'
 import { ActivityLine } from '../activity/Activity'
 import { Eco } from '@/ui/eco/Eco'
+import { CinemaCard, CinemaDev, CinemaNotices, FilmSheet, useCinemaDrop } from '../cinema/CinemaDev'
+import { useCinema } from '../cinema/store'
+import { t as cinemaT } from '../cinema/strings'
+import cs from '../cinema/cinema.module.css'
 import { ControlsDock, LobbyDock } from './ControlsDock'
 import { E2eeChip, MismatchBanner } from './E2ee'
 import { cardWidth, featuredWidth, seatWidth, stripTile, voiceLayout, type SeatSize } from './layout'
@@ -58,6 +62,10 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
   // Full = the others fill it (the server does not count you), and moderators who can move people still get in.
   const mover = useData((st) => !!channel.spaceId && can(spacePermissions(st, channel.spaceId), Permission.MOVE_MEMBERS))
   const full = !!channel.userLimit && !mover && people.filter((p) => p.userId !== meId).length >= channel.userLimit
+  // Sala de Cinema (dev stage): seated → the film takes the stage; a session I'm not in → a card with Sentar.
+  const cinema = useCinema(useShallow((st) => ({ id: st.session?.channelId === channel.id ? st.session.sessionId : null, seated: st.mine.seated })))
+  const watching = live && cinema.id !== null && cinema.seated
+  const drop = useCinemaDrop(live && cinema.id === null)
 
   // Watching is opt-in and costs bandwidth: leaving the call's stage keeps one stream for the mini-player
   // (the one in focus, else the first) and stops the rest.
@@ -93,7 +101,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
     ) : null
 
   return (
-    <section className={`${s.stage} ${variant === 'dm' ? s.dm : ''} ${live ? '' : s.idle}`} aria-label={channel.name}>
+    <section className={`${s.stage} ${variant === 'dm' ? s.dm : ''} ${live ? '' : s.idle}`} aria-label={channel.name} {...drop.props}>
       {header}
       <MismatchBanner channel={channel} />
       <Room stale={conn.state !== 'connected' && here} live={live}>
@@ -102,11 +110,16 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
             <E2eeChip channelId={channel.id} />
           </div>
         )}
-        {live ? (
+        {watching ? (
+          <CinemaDev key={cinema.id} channel={channel} />
+        ) : live ? (
           <LiveRoom channel={channel} people={people.map((p) => p.userId)} meId={meId} />
         ) : (
           <PreJoin channel={channel} people={people.map((p) => p.userId)} streaming={people.filter((p) => p.streaming).map((p) => p.userId)} variant={variant} />
         )}
+        {live && !watching && <CinemaCard channel={channel} />}
+        {live && <CinemaNotices />}
+        {drop.dragging && <div className={cs.dropHint}>{cinemaT.dropHint}</div>}
         {here && conn.state === 'reconnecting' && (
           <div className={s.reconnect} role="status" aria-live="polite">
             <Eco state="connecting" size={22} />
@@ -120,6 +133,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
           </Notice>
         )}
       </Room>
+      {live && <FilmSheet />}
       {live ? (
         <ControlsDock channel={channel} />
       ) : (

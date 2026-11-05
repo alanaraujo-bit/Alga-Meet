@@ -1,11 +1,14 @@
 import type { Channel } from '@alga/shared'
 import type { Glyph } from '@/ui/icons'
-import { ArrowLeftRight, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, Settings2, Square, Volume2, Waveform } from '@/ui/icons'
+import { ArrowLeftRight, FilmStrip, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, Settings2, Square, Volume2, Waveform } from '@/ui/icons'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Ref, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
 import { useData } from '@/store/data'
 import { Icon, MenuButton, Spinner, Tooltip, useEnvelope } from '@/ui'
+import { openFromFile, seat } from '../cinema/actions'
+import { useCinema } from '../cinema/store'
+import { t as cinemaT } from '../cinema/strings'
 import { openSettings } from '../settings/store'
 import { levelNow } from './levels'
 import { t } from './strings'
@@ -55,6 +58,8 @@ export function ControlsDock({ channel }: { channel: Channel }) {
   const sbOpen = useSoundboard((st) => st.open)
   const [sbAnchor, setSbAnchor] = useState<HTMLElement | null>(null)
   useLayoutEffect(() => setSbAnchor(sbOpen ? sbButton.current : null), [sbOpen])
+  // Cinema (ruling R30: always offered; a server without it answers "Cinema desligado neste servidor").
+  const cinema = useCinema(useShallow((st) => ({ open: !!st.session, seated: st.mine.seated, busy: st.busy })))
 
   return (
     <div ref={dock} className={s.dock} role="toolbar" aria-label="Controles da chamada">
@@ -96,6 +101,15 @@ export function ControlsDock({ channel }: { channel: Channel }) {
           <CallButton icon={MonitorUp} label={t.dock.share} disabled={!connected} onClick={() => useVoice.setState({ picker: true })} />
         )}
       </MenuButton>
+      <CallButton
+        icon={FilmStrip}
+        label={cinema.seated ? cinemaT.standUp : cinema.open ? cinemaT.sitHere : cinemaT.button}
+        hint={cinema.open ? undefined : cinemaT.buttonHint}
+        on={cinema.seated}
+        aria-pressed={cinema.seated}
+        disabled={!connected || cinema.busy}
+        onClick={() => (cinema.open ? seat(!cinema.seated) : void openFromFile())}
+      />
       {channel.spaceId && (
         <CallButton
           ref={sbButton}
