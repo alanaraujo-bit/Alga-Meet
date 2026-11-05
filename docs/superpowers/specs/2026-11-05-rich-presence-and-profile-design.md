@@ -47,6 +47,14 @@ pessoa vê exatamente o que sai e de quais apps), **arte de verdade** (capa da S
 - O soundboard (`feat/soundboard`) também edita `models.ts`, `gateway.ts`, `app.ts` e `ui/icons.tsx` — tudo aditivo.
 - Servidor novo precisa ir para o staging junto com o app (clientes antigos ignoram os campos novos).
 
+## Revisão independente (feita) e limites conhecidos
+Corrigido após revisão: bloqueio vale para presença/atividade/status/perfil mesmo em espaço compartilhado; tela cheia
+desconhecida é palpite opt-in; ícone exige cabeçalho PNG ≤ 256×256; `null` de outro dispositivo não apaga a atividade;
+validação no cliente antes de enviar; memória do "recente" podada; ícone só de `.exe` local.
+Ficou (baixo risco, anotado): com dois PCs, o status salvo num deles pode sobrescrever o mais novo do outro ao reconectar;
+PID reaproveitado pode manter um jogo "vivo" por alguns segundos; o helper lê metadados do exe em foco mesmo em
+compartilhamento de rede lento; a lista local de apps vistos (inclusive ocultos) fica no `settings.json` do PC.
+
 ## Próximos passos sugeridos (do estudo)
 Banner por imagem grátis; widgets de perfil preenchidos pelo uso real ("Mais jogados"); privacidade de atividade por
 espaço; estilo do nome de exibição como item da loja; "Entrar na partida" quando o jogo informar; persistir a
