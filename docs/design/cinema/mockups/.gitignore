@@ -1,0 +1,2 @@
+# 2x renders are heavy (~21 MB); regenerate with node docs/design/cinema/mockups/render.mjs. JPGs are the committed copy.
+png/
