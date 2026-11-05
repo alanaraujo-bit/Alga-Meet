@@ -725,14 +725,15 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: var(--s-4);
-  max-width: 560px;
+  gap: var(--s-4) var(--s-2);
+  max-width: 720px;
 }
 .previewPerson {
   display: grid;
   justify-items: center;
   gap: var(--s-2);
-  width: 112px;
+  /* Wide enough for "Jogando Counter-Strike 2" under the name. */
+  width: 168px;
 }
 .previewFace {
   position: relative;
