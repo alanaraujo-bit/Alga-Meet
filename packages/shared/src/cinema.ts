@@ -108,6 +108,8 @@ const FilmSchema = z.object({
   chapters: z.array(z.object({ startS: seconds, title: text(120) })).max(100),
   episode: z.object({ season: nonNegInt, episode: nonNegInt }).nullable(),
 })
+/** The film as the host sends it; also what the host-side probe mapping is validated against. */
+export const CinemaFilmSchema = FilmSchema
 /** startS may be exactly -1 (init segment); anything below is invalid. */
 const PieceMetaSchema = z.tuple([
   z.number().finite().min(-1),
