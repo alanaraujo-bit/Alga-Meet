@@ -5,6 +5,7 @@ import type {
 import type { Entitlements, Gift, SpaceUpgradeState } from './billing.js'
 import type { E2eeClientFrame, E2eeCommit, E2eeEpoch, E2eeProposals, E2eeResyncRequired, E2eeWelcome } from './e2ee.js'
 import type { RsvpStatus, SpaceEvent } from './events.js'
+import type { SpaceSound } from './soundboard.js'
 
 /**
  * Realtime gateway: WebSocket at /gateway, JSON frames.
@@ -114,6 +115,13 @@ export type Dispatch =
    * after a LiveKit join whose token predates the change.
    */
   | { t: 'VOICE_E2EE_CHANGED'; d: { channelId: string; e2ee: boolean } }
+  /** To every member of the space: its sound list changed (upload, rename, delete). The full list, newest last. */
+  | { t: 'SPACE_SOUNDS_UPDATE'; d: { spaceId: string; sounds: SpaceSound[] } }
+  /**
+   * Only to the users in voice in `channelId`: `userId` played `soundId` (a space sound id or `alga:<slug>`). Play it
+   * locally unless deafened or the soundboard is muted; always show who played it.
+   */
+  | { t: 'SOUNDBOARD_PLAY'; d: { channelId: string; soundId: string; userId: string; playId: string; durationMs: number } }
   /**
    * Sent only to the user: their plan or owned/included cosmetics changed (purchase confirmed by the provider, renewal,
    * a cancellation reaching its end, expiry, refund). ME_UPDATE with the new Me.plan follows when the plan changed.

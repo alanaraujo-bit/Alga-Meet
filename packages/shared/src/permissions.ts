@@ -24,6 +24,10 @@ export const Permission = {
   MANAGE_NICKNAMES: 1 << 19,
   /** Create space events (events.ts); editing/deleting one takes being its creator or MANAGE_SPACE. */
   CREATE_EVENTS: 1 << 20,
+  /** Play space and built-in sounds in a voice channel of the space. */
+  USE_SOUNDBOARD: 1 << 21,
+  /** Upload, rename and delete the space's sounds. */
+  MANAGE_SOUNDBOARD: 1 << 22,
 } as const
 export type PermissionName = keyof typeof Permission
 
@@ -40,7 +44,8 @@ export const DEFAULT_EVERYONE_PERMISSIONS =
   Permission.SPEAK |
   Permission.STREAM |
   Permission.CHANGE_NICKNAME |
-  Permission.CREATE_EVENTS
+  Permission.CREATE_EVENTS |
+  Permission.USE_SOUNDBOARD
 
 export function hasPermission(granted: number, needed: number): boolean {
   if (granted & Permission.ADMINISTRATOR) return true
