@@ -10,9 +10,10 @@
 
 | Pergunta | Decisão | Base |
 |---|---|---|
-| Áudio sem perda (`lossless`) | **`flac` 5.1** (fontes TrueHD, DTS-HD MA; 7.1 rebaixado a 5.1 pelo ffmpeg), por **Ruling R8** | FLAC 5.1 passou: toca, 6/6 canais com o tom certo. |
-| Áudio com perda | **`aac` 640k 5.1** (fontes AC-3, E-AC-3, DTS), por **Ruling R8** | AAC 5.1 passa em tudo; Opus 5.1 também, sem razão para trocar. |
-| Teto de canais | **6 para todos os codecs** (**Ruling R8**): AAC/Opus/FLAC/MP3 até 6 canais passam por cópia; acima de 6, recodifica na mesma família em 5.1 | Decisão de produto. A medição mostra que o teto não é do Chromium para Opus/FLAC (ver 7.1 abaixo), mas AAC 7.1 nem anexa. |
+| Áudio sem perda (`lossless`) | **`flac` com a contagem de canais da fonte (até 8)** (TrueHD, DTS-HD MA), por **Ruling R10** | FLAC 5.1 e 7.1 passaram: tocam com todos os canais (6/6 e 8/8) no tom certo. |
+| Áudio com perda | **≤ 6 canais (AC-3, E-AC-3, DTS): `aac` 640k. 7.1: `opus` 7.1** (libopus, `mapping_family 1`), por **Ruling R10** | AAC 5.1 passa; AAC 7.1 não anexa no MSE; Opus 7.1 passa 8/8. |
+| Fontes já compatíveis | AAC/Opus/FLAC/MP3: cópia. Exceção: AAC com mais de 6 canais vira Opus com a mesma contagem | Idem (AAC 7.1 falha). |
+| Teto de canais | **8** (7.1 mantido). **Ruling R8 (teto de 6) está superada pelo R10.** | O re-teste com 8 canais verdadeiros mostrou que o Chromium entrega 7.1 em Opus e FLAC. |
 | Relógio | **só gateway, PROVISÓRIO** (**Ruling R9**) | Não medido no WebSocket do staging (sem contas): só o piso local (0,39 ms) e um substituto HTTP. Medição real e erro entre clientes ficam na Task 15; se errar a meta, entra refinamento P2P. |
 | Eco | **pendente (Task 15)**; fallback: aviso de fone [dono] | Procedimento escrito; não foi tocado áudio alto nesta máquina. |
 | ffmpeg para a Task 6 | URL, versão e SHA-256 abaixo | Mesmo binário medido aqui. |
@@ -49,7 +50,7 @@ GPL do PATH. `node apps/desktop/scripts/cinema-fixtures.mjs` gera 7 arquivos; `-
 
 ## Matriz MSE no Electron 45 (Step 3)
 
-**Correção (rodada 1):** a primeira medição de 7.1 usou a faixa do fixture `hevc10-truehd-71`, que na verdade é 5.1, e
+**Correção (rodada 1):** a primeira medição de 7.1 (que motivou o R8, hoje superado) usou a faixa do fixture `hevc10-truehd-71`, que na verdade é 5.1, e
 concluiu errado que o Chromium não entrega 8 canais. Refeito com um WAV de 8 canais verdadeiros (um tom por canal, ordem
 do FFmpeg FL FR FC LFE BL BR SL SR), sem outra mudança: Opus 7.1 e FLAC 7.1 entregam os 8 canais com o tom certo
 (tabela abaixo, com o 2º pico de cada canal no JSON do script). A falha dos números antigos era de fixture, não de
@@ -91,7 +92,7 @@ Não: Dolby Vision (`dvh1.05.06`, `dvhe.08.06`), `mp4v.20.9` (MPEG-2/4), `ac-3`,
 
 Consequências para o motor: AC-3, E-AC-3, DTS e TrueHD precisam de transcodificação de áudio (nenhum passa direto).
 HEVC e AV1 passam direto (cópia de vídeo). MPEG-2 não toca (o remux funciona, a decodificação não). Dolby Vision perfil 5
-não tem tipo suportado: tratar como não suportado ou avisar (o fixture não pôde ser testado). Canais: o Chromium entregou 8 discretos para Opus e FLAC 7.1; o teto de 6 vem do Ruling R8, não de limite técnico (exceto AAC 7.1, que não anexa).
+não tem tipo suportado: tratar como não suportado ou avisar (o fixture não pôde ser testado). Canais: o Chromium entregou 8 discretos para Opus e FLAC 7.1; não há teto técnico de 6 (Ruling R10 supera o R8); só o AAC 7.1 não anexa.
 
 ## Velocidade do ffmpeg LGPL (Step 4, só fixtures)
 
