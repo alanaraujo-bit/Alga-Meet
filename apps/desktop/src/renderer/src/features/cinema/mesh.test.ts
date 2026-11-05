@@ -106,7 +106,9 @@ class FakePC {
   log: string[] = []
   onnegotiationneeded: (() => void) | null = null
   constructor() { FakePC.all.push(this) }
-  createDataChannel() { return { readyState: 'connecting', close() {}, onopen: null, onclose: null, binaryType: '' } }
+  ch = { readyState: 'connecting', close() {}, onopen: null, onclose: null, binaryType: '' }
+  onconnectionstatechange: (() => void) | null = null
+  createDataChannel() { return this.ch }
   async setLocalDescription() { this.localDescription = { sdp: SDPFP }; this.signalingState = 'have-local-offer' }
   async setRemoteDescription(d: { sdp: string }) { await Promise.resolve(); this.remoteDescription = d; this.signalingState = 'stable'; this.log.push('remote') }
   async addIceCandidate(c: { candidate: string }) { this.log.push('ice:' + c.candidate) }
@@ -203,5 +205,23 @@ describe('Mesh', () => {
     mesh.sync([seat('a')])
     mesh.close()
     expect(gone).toEqual(['a'])
+  })
+  it('a recovered link is not hit by the re-armed connect timer', () => {
+    vi.useFakeTimers()
+    const gone: string[] = []
+    const { mesh } = mk()
+    mesh.onPeerGone((id) => gone.push(id))
+    mesh.sync([seat('b')])
+    const pc = FakePC.all[0]!
+    pc.ch.readyState = 'open'
+    pc.connectionState = 'failed'
+    pc.onconnectionstatechange!()
+    expect(pc.restarts).toBe(1)
+    pc.connectionState = 'connected'
+    pc.onconnectionstatechange!()
+    vi.advanceTimersByTime(70_000)
+    expect(pc.restarts).toBe(1)
+    expect(gone).toEqual([])
+    expect(pc.closed).toBe(false)
   })
 })

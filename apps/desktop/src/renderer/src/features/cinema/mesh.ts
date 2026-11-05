@@ -153,14 +153,14 @@ export class Mesh {
     this.queues.set(from, q)
     if (q.n >= MAX_QUEUED) return Promise.resolve()
     q.n++
-    q.tail = q.tail.then(() => this.handle(from, s)).catch(() => {}).finally(() => { q.n-- })
+    const link = this.links.get(from)
+    q.tail = q.tail.then(() => this.handle(from, s, link)).catch(() => {}).finally(() => { q.n-- })
     return q.tail
   }
 
-  private async handle(from: string, s: CinemaSignal): Promise<void> {
-    const link = this.links.get(from)
-    // Only sync() opens links: a stray signal after a drop must not resurrect the pair.
-    if (this.closed || !link) return
+  private async handle(from: string, s: CinemaSignal, link: Link | undefined): Promise<void> {
+    // Only sync() opens links; the link is captured at enqueue time so a queued signal never hits a re-opened one.
+    if (this.closed || !link || this.links.get(from) !== link) return
     try {
       if (s.kind === 'ice') {
         if (link.pc.remoteDescription) for (const c of s.candidates) await this.addCandidate(link, c)
@@ -225,7 +225,11 @@ export class Mesh {
     pc.onconnectionstatechange = () => {
       if (this.links.get(id) !== link) return
       if (pc.connectionState === 'closed') return this.drop(id)
-      if (pc.connectionState === 'connected') link.retries = 0
+      if (pc.connectionState === 'connected') {
+        link.retries = 0
+        // Recovered: the re-armed connect timer must not fire later (the channel is already open, so `opened` will not clear it).
+        if (link.ch?.readyState === 'open' && link.timer) { clearTimeout(link.timer); link.timer = null }
+      }
       if (pc.connectionState === 'failed') this.fail(id, link)
     }
     this.armTimer(id, link)
@@ -252,6 +256,7 @@ export class Mesh {
   /** Failed or timed out: the offerer retries with an ICE restart (twice), then the pair is given up. */
   private fail(id: string, link: Link): void {
     if (this.links.get(id) !== link) return
+    if (link.pc.connectionState === 'connected' && link.ch?.readyState === 'open') return
     if (++link.retries > MAX_RETRIES) return this.drop(id)
     // Only the offerer renegotiates; the other side just counts failures and waits for its offer.
     if (link.offerer) link.pc.restartIce()
@@ -324,8 +329,9 @@ export class Mesh {
     const { e2ee, sessionId, channelId, selfId } = this.opts
     if (!e2ee) return true
     const fp = fingerprintOf(s.sdp)
-    const expected = fp && s.tag && s.epoch !== undefined
-      ? await this.tagOf(channelId, s.epoch, tagInput(sessionId, from, selfId, fp))
+    const epochOk = s.epoch !== undefined && Number.isInteger(s.epoch) && s.epoch >= 0
+    const expected = fp && s.tag && epochOk
+      ? await this.tagOf(channelId, s.epoch!, tagInput(sessionId, from, selfId, fp))
       : null
     if (!expected || expected !== s.tag) {
       console.warn('[cinema/mesh] rejecting', s.kind, 'from', from, ': E2EE fingerprint tag missing or wrong')
