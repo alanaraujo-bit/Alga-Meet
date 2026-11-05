@@ -15,6 +15,11 @@ describe('cleanTitle', () => {
     ['Show - S01E02 - Pilot.mp4', 'Show'],
     ['Spider-Man.No.Way.Home.2021.BluRay.x265.mkv', 'Spider-Man No Way Home (2021)'],
     ['2012.2009.1080p.mkv', '2012 (2009)'],
+    ['Blade.Runner.2049.2017.2160p.WEB-DL.mkv', 'Blade Runner 2049 (2017)'],
+    ['Wonder.Woman.1984.2020.1080p.BluRay.mkv', 'Wonder Woman 1984 (2020)'],
+    ['S01E02.mkv', 'S01E02'],
+    ['S01E02 - Piloto.mkv', 'Piloto'],
+    ['S01E02.Piloto.720p.mkv', 'Piloto'],
     ['no extension', 'no extension'],
     ['1080p.mkv', '1080p'],
     ['...mkv', 'Filme'],
@@ -60,6 +65,13 @@ describe('nextEpisodes', () => {
     mkdirSync(dir)
     mk(dir, 'Show.S02E01.mkv', 'Show.S01E10.mkv', 'Show.S01E09.mkv', 'Show.S01E02.mkv')
     expect(await nextEpisodes(dir, join(dir, 'Show.S01E09.mkv'))).toEqual([join(dir, 'Show.S01E10.mkv'), join(dir, 'Show.S02E01.mkv')])
+  })
+  it('works for files named by the episode token only', async () => {
+    const dir = join(root, 'd')
+    mkdirSync(dir)
+    mk(dir, 'S01E01 - Piloto.mkv', 'S01E02 - Segundo.mkv', 'S01E03.mkv', 'Show.S01E04.mkv')
+    expect(parseEpisode('S01E02 - Piloto.mkv')).toEqual({ season: 1, episode: 2 })
+    expect(await nextEpisodes(dir, 'S01E01 - Piloto.mkv')).toEqual([join(dir, 'S01E02 - Segundo.mkv'), join(dir, 'S01E03.mkv')])
   })
   it('empty when current is not an episode, is last, or the folder is missing', async () => {
     const dir = join(root, 'c')

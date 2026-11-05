@@ -2,7 +2,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { CinemaFilmSchema } from '@alga/shared'
+import { CinemaFilmSchema, type CinemaFilm } from '@alga/shared'
 
 vi.mock('electron', () => ({ app: { isPackaged: false, getAppPath: () => process.cwd() } }))
 
@@ -20,7 +20,7 @@ const err = (probe: unknown) => {
   const r = filmFromProbe(probe, 'movie.mkv')
   return 'error' in r ? r.error : null
 }
-const A = (r: ReturnType<typeof ok>) => r.film.audio.map((a) => [a.id, a.out, a.channels, a.mime])
+const A = (r: { film: CinemaFilm; warnings?: unknown }) => r.film.audio.map((a) => [a.id, a.out, a.channels, a.mime])
 
 const AAC = 'audio/mp4; codecs="mp4a.40.2"'
 const OPUS = 'audio/mp4; codecs="opus"'
@@ -144,6 +144,10 @@ describe('filmFromProbe: HDR / Dolby Vision / mime derivation', () => {
     v.profile = 'Main 10'; v.level = 153; v.field_order = 'tt'
     expect(ok('x', 'a.mkv', p).film.videoMime).toBe('video/mp4; codecs="hvc1.2.4.L153.40"')
   })
+  it.each(['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf'])('hostile H.264 profile %s does not throw', (profile) => {
+    const p = fx('h264-ac3-51'); p.streams[0].profile = profile
+    expect(ok('x', 'a.mkv', p).film.videoMime).toBe('video/mp4; codecs="avc1.640028"')
+  })
   it('H.264 profiles', () => {
     const mime = (profile: string, level: number) => {
       const p = fx('h264-ac3-51'); p.streams[0].profile = profile; p.streams[0].level = level
@@ -165,6 +169,14 @@ describe('filmFromProbe: HDR / Dolby Vision / mime derivation', () => {
     q.streams[0].width = 3840; q.streams[0].height = 2160
     expect(ok('x', 'a.mkv', q).film.videoMime).toBe('video/mp4; codecs="av01.0.12M.10"')
   })
+  it('absurd size/duration never yields a non-finite bitrate', () => {
+    for (const [size, dur] of [['1e308', '1e-300'], ['1e308', '20'], ['-5', '20']]) {
+      const p = fx('h264-ac3-51'); delete p.format.bit_rate; p.format.size = size; p.format.duration = dur
+      const r = ok('x', 'a.mkv', p)
+      expect(Number.isFinite(r.film.bitrateKbps)).toBe(true)
+      expect(CinemaFilmSchema.safeParse(r.film).success).toBe(true)
+    }
+  })
   it('high bitrate warning above 60 Mbps', () => {
     const p = fx('h264-ac3-51'); p.format.bit_rate = '61000000'
     const r = ok('x', 'a.mkv', p)
@@ -183,6 +195,17 @@ describe('filmFromProbe: hostile / broken input', () => {
     const p = fx('no-video')
     p.streams.push({ index: 5, codec_type: 'video', codec_name: 'mjpeg', width: 600, height: 600, disposition: { attached_pic: 1 } })
     expect(err(p)).toBe('no_video')
+  })
+  it('cover-art streams (attached_pic or plain mjpeg/png) are skipped; the video index is exposed', () => {
+    for (const art of [{ codec_name: 'mjpeg', disposition: { attached_pic: 1 } }, { codec_name: 'png', disposition: {} }]) {
+      const p = fx('h264-ac3-51')
+      p.streams.unshift({ index: 0, codec_type: 'video', width: 600, height: 600, ...art })
+      p.streams.forEach((s: any, i: number) => (s.index = i))
+      const r = ok('x', 'a.mkv', p)
+      expect(r.videoStreamIndex).toBe(1)
+      expect(r.film).toMatchObject({ videoCodec: 'h264', width: 1920 })
+    }
+    expect(ok('h264-ac3-51').videoStreamIndex).toBe(0)
   })
   it('mpeg2video -> unsupported_video', () => expect(err(fx('mpeg2-mp2'))).toBe('unsupported_video'))
   it('absurd dimensions -> unsupported_video', () => {
@@ -262,6 +285,7 @@ describe('probeFile', () => {
     setFfmpegBinsForTest({ ffmpeg: 'x', ffprobe: ffprobeBin })
     const r = await probeFile(realFile)
     expect('film' in r && r.film.audio[0]).toMatchObject({ out: 'copy', channels: 6 })
+    expect('film' in r && r.videoStreamIndex).toBe(0)
     expect(await probeFile(join(process.cwd(), 'test-fixtures', 'cinema', 'no-such-file.mkv'))).toEqual({ error: 'unreadable' })
   })
 })

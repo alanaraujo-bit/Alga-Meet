@@ -8,7 +8,8 @@ import { capText, cleanTitle, parseEpisode, stripControls } from './names'
 
 export type CinemaWarning = 'dv_profile5' | 'high_bitrate' | 'pgs_ignored' | 'audio_converted' | 'atmos_dropped' | 'tracks_truncated'
 export type CinemaProbeError = 'no_video' | 'unsupported_video' | 'no_duration' | 'unreadable'
-export type CinemaProbeResult = { film: CinemaFilm; warnings: CinemaWarning[] } | { error: CinemaProbeError }
+/** `videoStreamIndex`: absolute ffprobe stream index of the chosen video (Task 8 maps it with `-map 0:<index>`). */
+export type CinemaProbeResult = { film: CinemaFilm; warnings: CinemaWarning[]; videoStreamIndex: number } | { error: CinemaProbeError }
 
 // Caps of CinemaFilmSchema (packages/shared/src/cinema.ts).
 const MAX_AUDIO = 32
@@ -21,6 +22,7 @@ const MAX_DIM = 16384
 const MAX_ORDINAL = 999
 const HIGH_BITRATE_KBPS = 60_000
 const MAX_CHANNELS = 8
+const MAX_KBPS = 1_000_000_000
 const PROBE_TIMEOUT_MS = 15_000
 /** ffprobe JSON of a file with hundreds of chapters/tracks outgrows runTool's default 64 KiB tail. */
 const PROBE_TAIL_MAX = 8 * 1024 * 1024
@@ -51,6 +53,7 @@ const dd = (n: number): string => String(n).padStart(2, '0')
 
 // ---- video ----------------------------------------------------------------------------------------------------------------
 
+const STILL_CODECS = new Set(['mjpeg', 'png', 'bmp', 'gif', 'webp'])
 const VIDEO_CODECS = { h264: 'h264', hevc: 'hevc', av1: 'av1', vp9: 'vp9' } as const
 
 /**
@@ -66,12 +69,12 @@ function videoMime(codec: CinemaFilm['videoCodec'], v: Obj, width: number, heigh
   switch (codec) {
     case 'h264': {
       // avc1.PPCCLL = profile_idc, constraint_set flags, level_idc (all hex bytes; ffprobe `level` already is level_idc).
-      const table: Record<string, [number, number]> = {
+      const table = new Map<string, [number, number]>(Object.entries({
         constrainedbaseline: [0x42, 0xc0], baseline: [0x42, 0x00], main: [0x4d, 0x00], extended: [0x58, 0x00],
         high: [0x64, 0x00], high10: [0x6e, 0x00], high10intra: [0x6e, 0x00], 'high4:2:2': [0x7a, 0x00], 'high4:2:2intra': [0x7a, 0x00],
         'high4:4:4predictive': [0xf4, 0x00], 'high4:4:4': [0xf4, 0x00],
-      }
-      const [pp, cc] = table[profile] ?? (depth > 8 ? [0x6e, 0x00] : [0x64, 0x00])
+      }) as [string, [number, number]][])
+      const [pp, cc] = table.get(profile) ?? (depth > 8 ? [0x6e, 0x00] : [0x64, 0x00])
       const ll = level !== null && level > 0 && level < 256 ? level : height <= 1080 ? 0x28 : 0x33
       return `video/mp4; codecs="avc1.${hex(pp, 2)}${hex(cc, 2)}${hex(ll, 2)}"`
     }
@@ -167,7 +170,8 @@ export function filmFromProbe(probe: unknown, fileName: string): CinemaProbeResu
   if (!root || !format || !Array.isArray(root.streams)) return { error: 'unreadable' }
   const streams = list(root.streams)
 
-  const v = streams.find((s) => s.codec_type === 'video' && obj(s.disposition)?.attached_pic !== 1)
+  // Cover art can come as attached_pic or as a plain mjpeg/png stream: neither is the movie.
+  const v = streams.find((s) => s.codec_type === 'video' && obj(s.disposition)?.attached_pic !== 1 && !STILL_CODECS.has((str(s.codec_name) ?? '').toLowerCase()))
   if (!v) return { error: 'no_video' }
   const name = str(v.codec_name)
   const videoCodec = name !== null && Object.hasOwn(VIDEO_CODECS, name) ? VIDEO_CODECS[name as keyof typeof VIDEO_CODECS] : null
@@ -181,7 +185,9 @@ export function filmFromProbe(probe: unknown, fileName: string): CinemaProbeResu
 
   const size = num(format.size)
   const bps = num(format.bit_rate) ?? (size !== null && size > 0 ? (size * 8) / durationS : 0)
-  const bitrateKbps = Math.max(0, Math.round(bps / 1000))
+  // Absurd inputs can overflow to Infinity/NaN, which CinemaFilmSchema rejects: unknown -> 0, capped at 1 Tbps.
+  const kbps = Math.round(bps / 1000)
+  const bitrateKbps = Number.isFinite(kbps) ? Math.min(Math.max(kbps, 0), MAX_KBPS) : 0
   const { hdr, dvProfile5 } = hdrOf(v)
 
   const audio: { track: CinemaAudioTrack; atmos: boolean }[] = []
@@ -227,7 +233,7 @@ export function filmFromProbe(probe: unknown, fileName: string): CinemaProbeResu
     audio: keptAudio.map((a) => a.track), subtitles: subtitles.slice(0, MAX_SUBS), chapters: chapters.slice(0, MAX_CHAPTERS),
     episode: parseEpisode(fileName),
   }
-  return { film, warnings }
+  return { film, warnings, videoStreamIndex: num(v.index) ?? streams.indexOf(v) }
 }
 
 /** Runs the bundled ffprobe (15 s) on an absolute path. Any failure (missing binary, bad file, junk output) is 'unreadable'. */

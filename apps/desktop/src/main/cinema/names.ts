@@ -36,20 +36,22 @@ const isEpisodeToken = (t: string): boolean => SEASON_EPISODE.test(t) || NXM.tes
 /** 'Duna.Parte.Dois.2024.2160p.WEB-DL.mkv' -> 'Duna Parte Dois (2024)'; episodes keep only the show name. */
 export function cleanTitle(fileName: string): string {
   const all = tokens(stem(fileName))
-  const kept: string[] = []
-  let year: string | null = null
-  for (const [i, t] of all.entries()) {
+  // A name that starts with the episode token ("S01E02 - Piloto") has no show name: the title is the text after it.
+  const lead = all.length > 0 && isEpisodeToken(all[0]!)
+  let src = lead ? all.slice(1) : all
+  while (src[0] === '-') src = src.slice(1)
+  const head: string[] = []
+  for (const [i, t] of src.entries()) {
     if (i > 0 && (isEpisodeToken(t) || isJunk(t))) break
-    if (i > 0 && YEAR.test(t)) {
-      year = t
-      break
-    }
-    kept.push(t)
+    head.push(t)
   }
+  // The release year is the LAST year token before the junk ("Blade.Runner.2049.2017" -> "Blade Runner 2049 (2017)").
+  const y = head.findLastIndex((t, i) => i > 0 && YEAR.test(t))
+  const kept = y > 0 ? head.slice(0, y) : head
   while (kept.at(-1) === '-') kept.pop()
   let title = kept.join(' ').trim()
-  if (!title) title = all.join(' ').trim() || 'Filme'
-  if (year && title !== 'Filme') title += ` (${year})`
+  if (!title) title = lead ? all[0]! : all.join(' ').trim() || 'Filme'
+  if (y > 0 && title !== 'Filme') title += ` (${head[y]})`
   return capText(title, TITLE_MAX).trim() || 'Filme'
 }
 
@@ -62,7 +64,8 @@ export function parseEpisode(fileName: string): { season: number; episode: numbe
   return null
 }
 
-const showKey = (fileName: string): string => cleanTitle(fileName).replace(/ \((19|20)\d{2}\)$/, '').toLowerCase()
+// Files named by the bare episode token have no show name: they all share one key (same naming pattern, same folder).
+const showKey = (fileName: string): string => (isEpisodeToken(tokens(stem(fileName))[0] ?? '') ? '<episode-first>' : cleanTitle(fileName)).replace(/ \((19|20)\d{2}\)$/, '').toLowerCase()
 
 /**
  * Episodes of the same show that come after `current`, in (season, episode) order, as full paths inside `dir`.
