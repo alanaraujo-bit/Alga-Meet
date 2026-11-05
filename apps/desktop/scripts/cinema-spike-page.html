@@ -1,0 +1,118 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>cinema spike</title>
+<body style="margin:0;background:#111;color:#ccc;font:12px monospace">
+<div id="box"></div>
+<script>
+// Page for scripts/cinema-spike.mjs. Everything runs in the renderer; Playwright calls these globals.
+
+// ── MSE playback + per-channel level (Step 3) ──
+const rmsDb = (buf) => { let s = 0; for (const x of buf) s += x * x; return 10 * Math.log10(s / buf.length + 1e-20) }
+async function fetchBuf(url) { return new Uint8Array(await (await fetch(url)).arrayBuffer()) }
+function append(sb, data) {
+  return new Promise((res, rej) => {
+    sb.addEventListener('updateend', () => res(), { once: true })
+    sb.addEventListener('error', () => rej(new Error('SourceBuffer error')), { once: true })
+    sb.appendBuffer(data)
+  })
+}
+window.cinemaPlay = async ({ vFile, vType, aFile, aType, channels, tones, base, seconds }) => {
+  const out = { appended: false, played: false }
+  try {
+    // A fresh element per run: createMediaElementSource can only ever be called once per element.
+    const box = document.getElementById('box'); box.innerHTML = ''
+    const v = document.createElement('video'); v.width = 320; v.height = 180; box.append(v)
+    const ms = new MediaSource()
+    v.src = URL.createObjectURL(ms)
+    await new Promise((r) => ms.addEventListener('sourceopen', r, { once: true }))
+    const buffers = []
+    if (vFile) buffers.push([ms.addSourceBuffer(vType), vFile])
+    buffers.push([ms.addSourceBuffer(aType), aFile])
+    for (const [sb, f] of buffers) await append(sb, await fetchBuf(`${base}/${f}`))
+    ms.endOfStream()
+    out.appended = true
+    // Analysis graph. Never reaches the speakers: the only path to destination goes through a gain-0 node.
+    const ctx = new AudioContext({ sampleRate: 48000 })
+    await ctx.resume()
+    const src = ctx.createMediaElementSource(v)
+    const silent = ctx.createGain(); silent.gain.value = 0
+    src.connect(silent).connect(ctx.destination) // keeps the element's clock running
+    const split = ctx.createChannelSplitter(8)
+    split.channelCountMode = 'explicit'; split.channelInterpretation = 'discrete'; split.channelCount = 8
+    src.connect(split)
+    const an = []
+    for (let i = 0; i < 8; i++) { const a = ctx.createAnalyser(); a.fftSize = 8192; split.connect(a, i); an.push(a) }
+    await v.play()
+    const best = Array.from({ length: 8 }, () => ({ db: -200, hz: 0 }))
+    const td = new Float32Array(2048), fd = new Float32Array(an[0].frequencyBinCount)
+    const t0 = performance.now()
+    while (performance.now() - t0 < seconds * 1000) {
+      await new Promise((r) => setTimeout(r, 250))
+      an.forEach((a, i) => {
+        a.getFloatTimeDomainData(td)
+        const db = rmsDb(td)
+        if (db > best[i].db) {
+          a.getFloatFrequencyData(fd)
+          let m = 0; for (let k = 1; k < fd.length; k++) if (fd[k] > fd[m]) m = k
+          best[i] = { db, hz: Math.round((m * ctx.sampleRate) / a.fftSize) }
+        }
+      })
+    }
+    const q = v.getVideoPlaybackQuality()
+    out.played = v.currentTime > seconds * 0.8 && !v.error
+    out.currentTime = Math.round(v.currentTime * 10) / 10
+    out.elementError = v.error ? v.error.message : null
+    out.video = vFile ? { w: v.videoWidth, h: v.videoHeight, total: q.totalVideoFrames, dropped: q.droppedVideoFrames } : null
+    out.sourceChannels = src.channelCount
+    out.channels = best.slice(0, channels).map((b, i) => ({
+      ch: i, db: Math.round(b.db * 10) / 10, peakHz: b.hz, expectedHz: tones[i],
+      ok: b.db > -60 && Math.abs(b.hz - tones[i]) <= Math.max(12, tones[i] * 0.03),
+    }))
+    out.allChannelsOk = out.channels.every((c) => c.ok)
+    ctx.close()
+  } catch (e) { out.error = String(e && e.message || e).slice(0, 200) }
+  return out
+}
+
+// ── Data channel throughput (Step 5) ──
+const CHUNK = 224 * 1024, HIGH = 4 * 1024 * 1024, LOW = 1024 * 1024
+const pcs = new Map()
+let rx = 0
+const gathered = (pc) => new Promise((r) => { if (pc.iceGatheringState === 'complete') return r(); pc.addEventListener('icegatheringstatechange', () => pc.iceGatheringState === 'complete' && r()) })
+function wire(id, dc) { dc.binaryType = 'arraybuffer'; dc.onmessage = (e) => { rx += e.data.byteLength }; pcs.get(id).dc = dc; pcs.get(id).open = new Promise((r) => (dc.onopen = r)) }
+window.dcOffer = async (id) => {
+  const pc = new RTCPeerConnection({ iceServers: [] }); pcs.set(id, { pc })
+  wire(id, pc.createDataChannel('d', { ordered: true }))
+  await pc.setLocalDescription(await pc.createOffer()); await gathered(pc)
+  return pc.localDescription.sdp
+}
+window.dcAnswer = async (id, sdp) => {
+  const pc = new RTCPeerConnection({ iceServers: [] }); pcs.set(id, { pc })
+  pc.ondatachannel = (e) => wire(id, e.channel)
+  await pc.setRemoteDescription({ type: 'offer', sdp })
+  await pc.setLocalDescription(await pc.createAnswer()); await gathered(pc)
+  return pc.localDescription.sdp
+}
+window.dcAccept = (id, sdp) => pcs.get(id).pc.setRemoteDescription({ type: 'answer', sdp })
+window.dcWaitOpen = async (ids) => { for (const id of ids) { while (!pcs.get(id).open) await new Promise((r) => setTimeout(r, 20)); await pcs.get(id).open } }
+window.dcPath = async (id) => {
+  const stats = await pcs.get(id).pc.getStats()
+  let pair; stats.forEach((s) => { if (s.type === 'candidate-pair' && s.nominated && s.state === 'succeeded') pair = s })
+  const cand = (k) => { let c; stats.forEach((s) => { if (s.id === pair?.[k]) c = s }); return c }
+  return pair ? { local: cand('localCandidateId')?.candidateType, remote: cand('remoteCandidateId')?.candidateType, protocol: cand('localCandidateId')?.protocol, rttMs: pair.currentRoundTripTime * 1000 } : null
+}
+// Sender: keep each channel's buffer between LOW and HIGH; bufferedamountlow refills it.
+window.dcPump = (ids, seconds) => {
+  const chunk = new Uint8Array(CHUNK)
+  const end = performance.now() + seconds * 1000
+  for (const id of ids) {
+    const dc = pcs.get(id).dc
+    dc.bufferedAmountLowThreshold = LOW
+    const fill = () => { while (performance.now() < end && dc.readyState === 'open' && dc.bufferedAmount < HIGH) dc.send(chunk) }
+    dc.onbufferedamountlow = fill
+    fill()
+  }
+}
+window.dcRx = () => ({ bytes: rx, t: performance.now() })
+window.dcReset = () => { for (const { pc } of pcs.values()) pc.close(); pcs.clear(); rx = 0 }
+</script>

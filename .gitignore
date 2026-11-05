@@ -35,3 +35,7 @@ docs/site/videos/
 
 # Local-only operational notes (real home network values) — never published.
 docs/private/
+
+# Sala de Cinema: generated fixtures and the pinned LGPL ffmpeg (fetched at build time)
+apps/desktop/test-fixtures/cinema/
+apps/desktop/build/ffmpeg/
