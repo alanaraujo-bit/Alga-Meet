@@ -26,6 +26,14 @@ export interface FilmAudioOpts {
   route?: 'webaudio' | 'mediastream'
 }
 
+/**
+ * A media element can feed exactly one MediaElementAudioSourceNode in its whole life (a second one throws
+ * InvalidStateError, even after the first context closed): FilmAudio is kept per element and reused (React StrictMode
+ * unmounts and remounts on the same <video>). After destroy() that element can never carry film audio again: use a
+ * fresh <video> per session.
+ */
+const byElement = new WeakMap<HTMLMediaElement, FilmAudio>()
+
 export class FilmAudio {
   private readonly ctx = new AudioContext({ latencyHint: 'interactive' })
   private readonly source: MediaElementAudioSourceNode
@@ -39,8 +47,20 @@ export class FilmAudio {
   private others = false
   private duckDb = 0
   private deviceLabel: string | null = null
+  private releaseTimer: ReturnType<typeof setTimeout> | undefined
+  private dead = false
 
-  constructor(video: HTMLVideoElement, opts: FilmAudioOpts = {}) {
+  /** The element's FilmAudio: created on first use, then the same one (a pending release() is called off). */
+  static for(video: HTMLVideoElement, opts: FilmAudioOpts = {}): FilmAudio {
+    const had = byElement.get(video)
+    if (!had) return new FilmAudio(video, opts)
+    clearTimeout(had.releaseTimer)
+    if (had.dead) throw new Error('cinema: this <video> already had its film audio; use a fresh element')
+    return had
+  }
+
+  private constructor(private readonly video: HTMLVideoElement, opts: FilmAudioOpts) {
+    byElement.set(video, this)
     this.source = this.ctx.createMediaElementSource(video)
     this.volume = this.ctx.createGain()
     this.duck = this.ctx.createGain()
@@ -52,8 +72,21 @@ export class FilmAudio {
       this.sinkEl.srcObject = dest.stream
       void this.sinkEl.play().catch(() => undefined)
     } else this.duck.connect(this.ctx.destination)
-    void this.ctx.resume().catch(() => undefined)
+    this.resume()
+    // a context created before any user gesture starts suspended: playback is the moment it must run
+    video.addEventListener('play', this.resume)
     this.timer = setInterval(() => this.tick(), TICK_MS)
+  }
+
+  /** Wakes a suspended context; also call it from any user gesture that starts playback. */
+  readonly resume = (): void => {
+    if (!this.dead && this.ctx.state === 'suspended') void this.ctx.resume().catch(() => undefined)
+  }
+
+  /** Ends it on the next tick unless FilmAudio.for() takes the element again first (StrictMode's unmount/remount). */
+  release(): void {
+    clearTimeout(this.releaseTimer)
+    this.releaseTimer = setTimeout(() => this.destroy(), 0)
   }
 
   setVolume(v: number): void {
@@ -89,6 +122,10 @@ export class FilmAudio {
   outputLatencyMs = (): number => ((this.ctx.outputLatency || 0) + this.ctx.baseLatency) * 1000
 
   destroy(): void {
+    if (this.dead) return
+    this.dead = true
+    clearTimeout(this.releaseTimer)
+    this.video.removeEventListener('play', this.resume)
     clearInterval(this.timer)
     this.sinkEl?.pause()
     this.source.disconnect()

@@ -37,6 +37,9 @@ extraResources:
   - from: ../../native/mls/pkg
     to: mls
     filter: [alga_mls.js, alga_mls_bg.wasm, THIRD-PARTY-NOTICES.txt]
+  # Notices of third-party code bundled into the renderer under licences that need them (JASSUB/libass WASM: LGPL, FTL…).
+  - from: build/notices
+    to: notices
 # native/mls/pkg is committed: refuse to package a missing or stale build (native/mls/build-info.cjs).
 beforePack: ../../native/mls/build-info.cjs
 # Chromium UI strings for pt-BR plus the en-US fallback; the other ~50 locales are dead weight.

@@ -1,0 +1,42 @@
+Alga Meet - third-party notices for code bundled into the app's renderer
+=========================================================================
+
+(The E2EE MLS module ships its own notices in resources/mls/THIRD-PARTY-NOTICES.txt; the FFmpeg build ships
+LICENSE.txt and SOURCE.txt in resources/ffmpeg.)
+
+JASSUB 2.5.35 (styled ASS/SSA subtitles in the Sala de Cinema)
+--------------------------------------------------------------
+Source: https://github.com/ThaUnknown/jassub (npm package "jassub", version 2.5.35)
+Package licence expression: LGPL-2.1-or-later AND (FTL OR GPL-2.0-or-later) AND MIT AND MIT-Modern-Variant AND ISC
+AND NTP AND Zlib AND BSL-1.0
+
+The renderer ships, unmodified, the package's worker scripts and WebAssembly builds (jassub-worker.wasm and
+jassub-worker-modern.wasm) and its default font (default.woff2). They contain:
+
+- JASSUB and JavascriptSubtitlesOctopus: MIT License.
+  Copyright (c) 2021-2022 JASSUB contributors; Copyright (c) 2017-2021 JavascriptSubtitlesOctopus contributors.
+  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+  documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
+  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit
+  persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice
+  and this permission notice shall be included in all copies or substantial portions of the Software.
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+  WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+  OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+- libass: ISC License. Source: https://github.com/libass/libass
+- FriBidi: GNU Lesser General Public License v2.1 or later (LGPL-2.1-or-later). Source: https://github.com/fribidi/fribidi
+  The LGPL code is used unmodified as part of the JASSUB WebAssembly files, which are separate files in the app's
+  resources (app.asar, renderer assets) and can be replaced with a rebuild from the JASSUB sources above. Full licence
+  text: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt
+- FreeType: used under the FreeType License (FTL), chosen from "FTL OR GPL-2.0-or-later".
+  Portions of this software are copyright (c) The FreeType Project (https://freetype.org). All rights reserved.
+  Licence: https://gitlab.freedesktop.org/freetype/freetype/-/blob/master/docs/FTL.TXT
+- HarfBuzz: "Old MIT" licence. Source: https://github.com/harfbuzz/harfbuzz (COPYING)
+- Other components of the WebAssembly build (Emscripten runtime and libraries) under MIT, MIT-Modern-Variant, NTP,
+  Zlib and BSL-1.0, as listed by the package. Their texts are in the sources linked above.
+- default.woff2 (the fallback subtitle font, registered as "Liberation Sans"): Liberation Fonts, SIL Open Font
+  License 1.1. https://github.com/liberationfonts/liberation-fonts
+
+Source code for all of the above is available at the URLs given; the exact versions are pinned in the app's
+package-lock.json (jassub 2.5.35).

@@ -5,6 +5,7 @@ import modernWasmUrl from 'jassub/dist/wasm/jassub-worker-modern.wasm?url'
 import wasmWorkerUrl from 'jassub/dist/wasm/jassub-worker.js?url'
 import modernWasmWorkerUrl from 'jassub/dist/wasm/jassub-worker-modern.js?url'
 import defaultFontUrl from 'jassub/dist/default.woff2?url'
+import { assTimeOffset } from './subtitles'
 
 /** Subtitle track piece 0 (ruling R27): UTF-8 JSON; pieces 1..k hold the font files named in `fonts[].piece`. */
 export interface SubtitleManifest {
@@ -24,7 +25,7 @@ export function createAss(video: HTMLVideoElement, manifest: SubtitleManifest, f
     subContent: manifest.text,
     fonts: fontBytes,
     maxRenderHeight: 1080,
-    timeOffset: offsetS,
+    timeOffset: assTimeOffset(offsetS), // sign flip: see assTimeOffset
     workerUrl,
     wasmUrl,
     modernWasmUrl,
@@ -34,9 +35,9 @@ export function createAss(video: HTMLVideoElement, manifest: SubtitleManifest, f
   })
 }
 
-/** Per-person delay without recreating the renderer. */
+/** Per-person delay without recreating the renderer (positive = later, like the text overlay). */
 export function setAssOffset(ass: JASSUB, offsetS: number): void {
-  ass.timeOffset = offsetS
+  ass.timeOffset = assTimeOffset(offsetS)
 }
 
 export function destroyAss(ass: JASSUB): void {
