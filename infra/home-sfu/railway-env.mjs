@@ -12,6 +12,9 @@ process.stdin.on('data', (d) => (raw += d)).on('end', () => {
   if (key === 'devkey' || secret.length < 32) fail('refusing the dev key pair or a secret shorter than 32 characters')
   const api = v.PUBLIC_URL || (v.RAILWAY_PUBLIC_DOMAIN && `https://${v.RAILWAY_PUBLIC_DOMAIN}`)
   if (!api) fail('neither PUBLIC_URL nor RAILWAY_PUBLIC_DOMAIN is set; add ALGA_API_URL to .env by hand')
-  process.stdout.write(`LIVEKIT_API_KEY=${key}\nLIVEKIT_API_SECRET=${secret}\nALGA_API_URL=${api.replace(/\/+$/, '')}\n`)
-  console.error(`railway-env: wrote LIVEKIT_API_KEY=${key}, LIVEKIT_API_SECRET=(hidden), ALGA_API_URL=${api}`)
+  // Cinema relay (coturn): the SAME secret the API signs TURN credentials with. Optional here; the compose file requires it.
+  const turn = v.CINEMA_TURN_SECRET
+  if (turn && turn.length < 32) fail('CINEMA_TURN_SECRET shorter than 32 characters')
+  process.stdout.write(`LIVEKIT_API_KEY=${key}\nLIVEKIT_API_SECRET=${secret}\nALGA_API_URL=${api.replace(/\/+$/, '')}\n` + (turn ? `CINEMA_TURN_SECRET=${turn}\n` : ''))
+  console.error(`railway-env: wrote LIVEKIT_API_KEY=${key}, LIVEKIT_API_SECRET=(hidden), ALGA_API_URL=${api}${turn ? ', CINEMA_TURN_SECRET=(hidden)' : ' (no CINEMA_TURN_SECRET on Railway yet: coturn will not start)'}`)
 })

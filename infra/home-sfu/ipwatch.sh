@@ -7,6 +7,12 @@ cd "$(dirname "$0")"
 ip4=$(curl -4 -fsS --max-time 10 https://api.ipify.org || curl -4 -fsS --max-time 10 https://ifconfig.me) || exit 0
 [[ $ip4 =~ ^[0-9]+(\.[0-9]+){3}$ ]] || exit 0   # offline or odd answer: try again next run
 
+# coturn learns the IP at startup too (its entrypoint writes it to /tmp/ext-ip).
+if [ -n "$(docker compose ps -q coturn 2>/dev/null || true)" ] && [ "$(docker compose exec -T coturn cat /tmp/ext-ip 2>/dev/null | tr -d '\r')" != "$ip4" ]; then
+  logger -t alga-sfu "coturn advertises another IP than $ip4: recreating coturn" 2>/dev/null || true
+  docker compose up -d --force-recreate coturn
+fi
+
 id=$(docker compose ps -q livekit 2>/dev/null || true)
 [ -n "$id" ] || exit 0   # stopped on purpose (or not installed): leave it alone
 started=$(docker inspect -f '{{.State.StartedAt}}' "$id")

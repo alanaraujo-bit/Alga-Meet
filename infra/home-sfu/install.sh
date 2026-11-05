@@ -34,7 +34,7 @@ ENV=$DIR/.env
 chmod 600 "$ENV"
 sed -i 's/\r$//' "$ENV"                     # created from Windows/PowerShell: strip CRLF, or the secret gets a \r
 get() { grep -m1 "^$1=" "$ENV" | cut -d= -f2- || true; }
-for k in LIVEKIT_API_KEY LIVEKIT_API_SECRET ALGA_API_URL DUCKDNS_SUBDOMAIN DUCKDNS_TOKEN; do
+for k in LIVEKIT_API_KEY LIVEKIT_API_SECRET ALGA_API_URL DUCKDNS_SUBDOMAIN DUCKDNS_TOKEN CINEMA_TURN_SECRET; do
   [ -n "$(get "$k")" ] || die "$k vazio ou ausente em .env (README §4)"
 done
 key=$(get LIVEKIT_API_KEY); api=$(get ALGA_API_URL); sub=$(get DUCKDNS_SUBDOMAIN)
@@ -53,7 +53,7 @@ ok ".env completo (modo 600), domínio $DOMAIN, API $api, chave $key"
 
 # --- 4. Ports free (unless it is this stack holding them) -------------------------------------------------------
 if [ -z "$(docker compose ps -q 2>/dev/null)" ]; then
-  busy=$(ss -Htlnu 2>/dev/null | awk '{print $1, $5}' | grep -E '^(tcp [^ ]*:(80|443|7881)|udp [^ ]*:(7882|3478))$' || true)
+  busy=$(ss -Htlnu 2>/dev/null | awk '{print $1, $5}' | grep -E '^(tcp [^ ]*:(80|443|7881|3479)|udp [^ ]*:(7882|3478|3479))$' || true)
   [ -z "$busy" ] || die "portas já em uso por outro serviço: $(echo $busy)"
   ok "portas 80, 443, 7881/tcp e 7882, 3478/udp livres"
 fi
@@ -63,13 +63,13 @@ render() { sed -e "s|<DOMAIN>|$DOMAIN|g" -e "s|<API_KEY>|$key|g" -e "s|<API_URL>
 render livekit.home.yaml livekit.yaml
 render caddy.home.yaml caddy.yaml
 grep -n '<[A-Z_]*>' livekit.yaml caddy.yaml && die "placeholder sobrando (linhas acima)"
-chmod 644 livekit.yaml caddy.yaml duckdns.sh upnp.sh
+chmod 644 livekit.yaml caddy.yaml turnserver.conf duckdns.sh upnp.sh
 chmod 755 install.sh doctor.sh ipwatch.sh
 mkdir -p caddy_data
 ok "livekit.yaml e caddy.yaml gerados"
 
 # --- 6. Start ---------------------------------------------------------------------------------------------------
-docker compose pull --quiet livekit caddy duckdns
+docker compose pull --quiet livekit caddy duckdns coturn
 docker compose build --quiet upnp
 docker compose up -d --remove-orphans
 for _ in $(seq 30); do

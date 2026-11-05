@@ -2,7 +2,10 @@
 # UPnP port mapper (runs in the `upnp` container, host network). Asks the router to forward the SFU ports to this
 # host, refreshes every 20 min (1 h lease), and deletes the mappings when the container stops (compose down/stop).
 set -u
-MAPS="80/TCP 443/TCP 7881/TCP 7882/UDP 3478/UDP"
+MAPS="80/TCP 443/TCP 7881/TCP 7882/UDP 3478/UDP 3479/TCP 3479/UDP"
+# coturn relay range (turnserver.conf min-port/max-port): one mapping per port, UPnP has no ranges.
+for p in $(seq 49160 49200); do MAPS="$MAPS $p/UDP"; done
+total=$(echo $MAPS | wc -w)
 
 if [ "${UPNP:-1}" = 0 ]; then
   echo "UPNP=0: nothing to do (forward the ports on the router by hand, README section 2)"
@@ -39,7 +42,7 @@ while :; do
     fi
   done
   wan=$(upnpc $U -s 2>/dev/null | sed -n 's/^ExternalIPAddress = //p')
-  echo "$(date -u +%FT%TZ) $ok/5 mapped, router WAN IP: ${wan:-unknown}"
-  [ "$ok" = 5 ] && touch /tmp/ok
+  echo "$(date -u +%FT%TZ) $ok/$total mapped, router WAN IP: ${wan:-unknown}"
+  [ "$ok" = "$total" ] && touch /tmp/ok
   sleep 1200 & wait $!
 done

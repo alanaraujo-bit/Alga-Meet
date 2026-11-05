@@ -63,6 +63,34 @@ services:
       retries: 3
     logging: *logging
 
+  coturn:
+    # TURN relay for the Cinema's P2P film transfer (README "Relay da Sala de Cinema"). LiveKit's own TURN (3478/udp)
+    # only accepts LiveKit credentials, so this is a second server: 3479 udp+tcp, relay ports 49160-49200/udp.
+    # Host network: a relay needs real ports and real source IPs for denied-peer-ip; the upnp service forwards them.
+    # Secret and realm come from .env, never from a file. The public IP is learned at startup (DuckDNS name) and
+    # ipwatch.sh recreates the container when it changes.
+    image: coturn/coturn:4.7.0
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        ip=$$(getent ahostsv4 "$$REALM" | awk 'NR==1 {print $$1}')
+        echo "$$ip" > /tmp/ext-ip
+        exec turnserver -c /etc/coturn/turnserver.conf --realm="$$REALM" --static-auth-secret="$$CINEMA_TURN_SECRET" \
+          $${ip:+--external-ip="$$ip"}
+    restart: unless-stopped
+    network_mode: host
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      REALM: "${DUCKDNS_SUBDOMAIN:?missing in .env}.duckdns.org"
+      CINEMA_TURN_SECRET: "${CINEMA_TURN_SECRET:?missing in .env (README, Relay da Sala de Cinema)}"
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+    tmpfs: [/tmp]
+    logging: *logging
+
   duckdns:
     # Updates <sub>.duckdns.org (A, and AAAA when DUCKDNS_IPV6=1) every 5 min. Host network: sees the host's IPv6.
     image: curlimages/curl:8.22.0

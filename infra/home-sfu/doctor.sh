@@ -34,7 +34,7 @@ aaaa=$(getent ahostsv6 "$DOMAIN" 2>/dev/null | awk '$1 !~ /^::ffff:/ {print $1; 
 
 echo "== Contêineres"
 docker compose ps --format '  {{.Service}}: {{.State}} {{.Health}}' 2>/dev/null || fail "docker compose indisponível"
-for s in livekit caddy duckdns upnp; do
+for s in livekit caddy duckdns upnp coturn; do
   st=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q "$s" 2>/dev/null)" 2>/dev/null)
   [ "$st" = healthy ] || fail "$s: ${st:-parado} (docker compose logs --tail 30 $s)"
 done
@@ -45,7 +45,7 @@ if [ -n "$id" ]; then
 fi
 
 echo "== Portas neste servidor"
-ss -Htlnu 2>/dev/null | awk '{print $1, $5}' | grep -E '^(tcp [^ ]*:(80|443|7881)|udp [^ ]*:(7882|3478))$' | sort -u | sed 's/^/  escutando: /'
+ss -Htlnu 2>/dev/null | awk '{print $1, $5}' | grep -E '^(tcp [^ ]*:(80|443|7881|3479)|udp [^ ]*:(7882|3478|3479))$' | sort -u | sed 's/^/  escutando: /'
 if [ -f /etc/ufw/ufw.conf ] && grep -q '^ENABLED=yes' /etc/ufw/ufw.conf; then
   echo "  ufw ativo: normal. As portas publicadas pelo Docker entram pelas regras DNAT do próprio Docker, antes do ufw."
 else echo "  ufw inativo"; fi
@@ -53,7 +53,7 @@ else echo "  ufw inativo"; fi
 echo "== Roteador (UPnP)"
 maps=$(docker compose exec -T upnp upnpc -l 2>/dev/null | tr -d '\r' | grep "'alga-sfu'" || true)
 if [ "$(get UPNP)" = 0 ]; then echo "  UPNP=0: portas encaminhadas à mão (README §2)"
-elif [ "$(echo "$maps" | grep -c .)" -ge 5 ]; then pass "5 encaminhamentos UPnP ativos"; echo "$maps" | sed 's/^/   /'
+elif [ "$(echo "$maps" | grep -c .)" -ge 48 ]; then pass "48 encaminhamentos UPnP ativos (inclui o coturn)"; echo "$maps" | sed 's/^/   /'
 else fail "encaminhamentos UPnP incompletos (docker compose logs upnp):"; echo "$maps" | sed 's/^/   /'; fi
 
 echo "== TLS (certificados Let's Encrypt)"
@@ -84,6 +84,11 @@ if [ -n "$pub4" ]; then
   if [ "$h1" = OK ] && [ "$h2" = ok ]; then pass "NAT loopback (hairpin) funciona: portas abertas no IP público e TURN viável"
   else warn "sem NAT loopback (443: ${h1:-falhou}, 3478/udp: ${h2:-falhou}): TURN não vai funcionar; voz/tela seguem por 7882/udp e 7881/tcp. Teste de fora: README §7"; fi
 fi
+
+# coturn answers a STUN binding request without credentials; the relay itself needs a TURN REST credential (README).
+[ "$(stun 127.0.0.1 3479)" = ok ] && pass "coturn (Sala de Cinema) 3479/udp responde (local)" || fail "coturn 3479/udp não responde localmente (docker compose logs --tail 30 coturn)"
+ext=$(docker compose exec -T coturn cat /tmp/ext-ip 2>/dev/null | tr -d '\r')
+[ -n "$ext" ] && [ "$ext" = "$pub4" ] && pass "coturn anuncia o IP público ($ext)" || fail "coturn anuncia '${ext:-?}', IP público é ${pub4:-?} (./ipwatch.sh corrige)"
 
 echo "== Sistema"
 rm=$(cat /proc/sys/net/core/rmem_max); wm=$(cat /proc/sys/net/core/wmem_max)

@@ -33,6 +33,8 @@ Portas que precisam chegar de fora até o servidor (o serviço `upnp` abre sozin
 | 7881 | TCP | mídia por TCP (redes que bloqueiam UDP) |
 | 7882 | UDP | **mídia de todas as chamadas** (uma porta só, "UDP mux") |
 | 3478 | UDP | TURN/UDP |
+| 3479 | TCP e UDP | coturn da Sala de Cinema (§11) |
+| 49160-49200 | UDP | relay do coturn (§11) |
 
 7880 (sinalização sem TLS) e 5349 (TURN depois do Caddy) **não** são publicadas: só o Caddy fala com elas.
 
@@ -73,7 +75,7 @@ apontam para o lugar errado):
 2. Na página do roteador, procure **LAN → Servidor DHCP → Reserva de IP / IP estático / "Static DHCP"**.
 3. Crie a reserva: MAC do servidor → `192.168.1.110`. Salve.
 
-**Portas.** Por padrão o serviço `upnp` pede ao roteador para abrir as 5 portas e renova o pedido a cada 20 min;
+**Portas.** Por padrão o serviço `upnp` pede ao roteador para abrir as portas (inclusive as do coturn, §11) e renova o pedido a cada 20 min;
 quando a pilha para (`docker compose down`), ele as fecha. Confira com `./doctor.sh` (seção "Roteador (UPnP)").
 
 Se o roteador recusar (comum para portas abaixo de 1024, como 80 e 443), encaminhe à mão e ponha `UPNP=0` no `.env`.
@@ -156,7 +158,7 @@ O `install.sh`:
 1. confere Ubuntu, CPU/RAM/disco, Docker e o `.env` (sem mostrar segredos);
 2. confere se as portas estão livres;
 3. gera `livekit.yaml` e `caddy.yaml`;
-4. baixa as imagens e sobe os 4 contêineres;
+4. baixa as imagens e sobe os 5 contêineres (inclui o `coturn`, §11);
 5. instala o cron do `ipwatch.sh`.
 
 É idempotente: rode de novo depois de editar o `.env` ou copiar uma versão nova do kit.
@@ -272,7 +274,7 @@ mais ~5 % de cabeçalhos/retransmissão.
   - A VM (§10) esconde o IP da casa.
 - **Isole o servidor** se der: VLAN própria ou rede de convidados, longe dos PCs e do NAS da casa. Um contêiner
   comprometido na mesma rede local alcança os outros aparelhos.
-- **Só estas portas abertas**: 80, 443, 7881/tcp, 7882 e 3478/udp.
+- **Só estas portas abertas**: 80, 443, 7881/tcp, 7882, 3478/udp e as do coturn (3479, 49160-49200/udp).
   - 7880 e 5349 ficam só na rede interna do Docker.
   - Não abra o SSH (22) para a internet.
 - **UPnP** é cômodo, mas deixa qualquer aparelho da casa abrir portas. Depois de estável, você pode criar as regras à
@@ -314,3 +316,53 @@ Na VM, use este kit com `UPNP=0`. Libere as mesmas 5 portas em dois lugares:
 - no firewall da própria VM (as imagens Ubuntu da Oracle vêm com regras iptables que bloqueiam quase tudo).
 
 Também serve o kit de VM em `infra/livekit/` (rede do host, faixa UDP 50000–60000). As imagens têm versão arm64.
+
+## 11. Relay da Sala de Cinema (coturn)
+
+A Sala de Cinema transfere o filme por P2P. Quem não alcança ninguém direto usa um TURN, e o do LiveKit (3478/udp) só
+aceita credenciais do LiveKit. Por isso o kit tem um **coturn** (serviço `coturn`, `coturn/coturn:4.7.0`, rede do host):
+
+| O quê | Valor |
+|---|---|
+| Porta de escuta | **3479** TCP e UDP |
+| Portas de relay | **49160-49200/udp** (41 portas) |
+| Teto | **30 Mbps somando todos os relays** (`bps-capacity`/`max-bps` no `turnserver.conf`) |
+| Credenciais | TURN REST: usuário `<expiraUnix>:<idDoUsuario>`, senha `base64(HMAC-SHA1(segredo, usuário))`, emitidas pela API |
+| Segredo | `CINEMA_TURN_SECRET`, o mesmo na API (Railway) e no `.env` do servidor. Nunca no git |
+| Realm / IP | `<sub>.duckdns.org`; o IP público é lido desse nome ao subir, e o `ipwatch.sh` recria o coturn se mudar |
+
+- `denied-peer-ip` recusa toda faixa privada (10/8, 172.16/12, 192.168/16, 100.64/10, loopback, link-local, ULA): o
+  relay não vira porta para a rede da casa. `no-cli`, `no-multicast-peers` e `no-tcp-relay` também estão ligados.
+- O coturn não mascara IPs nos logs; eles rodam em 10 MB x 3 e não vão a lugar nenhum.
+- O serviço `upnp` abre 48 mapeamentos (as 7 portas fixas + 41 de relay, UPnP não tem faixa). Se o roteador recusar
+  tantos, encaminhe à mão as portas acima e ponha `UPNP=0` (§2).
+- Mesma limitação do TURN do LiveKit: sem NAT loopback no roteador, só o teste de fora de casa vale (§7).
+
+### Subir (só depois do OK explícito do dono; nenhum passo exige sudo)
+
+No PC, na raiz do repositório, com o Railway CLI logado. O segredo nasce e viaja por pipe, sem aparecer na tela:
+
+```sh
+# 1. gera o segredo direto para o Railway e liga a feature no staging (3 variáveis; o Railway redeploya a API)
+node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))" | railway variable set -s api -e staging CINEMA_TURN_SECRET --stdin
+railway variable set -s api -e staging CINEMA=true CINEMA_TURN_URLS="turn:<sub>.duckdns.org:3479?transport=udp,turn:<sub>.duckdns.org:3479?transport=tcp"
+# 2. leva o segredo (e o resto do .env) do Railway para o servidor, sem mostrar
+railway variables -s api -e staging --json | node infra/home-sfu/railway-env.mjs | ssh <usuario>@<ip-do-servidor> "umask 077; mkdir -p ~/alga-sfu; cat > ~/alga-sfu/.env"
+```
+
+- O passo 2 recria o `.env` do zero e apaga o que é só do servidor (`DUCKDNS_SUBDOMAIN`, `DUCKDNS_TOKEN`, `UPNP_URL`
+  etc.). Num servidor que já roda, faça antes `cp ~/alga-sfu/.env ~/alga-sfu/.env.bak` e depois reponha essas linhas
+  a partir do backup (§4), ou grave o passo 2 em outro arquivo e copie só a linha `CINEMA_TURN_SECRET`.
+- Confira só os nomes: `ssh <usuario>@<ip-do-servidor> "cut -d= -f1 ~/alga-sfu/.env"` deve listar `CINEMA_TURN_SECRET`.
+
+No servidor (ou por `ssh`), copie o kit (§5) e rode:
+
+```sh
+cd ~/alga-sfu && bash install.sh && ./doctor.sh
+```
+
+O `doctor.sh` deve mostrar `coturn ... 3479/udp responde`, `coturn anuncia o IP público` e 48 encaminhamentos UPnP.
+Teste o relay com um `turnutils_uclient` e uma credencial gerada como a API gera (`docker run --rm --network host
+coturn/coturn:4.7.0 turnutils_uclient -u <expiraUnix>:teste -w <credencial> -p 3479 -y <sub>.duckdns.org`).
+
+O que precisar de sudo vira passo do dono. Hoje não há nenhum além do `root-setup.sh` opcional (§5).
