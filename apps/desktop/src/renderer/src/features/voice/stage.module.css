@@ -732,7 +732,7 @@
   display: grid;
   justify-items: center;
   gap: var(--s-2);
-  width: 96px;
+  width: 112px;
 }
 .previewFace {
   position: relative;
@@ -757,6 +757,33 @@
   color: var(--text-secondary);
   font: var(--type-ui);
   font-weight: var(--w-medium);
+}
+/* What they are doing, one quiet line ("Jogando VALORANT"); the name stays the loudest thing. */
+.previewActivity {
+  display: flex;
+  justify-content: center;
+  max-width: 100%;
+  min-height: 18px;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+/* The faces arrive one after another (60 ms apart), as if the room turned to look at you. */
+.previewPerson {
+  animation: seatIn 320ms var(--ease-out-quart) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+@keyframes seatIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+}
+.enterHint {
+  margin-top: var(--s-1);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-wrap: balance;
 }
 
 /* ── Controls dock (floating, centered, 16px off the bottom) ── */
@@ -862,10 +889,33 @@
     border: 2px solid Highlight;
   }
 }
-.dockJoin {
-  composes: dock;
-  padding: 6px 6px 6px var(--s-4);
-  gap: var(--s-3);
-  color: var(--text-secondary);
+/* Entrar, in the spot Desconectar takes once you are in: the same pill, the room's own color. */
+.joinPill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--h-call);
+  padding: 0 var(--s-5) 0 var(--s-4);
+  border-radius: var(--r-full);
+  background: var(--accent-sheen), var(--accent-fill);
+  color: var(--on-accent);
   font: var(--type-ui);
+  font-weight: var(--w-semibold);
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transition:
+    background-color var(--dur-hover-out) var(--ease-out-quad),
+    transform var(--dur-base) var(--ease-out-quart);
+}
+.joinPill:hover {
+  transition-duration: 0ms, var(--dur-base);
+  background: var(--accent-sheen), var(--accent-fill-hover);
+}
+.joinPill:active {
+  transform: scale(0.97);
+}
+.joinPill[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
 }

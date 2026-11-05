@@ -13,7 +13,8 @@ import { AuraGlyph, DecoratedAvatar, ReactionLayer, StreamFrame } from '../billi
 import { useEncodingGate, useTileCount } from '../billing/engine'
 import { useLook } from '../billing/store'
 import { personEntries } from '../shell/people'
-import { ControlsDock } from './ControlsDock'
+import { ActivityLine } from '../activity/Activity'
+import { ControlsDock, LobbyDock } from './ControlsDock'
 import { E2eeChip, MismatchBanner } from './E2ee'
 import { cardWidth, featuredWidth, seatWidth, stripTile, voiceLayout, type SeatSize } from './layout'
 import { useLevelGetter } from './levels'
@@ -100,7 +101,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
         {live ? (
           <LiveRoom channel={channel} people={people.map((p) => p.userId)} meId={meId} />
         ) : (
-          <PreJoin channel={channel} people={people.map((p) => p.userId)} streaming={people.filter((p) => p.streaming).map((p) => p.userId)} joining={joining} variant={variant} />
+          <PreJoin channel={channel} people={people.map((p) => p.userId)} streaming={people.filter((p) => p.streaming).map((p) => p.userId)} variant={variant} />
         )}
         {here && conn.state === 'reconnecting' && (
           <div className={s.reconnect} role="status" aria-live="polite">
@@ -115,7 +116,11 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
           </Notice>
         )}
       </Room>
-      {live && <ControlsDock channel={channel} />}
+      {live ? (
+        <ControlsDock channel={channel} />
+      ) : (
+        <LobbyDock channel={channel} joining={joining} full={!!channel.userLimit && people.length >= channel.userLimit} />
+      )}
     </section>
   )
 }
@@ -221,52 +226,53 @@ function Notice({ title, children, action, dismiss }: { title: string; children:
 
 // ── Not in the room ───────────────────────────────────────────
 
-function PreJoin({ channel, people, streaming, joining, variant }: { channel: Channel; people: string[]; streaming: string[]; joining: boolean; variant: 'channel' | 'dm' }) {
-  // Leaving by keyboard (Desconectar) removes the focused dock: the keyboard lands here instead of on <body>.
-  const joinRef = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    if (document.activeElement === document.body) joinRef.current?.focus()
-  }, [])
-  const join = (
-    <Button ref={joinRef} variant="primary" size="lg" icon={Volume2} loading={joining} onClick={() => void joinVoice(channel.id)}>
-      {variant === 'dm' ? t.call.join : t.join(channel.name)}
-    </Button>
-  )
+/**
+ * A look into the room before anyone sees you (Entrar lives in the LobbyDock below): who is there, who is live,
+ * what each one is doing. From the channel list a second click on the same room enters it.
+ */
+function PreJoin({ channel, people, streaming, variant }: { channel: Channel; people: string[]; streaming: string[]; variant: 'channel' | 'dm' }) {
+  const hint = variant === 'channel' && <p className={s.enterHint}>{t.stage.enterHint}</p>
   if (people.length === 0)
     return (
       <div className={s.empty}>
         <span className={s.emptySeat} aria-hidden />
         <h2 className={s.emptyTitle}>{t.stage.emptyTitle}</h2>
         <p className={s.emptyBody}>{t.stage.emptyBody}</p>
-        <div className={s.emptyActions}>{join}</div>
+        {hint}
       </div>
     )
   return (
     <div className={s.preview}>
       <ul className={s.previewPeople} aria-label={t.stage.preview(people.length)}>
-        {people.map((id) => (
-          <PreviewPerson key={id} userId={id} spaceId={channel.spaceId} live={streaming.includes(id)} />
+        {people.map((id, i) => (
+          <PreviewPerson key={id} userId={id} spaceId={channel.spaceId} live={streaming.includes(id)} order={i} />
         ))}
       </ul>
       <p className={s.count}>{t.stage.preview(people.length)}</p>
-      {join}
+      {hint}
     </div>
   )
 }
 
-function PreviewPerson({ userId, spaceId, live }: { userId: string; spaceId: string | null; live: boolean }) {
+function PreviewPerson({ userId, spaceId, live, order }: { userId: string; spaceId: string | null; live: boolean; order: number }) {
   const u = useData((st) => st.users[userId])
   // The space nickname, as in chat and on the stage.
   const name = useData((st) => displayName(st, userId, spaceId))
   const hue = usePersonHue(u)
   if (!u) return null
   return (
-    <li className={s.previewPerson} style={{ ['--h' as string]: hue }}>
+    <li className={s.previewPerson} style={{ ['--h' as string]: hue, ['--i' as string]: Math.min(order, 8) }}>
       <span className={s.previewFace}>
         <Avatar user={u} size={64} decorative />
       </span>
       <span className={s.previewName}>{name}</span>
-      {live && <span className={s.liveBadge}>{t.stage.live}</span>}
+      {live ? (
+        <span className={s.liveBadge}>{t.stage.live}</span>
+      ) : (
+        <span className={s.previewActivity}>
+          <ActivityLine userId={userId} />
+        </span>
+      )}
     </li>
   )
 }

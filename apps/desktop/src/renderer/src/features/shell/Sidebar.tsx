@@ -1,5 +1,5 @@
 import { Permission, type Channel } from '@alga/shared'
-import { ChevronDown, Hash, HeadphoneOff, LogOut, MicOff, Plus, Search, ShieldOff, Users, Volume2 } from '@/ui/icons'
+import { Bell, BellOff, CheckCheck, ChevronDown, Hash, HeadphoneOff, LogOut, MicOff, Plus, Search, ShieldOff, Users, Volume2 } from '@/ui/icons'
 import { useMemo, useRef } from 'react'
 import { useMedia } from '@/media'
 import { useShallow } from 'zustand/react/shallow'
@@ -17,6 +17,22 @@ import { roomLevelNow, useLevelGetter } from '../voice/levels'
 import { joinVoice, openCall } from '../voice/voice'
 import { UserPanel } from './UserPanel'
 import { ActivityBadge } from '../activity/Activity'
+import { mute, unmute, useMuted } from '../app/notifyPrefs'
+import type { MenuEntry } from '@/ui'
+
+/** One toggle for a channel or a DM: silenced until you turn it back on. */
+const muteEntry = (channelId: string, muted: boolean, dm: boolean): MenuEntry =>
+  muted
+    ? { label: dm ? t.space.notify.unmuteDm : t.space.notify.unmuteChannel, icon: Bell, onSelect: () => unmute(channelId) }
+    : { label: dm ? t.space.notify.muteDm : t.space.notify.muteChannel, icon: BellOff, onSelect: () => mute(channelId, 'forever') }
+
+function MutedMark() {
+  return (
+    <span className={s.mutedMark} role="img" aria-label={t.space.notify.muted}>
+      <Icon icon={BellOff} size={12} />
+    </span>
+  )
+}
 import { t } from './strings'
 import s from './shell.module.css'
 
@@ -99,27 +115,33 @@ function DmRow({ channel, active }: { channel: Channel; active: boolean }) {
       }
     }),
   )
+  const muted = useMuted(channel.id)
   return (
     <button
       type="button"
-      className={`${s.row} ${s.rowTall} ${unread && !active ? s.rowUnread : ''}`}
+      className={`${s.row} ${s.rowTall} ${unread && !active && !muted ? s.rowUnread : ''} ${muted ? s.rowMuted : ''}`}
       aria-current={active ? 'page' : undefined}
       onClick={() => openChat({ kind: 'dm', channelId: channel.id })}
-      onContextMenu={
-        channel.type === 'group_dm'
-          ? contextMenuHandler(() => [
-              {
-                label: t.space.leaveGroup,
-                icon: LogOut,
-                danger: true,
-                onSelect: () =>
-                  void leaveGroupDm(channel.id)
-                    .then(() => toast.success(t.space.leftGroup(title)))
-                    .catch((e: unknown) => toast.error(errorText(e))),
-              },
-            ], title)
-          : undefined
-      }
+      onContextMenu={contextMenuHandler(
+        () => [
+          muteEntry(channel.id, muted, true),
+          ...(channel.type === 'group_dm'
+            ? ([
+                { kind: 'separator' },
+                {
+                  label: t.space.leaveGroup,
+                  icon: LogOut,
+                  danger: true,
+                  onSelect: () =>
+                    void leaveGroupDm(channel.id)
+                      .then(() => toast.success(t.space.leftGroup(title)))
+                      .catch((e: unknown) => toast.error(errorText(e))),
+                },
+              ] satisfies MenuEntry[])
+            : []),
+        ],
+        title,
+      )}
     >
       {peer ? (
         <Avatar user={peer} size={32} presence={presence ?? undefined} decorative />
@@ -132,6 +154,7 @@ function DmRow({ channel, active }: { channel: Channel; active: boolean }) {
         {inCall ? <span className={s.rowSub}>{t.space.inVoice}</span> : channel.type === 'group_dm' ? <span className={s.rowSub}>{channel.recipientIds?.length ?? 0} membros</span> : null}
       </span>
       {inCall && <VoiceDot label={t.space.inVoice} />}
+      {muted && !mentions && <MutedMark />}
       <Badge count={mentions} mention />
     </button>
   )
@@ -182,18 +205,23 @@ function SpaceSidebar({ spaceId }: { spaceId: string }) {
 function TextChannelRow({ channel, active }: { channel: Channel; active: boolean }) {
   const unread = useData((st) => isUnread(st, channel.id))
   const mentions = useData((st) => mentionCount(st, channel.id))
+  const muted = useMuted(channel.id)
   return (
     <button
       type="button"
-      className={`${s.row} ${unread && !active ? s.rowUnread : ''}`}
+      className={`${s.row} ${unread && !active && !muted ? s.rowUnread : ''} ${muted ? s.rowMuted : ''}`}
       aria-current={active ? 'page' : undefined}
       onClick={() => openChat({ kind: 'space', spaceId: channel.spaceId!, channelId: channel.id })}
-      onContextMenu={contextMenuHandler(() => [{ label: t.space.markRead, onSelect: () => markSpaceRead(channel.spaceId!) }], channel.name)}
+      onContextMenu={contextMenuHandler(
+        () => [{ label: t.space.markRead, icon: CheckCheck, onSelect: () => markSpaceRead(channel.spaceId!) }, muteEntry(channel.id, muted, false)],
+        channel.name,
+      )}
     >
       <span className={s.rowIcon}>
         <Icon icon={Hash} size={16} />
       </span>
       <span className={s.rowName}>{channel.name}</span>
+      {muted && !mentions && <MutedMark />}
       <Badge count={mentions} mention />
     </button>
   )
@@ -203,10 +231,11 @@ function VoiceChannelRow({ channel, active }: { channel: Channel; active: boolea
   const voiceStates = useData((st) => st.voiceStates)
   const people = useMemo(() => voiceMembers({ voiceStates }, channel.id), [voiceStates, channel.id])
   const here = useMedia((st) => st.connection.channelId === channel.id && st.connection.state !== 'idle')
-  // Discord habit kept on purpose: one click on a voice channel puts you in it.
+  // A click looks into the room (who is there, your mic) without anyone seeing you; a second click (or a double
+  // click, or Enter twice) enters. Accidental joins are the classic voice-chat pain (docs/research/discord, F1).
   const open = () => {
-    openCall(channel.id)
-    if (!here) void joinVoice(channel.id)
+    if (active && !here) void joinVoice(channel.id)
+    else openCall(channel.id)
   }
   return (
     <>
@@ -215,7 +244,7 @@ function VoiceChannelRow({ channel, active }: { channel: Channel; active: boolea
         className={`${s.row} ${people.length ? s.voiceActive : ''}`}
         aria-current={active ? 'page' : undefined}
         onClick={open}
-        aria-label={here ? channel.name : `${t.space.joinVoice(channel.name)}${people.length ? `, ${people.length}` : ''}`}
+        aria-label={`${active && !here ? t.space.joinVoice(channel.name) : channel.name}${people.length ? `, ${people.length}` : ''}`}
       >
         <span className={s.rowIcon}>
           <Icon icon={Volume2} size={16} filled={active || people.length > 0} />

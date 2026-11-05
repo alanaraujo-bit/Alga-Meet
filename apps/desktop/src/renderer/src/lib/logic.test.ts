@@ -164,12 +164,15 @@ describe('unread + reactions', () => {
     expect(spaceUnread({ channels, readStates: { a: rs('a', '05'), b: rs('b', '09') } }, 's')).toEqual({ unread: false, mentions: 0 })
     expect(spaceUnread({ channels, readStates: { a: rs('a', '04', 2), b: rs('b', '09') } }, 's')).toEqual({ unread: true, mentions: 2 })
     expect(spaceUnread({ channels, readStates: {} }, 's').unread).toBe(true)
+    // A silenced channel adds no dot but keeps its @mentions.
+    expect(spaceUnread({ channels, readStates: { a: rs('a', '04', 2), b: rs('b', '09') } }, 's', (id) => id === 'a')).toEqual({ unread: false, mentions: 2 })
   })
   it('homeBadge counts incoming requests and unread DMs', () => {
     const channels = { d: ch('d', { type: 'dm', spaceId: null, lastMessageId: '03' }) }
     const relationships = { x: { type: 'incoming' } as Relationship, y: { type: 'friend' } as Relationship }
     expect(homeBadge({ channels, readStates: { d: rs('d', '01', 3) }, relationships })).toBe(4)
     expect(homeBadge({ channels, readStates: { d: rs('d', '03') }, relationships })).toBe(1)
+    expect(homeBadge({ channels, readStates: { d: rs('d', '01', 3) }, relationships }, () => true)).toBe(1)
   })
   it('own reaction echo is idempotent', () => {
     seq = 0

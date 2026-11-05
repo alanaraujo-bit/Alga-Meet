@@ -37,6 +37,7 @@ export const t = {
     emptyBody: 'Entre e chame alguém. Quem chegar já te ouve.',
     alone: 'Só você aqui. Quem entrar já te ouve.',
     preview: (n: number) => (n === 1 ? '1 pessoa conversando agora' : `${n} pessoas conversando agora`),
+    enterHint: 'Ninguém te vê aqui ainda. Clique de novo na sala para entrar.',
     you: 'Você',
     muted: 'Microfone desativado',
     deafened: 'Áudio desativado',
@@ -69,6 +70,15 @@ export const t = {
     unmuteFor: 'Voltar a ouvir',
     serverMuted: 'Silenciado pela moderação',
     serverDeafened: 'Áudio desativado pela moderação',
+  },
+
+  /** Before entering a room (LobbyDock). */
+  lobby: {
+    toolbar: 'Antes de entrar',
+    test: 'Testar microfone',
+    stopTest: 'Parar o teste',
+    testHint: 'Fale algo: o anel do microfone acende quando ele te ouve',
+    full: 'Sala cheia',
   },
 
   dock: {

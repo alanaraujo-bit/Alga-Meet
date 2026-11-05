@@ -1,11 +1,11 @@
 import type { Channel } from '@alga/shared'
 import type { Glyph } from '@/ui/icons'
-import { ArrowLeftRight, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, Settings2, Square, Waveform } from '@/ui/icons'
-import { useCallback, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Ref, type RefObject } from 'react'
+import { ArrowLeftRight, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, Settings2, Square, Volume2, Waveform } from '@/ui/icons'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Ref, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
 import { useData } from '@/store/data'
-import { Icon, MenuButton, Tooltip, useEnvelope } from '@/ui'
+import { Icon, MenuButton, Spinner, Tooltip, useEnvelope } from '@/ui'
 import { openSettings } from '../settings/store'
 import { levelNow } from './levels'
 import { t } from './strings'
@@ -13,7 +13,7 @@ import { SoundboardPanel } from '../soundboard/SoundboardPanel'
 import { SoundEditor } from '../soundboard/SoundEditor'
 import { setOpen, useSoundboard } from '../soundboard/store'
 import { t as sbT } from '../soundboard/strings'
-import { leaveVoice, useVoice } from './voice'
+import { joinVoice, leaveVoice, useVoice } from './voice'
 import s from './stage.module.css'
 
 /**
@@ -114,6 +114,76 @@ export function ControlsDock({ channel }: { channel: Channel }) {
       <CallButton icon={PhoneOff} label={t.dock.leave} leave onClick={leaveVoice} />
       {channel.spaceId && <SoundboardPanel anchor={sbAnchor} onClose={() => setOpen(false)} channel={channel} />}
       {channel.spaceId && <SoundEditor />}
+    </div>
+  )
+}
+
+/** My mic level while the test runs (not in a call yet, so levelNow() reads 0); nothing while muted. */
+const testLevel = () => {
+  const m = useMedia.getState()
+  return m.micTest.active && !m.self.muted ? m.self.level : 0
+}
+
+/**
+ * Before entering: the same dock in the same place, so nothing jumps when you join. Mic and sound are chosen before
+ * anyone hears you; the mic test runs only when asked (opening the mic just to look at a room would light the
+ * system's mic indicator). The join pill sits where Desconectar will be.
+ */
+export function LobbyDock({ channel, joining, full }: { channel: Channel; joining: boolean; full: boolean }) {
+  const self = useMedia(useShallow((st) => ({ muted: st.self.muted, deafened: st.self.deafened, mic: st.self.micAvailable })))
+  const testing = useMedia((st) => st.micTest.active)
+  const meter = useRef<HTMLSpanElement>(null)
+  useEnvelope(meter, testLevel)
+  const dock = useRef<HTMLDivElement>(null)
+  useToastClearance(dock)
+  const join = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    // Leaving by keyboard (Desconectar) removes the focused call dock: the keyboard lands on Entrar, not on <body>.
+    if (document.activeElement === document.body) join.current?.focus()
+    // The test belongs to this screen: leaving it, or joining (the call takes the mic), ends it.
+    return () => void (useMedia.getState().micTest.active && media.stopMicTest())
+  }, [])
+  return (
+    <div ref={dock} className={s.dock} role="toolbar" aria-label={t.lobby.toolbar}>
+      <CallButton
+        icon={self.muted || !self.mic ? MicOff : Mic}
+        label={!self.mic ? t.dock.noMic : self.muted ? t.dock.unmute : t.dock.mute}
+        pressed={self.muted}
+        off={self.muted || !self.mic}
+        disabled={!self.mic}
+        onClick={() => void media.toggleMute()}
+      >
+        <span ref={meter} className={s.ctlMeter} aria-hidden />
+      </CallButton>
+      <CallButton
+        icon={self.deafened ? HeadphoneOff : Headphones}
+        label={self.deafened ? t.dock.undeafen : t.dock.deafen}
+        pressed={self.deafened}
+        off={self.deafened}
+        onClick={() => void media.toggleDeafen()}
+      />
+      <CallButton
+        icon={Waveform}
+        label={testing ? t.lobby.stopTest : t.lobby.test}
+        hint={testing ? t.lobby.testHint : undefined}
+        pressed={testing}
+        on={testing}
+        disabled={!self.mic}
+        onClick={() => void (testing ? media.stopMicTest() : media.startMicTest({ loopback: false }))}
+      />
+      <CallButton icon={Settings2} label={t.dock.settings} onClick={() => openSettings('voice')} />
+      <span className={s.dockSep} />
+      <button
+        ref={join}
+        type="button"
+        className={s.joinPill}
+        aria-disabled={full || undefined}
+        aria-label={full ? t.lobby.full : channel.spaceId ? t.join(channel.name ?? '') : t.call.join}
+        onClick={full || joining ? undefined : () => void joinVoice(channel.id)}
+      >
+        {joining ? <Spinner size={12} /> : <Icon icon={Volume2} size={16} />}
+        <span>{full ? t.lobby.full : joining ? t.joining : t.joinShort}</span>
+      </button>
     </div>
   )
 }

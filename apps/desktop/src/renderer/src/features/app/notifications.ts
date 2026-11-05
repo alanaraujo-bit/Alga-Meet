@@ -4,14 +4,16 @@ import { isUnread, useData } from '@/store/data'
 import { channelTitle, displayName } from '@/store/selectors'
 import { onDispatch } from '@/store/session'
 import { useUi } from '@/store/ui'
+import { isMuted, levelOf, shouldNotify, startNotifyPrefs, useNotify } from './notifyPrefs'
 
 /**
- * Desktop notifications for DMs and @mentions while the window is not focused, the taskbar badge, and
- * click-through to the conversation. Each piece obeys its switch in Configurações › Notificações.
+ * Desktop notifications while the window is not focused (DMs always; space messages by that space's level, see
+ * notifyPrefs.ts), the taskbar badge, and click-through to the conversation. Each piece obeys its switch in
+ * Configurações › Notificações; silenced spaces, channels and DMs never interrupt.
  */
 export function startNotifications(): () => void {
   const b = window.alga
-  const offs: Array<() => void> = []
+  const offs: Array<() => void> = [startNotifyPrefs()]
 
   offs.push(
     onDispatch((d) => {
@@ -22,7 +24,13 @@ export function startNotifications(): () => void {
       const ch = st.channels[m.channelId]
       if (!ch) return
       const dm = ch.type === 'dm' || ch.type === 'group_dm'
-      if (!dm && !mentionedIds(m.content).includes(st.me.id)) return
+      const go = shouldNotify({
+        dm,
+        mentioned: mentionedIds(m.content).includes(st.me.id),
+        channelMuted: isMuted(ch.id),
+        level: ch.spaceId ? levelOf(ch.spaceId) : 'all',
+      })
+      if (!go) return
       const who = displayName(st, m.author.id, ch.spaceId)
       b?.notify?.({
         title: dm ? who : `${who} em #${channelTitle(st, ch)}`,
@@ -44,13 +52,14 @@ export function startNotifications(): () => void {
       }),
     )
 
-  // Taskbar badge = what needs you: mentions + unread DMs.
+  // Taskbar badge = what needs you: mentions + unread DMs, minus anything you silenced.
   let last = -1
   const badge = () => {
     const st = useData.getState()
     let n = 0
     if (useUi.getState().taskbarBadge)
       for (const c of Object.values(st.channels)) {
+        if (isMuted(c.id) || (c.spaceId && levelOf(c.spaceId) === 'none')) continue
         const mentions = st.readStates[c.id]?.mentionCount ?? 0
         n += c.type === 'dm' || c.type === 'group_dm' ? (isUnread(st, c.id) ? Math.max(1, mentions) : 0) : mentions
       }
@@ -59,6 +68,7 @@ export function startNotifications(): () => void {
   badge()
   offs.push(useData.subscribe((s, p) => (s.readStates !== p.readStates || s.channels !== p.channels) && badge()))
   offs.push(useUi.subscribe((s, p) => s.taskbarBadge !== p.taskbarBadge && badge()))
+  offs.push(useNotify.subscribe(badge))
 
   return () => {
     offs.forEach((off) => off())

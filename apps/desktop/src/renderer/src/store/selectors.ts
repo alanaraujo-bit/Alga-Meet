@@ -45,23 +45,23 @@ export function mentionCount(s: Pick<S, 'readStates'>, channelId: string): numbe
   return s.readStates[channelId]?.mentionCount ?? 0
 }
 
-/** Rail indicator for a space: any unread text channel, and total mentions. */
-export function spaceUnread(s: Pick<S, 'channels' | 'readStates'>, spaceId: string): { unread: boolean; mentions: number } {
+/** Rail indicator for a space: any unread text channel, and total mentions. `quiet` channels (silenced) add no dot, only their mentions. */
+export function spaceUnread(s: Pick<S, 'channels' | 'readStates'>, spaceId: string, quiet: (channelId: string) => boolean = () => false): { unread: boolean; mentions: number } {
   let unread = false
   let mentions = 0
   for (const c of Object.values(s.channels)) {
     if (c.spaceId !== spaceId || c.type !== 'text') continue
-    if (isUnread(s, c.id)) unread = true
+    if (!unread && isUnread(s, c.id) && !quiet(c.id)) unread = true
     mentions += mentionCount(s, c.id)
   }
   return { unread, mentions }
 }
 
-/** Home badge: incoming friend requests + unread DMs (each DM counts its mentions, or 1). */
-export function homeBadge(s: Pick<S, 'channels' | 'readStates' | 'relationships'>): number {
+/** Home badge: incoming friend requests + unread DMs (each DM counts its mentions, or 1); `quiet` DMs (silenced) do not count. */
+export function homeBadge(s: Pick<S, 'channels' | 'readStates' | 'relationships'>, quiet: (channelId: string) => boolean = () => false): number {
   let n = Object.values(s.relationships).filter((r) => r.type === 'incoming').length
   for (const c of Object.values(s.channels)) {
-    if ((c.type === 'dm' || c.type === 'group_dm') && isUnread(s, c.id)) n += Math.max(1, mentionCount(s, c.id))
+    if ((c.type === 'dm' || c.type === 'group_dm') && isUnread(s, c.id) && !quiet(c.id)) n += Math.max(1, mentionCount(s, c.id))
   }
   return n
 }

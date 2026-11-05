@@ -8,6 +8,7 @@ import { Badge, contextMenuHandler, Icon, MenuButton, Tooltip, VoiceDot } from '
 import { hueFor, initials } from '@/ui/Avatar'
 import { arrowFocus } from '@/ui/floating'
 import { roomLevelNow } from '../voice/levels'
+import { isMutedIn, useNotify, useSilenced } from '../app/notifyPrefs'
 import { spaceMenu } from '../spaces/spaceMenu'
 import { openStaff } from '../staff/store'
 import { t as tstaff } from '../staff/strings'
@@ -20,7 +21,8 @@ export function SpaceRail() {
   const relationships = useData((st) => st.relationships)
   const channels = useData((st) => st.channels)
   const readStates = useData((st) => st.readStates)
-  const home = useMemo(() => homeBadge({ channels, readStates, relationships }), [channels, readStates, relationships])
+  const prefs = useNotify()
+  const home = useMemo(() => homeBadge({ channels, readStates, relationships }, (id) => isMutedIn(prefs, id)), [channels, readStates, relationships, prefs])
   const dmCall = useData((st) => Object.values(st.voiceStates).some((v) => v.spaceId === null))
   const staff = useData((st) => !!st.me?.staffRole)
 
@@ -87,7 +89,11 @@ function SpaceIcon({ spaceId, active }: { spaceId: string; active: boolean }) {
   const space = useData((st) => st.spaces[spaceId])
   const channels = useData((st) => st.channels)
   const readStates = useData((st) => st.readStates)
-  const { unread, mentions } = useMemo(() => spaceUnread({ channels, readStates }, spaceId), [channels, readStates, spaceId])
+  const prefs = useNotify()
+  const silenced = useSilenced(spaceId)
+  const counts = useMemo(() => spaceUnread({ channels, readStates }, spaceId, (id) => isMutedIn(prefs, id)), [channels, readStates, spaceId, prefs])
+  // A silenced space keeps its @mention badge (someone called you) but never shows the unread dot.
+  const { unread, mentions } = { unread: counts.unread && !silenced, mentions: counts.mentions }
   const voice = useData((st) => Object.values(st.voiceStates).some((v) => v.spaceId === spaceId))
   // When I'm in this space's voice, the dot's ring rides the room's real envelope; elsewhere the dot is still.
   const mine = useMedia((st) => st.connection.state === 'connected' && !!st.connection.channelId && useData.getState().channels[st.connection.channelId]?.spaceId === spaceId)

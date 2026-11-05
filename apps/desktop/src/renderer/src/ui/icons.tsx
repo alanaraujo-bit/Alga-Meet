@@ -51,6 +51,7 @@ export {
   ArrowSquareOut as ExternalLink,
   ArrowUp,
   Bell,
+  BellSlash as BellOff,
   CaretDown as ChevronDown,
   CaretLeft as ChevronLeft,
   CaretRight as ChevronRight,

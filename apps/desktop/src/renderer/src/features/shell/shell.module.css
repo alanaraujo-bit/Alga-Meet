@@ -291,6 +291,18 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Silenced: present but quiet. The name steps back, a small bell-slash says why; an @mention badge still shows. */
+.rowMuted {
+  color: var(--text-tertiary);
+}
+.rowMuted .rowIcon {
+  opacity: 0.7;
+}
+.mutedMark {
+  display: inline-flex;
+  color: var(--text-tertiary);
+  opacity: 0.8;
+}
 .rowIcon {
   display: grid;
   color: var(--text-tertiary);
