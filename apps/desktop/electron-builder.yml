@@ -28,6 +28,10 @@ extraResources:
   # Activity helper (native/activity/AlgaActivity.cs, built by scripts/build-activity.mjs), run by src/main/activity.ts.
   - from: build/bin
     to: bin
+  # LGPL-only shared ffmpeg/ffprobe + DLLs + license/source notice for the cinema host (scripts/fetch-ffmpeg.mjs), run by src/main/cinema/ffmpeg.ts.
+  - from: build/ffmpeg
+    to: ffmpeg
+    filter: ["**/*", "!.pinned"]
   # E2EE: MLS WASM + its wasm-bindgen glue (native/mls/build.sh), loaded from resources/mls by src/main/mls/host.ts,
   # and the notices of the crates compiled into it (MIT/Apache/BSD texts, MPL-2.0 source links).
   - from: ../../native/mls/pkg

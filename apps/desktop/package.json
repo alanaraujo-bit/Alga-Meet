@@ -7,13 +7,14 @@
   "author": "Alga",
   "main": "./out/main/index.js",
   "scripts": {
-    "dev": "node scripts/build-activity.mjs && electron-vite dev",
-    "build": "node scripts/build-activity.mjs && electron-vite build",
+    "dev": "node scripts/build-activity.mjs && node scripts/fetch-ffmpeg.mjs && electron-vite dev",
+    "build": "node scripts/build-activity.mjs && node scripts/fetch-ffmpeg.mjs && electron-vite build",
+    "fetch:ffmpeg": "node scripts/fetch-ffmpeg.mjs",
     "build:activity": "node scripts/build-activity.mjs",
     "preview": "electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json",
     "test": "vitest run",
-    "dist": "node scripts/build-activity.mjs && node scripts/build-setup-ui.mjs && electron-vite build && electron-builder --win --publish never && node scripts/check-package.mjs",
+    "dist": "node scripts/build-activity.mjs && node scripts/fetch-ffmpeg.mjs && node scripts/build-setup-ui.mjs && electron-vite build && electron-builder --win --publish never && node scripts/check-package.mjs",
     "build:setup-ui": "node scripts/build-setup-ui.mjs",
     "screenshot": "node scripts/screenshot.mjs"
   },
