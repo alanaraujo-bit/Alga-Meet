@@ -1,6 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { createReadStream } from 'node:fs'
-import { mkdir, open, readFile, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, extname, isAbsolute, join } from 'node:path'
 import { app } from 'electron'
 import { CINEMA_ITEMS_PER_FRAME, type CinemaAudioTrack, type CinemaFilm, type CinemaPieceMeta, type CinemaSubtitleTrack, type CinemaTrackId } from '@alga/shared'
@@ -8,6 +7,7 @@ import { runTool, type FfmpegBins } from './ffmpeg'
 import { MAX_SUBTITLE_BYTES, decodeSubtitle, extractFonts, extractSubtitle, makePoster, makeThumbs, srtToVtt } from './extras'
 import { initDelay, initTimescale, segmentStart } from './mp4'
 import { capText, stripControls } from './names'
+import { HLS_TIME_S, hashFile, head, parsePlaylist, runArgs } from './runs'
 
 /*
  * The host's piece factory (spec §6.3 step 3, Rulings R4/R5/R27). Per video/audio track ONE ffmpeg run at a time writes
@@ -42,7 +42,6 @@ export interface PieceFactoryOpts {
 }
 type Unsubscribe = () => void
 
-const HLS_TIME_S = 4
 const POLL_MS = 250
 /** Slack for timestamps: a run's last EXTINF ignores B-frame reordering, AAC priming shifts ~21 ms, tfdt rounds to 1 ms. */
 const EPS = 0.25
@@ -54,10 +53,6 @@ const END_SLACK_S = 1
 const STALE_MS = 3_600_000
 /** Same cap as PieceMetaSchema in packages/shared/src/cinema.ts: the server rejects bigger pieces. */
 const MAX_PIECE_BYTES = 64 * 1024 * 1024
-/** The moof (with tfdt) sits in the first few KiB of a segment. */
-const HEAD_BYTES = 256 * 1024
-/** Opus mapping family 1 (Vorbis order) layouts by channel count; libopus refuses the 5.1(side)/7.1(wide) variants. */
-const OPUS_LAYOUTS = ['', 'mono', 'stereo', '3.0', 'quad', '5.0', '5.1', '6.1', '7.1']
 
 export const cinemaRoot = (): string => join(app.getPath('temp'), 'alga-cinema')
 export const sessionDir = (root: string = cinemaRoot()): string => join(root, randomBytes(8).toString('hex'))
@@ -91,53 +86,6 @@ interface Track {
 const sha256 = (b: Uint8Array) => createHash('sha256').update(b).digest('hex')
 const end = (p: Piece) => p.startS + p.durS
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
-/** ffmpeg on Windows puts the HLS init segment in the cwd when the paths use backslashes. */
-const ff = (p: string) => p.replace(/\\/g, '/')
-
-/** Streams the file through SHA-256: big segments never block the main process. */
-async function hashFile(file: string): Promise<string> {
-  const h = createHash('sha256')
-  for await (const chunk of createReadStream(file)) h.update(chunk as Buffer)
-  return h.digest('hex')
-}
-
-async function head(file: string): Promise<Uint8Array> {
-  const fh = await open(file, 'r')
-  try {
-    const b = Buffer.alloc(HEAD_BYTES)
-    const { bytesRead } = await fh.read(b, 0, HEAD_BYTES, 0)
-    return b.subarray(0, bytesRead)
-  } finally {
-    await fh.close()
-  }
-}
-
-function audioArgs(a: CinemaAudioTrack): string[] {
-  const ch = Math.min(Math.max(a.channels, 1), 8)
-  switch (a.out) {
-    case 'copy': return ['-c:a', 'copy', '-copypriorss', '0'] // no packets before the seek point: continuations do not overlap
-    case 'aac': return ['-c:a', 'aac', '-b:a', '640k', '-ac', String(ch)]
-    // ~96 kbps per channel (576k for 5.1, 768k for 7.1); > 8 source channels are downmixed to 7.1 by the layout.
-    case 'opus': return ['-af', `aformat=channel_layouts=${OPUS_LAYOUTS[ch]}`, '-c:a', 'libopus', '-b:a', `${96 * ch}k`, '-mapping_family', '1']
-    case 'flac': return ['-c:a', 'flac', ...(ch === 8 ? ['-ac', '8'] : [])]
-  }
-}
-
-/** Entries of run `k`'s playlist; segment files are `r<k>-<n>.m4s`, so a lingering killed run never collides with the next. */
-function parsePlaylist(text: string, k: number): { durS: number; name: string; n: number }[] {
-  const out: { durS: number; name: string; n: number }[] = []
-  let dur: number | null = null
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim()
-    const m = /^r(\d+)-(\d+)\.m4s$/.exec(line)
-    if (line.startsWith('#EXTINF:')) dur = Number.parseFloat(line.slice(8))
-    else if (dur !== null && m && Number(m[1]) === k) {
-      out.push({ durS: dur, name: line, n: Number(m[2]) })
-      dur = null
-    }
-  }
-  return out
-}
 
 export class PieceFactory {
   private readonly tracks = new Map<CinemaTrackId, Track>()
@@ -305,7 +253,7 @@ export class PieceFactory {
   }
 
   private async startRun(t: Track, g: number): Promise<void> {
-    const { film, path, bins, videoStreamIndex, readRate } = this.opts
+    const { film, bins } = this.opts
     const prev = t.order.filter((p) => end(p) <= g + EPS).pop()
     // Continue right after the coverage when the target is close; the 10 ms keeps -ss off the previous keyframe. The ffmpeg
     // CLI seeks to 3/23 s before -ss when a stream has a decode delay (B-frames): add it back so video lands on the keyframe <= from.
@@ -314,7 +262,7 @@ export class PieceFactory {
     const seek = t.audio ? from : from + (cont ? 0.01 : 0) + (t.delayS > 0 ? 3 / 23 : 0)
     const stopAt = t.order.find((p) => p.startS > from + EPS)?.startS ?? null
     // The stop check is on DTS: a keyframe's DTS is its startS minus the B-frame delay; 1 ms keeps it out.
-    const to = stopAt === null ? [] : ['-to', (stopAt - (t.audio ? 0 : t.delayS) - 0.001).toFixed(3)]
+    const to = stopAt === null ? null : stopAt - (t.audio ? 0 : t.delayS) - 0.001
     await mkdir(t.dir, { recursive: true })
     if (this.closing) return
     const k = ++t.runs
@@ -323,17 +271,7 @@ export class PieceFactory {
       k, firstN: t.nextN, from, stopAt, playlist, initFile: join(t.dir, `run${k}-init.mp4`), abort: new AbortController(),
       seen: 0, frontier: from, added: 0, dead: false, exited: Promise.resolve(),
     }
-    const media = t.audio
-      ? ['-map', `0:a:${t.audio.id}`, ...audioArgs(t.audio)]
-      : ['-map', `0:${videoStreamIndex}`, '-c:v', 'copy', ...(film.videoCodec === 'hevc' ? ['-tag:v', 'hvc1'] : []), '-avoid_negative_ts', 'disabled']
-    const args = [
-      '-v', 'error', '-y', '-copyts', '-start_at_zero', ...(readRate ? ['-readrate', String(readRate)] : []),
-      ...(seek > 0 ? ['-ss', seek.toFixed(3)] : []), '-i', path, ...media, ...to,
-      '-f', 'hls', '-hls_segment_type', 'fmp4', '-hls_time', String(HLS_TIME_S), '-hls_playlist_type', 'event',
-      '-hls_flags', 'independent_segments+temp_file', '-hls_segment_options', 'movflags=+frag_discont',
-      '-start_number', String(t.nextN), '-hls_fmp4_init_filename', basename(run.initFile),
-      '-hls_segment_filename', ff(join(t.dir.replace(/%/g, '%%'), `r${k}-%d.m4s`)), ff(playlist),
-    ]
+    const args = runArgs({ ...this.opts, audio: t.audio, k, n: t.nextN, seek, to, dir: t.dir, playlist, initFile: run.initFile })
     t.run = run
     const timer = setInterval(() => void this.ingest(t, run), POLL_MS)
     // Slower than real time is useless anyway: the timeout only catches a hung process.
