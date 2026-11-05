@@ -49,7 +49,8 @@ export interface Spooled {
 
 /** Streams an upload to a temp file, hashing and counting; 413 if busboy truncated it at `maxBytes`. */
 export async function spool(file: Readable & { truncated?: boolean }, name: string, maxBytes: number): Promise<Spooled> {
-  const path = join(tmpdir(), `alga-upload-${randomUUID()}`)
+  // The pid lets a test check only its own leftovers while other test files upload in parallel.
+  const path = join(tmpdir(), `alga-upload-${process.pid}-${randomUUID()}`)
   const hash = createHash('sha256')
   let size = 0
   try {

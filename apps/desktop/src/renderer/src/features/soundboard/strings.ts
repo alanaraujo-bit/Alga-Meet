@@ -43,6 +43,7 @@ export const t = {
     choose: 'Escolher arquivo',
     decoding: 'Abrindo o áudio…',
     tooBig: 'Esse arquivo passa de 20 MB.',
+    tooLong: 'Esse áudio passa de 10 minutos. Corte um trecho menor antes.',
     undecodable: 'Não conseguimos abrir esse arquivo. Tente MP3, WAV ou OGG.',
     empty: 'Esse áudio está vazio.',
     selection: (ms: number) => `${secs.format(ms / 1000)} s selecionados`,

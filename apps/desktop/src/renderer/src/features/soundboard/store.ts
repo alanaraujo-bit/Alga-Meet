@@ -169,11 +169,12 @@ export function startSoundboard(): () => void {
       if (s.devices.outputId !== prev.devices.outputId) player.setSoundboardOutput(s.devices.outputId)
       if (s.connection.channelId !== prev.connection.channelId || s.connection.state !== prev.connection.state) {
         const spaceId = callSpace()
-        if (!spaceId) {
+        // Call over or another channel: old sounds stop, who-played resets, an editor bound to another space closes.
+        if (!spaceId || s.connection.channelId !== prev.connection.channelId) {
           player.stopAll()
-          useSoundboard.setState({ playing: {}, open: false })
-          return
+          useSoundboard.setState((st) => ({ playing: {}, open: false, editor: st.editor && st.editor.spaceId === spaceId ? st.editor : null }))
         }
+        if (!spaceId) return
         if (s.connection.state === 'connected' && prev.connection.state !== 'connected') {
           void loadSounds(spaceId).catch(() => undefined)
           void player.preload(spaceId, ALGA_SOUNDS.map((a) => a.id))

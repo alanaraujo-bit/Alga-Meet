@@ -86,3 +86,28 @@ describe('SPACE_SOUNDS_UPDATE', () => {
     expect(player.evict).toHaveBeenCalledWith('s1')
   })
 })
+
+describe('leaving or switching the call', () => {
+  it('closes the editor and the panel and stops sounds when the call ends', async () => {
+    const { startSoundboard } = await import('./store')
+    const off = startSoundboard()
+    useSoundboard.setState({ open: true, editor: { spaceId: 'sp' } })
+    useMedia.setState({ connection: { state: 'idle', channelId: null } } as never)
+    expect(useSoundboard.getState().editor).toBeNull()
+    expect(useSoundboard.getState().open).toBe(false)
+    expect(player.stopAll).toHaveBeenCalled()
+    off()
+  })
+  it('switching channel in the same space clears who-played and stops old sounds', async () => {
+    const { startSoundboard } = await import('./store')
+    useData.setState({ channels: { vc: { id: 'vc', spaceId: 'sp' }, vc2: { id: 'vc2', spaceId: 'sp' } } } as never)
+    useMedia.setState({ connection: { state: 'connected', channelId: 'vc' } } as never)
+    const off = startSoundboard()
+    play()
+    vi.clearAllMocks()
+    useMedia.setState({ connection: { state: 'connected', channelId: 'vc2' } } as never)
+    expect(useSoundboard.getState().playing).toEqual({})
+    expect(player.stopAll).toHaveBeenCalled()
+    off()
+  })
+})

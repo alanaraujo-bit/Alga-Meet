@@ -118,3 +118,22 @@ export function mixdown(channels: Float32Array[]): Float32Array {
   for (const ch of channels) for (let i = 0; i < out.length; i++) out[i]! += ch[i]! / channels.length
   return out
 }
+
+export const MAX_INPUT_BYTES = 20 * 1024 * 1024
+export const MAX_INPUT_SEC = 10 * 60
+
+/** Checked before decoding: a decoded 48 kHz float file costs ~23 MB per minute and channel. NaN = unknown. */
+export function checkInput(bytes: number, durationSec: number): 'tooBig' | 'tooLong' | null {
+  if (bytes > MAX_INPUT_BYTES) return 'tooBig'
+  if (Number.isFinite(durationSec) && durationSec > MAX_INPUT_SEC) return 'tooLong'
+  return null
+}
+
+/** Default selection: 5 s from the first audible sample (−34 dBFS), or from 0 when nothing crosses it. */
+export function firstWindow(samples: Float32Array): { start: number; end: number } {
+  const totalMs = (samples.length / SOUND_SAMPLE_RATE) * 1000
+  let i = 0
+  while (i < samples.length && Math.abs(samples[i]!) < 0.02) i++
+  const start = i >= samples.length ? 0 : Math.max(0, (i / SOUND_SAMPLE_RATE) * 1000 - 30)
+  return clampWindow({ start, end: start + MAX_SOUND_MS }, totalMs)
+}

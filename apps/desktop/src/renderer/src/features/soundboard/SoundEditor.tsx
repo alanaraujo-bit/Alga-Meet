@@ -4,7 +4,7 @@ import { ApiRequestError } from '@/lib/api'
 import { EmojiPicker } from '@/features/chat/EmojiPicker'
 import { Button, Icon, Modal, Switch, TextField, toast } from '@/ui'
 import { FileAudio, Pause, Play, Repeat, Upload } from '@/ui/icons'
-import { applyEdits, clampWindow, encodeWav, loudnessGainDb, mixdown } from './audio-edit'
+import { MAX_INPUT_SEC, applyEdits, checkInput, encodeWav, firstWindow, loudnessGainDb, mixdown } from './audio-edit'
 import { cleanName } from './logic'
 import { audioNow, playSamples } from './player'
 import { openEditor, renameSound, uploadSound, useSoundboard } from './store'
@@ -12,8 +12,6 @@ import { t } from './strings'
 import { Waveform, type Win } from './Waveform'
 import s from './editor.module.css'
 
-const MAX_INPUT_BYTES = 20 * 1024 * 1024
-const MAX_INPUT_MS = 10 * 60 * 1000
 
 /** New sound (pick → trim → save) or, with `sound`, rename + emoji. Mounted once in the call dock. */
 export function SoundEditor() {
@@ -81,8 +79,23 @@ function RenameForm({ spaceId, sound }: { spaceId: string; sound: SpaceSound }) 
 
 interface Loaded { samples: Float32Array; fileName: string }
 
+/** Duration from the file's metadata, without decoding it (NaN when the container does not say). */
+function probeDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const el = new Audio()
+    const done = (d: number) => { URL.revokeObjectURL(url); el.removeAttribute('src'); resolve(d) }
+    el.preload = 'metadata'
+    el.onloadedmetadata = () => done(el.duration)
+    el.onerror = () => done(Number.NaN)
+    setTimeout(() => done(Number.NaN), 4000)
+    el.src = url
+  })
+}
+
 async function decode(file: File): Promise<Loaded> {
-  if (file.size > MAX_INPUT_BYTES) throw new Error(t.editor.tooBig)
+  const pre = checkInput(file.size, await probeDuration(file))
+  if (pre) throw new Error(pre === 'tooBig' ? t.editor.tooBig : t.editor.tooLong)
   let buf: AudioBuffer
   try {
     // An offline context at 48 kHz decodes and resamples in one go.
@@ -90,18 +103,10 @@ async function decode(file: File): Promise<Loaded> {
   } catch {
     throw new Error(t.editor.undecodable)
   }
-  if (!buf.length || buf.duration * 1000 > MAX_INPUT_MS) throw new Error(buf.length ? t.editor.tooBig : t.editor.empty)
+  if (!buf.length) throw new Error(t.editor.empty)
+  if (buf.duration > MAX_INPUT_SEC) throw new Error(t.editor.tooLong)
   const channels = Array.from({ length: buf.numberOfChannels }, (_, i) => buf.getChannelData(i))
   return { samples: mixdown(channels), fileName: file.name }
-}
-
-/** Default selection: the loudest-starting 5 s, i.e. from the first non-silent sample. */
-function firstWindow(samples: Float32Array): Win {
-  const totalMs = (samples.length / SOUND_SAMPLE_RATE) * 1000
-  let i = 0
-  while (i < samples.length && Math.abs(samples[i]!) < 0.02) i++
-  const start = Math.max(0, (i / SOUND_SAMPLE_RATE) * 1000 - 30)
-  return clampWindow({ start, end: start + MAX_SOUND_MS }, totalMs)
 }
 
 function NewSound({ spaceId }: { spaceId: string }) {

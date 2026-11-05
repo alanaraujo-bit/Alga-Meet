@@ -1,76 +1,76 @@
 {
-  "at": "2026-11-05T03:42:02.801Z",
+  "at": "2026-11-05T03:46:53.931Z",
   "results": [
     {
       "name": "A e B entram na call; o botão Soundboard aparece no dock",
       "pass": true,
-      "ms": 1465,
+      "ms": 1543,
       "detail": null
     },
     {
       "name": "Painel vazio para quem gerencia: convite para adicionar",
       "pass": true,
-      "ms": 155,
+      "ms": 146,
       "detail": null
     },
     {
       "name": "A sobe um som pelo editor: arquivo de 8 s, corta, nomeia e salva",
       "pass": true,
-      "ms": 890,
+      "ms": 742,
       "detail": "3500 ms no servidor"
     },
     {
       "name": "B vê o som chegar no painel sem recarregar",
       "pass": true,
-      "ms": 160,
+      "ms": 152,
       "detail": null
     },
     {
       "name": "A toca: o som sai no app de B e A entra em cooldown",
       "pass": true,
-      "ms": 3952,
-      "detail": "clique → B tocando em 351 ms"
+      "ms": 4097,
+      "detail": "clique → B tocando em 461 ms"
     },
     {
       "name": "B ouve o anúncio \"Ana Som tocou Sirene da vitória\"",
       "pass": true,
-      "ms": 26,
+      "ms": 23,
       "detail": null
     },
     {
       "name": "Servidor impõe o cooldown (429 com retryAfterMs)",
       "pass": true,
-      "ms": 19,
-      "detail": "retryAfterMs 2748"
+      "ms": 9,
+      "detail": "retryAfterMs 2718"
     },
     {
       "name": "B silencia o soundboard: não ouve, mas vê quem tocou",
       "pass": true,
-      "ms": 4816,
+      "ms": 4731,
       "detail": null
     },
     {
       "name": "B ensurdecido não ouve o som",
       "pass": true,
-      "ms": 6293,
+      "ms": 6459,
       "detail": null
     },
     {
       "name": "Quem não está na call não pode tocar (403)",
       "pass": true,
-      "ms": 383,
+      "ms": 370,
       "detail": null
     },
     {
       "name": "Janela estreita: o painel continua usável",
       "pass": true,
-      "ms": 640,
+      "ms": 633,
       "detail": null
     },
     {
       "name": "A apaga o som (confirmação inline) e some para B",
       "pass": true,
-      "ms": 299,
+      "ms": 399,
       "detail": null
     }
   ]

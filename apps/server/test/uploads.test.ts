@@ -77,7 +77,7 @@ async function download(app: FastifyInstance, url: string, headers: Record<strin
   return app.inject({ method: 'GET', url: u.pathname + u.search, headers })
 }
 
-const leftoverSpools = () => readdirSync(tmpdir()).filter((f) => f.startsWith('alga-upload-'))
+const leftoverSpools = () => readdirSync(tmpdir()).filter((f) => f.startsWith(`alga-upload-${process.pid}-`))
 
 async function spaceWithMember(app = s.app) {
   const [owner, member, outsider] = [await register(app), await register(app), await register(app)]

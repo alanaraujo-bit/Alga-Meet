@@ -69,3 +69,23 @@ describe('peaks', () => {
     expect(peaks(new Float32Array(0), 4)).toHaveLength(4)
   })
 })
+
+describe('firstWindow', () => {
+  it('starts at the first loud sample, or at 0 for a quiet recording (never a 50 ms tail)', async () => {
+    const { firstWindow } = await import('./audio-edit')
+    const loud = new Float32Array(48000 * 8); loud.fill(0.3, 48000 * 2)
+    expect(firstWindow(loud).start).toBeGreaterThan(1900)
+    const quiet = sine(8000, 0.01)
+    expect(firstWindow(quiet)).toEqual({ start: 0, end: 5000 })
+  })
+})
+
+describe('checkInput', () => {
+  it('refuses big files and anything over 10 minutes before decoding', async () => {
+    const { checkInput } = await import('./audio-edit')
+    expect(checkInput(1_000_000, 30)).toBeNull()
+    expect(checkInput(21 * 1024 * 1024, 30)).toBe('tooBig')
+    expect(checkInput(1_000_000, 11 * 60)).toBe('tooLong')
+    expect(checkInput(1_000_000, Number.NaN)).toBeNull() // unknown duration: the decode check still applies
+  })
+})
