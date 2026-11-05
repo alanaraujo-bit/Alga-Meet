@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   picks: [] as string[],
   factories: [] as { closed: boolean; cbs: Record<string, (e: unknown) => void> }[],
   piece: new Uint8Array(0) as Uint8Array | null,
+  probeGate: null as Promise<void> | null,
 }))
 
 vi.mock('electron', () => ({
@@ -31,7 +32,7 @@ vi.mock('../ipc', async () => {
   }
 })
 vi.mock('./ffmpeg', () => ({ checkFfmpeg: async () => ({ ok: true, version: 'x' }), ffmpegBins: () => ({ ffmpeg: 'f', ffprobe: 'p' }) }))
-vi.mock('./probe', () => ({ probeFile: async () => ({ film: { title: 't', durationS: 10, audio: [], subtitles: [] }, warnings: [], videoStreamIndex: 7 }) }))
+vi.mock('./probe', () => ({ probeFile: async () => { await h.probeGate; return { film: { title: 't', durationS: 10, audio: [], subtitles: [] }, warnings: [], videoStreamIndex: 7 } } }))
 vi.mock('./names', async () => ({ ...(await vi.importActual<object>('./names')), nextEpisodes: async () => ['C:\\secret\\dir\\S01E02.mkv'] }))
 vi.mock('./pieces', () => ({
   cinemaRoot: () => process.env.TEMP ?? '/tmp',
@@ -69,7 +70,7 @@ const probed = async () => {
   const r = await call(IPC.cinemaProbe, fileId)
   return { fileId, r }
 }
-beforeEach(() => { h.emitted.length = 0; h.factories.length = 0 })
+beforeEach(() => { h.emitted.length = 0; h.factories.length = 0; h.probeGate = null })
 
 describe('cinema ipc', () => {
   it('unknown fileId rejects (invoke) and throws (send)', async () => {
@@ -148,5 +149,55 @@ describe('cinema ipc', () => {
     writeFileSync(join(dir, 'a.txt'), 'x')
     await expect(call(IPC.cinemaFromDrop, join(dir, 'a.txt'))).rejects.toThrow()
     await expect(call(IPC.cinemaFromDrop, 5)).rejects.toThrow()
+  })
+
+  it('close during a slow probe: no factory left running, nothing emitted, probe rejects', async () => {
+    h.picks.push(movie)
+    const { fileId } = await call(IPC.cinemaPick)
+    let open!: () => void
+    h.probeGate = new Promise<void>((r) => (open = r))
+    const p = call(IPC.cinemaProbe, fileId)
+    await call(IPC.cinemaClose, fileId)
+    open()
+    await expect(p).rejects.toThrow()
+    expect(h.factories.every((f) => f.closed)).toBe(true)
+    expect(h.emitted).toEqual([])
+  })
+
+  it('two concurrent probes of one id create exactly one factory', async () => {
+    h.picks.push(movie)
+    const { fileId } = await call(IPC.cinemaPick)
+    const [a, b] = await Promise.all([call(IPC.cinemaProbe, fileId), call(IPC.cinemaProbe, fileId)])
+    expect(h.factories).toHaveLength(1)
+    expect(a.next[0].fileId).toBe(b.next[0].fileId)
+  })
+
+  it('a re-probe and a close release the previous sibling ids', async () => {
+    const { fileId, r } = await probed()
+    const sib = r.next[0].fileId
+    await call(IPC.cinemaProbe, fileId)
+    await expect(call(IPC.cinemaProbe, sib)).rejects.toThrow('unknown file')
+    const r2 = await call(IPC.cinemaProbe, fileId)
+    await call(IPC.cinemaClose, fileId)
+    await expect(call(IPC.cinemaProbe, r2.next[0].fileId)).rejects.toThrow('unknown file')
+  })
+
+  it('errors reaching the renderer never carry the local path (both slash styles)', async () => {
+    const { fileId } = await probed()
+    h.factories[0]!.cbs.error!({ track: 'v', reason: `ffmpeg: ${movie}: Invalid data; ${movie.split('\\').join('/')} and ${dir.toUpperCase()}` })
+    const sent = JSON.stringify(h.emitted)
+    expect(sent).toContain('<arquivo>')
+    expect(sent.toLowerCase()).not.toContain('alga-cinema-ipc')
+    h.picks.push(join(dir, 'gone.mkv'))
+    const err = await call(IPC.cinemaFromDrop, join(dir, 'gone.mkv')).catch((e: Error) => e)
+    expect(err).toBeInstanceOf(Error)
+    expect(String((err as Error).message).toLowerCase()).not.toContain('alga-cinema-ipc')
+    expect(fileId).toBeTruthy()
+  })
+
+  it('fromDrop rejects UNC and device paths', async () => {
+    for (const p of ['\\\\server\\share\\x.mkv', '//server/share/x.mkv', '\\\\?\\C:\\x.mkv', '\\\\.\\pipe\\x.mkv']) {
+      await expect(call(IPC.cinemaFromDrop, p)).rejects.toThrow('network and device')
+    }
   })
 })

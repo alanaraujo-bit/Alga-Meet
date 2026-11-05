@@ -100,6 +100,12 @@ function parseMembers(json: string, ownLeaf: number): Member[] {
   })
 }
 
+/** Zeroes and forgets a call's cinema keys. */
+function wipe(c: Call): void {
+  for (const k of c.cinemaKeys.values()) k.fill(0)
+  c.cinemaKeys.clear()
+}
+
 export class E2eeSession {
   private call: Call | null = null
   private queue: Promise<void> = Promise.resolve()
@@ -277,8 +283,13 @@ export class E2eeSession {
   private async receive(c: Call): Promise<void> {
     c.ownLeaf = Number(await this.deps.mls('own_leaf_index'))
     c.members = parseMembers((await this.deps.mls('members')) as string, c.ownLeaf)
-    c.cinemaKeys.set(c.epoch, (await this.deps.mls('export_secret', CINEMA_LABEL, utf8(c.channelId), 32)) as Uint8Array)
-    for (const e of c.cinemaKeys.keys()) if (e <= c.epoch - CINEMA_KEEP) c.cinemaKeys.delete(e)
+    // Never lets a cinema failure block the media keys below: cinemaTag just answers null for this epoch.
+    try {
+      c.cinemaKeys.set(c.epoch, (await this.deps.mls('export_secret', CINEMA_LABEL, utf8(c.channelId), 32)) as Uint8Array)
+    } catch (err) {
+      this.deps.log('e2ee: cinema key export failed', { err: err instanceof Error ? err.message : String(err) })
+    }
+    for (const [e, k] of c.cinemaKeys) if (e <= c.epoch - CINEMA_KEEP) { k.fill(0); c.cinemaKeys.delete(e) }
     const seen = new Map<string, number>()
     for (const m of c.members) seen.set(m.userId, (seen.get(m.userId) ?? 0) + 1)
     for (const m of c.members) {
@@ -333,7 +344,8 @@ export class E2eeSession {
 
   private async forget(c: Call): Promise<void> {
     if (c.joined) await this.deps.mls('leave').catch(() => {})
-    Object.assign(c, { state: 'joining', joined: false, epoch: -1, pending: 0, committing: false, sendEpoch: -1, members: [], cinemaKeys: new Map() })
+    Object.assign(c, { state: 'joining', joined: false, epoch: -1, pending: 0, committing: false, sendEpoch: -1, members: [] })
+    wipe(c)
   }
 
   private async fail(c: Call, reason: string): Promise<void> {
@@ -345,6 +357,7 @@ export class E2eeSession {
   private async drop(): Promise<void> {
     const c = this.call
     this.call = null
+    if (c) wipe(c)
     if (c?.joined) await this.deps.mls('leave').catch(() => {})
   }
 }
