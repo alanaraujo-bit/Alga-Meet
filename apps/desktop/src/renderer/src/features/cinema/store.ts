@@ -1,7 +1,7 @@
 // Sala de Cinema, client side (spec §6): the session as the gateway reports it (CINEMA_*), and while I sit, the engine —
 // clock, swarm, mesh, player, film audio — wired together. The dev stage (CinemaDev) renders this; Plan 2 swaps the UI.
 import {
-  CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME, CINEMA_SEEK_READY_S, CINEMA_STATUS_INTERVAL_MS, positionAt,
+  CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME, CINEMA_READY_TIMEOUT_MS, CINEMA_SEEK_READY_S, CINEMA_STATUS_INTERVAL_MS, positionAt,
   type CinemaClientFrame, type CinemaEndReason, type CinemaFilm, type CinemaPieceMeta, type CinemaSeat, type CinemaSessionView,
   type CinemaSignal, type CinemaSummary, type CinemaTrackId, type Dispatch, type DispatchOf,
 } from '@alga/shared'
@@ -35,7 +35,8 @@ export interface CinemaState {
   cache: { kind: 'opfs' | 'memory'; capBytes: number } | null
   /** The <video>'s film audio (volume, ducking, output), once the stage is mounted. */
   audio: FilmAudio | null
-  prefs: { volume: number; muted: boolean; ducking: boolean }
+  /** route: how the film audio reaches the speakers (FilmAudioOpts); applies to the next session's <video>. */
+  prefs: { volume: number; muted: boolean; ducking: boolean; route: FilmRoute }
   stats: CinemaStats | null
   statsOpen: boolean
   /** One-time notices (IP on sitting, headphones), each dismissed on its own. */
@@ -58,7 +59,8 @@ export interface CinemaStats {
 }
 
 const PREFS_KEY = 'alga.cinema.v1'
-type Stored = { volume?: number; muted?: boolean; ducking?: boolean; ipSeen?: boolean; echoSeen?: boolean }
+type FilmRoute = 'webaudio' | 'mediastream'
+type Stored = { volume?: number; muted?: boolean; ducking?: boolean; route?: FilmRoute; ipSeen?: boolean; echoSeen?: boolean }
 const stored = (): Stored => {
   try {
     return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Stored
@@ -75,7 +77,10 @@ const store = (patch: Stored): void => {
 }
 const initialPrefs = (): CinemaState['prefs'] => {
   const s = stored()
-  return { volume: typeof s.volume === 'number' ? Math.min(1, Math.max(0, s.volume)) : 1, muted: s.muted === true, ducking: s.ducking !== false }
+  return {
+    volume: typeof s.volume === 'number' ? Math.min(1, Math.max(0, s.volume)) : 1, muted: s.muted === true, ducking: s.ducking !== false,
+    route: s.route === 'mediastream' ? 'mediastream' : 'webaudio',
+  }
 }
 const freshMine = (): CinemaState['mine'] => ({ seated: false, status: 'preparing', audioId: null, subtitleId: null, offsetS: 0, unsupported: null })
 const initial = (): CinemaState => ({
@@ -120,6 +125,11 @@ interface Engine {
   unsupported: boolean
   /** The call's E2EE failed while I sat: no mesh, the seat stays preparing. */
   e2eeFailed: boolean
+  /**
+   * Sat into a room already playing: until then a stall is still the join (spec §6.6 "entrar no meio"), reported as
+   * preparing, so the room does not pause for everyone while I load (measured: a 7 s room pause on a late join).
+   */
+  arrivingUntil: number
   checked: boolean
   /** Audio track the player could not switch to yet (its init is still on the way). */
   pendingAudio: number | null
@@ -151,8 +161,6 @@ interface HostFile {
   seq: number; pos: number
   /** Index entries not sent to the server yet (n → meta per track), and the throttle of queuePieces. */
   pending: Map<CinemaTrackId, Map<number, CinemaPieceMeta>>; flushTimer: ReturnType<typeof setTimeout> | undefined; flushedAt: number
-  /** Round-robin position over the tracks with pending entries. */
-  rr: number
   /** A new gateway session (READY) may have lost index frames: resend the index when the session is confirmed. */
   resync: boolean
   repairedAt: number
@@ -177,7 +185,8 @@ function createEngine(v: CinemaSessionView): void {
   const isHost = v.hostId === meId()
   const e: Engine = {
     sessionId: v.sessionId, hostId: v.hostId, isHost, film: v.film, swarm: null, mesh: null, player: null, earlyPieces: [], earlySignals: [],
-    offs: [], timer: setInterval(() => tick(e), 500), stalled: false, unsupported: false, e2eeFailed: false, checked: false, pendingAudio: null, sentStatus: null,
+    offs: [], timer: setInterval(() => tick(e), 500), stalled: false, unsupported: false, e2eeFailed: false,
+    arrivingUntil: v.playback.playing ? Date.now() + CINEMA_READY_TIMEOUT_MS : 0, checked: false, pendingAudio: null, sentStatus: null,
     sentAt: 0, closed: false,
   }
   eng = e
@@ -332,7 +341,7 @@ function aheadS(e: Engine): number {
 function statusNow(e: Engine): Status {
   if (e.unsupported) return 'unsupported'
   if (e.e2eeFailed) return 'preparing'
-  if (e.stalled) return 'stalled'
+  if (e.stalled) return Date.now() < e.arrivingUntil ? 'preparing' : 'stalled'
   const pos = playheadS(e)
   const need = Math.max(0, Math.min(CINEMA_SEEK_READY_S, e.film.durationS - pos - 0.5))
   if (aheadS(e) >= need) return 'ready'
@@ -434,19 +443,35 @@ function lowestRun(m: Map<number, CinemaPieceMeta>): number[] {
   return ns.slice(0, j + 1)
 }
 
-/** One flush: up to INDEX_FRAMES_PER_FLUSH frames, one track after the other (round-robin); the rest waits. */
+/**
+ * Flush order: what a seat needs for its first frame — the video and the default audio — then the track that has shipped
+ * the fewest entries; one frame per track per round. A plain round-robin over every pending track (other audio,
+ * subtitles, poster, thumbs) held the default audio's index back ~10 s after "Abrir sessão" (measured: no seat can show
+ * a frame without its audio init).
+ */
+function flushOrder(h: HostFile): CinemaTrackId[] {
+  const def = h.film.audio.find((a) => a.default) ?? h.film.audio[0]
+  const first = (t: CinemaTrackId) => (t === 'v' || (def && t === `a${def.id}`) ? 0 : 1)
+  const shipped = (t: CinemaTrackId) => (h.index.get(t)?.length ?? 0) - (h.pending.get(t)?.size ?? 0)
+  return [...h.pending.keys()].sort((a, b) => first(a) - first(b) || shipped(a) - shipped(b))
+}
+
+/** One flush: up to INDEX_FRAMES_PER_FLUSH frames in flushOrder; the rest waits. */
 function flushPieces(h: HostFile): void {
   const sessionId = h.sessionId
   if (hostFile !== h || !sessionId) return
   h.flushedAt = Date.now()
-  for (let frames = 0; frames < INDEX_FRAMES_PER_FLUSH && h.pending.size; frames++) {
-    const tracks = [...h.pending.keys()]
-    const track = tracks[h.rr++ % tracks.length]!
-    const m = h.pending.get(track)!
-    const run = lowestRun(m)
-    if (!send({ op: 'cinema_pieces', sessionId, track, from: run[0]!, items: run.map((n) => m.get(n)!) })) break // socket down: all stays queued
-    for (const n of run) m.delete(n)
-    if (!m.size) h.pending.delete(track)
+  let frames = 0
+  rounds: while (frames < INDEX_FRAMES_PER_FLUSH && h.pending.size) {
+    for (const track of flushOrder(h)) {
+      if (frames >= INDEX_FRAMES_PER_FLUSH) break
+      const m = h.pending.get(track)!
+      const run = lowestRun(m)
+      if (!send({ op: 'cinema_pieces', sessionId, track, from: run[0]!, items: run.map((n) => m.get(n)!) })) break rounds // socket down: all stays queued
+      frames++
+      for (const n of run) m.delete(n)
+      if (!m.size) h.pending.delete(track)
+    }
   }
   scheduleFlush(h)
 }
@@ -465,7 +490,7 @@ export function hostBegin(fileId: string, film: CinemaFilm): void {
   hostEnd()
   const h: HostFile = {
     fileId, film, sessionId: null, index: new Map(), offs: [], seq: -1, pos: 0, pending: new Map(), flushTimer: undefined, flushedAt: 0,
-    rr: 0, resync: false, repairedAt: 0,
+    resync: false, repairedAt: 0,
   }
   hostFile = h
   h.offs.push(
@@ -673,8 +698,8 @@ function stopPing(): void {
 /** The stage mounted its <video>: film audio goes on it and the player starts (if I am seated). */
 export function attachVideo(el: HTMLVideoElement): void {
   video = el
-  const audio = FilmAudio.for(el)
   const p = useCinema.getState().prefs
+  const audio = FilmAudio.for(el, { route: p.route })
   audio.setVolume(p.volume)
   audio.setMuted(p.muted)
   audio.setDucking(p.ducking)

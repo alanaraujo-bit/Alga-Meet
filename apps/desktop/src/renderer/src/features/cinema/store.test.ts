@@ -1,5 +1,5 @@
 import type { CinemaPieceMeta, CinemaSessionView, Dispatch } from '@alga/shared'
-import { CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME } from '@alga/shared'
+import { CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME, CINEMA_READY_TIMEOUT_MS } from '@alga/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const CH = '0190a0a0-0000-7000-8000-00000000c0c0'
@@ -56,6 +56,28 @@ vi.mock('./mesh', () => ({
     }
   },
 }))
+const players = vi.hoisted(() => ({ list: [] as any[] }))
+vi.mock('./player', () => ({
+  CinemaPlayer: class {
+    stall: (stalled: boolean) => void = () => undefined
+    setAudio = vi.fn(async () => undefined)
+    apply = vi.fn()
+    destroy = vi.fn()
+    stats = () => ({ droppedFrames: 0, syncErrP95Ms: 0, bufferedAheadS: 0 })
+    onStall(cb: (stalled: boolean) => void) {
+      this.stall = cb
+      return () => undefined
+    }
+    onError = () => () => undefined
+    constructor() {
+      players.list.push(this)
+    }
+  },
+  canPlay: async () => ({ ok: true }),
+}))
+vi.mock('./audio', () => ({
+  FilmAudio: { for: () => ({ setVolume() {}, setMuted() {}, setDucking() {}, setOutput: async () => undefined, echoRisk: () => false, outputLatencyMs: () => 0, release() {} }) },
+}))
 const bridge = {
   checkFfmpeg: vi.fn(async () => ({ ok: true, version: 'n9' }) as { ok: true; version: string } | { ok: false; reason: 'blocked' | 'missing' | 'crashed'; detail: string }),
   pick: vi.fn(async () => ({ fileId: 'f1', name: 'Duna.2024.mkv' })),
@@ -71,7 +93,7 @@ const bridge = {
 }
 vi.stubGlobal('window', { alga: { cinema: bridge, e2ee: { cinemaTag: async () => null } } })
 
-const { handleCinemaDispatch, onMediaChange, useCinema, resetCinema } = await import('./store')
+const { handleCinemaDispatch, onMediaChange, useCinema, resetCinema, attachVideo, detachVideo } = await import('./store')
 const { useMedia } = await import('@/media/store')
 const { openFromFile, openSession } = await import('./actions')
 const { t } = await import('./strings')
@@ -266,6 +288,22 @@ describe('index budget and repair (host)', () => {
     for (const tr of tracks) expect(server.get(tr)).toBe(made.get(tr))
   })
 
+  it('the video and the default audio go first: a0 is in the next flush even behind five other pending tracks', async () => {
+    await hosting()
+    bridge.emitPieces!({ fileId: 'f1', track: 'v', from: 0, items: [meta(0), meta(1)] })
+    await vi.advanceTimersByTimeAsync(2000)
+    sent.length = 0
+    for (const tr of ['a1', 's0', 's1', 'poster', 'thumbs']) bridge.emitPieces!({ fileId: 'f1', track: tr, from: 0, items: [meta(0)] })
+    bridge.emitPieces!({ fileId: 'f1', track: 'v', from: 2, items: [meta(2)] })
+    bridge.emitPieces!({ fileId: 'f1', track: 'a0', from: 0, items: [meta(0)] })
+    await vi.advanceTimersByTimeAsync(0) // the interval since the last flush has passed: this one goes at once
+    // a0 has shipped nothing yet, v two entries; then the extras, fewest shipped first
+    expect(pieceFrames().map((f) => f.track)).toEqual(['a0', 'v', 'a1'])
+    sent.length = 0
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(pieceFrames().map((f) => f.track)).toEqual(['s0', 's1', 'poster'])
+  })
+
   it('a new gateway session resends the whole index once the session is confirmed; a refused (invalid) frame too, not in a loop', async () => {
     await hosting()
     bridge.emitPieces!({ fileId: 'f1', track: 'v', from: 0, items: [meta(0), meta(1), meta(2)] })
@@ -453,5 +491,38 @@ describe('E2EE gating of the mesh', () => {
     dispatch({ t: 'CINEMA_STATE', d: view() })
     await flush()
     expect((engine.meshes[0].opts as { e2ee: unknown }).e2ee).toBeNull()
+  })
+})
+
+describe('late join (sat into a room already playing)', () => {
+  const el = { currentTime: 30 } as HTMLVideoElement
+  const lastStatus = () => (sent.filter((f) => f.op === 'cinema_status').at(-1) as { status?: string } | undefined)?.status
+  const playing = () => ({ ...view().playback, playing: true, reason: 'user' as const, at: Date.now() - 60_000, position: 0, seq: 3 })
+  beforeEach(() => {
+    vi.useFakeTimers()
+    players.list.length = 0
+  })
+  afterEach(() => {
+    detachVideo(el)
+    vi.useRealTimers()
+  })
+
+  it('a stall in its first CINEMA_READY_TIMEOUT_MS reports preparing (the room does not pause for everyone); later, stalled', async () => {
+    attachVideo(el)
+    dispatch({ t: 'CINEMA_STATE', d: view({ playback: playing() }) })
+    await vi.advanceTimersByTimeAsync(0)
+    players.list.at(-1).stall(true)
+    expect(lastStatus()).toBe('preparing')
+    await vi.advanceTimersByTimeAsync(CINEMA_READY_TIMEOUT_MS + 1000)
+    expect(lastStatus()).toBe('stalled')
+  })
+
+  it('a seat that was there when the room started pauses it on a stall at once', async () => {
+    attachVideo(el)
+    dispatch({ t: 'CINEMA_STATE', d: view() }) // foyer
+    await vi.advanceTimersByTimeAsync(0)
+    dispatch({ t: 'CINEMA_STATE', d: view({ playback: playing() }) })
+    players.list.at(-1).stall(true)
+    expect(lastStatus()).toBe('stalled')
   })
 })

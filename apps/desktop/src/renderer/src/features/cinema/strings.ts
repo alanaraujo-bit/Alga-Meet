@@ -121,6 +121,9 @@ export const t = {
     cache: 'Cache',
     audio: 'Faixa de áudio',
     seats: 'Poltronas',
+    route: 'Saída do som do filme',
+    routes: { webaudio: 'WebAudio', mediastream: 'MediaStream (<audio>)' },
+    routeNext: 'vale na próxima sessão',
   },
   audio: {
     echoNotice: 'Use fone para os outros não ouvirem o filme pelo seu microfone',

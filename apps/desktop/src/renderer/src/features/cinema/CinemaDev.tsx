@@ -397,6 +397,7 @@ const n1 = (v: number) => (Math.round(v * 10) / 10).toString().replace('.', ',')
 function StatsPanel({ names }: { names: Record<string, string> }) {
   const stats = useCinema((s) => s.stats)
   const session = useCinema((s) => s.session)
+  const route = useCinema((s) => s.prefs.route)
   if (!session) return null
   const f = session.film
   const sw = stats?.swarm
@@ -418,6 +419,14 @@ function StatsPanel({ names }: { names: Record<string, string> }) {
       {rows.map(([k, v]) => (
         <div key={k}><span>{k}</span><b>{v}</b></div>
       ))}
+      {/* the echo test compares both routes (spec §6.7); the <video> keeps its route until the next session */}
+      <label><span>{t.stats.route}</span>
+        <select value={route} onChange={(e) => act.setPrefs({ route: e.target.value as typeof route })}>
+          <option value="webaudio">{t.stats.routes.webaudio}</option>
+          <option value="mediastream">{t.stats.routes.mediastream}</option>
+        </select>
+        <small> {t.stats.routeNext}</small>
+      </label>
     </div>
   )
 }

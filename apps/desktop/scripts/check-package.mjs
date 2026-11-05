@@ -42,6 +42,15 @@ if (missing.length) {
 }
 console.log(`app.asar: ${seen.size - 1} runtime packages, all dependencies present`)
 
+// A worker copied with `?url` instead of bundled keeps bare imports (`from 'abslink'`) a browser can't resolve: it never
+// starts (the cinema's ASS renderer, JASSUB, shipped like that). Renderer assets may only import relative paths.
+const bare = [...files].filter((f) => f.startsWith('/out/renderer/assets/') && f.endsWith('.js')).filter((f) =>
+  /^\s*import\s[^;]*?\bfrom\s*['"](?![./])[^'"]+['"]/m.test(asar.extractFile(archive, f.slice(1).split('/').join(sep)).toString()))
+if (bare.length) {
+  console.error(`renderer assets with bare imports (a worker not bundled? use ?worker&url):\n  ${bare.join('\n  ')}`)
+  process.exit(1)
+}
+
 // The uninstall entry points at the setup window (build/installer.nsh): without it "Desinstalar" would do nothing.
 const setupUi = join(archive, '..', 'bin', 'alga-setup-ui.exe')
 if (!existsSync(setupUi)) {

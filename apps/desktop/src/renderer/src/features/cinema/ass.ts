@@ -1,5 +1,6 @@
 import JASSUB from 'jassub'
-import workerUrl from 'jassub/dist/worker/worker.js?url'
+// ?worker&url: Vite bundles the worker and its imports (abslink, renderers); plain ?url copied worker.js with bare imports, so the worker never started
+import workerUrl from 'jassub/dist/worker/worker.js?worker&url'
 import wasmUrl from 'jassub/dist/wasm/jassub-worker.wasm?url'
 import modernWasmUrl from 'jassub/dist/wasm/jassub-worker-modern.wasm?url'
 import wasmWorkerUrl from 'jassub/dist/wasm/jassub-worker.js?url'
