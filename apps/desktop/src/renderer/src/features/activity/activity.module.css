@@ -1,0 +1,365 @@
+/* Rich presence. One accent per activity: the app's own hue (--tint), toned to sit on the dark surface. */
+
+.card {
+  --tint: var(--accent);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin-top: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-lg);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow:
+    inset 0 0 0 1px var(--border-subtle),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+/* The icon's hue as light falling from the left, drifting very slowly: the card is alive, not busy. */
+.glow {
+  position: absolute;
+  inset: -45%;
+  background: radial-gradient(closest-side at 26% 58%, color-mix(in oklab, var(--tint) 24%, transparent), transparent 72%);
+  animation: drift 16s var(--ease-in-out-cubic) infinite alternate;
+}
+/* Steam games: their store art on the right, sharp, melting into the card toward the text (a window, not wallpaper). */
+.art {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 72%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+  opacity: 0;
+  transform: scale(1.06);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 58%);
+  mask-image: linear-gradient(90deg, transparent, #000 58%);
+  transition:
+    opacity 700ms var(--ease-out-quart),
+    transform 1400ms var(--ease-out-quart);
+}
+.card[data-art] .art {
+  opacity: 0.42;
+  transform: scale(1);
+}
+.card[data-art] .backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(20, 21, 23, 0.55) 30%, rgba(20, 21, 23, 0.1));
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(-5%, -3%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(5%, 4%, 0) scale(1.08);
+  }
+}
+
+.eyebrow {
+  margin-bottom: var(--s-2);
+  color: var(--text-tertiary);
+  font: var(--type-badge);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.iconMotion {
+  display: inline-flex;
+  flex: none;
+}
+
+.icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  color: var(--text-tertiary);
+}
+.icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  -webkit-user-drag: none;
+}
+/* From 32 px the icon sits on a tile lit by its own color, like an app on a shelf. */
+.tile {
+  overflow: hidden;
+  border-radius: 24%;
+  background:
+    radial-gradient(120% 120% at 28% 18%, color-mix(in oklab, var(--tint, var(--accent)) 26%, var(--bg-raised)), var(--bg-raised) 70%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 6px 18px -6px color-mix(in oklab, var(--tint, #000) 45%, rgba(0, 0, 0, 0.6)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.tile img {
+  width: 76%;
+  height: 76%;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+}
+/* A cover fills the tile edge to edge. */
+.tile.covered img.cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: none;
+}
+.compact {
+  margin-top: 0;
+  padding: var(--s-2) var(--s-3) var(--s-2) var(--s-2);
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.name {
+  overflow: hidden;
+  color: var(--text-primary);
+  font: var(--type-ui-lg);
+  font-weight: var(--w-semibold);
+  letter-spacing: var(--track-ui-lg);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.elapsed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tint);
+  font: var(--type-meta);
+  font-variant-numeric: tabular-nums;
+}
+.pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tint);
+  animation: pulse 2.4s var(--ease-out-quad) infinite;
+}
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--tint) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+/* List line: inherits the row's font and color; the name is the only thing raised. */
+.line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: bottom;
+  animation: lineIn 260ms var(--ease-out-quart);
+}
+.line .icon img {
+  border-radius: 3px;
+}
+.lineText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lineText strong {
+  color: var(--text-secondary);
+  font-weight: var(--w-medium);
+}
+@keyframes lineIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+.badge {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  animation: lineIn 260ms var(--ease-out-quart);
+}
+.badge .icon img {
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow,
+  .pulse {
+    animation: none;
+  }
+}
+
+/* Own card: the controls live with the thing they control. */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  margin: var(--s-3) calc(var(--s-1) * -1) calc(var(--s-1) * -1);
+}
+.actionEnd {
+  margin-left: auto;
+}
+.paused {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+
+/* "Ativo agora" (Friends, right column). Hidden when the window is too narrow to keep the list readable. */
+.activeNow {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: 320px;
+  min-height: 0;
+  padding: var(--s-4) var(--s-4) 0;
+  border-left: 1px solid var(--border-subtle);
+}
+@media (max-width: 1080px) {
+  .activeNow {
+    display: none;
+  }
+}
+.activeTitle {
+  margin: var(--s-1) 0 var(--s-3);
+  color: var(--text-primary);
+  font: var(--type-title-sm);
+  letter-spacing: var(--track-title);
+}
+.activeEmpty {
+  margin: var(--s-6) var(--s-2);
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+  text-align: center;
+  text-wrap: pretty;
+}
+.activeList {
+  flex: 1;
+  min-height: 0;
+  margin: 0 calc(var(--s-1) * -1);
+  padding: 0 var(--s-1) var(--s-4);
+}
+.activeCard {
+  display: grid;
+  gap: var(--s-3);
+  margin-bottom: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-lg);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  transition: background var(--dur-base) var(--ease-out-quad);
+}
+.activeCard:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.activeWho {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2_5, 10px);
+  min-width: 0;
+}
+.activeName {
+  overflow: hidden;
+  color: var(--text-primary);
+  font: var(--type-ui-lg);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activeSub {
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activeRoom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+}
+.activeRoomName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  white-space: nowrap;
+}
+
+/* Settings → Atividade */
+.preview {
+  max-width: 360px;
+}
+.preview > .card {
+  margin-top: 0;
+}
+.previewNone {
+  margin: 0;
+  padding: var(--s-3) 0;
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+}
+.apps {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.app {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+  transition: opacity var(--dur-base) var(--ease-out-quad);
+}
+.app + .app {
+  border-top: 1px solid var(--border-subtle);
+}
+.app[data-off] > .icon,
+.app[data-off] .appName {
+  opacity: 0.55;
+}
+.app > .text {
+  flex: 1;
+}
+.appName {
+  overflow: hidden;
+  color: var(--text-primary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.appMeta {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}

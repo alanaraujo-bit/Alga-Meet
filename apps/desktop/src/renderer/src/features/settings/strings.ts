@@ -8,6 +8,7 @@ export const t = {
   nav: {
     account: 'Minha conta',
     privacy: 'Privacidade',
+    activity: 'Atividade',
     plan: 'Assinatura',
     shop: 'Personalização',
     voice: 'Voz e vídeo',

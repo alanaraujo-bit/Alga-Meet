@@ -1,5 +1,5 @@
 import type { Session } from '@alga/shared'
-import { Bell, ChevronsUpDown, CreditCard, Gem, Keyboard, LogOut, Mic, Minus, Monitor, Palette, Plus, Power, Shield, User, Wrench, X, type Glyph } from '@/ui/icons'
+import { Bell, ChevronsUpDown, CreditCard, GameController, Gem, Keyboard, LogOut, Mic, Minus, Monitor, Palette, Plus, Power, Shield, User, Wrench, X, type Glyph } from '@/ui/icons'
 import { AnimatePresence } from 'motion/react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -19,6 +19,7 @@ import { openVerifyEmail } from '../auth/VerifyEmail'
 import { PlanSection, StreamPlanGroup } from '../billing/Plan'
 import { ShopSection } from '../billing/Shop'
 import { PrivacySection } from '../trust/Privacy'
+import { ActivitySettings } from '../activity/ActivitySettings'
 import { Group, Row, SettingsFrame } from './Frame'
 import { HOTKEY_ACTIONS, loadBindings, saveBindings, type SavedBinding } from './hotkeys'
 import { defaultDeviceName } from './devices'
@@ -35,6 +36,7 @@ const NAV: Array<{ group: string; items: Array<{ id: SettingsSection; icon: Glyp
     items: [
       { id: 'account', icon: User },
       { id: 'privacy', icon: Shield },
+      { id: 'activity', icon: GameController },
       { id: 'plan', icon: CreditCard },
       { id: 'shop', icon: Gem },
     ],
@@ -83,6 +85,7 @@ function Panel({ section }: { section: SettingsSection }) {
     >
       {section === 'account' && <Account />}
       {section === 'privacy' && <PrivacySection />}
+      {section === 'activity' && <ActivitySettings />}
       {section === 'plan' && <PlanSection />}
       {section === 'shop' && <ShopSection />}
       {section === 'voice' && <Voice />}

@@ -6,6 +6,8 @@ import { useSession } from '@/store/session'
 import { contextMenuHandler, Popover, ScrollArea } from '@/ui'
 import { DecoratedAvatar, Nameplate, ProfileCard } from '../billing/Cosmetics'
 import { useLook } from '../billing/store'
+import { ActivityBadge, ActivityCard, ActivityLine } from '../activity/Activity'
+import { useActivity } from '../activity/store'
 import { personEntries, ProfileFooter } from './people'
 import { t } from './strings'
 import s from './shell.module.css'
@@ -70,6 +72,7 @@ function MemberRow({ row, spaceId }: { row: Row; spaceId: string }) {
   const user = useData((st) => st.users[m.user.id]) ?? m.user
   // Cosmetics: subtle in a list (no motion unless hovered), the full card in the popover.
   const look = useLook(m.user.id)
+  const activity = useActivity(m.user.id)
   return (
     <>
       <button
@@ -89,8 +92,17 @@ function MemberRow({ row, spaceId }: { row: Row; spaceId: string }) {
               {name}
             </Nameplate>
           </span>
-          {room && <span className={s.memberSub}>{room}</span>}
+          {room ? (
+            <span className={s.memberSub}>{room}</span>
+          ) : (
+            activity && (
+              <span className={s.memberSub}>
+                <ActivityLine userId={m.user.id} />
+              </span>
+            )
+          )}
         </span>
+        {room && activity && <ActivityBadge userId={m.user.id} />}
       </button>
       <PersonPopover user={user} spaceId={spaceId} name={name} presence={presence} anchor={anchor} onClose={() => setAnchor(null)} />
     </>
@@ -119,6 +131,7 @@ export function PersonPopover({
   return (
     <Popover anchor={anchor} onClose={onClose} side={side} align="start" gap={12} label={name} width={300}>
       <ProfileCard user={user} look={look} name={name} presence={presence}>
+        <ActivityCard userId={user.id} />
         {spaceId && <RoleChips userId={user.id} spaceId={spaceId} />}
         <ProfileFooter user={user} spaceId={spaceId} onDone={onClose} />
       </ProfileCard>

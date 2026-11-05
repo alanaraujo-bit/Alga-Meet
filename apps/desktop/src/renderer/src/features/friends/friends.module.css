@@ -147,3 +147,10 @@
   color: var(--text-secondary);
   font-weight: var(--w-medium);
 }
+
+/* List + "Ativo agora" side by side under the header. */
+.split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}

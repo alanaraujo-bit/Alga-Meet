@@ -11,6 +11,8 @@ import { openSettings } from '../settings/store'
 import { DecoratedAvatar, ProfileCard } from '../billing/Cosmetics'
 import { useLook } from '../billing/store'
 import { VoicePanel } from '../voice/VoicePanel'
+import { ActivityLine } from '../activity/Activity'
+import { OwnActivity } from '../activity/Own'
 import { errorText } from '@/lib/errors'
 import { copyText } from '@/lib/clipboard'
 import { t } from '../app/strings'
@@ -63,7 +65,9 @@ function UserRow() {
           {offline ? (
             <span className={`${s.meStatus} ${s.meStatusWarn}`}>{t.userPanel.reconnecting}</span>
           ) : (
-            <span className={s.meStatus}>{t.userPanel.status[me.statusPreference]}</span>
+            <span className={s.meStatus}>
+              <ActivityLine userId={me.id} fallback={t.userPanel.status[me.statusPreference]} />
+            </span>
           )}
         </span>
       </button>
@@ -85,7 +89,9 @@ function UserRow() {
       <IconButton icon={Settings} label={t.userPanel.settings} shortcut="Ctrl ," onClick={() => openSettings()} />
 
       <Popover anchor={anchor} onClose={() => setAnchor(null)} side="top" align="start" gap={12} label={t.userPanel.setStatus} width={280}>
-        <ProfileCard user={me} look={look} presence={presence} />
+        <ProfileCard user={me} look={look} presence={presence}>
+          <OwnActivity onNavigate={() => setAnchor(null)} />
+        </ProfileCard>
         <div className={s.statusMenu} role="radiogroup" aria-label={t.userPanel.setStatus}>
           {STATUSES.map((p) => (
             <button key={p} type="button" role="radio" aria-checked={me.statusPreference === p} className={s.statusItem} onClick={() => pick(p)}>
