@@ -39,6 +39,7 @@ ff('hevc10-hdr10-eac3-51.mkv', [
   '-x265-params', `keyint=48:min-keyint=48:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc:hdr10=1:repeat-headers=1:master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,1):max-cll=1000,400`,
   '-c:a', 'eac3', '-b:a', '640k',
 ])
+// NB: the ffmpeg TrueHD encoder takes at most 6 channels, so despite the name this track ends up 5.1(side).
 ff('hevc10-truehd-71.mkv', [...inputs(8), '-c:v', 'libx265', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p10le', '-x265-params', 'keyint=48:min-keyint=48', '-c:a', 'truehd', '-strict', '-2'])
 ff('av1-opus-51.mkv', [...inputs(6), '-c:v', 'libsvtav1', '-preset', '10', '-g', '48', '-pix_fmt', 'yuv420p', '-c:a', 'libopus', '-b:a', '384k', '-mapping_family', '1'])
 ff('h264-dts-51.mkv', [...inputs(6), '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', ...gop, '-c:a', 'dca', '-strict', '-2', '-b:a', '1536k'])

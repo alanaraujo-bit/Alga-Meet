@@ -32,6 +32,7 @@ const ffDir = arg('ffmpeg', '')
 const outJson = arg('out', join(work, 'results.json'))
 const MSE_SECONDS = Number(arg('mse-seconds', 10))
 const DC_SECONDS = Number(arg('dc-seconds', 10))
+if (ffDir && /--enable-(gpl|nonfree)/.test(spawnSync(join(ffDir, 'ffmpeg.exe'), ['-buildconf'], { encoding: 'utf8' }).stdout ?? '')) throw new Error('--ffmpeg points at a GPL/nonfree build: LGPL numbers need the LGPL one')
 const bin = (n) => (ffDir ? join(ffDir, `${n}.exe`) : n)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const log = (...a) => console.log(`[cinema ${new Date().toISOString().slice(11, 19)}]`, ...a)
@@ -156,14 +157,18 @@ async function phaseMse() {
     av1: { file: 'v-av1.mp4', type: `video/mp4; codecs="av01.0.${pad2(av.level)}M.08"` },
   }
   // Audio tracks: 5.1 from the AC-3 fixture, 7.1 from the TrueHD one (decoded, then re-encoded).
-  const A = (name, src, enc) => mkfmp4(fx(src), `a-${name}.mp4`, ['-map', '0:a:0', '-vn', ...enc, '-strict', '-2'])
+  // The TrueHD fixture is really 5.1 (the ffmpeg TrueHD encoder takes at most 6 channels), so 7.1 tracks come from a
+  // true 8-channel WAV with one tone per channel (FFmpeg 7.1 order: FL FR FC LFE BL BR SL SR).
+  const wav71 = join(work, 'media', 'tones71.wav')
+  run('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', `aevalsrc=${TONES[8].map((f) => `0.25*sin(2*PI*${f}*t)`).join('|')}:c=7.1:s=48000:d=20`, '-c:a', 'pcm_s24le', wav71])
+  const A = (name, src, enc) => mkfmp4(src.includes(':') || src.includes('/') ? src : fx(src), `a-${name}.mp4`, ['-map', '0:a:0', '-vn', ...enc, '-strict', '-2'])
   const ok = {
     aac51: A('aac51', 'h264-ac3-51.mkv', ['-c:a', 'aac', '-b:a', '640k', '-ac', '6']),
     opus51: A('opus51', 'h264-ac3-51.mkv', ['-af', 'aformat=channel_layouts=5.1', '-c:a', 'libopus', '-b:a', '510k', '-mapping_family', '1']),
     flac51: A('flac51', 'h264-ac3-51.mkv', ['-c:a', 'flac']),
-    aac71: A('aac71', 'hevc10-truehd-71.mkv', ['-c:a', 'aac', '-b:a', '960k', '-ac', '8']),
-    opus71: A('opus71', 'hevc10-truehd-71.mkv', ['-af', 'aformat=channel_layouts=7.1', '-c:a', 'libopus', '-b:a', '768k', '-mapping_family', '1']),
-    flac71: A('flac71', 'hevc10-truehd-71.mkv', ['-c:a', 'flac']),
+    aac71: A('aac71', wav71, ['-c:a', 'aac', '-b:a', '960k', '-ac', '8']),
+    opus71: A('opus71', wav71, ['-af', 'aformat=channel_layouts=7.1', '-c:a', 'libopus', '-b:a', '768k', '-mapping_family', '1']),
+    flac71: A('flac71', wav71, ['-c:a', 'flac']),
     ac3: A('ac3', 'h264-ac3-51.mkv', ['-c:a', 'copy']),
     eac3: A('eac3', 'hevc10-hdr10-eac3-51.mkv', ['-c:a', 'copy', '-tag:a', 'ec-3']),
     aacCopy51: A('aacCopy51', 'h264-aac-srt-ass.mkv', ['-c:a', 'copy']),
@@ -205,14 +210,18 @@ async function phaseMse() {
     const baseAudio = audio['aac 5.1 (mp4a.40.2)']
     const rows = []
     for (const [name, v] of Object.entries(video)) {
+      if (!new RegExp(arg('mse-rows', '.')).test(name)) continue
       log('play video', name)
       rows.push({ kind: 'video', name, type: v.type, supportedByIsType: supported.find(([t]) => t === v.type)?.[1], ...(await play(v, baseAudio)) })
     }
     for (const [name, a] of Object.entries(audio)) {
+      if (!new RegExp(arg('mse-rows', '.')).test(name)) continue
       log('play audio', name)
       rows.push({ kind: 'audio', name, type: a.type, supportedByIsType: supported.find(([t]) => t === a.type)?.[1], ...(await play(video.h264, a)) })
     }
-    results.mse = { env, supported, rows }
+    // A filtered re-run (--mse-rows=<regex>) goes under its own key so the full matrix is not overwritten.
+    if (arg('mse-rows', '.') === '.') results.mse = { env, supported, rows }
+    else results[`mse_rows_${arg('mse-rows')}`] = { env, rows }
     save()
   } finally {
     await app.close().catch(() => {})

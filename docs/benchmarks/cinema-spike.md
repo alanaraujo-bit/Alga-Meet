@@ -10,17 +10,12 @@
 
 | Pergunta | Decisão | Base |
 |---|---|---|
-| Áudio sem perda (`lossless`) | **`aac` 640k** (regra do brief). Ressalva abaixo. | FLAC 5.1 toca com os 6 canais, mas FLAC 7.1 não entrega os 8 (4 canais errados) e AAC 7.1 nem anexa. |
-| Áudio com perda | **`aac`** (5.1, `mp4a.40.2`) | AAC 5.1 passa em tudo; Opus 5.1 também passa, então não há razão para trocar. |
-| Relógio | **só gateway** (refinamento P2P só se a Task 15 não bater a meta) | Custo do gateway ~0,4 ms; ver "Atenção" na seção do relógio. |
+| Áudio sem perda (`lossless`) | **`flac` 5.1** (fontes TrueHD, DTS-HD MA; 7.1 rebaixado a 5.1 pelo ffmpeg), por **Ruling R8** | FLAC 5.1 passou: toca, 6/6 canais com o tom certo. |
+| Áudio com perda | **`aac` 640k 5.1** (fontes AC-3, E-AC-3, DTS), por **Ruling R8** | AAC 5.1 passa em tudo; Opus 5.1 também, sem razão para trocar. |
+| Teto de canais | **6 para todos os codecs** (**Ruling R8**): AAC/Opus/FLAC/MP3 até 6 canais passam por cópia; acima de 6, recodifica na mesma família em 5.1 | Decisão de produto. A medição mostra que o teto não é do Chromium para Opus/FLAC (ver 7.1 abaixo), mas AAC 7.1 nem anexa. |
+| Relógio | **só gateway, PROVISÓRIO** (**Ruling R9**) | Não medido no WebSocket do staging (sem contas): só o piso local (0,39 ms) e um substituto HTTP. Medição real e erro entre clientes ficam na Task 15; se errar a meta, entra refinamento P2P. |
 | Eco | **pendente (Task 15)**; fallback: aviso de fone [dono] | Procedimento escrito; não foi tocado áudio alto nesta máquina. |
 | ffmpeg para a Task 6 | URL, versão e SHA-256 abaixo | Mesmo binário medido aqui. |
-
-**Ressalva sobre `lossless`.** Pela regra literal ("flac só se 5.1 e 7.1 passarem") o resultado é `aac`. Mas o limite
-é da plataforma, não do FLAC: o Chromium não entregou 8 canais discretos nem com Opus 7.1, e o dispositivo de saída
-desta máquina é estéreo (`maxChannelCount = 2`). Todo caminho (FLAC, Opus, AAC) fica limitado a 5.1 aqui. Se o
-controlador preferir, uma alternativa coerente é `flac` com teto de 6 canais (7.1 rebaixado a 5.1 pelo ffmpeg),
-já que FLAC 5.1 passou inteiro. Decisão de produto, não de medição: fica com o controlador.
 
 ### ffmpeg LGPL que a Task 6 fixa
 
@@ -44,7 +39,7 @@ GPL do PATH. `node apps/desktop/scripts/cinema-fixtures.mjs` gera 7 arquivos; `-
 |---|---|
 | `h264-ac3-51.mkv` | H.264 High + AC-3 5.1 |
 | `hevc10-hdr10-eac3-51.mkv` | HEVC Main10 com metadados HDR10 (BT.2020/PQ, mastering display, MaxCLL) + E-AC-3 5.1 |
-| `hevc10-truehd-71.mkv` | HEVC Main10 + TrueHD 7.1 |
+| `hevc10-truehd-71.mkv` | HEVC Main10 + TrueHD. **O nome engana: o encoder TrueHD do ffmpeg aceita no máximo 6 canais, então a faixa é 5.1(side), não 7.1** (descoberto na rodada de correção) |
 | `av1-opus-51.mkv` | AV1 + Opus 5.1 |
 | `h264-dts-51.mkv` | H.264 + DTS 5.1 |
 | `h264-aac-srt-ass.mkv` | H.264 + AAC 5.1 + faixas SRT e ASS + fonte anexada |
@@ -53,6 +48,13 @@ GPL do PATH. `node apps/desktop/scripts/cinema-fixtures.mjs` gera 7 arquivos; `-
 | `long-h264-1080p-10min.mkv`, `long-hevc10-4k-10min.mkv` | 435,9 MB e 1,99 GB (~25 Mbps), só para velocidade |
 
 ## Matriz MSE no Electron 45 (Step 3)
+
+**Correção (rodada 1):** a primeira medição de 7.1 usou a faixa do fixture `hevc10-truehd-71`, que na verdade é 5.1, e
+concluiu errado que o Chromium não entrega 8 canais. Refeito com um WAV de 8 canais verdadeiros (um tom por canal, ordem
+do FFmpeg FL FR FC LFE BL BR SL SR), sem outra mudança: Opus 7.1 e FLAC 7.1 entregam os 8 canais com o tom certo
+(tabela abaixo, com o 2º pico de cada canal no JSON do script). A falha dos números antigos era de fixture, não de
+mapeamento nem de perda. Só o AAC 7.1 continua falhando (não anexa no MSE). Comando:
+`node apps/desktop/scripts/cinema-spike.mjs --phase=mse --mse-rows="7\.1" --ffmpeg=<pasta LGPL>`.
 
 Remux com o ffmpeg LGPL (vídeo copiado; áudio convertido) para fMP4 fragmentado; `MediaSource` + `<video>` numa janela
 real; 10 s tocando. Nível e frequência de cada canal lidos por `AnalyserNode` atrás de um `ChannelSplitter`; um canal só
@@ -71,9 +73,14 @@ presença). O áudio nunca vai às caixas (o grafo termina num ganho 0).
 | Opus 5.1 | sim | sim | 6/6 | exige relabel `aformat=channel_layouts=5.1` na entrada do libopus |
 | FLAC 5.1 | sim | sim | 6/6 | |
 | AAC 7.1 | sim | **não** | n/d | `SourceBuffer error` ao anexar |
-| Opus 7.1 | sim | sim | **6/8** | canais 4 e 5 mudos |
-| FLAC 7.1 | sim | sim | **4/8** | canais 4 a 7 errados (traseiros mudos, laterais no lugar errado, nível -19,7 dBFS: parece rebaixamento a 5.1) |
+| Opus 7.1 | sim | sim | 8/8 | -15 dBFS por canal, tons nos canais certos |
+| FLAC 7.1 | sim | sim | 8/8 | idem |
 | AC-3 / E-AC-3 em MP4 | **não** | não | n/d | `addSourceBuffer` recusa o tipo |
+
+**Só vale para esta máquina.** HEVC depende do decoder de hardware (GPU/driver) e AV1 também; em outro PC o mesmo
+`isTypeSupported` pode dizer sim e a reprodução falhar, ou o contrário. O motor não pode assumir estes resultados: a Task 12
+deve sondar em tempo de execução (`canPlay`/`isTypeSupported` mais um teste de decodificação) e cair para transcodificação
+de vídeo ou aviso quando falhar.
 
 ### `isTypeSupported` do restante
 
@@ -84,7 +91,7 @@ Não: Dolby Vision (`dvh1.05.06`, `dvhe.08.06`), `mp4v.20.9` (MPEG-2/4), `ac-3`,
 
 Consequências para o motor: AC-3, E-AC-3, DTS e TrueHD precisam de transcodificação de áudio (nenhum passa direto).
 HEVC e AV1 passam direto (cópia de vídeo). MPEG-2 não toca (o remux funciona, a decodificação não). Dolby Vision perfil 5
-não tem tipo suportado: tratar como não suportado ou avisar (o fixture não pôde ser testado). O teto prático de canais é 6.
+não tem tipo suportado: tratar como não suportado ou avisar (o fixture não pôde ser testado). Canais: o Chromium entregou 8 discretos para Opus e FLAC 7.1; o teto de 6 vem do Ruling R8, não de limite técnico (exceto AAC 7.1, que não anexa).
 
 ## Velocidade do ffmpeg LGPL (Step 4, só fixtures)
 
@@ -103,6 +110,8 @@ Tempos em segundos; "×" = duração do arquivo / tempo gasto. Remux = `-c:v cop
 | mpeg2-mp2 | 20 s | 40, 0,04, 500 | 0,10, 198 | 35 | 205 | 370 |
 | **long 1080p H.264** | 10 min | 300, 0,23, 2609 | 0,81, 742 | 24 | 60 | 283 |
 | **long 4K HEVC10 (1,99 GB)** | 10 min | 300, 0,58, 1035 | 3,46, 174 | 24 | 60 | 291 |
+
+Obs.: a linha `hevc10-truehd-71` é TrueHD 5.1 (ver Fixtures), não 7.1.
 
 Leitura: listar keyframes e remuxar vídeo são desprezíveis (4K de 10 min em 0,6 s e 3,5 s). O gargalo é o encoder
 AAC nativo, ~24x em tempo real com 1 thread: um filme de 2 h converte o áudio inteiro em ~5 min, bem à frente do
@@ -140,11 +149,12 @@ A primeira linha é o piso do código do gateway (custo de processar o frame), n
 rede **sem credenciais**: `GET /legal` na API pública do staging a partir desta máquina (a amostra do handshake TLS
 foi descartada). Não é o gateway, e inclui o processamento HTTP.
 
-**Atenção.** A regra do brief diz "só gateway se p95 ≤ 80 ms". O p95 do substituto (216 ms) passa de 80, mas o
-substituto é de HTTP, de uma máquina de desenvolvimento, e o que importa para o offset NTP-style com amostra de menor
-ida e volta é a **assimetria**, não o tamanho do RTT. Por isso a decisão é gateway (como o controlador mandou) e o
-número real do WebSocket no staging, com offset entre clientes medido com rVFC, fica para a Task 12/15. Se lá o erro
-passar da meta, entra o refinamento P2P.
+**Não medido: o Step 6 contra o WebSocket do staging.** Sem contas, só temos o piso local e o substituto HTTP. A decisão
+"só gateway" é **provisória (Ruling R9)**. A regra do brief ("só gateway se p95 ≤ 80 ms") **não** é satisfeita por
+nenhum dado deste spike: o piso local (0,6 ms) não mede rede, e o substituto HTTP (mediana 166 / p95 216 ms) está acima
+de 80. Pelo R9, o RTT do staging não decide a precisão do offset: o erro vem da assimetria do caminho, e o filtro de menor
+ida e volta o reduz. O número real do WebSocket e o erro entre clientes (rVFC) são medidos na Task 15; se não bater a meta,
+entra o refinamento P2P.
 
 Achado útil para a Task 12: o gateway fecha o socket com 4008 depois de 120 frames em 60 s (`socket.ts:17,216`, inclui
 `identify`). 100 pings em 50 s cabem; os ops do cinema precisam do orçamento próprio já previsto no spec.

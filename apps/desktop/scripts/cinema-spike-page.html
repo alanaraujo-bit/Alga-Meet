@@ -54,7 +54,9 @@ window.cinemaPlay = async ({ vFile, vType, aFile, aType, channels, tones, base, 
         if (db > best[i].db) {
           a.getFloatFrequencyData(fd)
           let m = 0; for (let k = 1; k < fd.length; k++) if (fd[k] > fd[m]) m = k
-          best[i] = { db, hz: Math.round((m * ctx.sampleRate) / a.fftSize) }
+          let m2 = -1; for (let k = 1; k < fd.length; k++) if (Math.abs(k - m) > 8 && (m2 < 0 || fd[k] > fd[m2])) m2 = k
+          const hz = (k) => Math.round((k * ctx.sampleRate) / a.fftSize)
+          best[i] = { db, hz: hz(m), hz2: hz(m2), db2: Math.round(fd[m2]) - Math.round(fd[m]) } // db2: 2nd peak relative to the 1st
         }
       })
     }
@@ -65,7 +67,7 @@ window.cinemaPlay = async ({ vFile, vType, aFile, aType, channels, tones, base, 
     out.video = vFile ? { w: v.videoWidth, h: v.videoHeight, total: q.totalVideoFrames, dropped: q.droppedVideoFrames } : null
     out.sourceChannels = src.channelCount
     out.channels = best.slice(0, channels).map((b, i) => ({
-      ch: i, db: Math.round(b.db * 10) / 10, peakHz: b.hz, expectedHz: tones[i],
+      ch: i, db: Math.round(b.db * 10) / 10, peakHz: b.hz, peak2Hz: b.hz2, peak2RelDb: b.db2, expectedHz: tones[i],
       ok: b.db > -60 && Math.abs(b.hz - tones[i]) <= Math.max(12, tones[i] * 0.03),
     }))
     out.allChannelsOk = out.channels.every((c) => c.ok)
