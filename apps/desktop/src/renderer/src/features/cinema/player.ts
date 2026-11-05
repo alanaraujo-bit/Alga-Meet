@@ -2,7 +2,7 @@ import {
   CINEMA_RESUME_AHEAD_S, CINEMA_STALL_MS, positionAt,
   type CinemaFilm, type CinemaPlayback,
 } from '@alga/shared'
-import { EDGE_S, feedLane, laneOf, laneOp, rangesOf, type Lane } from './mse'
+import { aheadOf, feedLane, gapJumpTarget, laneOf, rangesOf, swapLane, type Lane } from './mse'
 import type { Swarm } from './swarm/swarm'
 import { SyncController } from './sync'
 
@@ -42,6 +42,7 @@ export class CinemaPlayer {
   private readonly opened: Promise<void>
   private readonly sync = new SyncController()
   private readonly stallCbs = new Set<(stalled: boolean) => void>()
+  private readonly errorCbs = new Set<(e: Error) => void>()
   private readonly errs: number[] = []
   private readonly offPiece: () => void
   private readonly tick: ReturnType<typeof setInterval>
@@ -83,6 +84,8 @@ export class CinemaPlayer {
     })
     this.tick = setInterval(() => this.onTick(), TICK_MS)
     document.addEventListener('visibilitychange', this.onVisibility)
+    video.addEventListener('waiting', this.jumpGap)
+    video.addEventListener('error', this.onVideoError)
     this.frameId = video.requestVideoFrameCallback(this.onFrame)
   }
 
@@ -134,11 +137,12 @@ export class CinemaPlayer {
     }
   }
 
-  /** Seconds buffered contiguously ahead of currentTime in both SourceBuffers (the element's buffered = intersection). */
+  /**
+   * Seconds buffered contiguously ahead of currentTime in both SourceBuffers (the element's buffered = intersection),
+   * across holes small enough for the gap jump.
+   */
   aheadS(): number {
-    const t = this.video.currentTime
-    const r = rangesOf(this.video.buffered).find((x) => x.startS <= t + EDGE_S && x.endS > t)
-    return r ? r.endS - t : 0
+    return aheadOf(rangesOf(this.video.buffered), this.video.currentTime)
   }
 
   /**
@@ -148,6 +152,12 @@ export class CinemaPlayer {
   onStall(cb: (stalled: boolean) => void): () => void {
     this.stallCbs.add(cb)
     return () => this.stallCbs.delete(cb)
+  }
+
+  /** A SourceBuffer update failed (that lane stops being fed) or the element errored (decode, unsupported). */
+  onError(cb: (e: Error) => void): () => void {
+    this.errorCbs.add(cb)
+    return () => this.errorCbs.delete(cb)
   }
 
   stats(): { droppedFrames: number; syncErrP95Ms: number; bufferedAheadS: number } {
@@ -166,8 +176,11 @@ export class CinemaPlayer {
     clearTimeout(this.timer)
     this.video.cancelVideoFrameCallback(this.frameId)
     document.removeEventListener('visibilitychange', this.onVisibility)
+    this.video.removeEventListener('waiting', this.jumpGap)
+    this.video.removeEventListener('error', this.onVideoError)
     this.offPiece()
     this.stallCbs.clear()
+    this.errorCbs.clear()
     this.video.pause()
     this.video.removeAttribute('src')
     this.video.load()
@@ -245,8 +258,23 @@ export class CinemaPlayer {
 
   private onTick(): void {
     this.swarm.setPlayhead(this.video.currentTime)
+    this.jumpGap()
     this.feed()
     this.checkStall()
+  }
+
+  /** Room playing, video waiting at a hole ≤ EDGE_S (fMP4 run join, keyframe shift after a seek): skip over it. */
+  private readonly jumpGap = (): void => {
+    const v = this.video
+    if (this.dead || !this.due(this.serverNow()) || v.seeking || v.readyState >= 3) return
+    const to = gapJumpTarget(rangesOf(v.buffered), v.currentTime)
+    if (to !== null) this.seek(to)
+  }
+
+  /** The room is playing now and not in the film's last second. */
+  private due(serverNow: number): boolean {
+    const p = this.p
+    return !!p?.playing && serverNow >= p.at && positionAt(p, serverNow, this.film.durationS) < this.film.durationS - END_S
   }
 
   private checkStall(): void {
@@ -256,11 +284,8 @@ export class CinemaPlayer {
       if (this.aheadS() >= Math.min(CINEMA_RESUME_AHEAD_S, this.film.durationS - v.currentTime - END_S)) this.setStalled(false)
       return
     }
-    const p = this.p
-    const serverNow = this.serverNow()
-    const due = !!p?.playing && serverNow >= p.at && positionAt(p, serverNow, this.film.durationS) < this.film.durationS - END_S
     // readyState below HAVE_FUTURE_DATA ('waiting'): nothing buffered past the current frame
-    if (!due || v.readyState >= 3) this.starveSince = null
+    if (!this.due(this.serverNow()) || v.readyState >= 3) this.starveSince = null
     else if (this.starveSince === null) this.starveSince = now
     else if (now - this.starveSince >= CINEMA_STALL_MS) this.setStalled(true)
   }
@@ -269,6 +294,17 @@ export class CinemaPlayer {
     this.stalled = stalled
     this.starveSince = null
     for (const cb of this.stallCbs) cb(stalled)
+  }
+
+  private readonly onVideoError = (): void => {
+    const e = this.video.error
+    this.fail(new Error(`cinema: video error ${e?.code ?? '?'}: ${e?.message ?? ''}`))
+  }
+
+  private fail(e: unknown): void {
+    const err = e instanceof Error ? e : new Error(String(e))
+    console.warn('[cinema] player', err)
+    for (const cb of this.errorCbs) cb(err)
   }
 
   // ---- MSE feeding --------------------------------------------------------------------------------------------------
@@ -284,22 +320,11 @@ export class CinemaPlayer {
       this.audioLane = laneOf(this.ms.addSourceBuffer(a.mime), track, a.mime)
       return this.feed()
     }
-    l.swapping = true // stops feedLane for this lane
-    l.track = track
     try {
-      try {
-        if (l.sb.updating) l.sb.abort() // cut the old track's append short
-      } catch {
-        // a remove is running (abort is not allowed then): the chain waits for it
-      }
-      await laneOp(l, (sb) => sb.remove(0, Infinity))
-      if (l.mime !== a.mime) l.sb.changeType(a.mime)
-      l.mime = a.mime
-      l.init = null
+      await swapLane(l, this.swarm, track, a.mime) // on failure the old track keeps playing, the caller gets the error
     } finally {
-      l.swapping = false
+      this.feed()
     }
-    this.feed()
   }
 
   private feed(): void {
@@ -313,7 +338,7 @@ export class CinemaPlayer {
     const playhead = () => this.video.currentTime
     const alive = () => !this.dead
     void Promise.allSettled(lanes.map((l) => feedLane(l, this.swarm, playhead, alive))).then((results) => {
-      for (const r of results) if (r.status === 'rejected') console.warn('[cinema] feed', r.reason)
+      for (const r of results) if (r.status === 'rejected') this.fail(r.reason)
       this.feeding = false
       if (this.again) {
         this.again = false

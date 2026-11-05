@@ -13,6 +13,8 @@ const JUMP_MS = 1_000
  */
 export class ClockEstimator {
   private samples: { offset: number; rtt: number }[] = []
+  /** The estimate in use while there is no sample (after reset): the last one, shifted across clock jumps. */
+  private fallback: number | null = null
   private wall: number | null = null
   private perf = 0
 
@@ -24,11 +26,16 @@ export class ClockEstimator {
     if (this.samples.length > MAX_SAMPLES) this.samples.shift()
   }
 
-  /** server − client (ms), from the min-RTT sample of the last 16; null before any sample. */
+  /** server − client (ms), from the min-RTT sample of the last 16; after reset(), the last estimate; null before any. */
   offsetMs(): number | null {
     let best: { offset: number; rtt: number } | null = null
     for (const x of this.samples) if (!best || x.rtt < best.rtt) best = x
-    return best ? best.offset : null
+    return best ? best.offset : this.fallback
+  }
+
+  /** False until the first sample (and again after reset()): commands should not be applied on a guessed clock. */
+  hasSample(): boolean {
+    return this.samples.length > 0
   }
 
   serverNow(clientNow = Date.now()): number {
@@ -39,15 +46,23 @@ export class ClockEstimator {
     return this.samples.length < WARM_SAMPLES ? FAST_PING_MS : SLOW_PING_MS
   }
 
-  /** True when the wall clock moved > 1 s more (or less) than performance.now since the last call. */
+  /**
+   * True when the wall clock moved > 1 s more (or less) than performance.now since the last call. The estimate is
+   * shifted by that drift right away, so serverNow stays right while the caller resets and pings fast.
+   */
   jumped(clientNow: number, perfNow: number): boolean {
     const drift = this.wall === null ? 0 : clientNow - this.wall - (perfNow - this.perf)
     this.wall = clientNow
     this.perf = perfNow
-    return Math.abs(drift) > JUMP_MS
+    if (Math.abs(drift) <= JUMP_MS) return false
+    for (const x of this.samples) x.offset -= drift
+    if (this.fallback !== null) this.fallback -= drift
+    return true
   }
 
+  /** Drops the samples (ping fast again) but keeps the current estimate until a new sample arrives. */
   reset(): void {
+    this.fallback = this.offsetMs()
     this.samples = []
     this.wall = null
   }

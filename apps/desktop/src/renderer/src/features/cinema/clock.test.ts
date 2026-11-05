@@ -5,6 +5,7 @@ describe('ClockEstimator', () => {
   it('has no offset before the first sample', () => {
     const c = new ClockEstimator()
     expect(c.offsetMs()).toBeNull()
+    expect(c.hasSample()).toBe(false)
     expect(c.serverNow(1_000)).toBe(1_000)
   })
 
@@ -41,7 +42,30 @@ describe('ClockEstimator', () => {
     expect(c.nextPingDelayMs()).toBe(15_000)
     c.reset()
     expect(c.nextPingDelayMs()).toBe(1_000)
-    expect(c.offsetMs()).toBeNull()
+    expect(c.hasSample()).toBe(false)
+  })
+
+  it("keeps the last offset after reset() until a new sample arrives", () => {
+    const c = new ClockEstimator()
+    c.add({ c: 2_000, s: 7_010, r: 2_010 }) // offset 5005
+    c.reset()
+    expect(c.offsetMs()).toBe(5_005)
+    expect(c.serverNow(10_000)).toBe(15_005)
+    c.add({ c: 20_000, s: 25_100, r: 20_020 }) // offset 5090
+    expect(c.hasSample()).toBe(true)
+    expect(c.offsetMs()).toBe(5_090)
+  })
+
+  it("shifts the offset by the measured jump, so serverNow stays right across reset()", () => {
+    const c = new ClockEstimator()
+    c.add({ c: 2_000, s: 7_010, r: 2_010 }) // offset 5005
+    c.jumped(100_000, 50)
+    expect(c.jumped(105_010, 60)).toBe(true) // wall clock jumped 5 s forward
+    expect(c.offsetMs()).toBe(5)
+    c.reset()
+    expect(c.offsetMs()).toBe(5)
+    expect(c.hasSample()).toBe(false)
+    expect(c.serverNow(105_010)).toBe(105_015)
   })
 
   it('detects a wall-clock jump against performance.now', () => {

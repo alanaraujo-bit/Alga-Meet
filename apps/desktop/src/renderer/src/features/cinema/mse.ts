@@ -4,34 +4,68 @@ import type { Swarm } from './swarm/swarm'
 /** The SourceBuffers hold this much ahead of the playhead and drop what is further behind (spec §6.5). */
 const AHEAD_S = 60
 const BEHIND_S = 30
-/** A buffered range this close to a piece's edges covers it (fMP4 keyframes shift up to ~0.13 s; B-frame offsets). */
+/** Data further ahead than this (left over from before a backward seek) is dropped: memory budget. */
+const KEEP_AHEAD_S = 90
+/**
+ * A buffered range this close to a piece's edges covers it (fMP4 keyframes shift up to ~0.13 s; B-frame offsets), and a
+ * hole this small between ranges is played across (HEVC open-GOP run joins, Task 8).
+ */
 export const EDGE_S = 0.25
 const PROBE_TIMEOUT_MS = 5_000
+/** A feeding round whose playhead moved more than this (a seek) is abandoned: its plan is stale. */
+const STALE_PLAN_S = 1
 
 export interface TimeRange { startS: number; endS: number }
 export type PieceSource = Pick<Swarm, 'get' | 'pieces'>
 
-const covers = (ranges: TimeRange[], s: number, e: number): boolean =>
-  ranges.some((r) => r.startS <= s + EDGE_S && r.endS >= e - EDGE_S)
+/** Edge tolerance is EDGE_S, or half the piece for short ones (else a short piece next to a range counts as covered). */
+const covers = (ranges: TimeRange[], s: number, e: number): boolean => {
+  const tol = Math.min(EDGE_S, (e - s) / 2)
+  return ranges.some((r) => r.startS <= s + tol && r.endS >= e - tol)
+}
 
 export const rangesOf = (b: TimeRanges): TimeRange[] => Array.from({ length: b.length }, (_, i) => ({ startS: b.start(i), endS: b.end(i) }))
 
 /**
+ * Seconds buffered contiguously from `t` (ranges sorted, as TimeRanges are), walking across holes up to EDGE_S. The
+ * range holding `t` is the first with start ≤ t + EDGE_S and end > t, so both sides of a range end give the same answer.
+ */
+export function aheadOf(ranges: TimeRange[], t: number): number {
+  let end: number | null = null
+  for (const r of ranges) {
+    if (end === null) {
+      if (r.startS <= t + EDGE_S && r.endS > t) end = r.endS
+    } else if (r.startS <= end + EDGE_S) end = Math.max(end, r.endS)
+    else break
+  }
+  return end === null ? 0 : end - t
+}
+
+/** Where to jump when playback waits at a hole ≤ EDGE_S: the next range's start, or null (no such hole at `t`). */
+export function gapJumpTarget(ranges: TimeRange[], t: number): number | null {
+  const next = ranges.find((r) => r.startS > t)
+  if (!next || next.startS - t > EDGE_S) return null
+  return ranges.some((r) => r.startS <= t && r.endS >= next.startS) ? null : next.startS
+}
+
+/**
  * What to append to a SourceBuffer (piece numbers, in startS order: n is generation order, R4) so it covers
- * [playhead, playhead + 60 s), and where to cut what is more than 30 s behind. `pieces` is the track's index (position
- * = n); the init segment and zero-length pieces are never part of the plan.
+ * [playhead, playhead + 60 s), and where to cut: what is more than 30 s behind, and what is more than 90 s ahead (after
+ * a backward seek). `pieces` is the track's index (position = n); init and zero-length pieces are never planned.
  */
 export function bufferPlan(
   buffered: TimeRange[], playheadS: number, pieces: readonly CinemaPieceMeta[],
-): { append: number[]; removeBeforeS: number | null } {
+): { append: number[]; removeBeforeS: number | null; removeAfterS: number | null } {
   const append: [number, number][] = []
   pieces.forEach(([s, d], n) => {
     if (d > 0 && s + d > playheadS && s < playheadS + AHEAD_S && !covers(buffered, s, s + d)) append.push([s, n])
   })
   const cut = playheadS - BEHIND_S
+  const keep = playheadS + KEEP_AHEAD_S
   return {
     append: append.sort((a, b) => a[0] - b[0]).map(([, n]) => n),
     removeBeforeS: cut > 0 && buffered.some((r) => r.startS < cut) ? cut : null,
+    removeAfterS: buffered.some((r) => r.endS > keep) ? keep : null,
   }
 }
 
@@ -40,16 +74,20 @@ type CanPlay = { ok: true } | { ok: false; reason: 'video_codec' | 'audio_codec'
 /**
  * Seat check (spec §6.5): `isTypeSupported` for the video and the chosen audio, then a real decode of the init segment
  * plus the first held media piece of each in a hidden MediaSource (HEVC on Windows is hardware-only: this is where a
- * seat finds out). A track with no held media piece yet is judged by type only: call this once the swarm has the
- * playhead's first pieces (e.g. when `aheadS > 0`).
+ * seat finds out). Both probes run at once (≤ 5 s in all). A track with no held media piece yet is judged by type only:
+ * call this once the swarm has the playhead's first pieces (e.g. when `aheadS > 0`).
  */
 export async function canPlay(film: CinemaFilm, audioId: number, swarm: PieceSource): Promise<CanPlay> {
   const audio = film.audio.find((a) => a.id === audioId)
   if (film.audio.length && !audio) throw new Error(`cinema: unknown audio track ${audioId}`)
   if (!MediaSource.isTypeSupported(film.videoMime)) return { ok: false, reason: 'video_codec' }
   if (audio && !MediaSource.isTypeSupported(audio.mime)) return { ok: false, reason: 'audio_codec' }
-  if (!(await probe(film.videoMime, 'v', swarm, film.durationS))) return { ok: false, reason: 'video_codec' }
-  if (audio && !(await probe(audio.mime, `a${audio.id}`, swarm, film.durationS))) return { ok: false, reason: 'audio_codec' }
+  const [videoOk, audioOk] = await Promise.all([
+    probe(film.videoMime, 'v', swarm, film.durationS),
+    audio ? probe(audio.mime, `a${audio.id}`, swarm, film.durationS) : true,
+  ])
+  if (!videoOk) return { ok: false, reason: 'video_codec' }
+  if (!audioOk) return { ok: false, reason: 'audio_codec' }
   return { ok: true }
 }
 
@@ -63,6 +101,7 @@ async function probe(mime: string, track: CinemaTrackId, swarm: PieceSource, dur
   const piece = media
   const el = document.createElement('video')
   el.muted = true
+  el.preload = 'auto'
   const ms = new MediaSource()
   const url = URL.createObjectURL(ms)
   try {
@@ -101,23 +140,43 @@ async function probe(mime: string, track: CinemaTrackId, swarm: PieceSource, dur
   }
 }
 
-/** One SourceBuffer and the track it plays; updates run one at a time through `chain`. */
-export interface Lane { sb: SourceBuffer; track: CinemaTrackId; mime: string; init: string | null; chain: Promise<unknown>; swapping: boolean }
+/**
+ * One SourceBuffer and the track it plays; updates run one at a time through `chain`. `broken`: an update failed
+ * (SourceBuffer error, or the element errored): the lane is not fed again.
+ */
+export interface Lane {
+  sb: SourceBuffer; track: CinemaTrackId; mime: string; init: string | null
+  chain: Promise<unknown>; swapping: boolean; broken: boolean
+}
 
 export const laneOf = (sb: SourceBuffer, track: CinemaTrackId, mime: string): Lane => {
   sb.mode = 'segments' // pieces carry absolute film timestamps
-  return { sb, track, mime, init: null, chain: Promise.resolve(), swapping: false }
+  return { sb, track, mime, init: null, chain: Promise.resolve(), swapping: false, broken: false }
 }
 
-/** Queues one SourceBuffer update on the lane; resolves on its 'updateend', rejects if the call throws. */
+/** Queues one SourceBuffer update on the lane; resolves on its 'updateend', rejects on 'error' or if the call throws. */
 export function laneOp(l: Lane, f: (sb: SourceBuffer) => void): Promise<void> {
   const run = () => new Promise<void>((resolve, reject) => {
-    const done = () => resolve()
-    l.sb.addEventListener('updateend', done, { once: true })
+    const sb = l.sb
+    let failed = false
+    const onError = () => {
+      failed = true // 'updateend' follows
+    }
+    const off = () => {
+      sb.removeEventListener('updateend', onEnd)
+      sb.removeEventListener('error', onError)
+    }
+    const onEnd = () => {
+      off()
+      if (failed) reject(new Error(`cinema: SourceBuffer error on ${l.track}`))
+      else resolve()
+    }
+    sb.addEventListener('updateend', onEnd)
+    sb.addEventListener('error', onError)
     try {
-      f(l.sb)
+      f(sb)
     } catch (e) {
-      l.sb.removeEventListener('updateend', done)
+      off()
       reject(e)
     }
   })
@@ -127,36 +186,80 @@ export function laneOp(l: Lane, f: (sb: SourceBuffer) => void): Promise<void> {
 }
 
 /**
- * One feeding round: the init (again if its version changed), then the plan around `playheadS()`: cut far behind,
- * append what the swarm holds in time order. Stops as soon as `alive()` fails or the lane swaps track.
+ * One feeding round: the init (again if its version changed), then the plan around `playheadS()`: cut far behind and
+ * far ahead, append what the swarm holds in time order. Stops when `alive()` fails, the lane swaps track or the playhead
+ * jumps (a seek: the next round plans again). A failed update marks the lane broken and rejects.
  */
 export async function feedLane(l: Lane, swarm: PieceSource, playheadS: () => number, alive: () => boolean): Promise<void> {
   const track = l.track
-  const live = () => alive() && !l.swapping && l.track === track
+  const live = () => alive() && !l.swapping && !l.broken && l.track === track
   const pieces = swarm.pieces(track)
   const init = pieces[0]
   if (!live() || !init) return
-  if (l.init !== init[3]) {
-    const buf = await swarm.get(track, 0)
-    if (!buf || !live()) return
-    await laneOp(l, (sb) => sb.appendBuffer(buf))
-    if (!live()) return
-    l.init = init[3]
-  }
-  const plan = bufferPlan(rangesOf(l.sb.buffered), playheadS(), pieces)
-  const cut = plan.removeBeforeS
-  if (cut !== null) await laneOp(l, (sb) => sb.remove(0, cut))
-  for (const n of plan.append) {
-    const buf = await swarm.get(track, n)
-    const m = pieces[n]
-    if (!live()) return
-    // not held yet, or an overlapping (regenerated, R4) piece already filled the range
-    if (!buf || !m || covers(rangesOf(l.sb.buffered), m[0], m[0] + m[1])) continue
-    try {
+  try {
+    if (l.init !== init[3]) {
+      const buf = await swarm.get(track, 0)
+      if (!buf || !live()) return
       await laneOp(l, (sb) => sb.appendBuffer(buf))
-    } catch (e) {
-      if ((e as Error).name === 'QuotaExceededError') return // full: Chromium evicts behind the playhead, retry next tick
-      throw e
+      if (!live()) return
+      l.init = init[3]
     }
+    const at = playheadS()
+    const plan = bufferPlan(rangesOf(l.sb.buffered), at, pieces)
+    const cut = plan.removeBeforeS
+    const keep = plan.removeAfterS
+    if (cut !== null) await laneOp(l, (sb) => sb.remove(0, cut))
+    if (keep !== null) await laneOp(l, (sb) => sb.remove(keep, Infinity))
+    for (const n of plan.append) {
+      const buf = await swarm.get(track, n)
+      const m = pieces[n]
+      if (!live() || Math.abs(playheadS() - at) > STALE_PLAN_S) return
+      // not held yet, or an overlapping (regenerated, R4) piece already filled the range
+      if (!buf || !m || covers(rangesOf(l.sb.buffered), m[0], m[0] + m[1])) continue
+      await laneOp(l, (sb) => sb.appendBuffer(buf))
+    }
+  } catch (e) {
+    if ((e as Error).name === 'QuotaExceededError') return // full: Chromium evicts behind the playhead, retry next tick
+    l.broken = true
+    throw e
+  }
+}
+
+/**
+ * Switches an audio lane to another track: empty it, change its type if needed, append the new init; only then is the
+ * lane on the new track. Fails without touching anything if the new init is not held yet; any later failure puts the
+ * old type back and clears `init`, so the next feeding round restores the old track at the playhead.
+ */
+export async function swapLane(l: Lane, swarm: PieceSource, track: CinemaTrackId, mime: string): Promise<void> {
+  const meta = swarm.pieces(track)[0]
+  const init = meta ? await swarm.get(track, 0) : null
+  if (!meta || !init) throw new Error(`cinema: no init segment for ${track} yet`)
+  const old = l.mime
+  l.swapping = true // stops feedLane for this lane
+  try {
+    try {
+      if (l.sb.updating) l.sb.abort() // cut the old track's append short
+    } catch {
+      // a remove is running (abort is not allowed then): the chain waits for it
+    }
+    await laneOp(l, (sb) => sb.remove(0, Infinity))
+    if (mime !== old) l.sb.changeType(mime)
+    l.mime = mime
+    await laneOp(l, (sb) => sb.appendBuffer(init))
+    l.track = track
+    l.init = meta[3]
+  } catch (e) {
+    if (l.mime !== old) {
+      try {
+        l.sb.changeType(old)
+        l.mime = old
+      } catch {
+        l.broken = true
+      }
+    }
+    l.init = null
+    throw e
+  } finally {
+    l.swapping = false
   }
 }
