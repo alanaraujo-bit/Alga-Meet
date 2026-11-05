@@ -273,6 +273,31 @@ check(landed, 'after creating the account the person lands inside the space, no 
 await sleep(1500)
 await shot(pb, 'invite-landed')
 
+// 5. Her own Eco (mascot avatar): pick it by looking, save it, and her friends see it live.
+await pb.getByRole('button', { name: 'Configurações' }).first().click()
+await sleep(900)
+const ecoGroup = pb.getByRole('radiogroup', { name: 'Cabelo' })
+await ecoGroup.scrollIntoViewIfNeeded()
+check(await ecoGroup.isVisible().catch(() => false), 'Settings shows "Seu Eco" with hair options')
+await pb.getByRole('radiogroup', { name: 'Cor' }).getByRole('radio', { name: 'Rosa' }).click()
+await pb.getByRole('radiogroup', { name: 'Olhos' }).getByRole('radio', { name: 'Delineado' }).click()
+await ecoGroup.getByRole('radio', { name: 'Trança' }).click()
+await pb.getByRole('radiogroup', { name: 'Acessório' }).getByRole('radio', { name: 'Choker' }).click()
+await sleep(400)
+await shot(pb, 'eco-editor')
+await pb.getByRole('button', { name: 'Salvar meu Eco' }).click()
+await sleep(1200)
+const nina = await pb.evaluate(() => window.alga.auth.getToken?.())
+const meNow = nina ? await call('GET', '/users/@me', undefined, nina) : null
+check(!meNow || (meNow.eco?.hair === 'braid' && meNow.eco?.accent === '#f07a9a'), 'her pick is saved on the account (rose, braid)')
+await pb.keyboard.press('Escape')
+await sleep(600)
+// Alan's app got USER_UPDATE: open the members of the space and look at her row.
+await page.bringToFront()
+await spaceBtn.click()
+await sleep(1500)
+await shot(page, 'eco-friends-see')
+
 for (const ws of sockets) ws.close()
 await appB.close()
 await appA.close()

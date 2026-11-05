@@ -1,4 +1,4 @@
-import { ACCOUNT_ACTION_REASONS, REPORT_REASONS, type EquippedCosmetics } from '@alga/shared'
+import { ACCOUNT_ACTION_REASONS, REPORT_REASONS, type EcoSpec, type EquippedCosmetics } from '@alga/shared'
 import { sql } from 'drizzle-orm'
 import {
   type AnyPgColumn, boolean, date, foreignKey, index, integer, jsonb, pgTable, primaryKey, real, text, timestamp, uniqueIndex, uuid,
@@ -16,6 +16,8 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   avatarUrl: text('avatar_url'),
   accentColor: text('accent_color'),
+  /** The Eco (mascot avatar) this person picked; null = the automatic one derived from the id (client-side). */
+  eco: jsonb('eco').$type<EcoSpec>(),
   bio: text('bio').notNull().default(''),
   statusPreference: text('status_preference', { enum: ['online', 'idle', 'dnd', 'invisible'] }).notNull().default('online'),
   createdAt: ts('created_at').notNull().defaultNow(),

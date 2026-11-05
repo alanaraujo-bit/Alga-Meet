@@ -20,6 +20,7 @@ import { PlanSection, StreamPlanGroup } from '../billing/Plan'
 import { ShopSection } from '../billing/Shop'
 import { PrivacySection } from '../trust/Privacy'
 import { ActivitySettings } from '../activity/ActivitySettings'
+import { EcoEditor } from './EcoEditor'
 import { Group, Row, SettingsFrame } from './Frame'
 import { HOTKEY_ACTIONS, loadBindings, saveBindings, type SavedBinding } from './hotkeys'
 import { defaultDeviceName } from './devices'
@@ -180,6 +181,7 @@ function Account() {
           </div>
         </form>
       </Group>
+      <EcoEditor />
       <Group title={t.account.email}>
         <Row label={me.email} hint={me.emailVerified === false ? t.account.emailUnverified : t.account.emailVerified}>
           {me.emailVerified === false && (

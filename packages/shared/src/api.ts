@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { StreamPreset } from './billing.js'
+import { EcoSpecSchema } from './eco.js'
 import type { Me } from './models.js'
 import { ALL_PERMISSIONS } from './permissions.js'
 import { birthDate, termsVersion, type AccountRestriction } from './trust-safety.js'
@@ -404,6 +405,8 @@ export const PatchMeBody = z.object({
   bio: z.string().max(190).optional(),
   accentColor: z.string().regex(/^#[0-9a-f]{6}$/i).nullable().optional(),
   avatarUrl: httpsUrl.nullable().optional(),
+  /** The mascot avatar (Eco) this person picked; null goes back to the automatic one. */
+  eco: EcoSpecSchema.nullable().optional(),
   statusPreference: z.enum(['online', 'idle', 'dnd', 'invisible']).optional(),
   /** Consent to send call-quality aggregates (Me.telemetryOptIn). Off unless the user turns it on. */
   telemetryOptIn: z.boolean().optional(),

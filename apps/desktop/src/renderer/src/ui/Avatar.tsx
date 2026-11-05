@@ -2,7 +2,8 @@ import type { PresenceStatus } from '@alga/shared'
 import { useEffect, useId, useState, type RefObject } from 'react'
 import s from './Avatar.module.css'
 import { Eco } from './eco/Eco'
-import { ecoBackdrop, ecoFor } from './eco/ecoRules'
+import { ecoBackdrop, ecoFor, type EcoLook } from './eco/ecoRules'
+import type { EcoSpec } from '@alga/shared'
 
 export type AvatarSize = 16 | 20 | 24 | 32 | 36 | 40 | 48 | 56 | 64 | 80 | 88 | 96 | 112 | 128
 
@@ -67,6 +68,8 @@ export interface AvatarUser {
   displayName: string
   avatarUrl: string | null
   accentColor?: string | null
+  /** The Eco they picked (PublicUser.eco); absent = the automatic one. */
+  eco?: EcoSpec
 }
 
 export function Avatar({
@@ -93,8 +96,8 @@ export function Avatar({
   const [brokenUrl, setBrokenUrl] = useState<string | null>(null)
   const broken = !!user.avatarUrl && brokenUrl === user.avatarUrl
   const photo = !!user.avatarUrl && !broken
-  // No photo: the person's own Eco (born from their id; their accent color, if they chose one, wins).
-  const eco = photo ? null : { ...ecoFor(user.id), ...(user.accentColor && /^#[0-9a-f]{6}$/i.test(user.accentColor) ? { accent: user.accentColor } : {}) }
+  // No photo: the Eco they picked (Configurações › Minha conta › Seu Eco), else the one born from their id.
+  const eco: EcoLook | null = photo ? null : (user.eco ?? ecoFor(user.id))
   const showDot = presence && DOT[size] > 0
   const label = decorative ? undefined : presence ? `${user.displayName}, ${PRESENCE_LABEL[presence]}` : user.displayName
   return (

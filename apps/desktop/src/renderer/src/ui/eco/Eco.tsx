@@ -1,5 +1,5 @@
 import { memo, type ReactNode } from 'react'
-import { BRAND_ECO, eyeColor, shade, type EcoAccessory, type EcoEyes, type EcoSpec, type EcoState } from './ecoRules'
+import { BRAND_ECO, eyeColor, shade, type EcoAccessory, type EcoEyes, type EcoHair, type EcoLook, type EcoState } from './ecoRules'
 import s from './eco.module.css'
 
 // Master drawing, viewBox 0 0 100 130 (docs/brand/mascote/ref: the Gemini "HOOD" master, redrawn as clean vector).
@@ -91,6 +91,21 @@ function Eyes({ state, eyes, color }: { state: EcoState; eyes: EcoEyes; color: s
       )
     case 'line':
       return <rect x="34" y="64" width="32" height="4.2" rx="2.1" fill={color} />
+    case 'wing':
+      // Slanted almond with a sharp eyeliner flick.
+      return (
+        <g fill={color} stroke={color} strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round">
+          <path d="M35 66.5 C38 63 42.5 62.5 46 64 C43 67.5 38.5 68.5 35 66.5 Z M35.5 66.3 L31 63" />
+          <path d="M65 66.5 C62 63 57.5 62.5 54 64 C57 67.5 61.5 68.5 65 66.5 Z M64.5 66.3 L69 63" />
+        </g>
+      )
+    case 'almond':
+      return (
+        <>
+          <path d="M35 66 C38 62.8 42 62.8 45 66 C42 68.6 38 68.6 35 66 Z M55 66 C58 62.8 62 62.8 65 66 C62 68.6 58 68.6 55 66 Z" fill={color} />
+          <path d="M34 63.2 C38 60.2 42 60.2 46 62.6 M54 62.6 C58 60.2 62 60.2 66 63.2" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        </>
+      )
     case 'bar':
       return (
         <g fill={color} className={s.blink}>
@@ -196,9 +211,84 @@ function Accessory({ kind, a }: { kind: EcoAccessory; a: string }): ReactNode {
           <path d="M57 62 L52 63" strokeWidth="1.2" />
         </g>
       )
+    case 'choker':
+      return (
+        <>
+          <path d="M38 93 C44 96 56 96 62 93" fill="none" stroke={a} strokeWidth="3" strokeLinecap="round" />
+          <circle cx="50" cy="98" r="2.2" fill={a} />
+        </>
+      )
+    case 'clip':
+      // A frond-shaped hair clip, in the logo's white.
+      return <path d="M60 50 C64 45 70 43 75 44 C72 48 67 51 60 50 Z" fill="#f7f8f8" />
+    case 'veil':
+      return <path d="M27 70 C40 74 60 74 73 70 L75 86 C62 94 38 94 25 86 Z" fill={a} fillOpacity="0.38" stroke={a} strokeWidth="1.6" />
     case 'none':
       return null
   }
+}
+
+/**
+ * Hair comes out of the hood in three layers: behind the hood (buns, ponytail), around the visor as a center-parted
+ * frame (every style), and in front (a braid over the shoulder, a side fringe over the visor).
+ */
+const FRAME = 'M23 82 C21 62 33 45 50 45 C67 45 79 62 77 82 L77 91 L70 91 C70.5 84 71 76 70.5 68 L29.5 68 C29 76 29.5 84 30 91 L23 91 Z'
+
+function HairBack({ hair, a, dark }: { hair: EcoHair; a: string; dark: string }): ReactNode {
+  if (hair === 'buns')
+    return (
+      <>
+        <circle cx="27" cy="38" r="9" fill={a} />
+        <circle cx="73" cy="38" r="9" fill={a} />
+        <path d="M22 37 C24 32 31 32 31 38 M78 37 C76 32 69 32 69 38" fill="none" stroke={dark} strokeWidth="1.6" strokeLinecap="round" />
+      </>
+    )
+  if (hair === 'ponytail')
+    return (
+      <>
+        <path d="M57 35 C64 21 82 17 89 28 C95 38 92 54 86 64 C87 51 85 41 79 36 C73 32 65 34 61 39 Z" fill={a} />
+        <path d="M80 28 C86 34 88 44 86 54" fill="none" stroke={dark} strokeWidth="1.6" strokeLinecap="round" />
+      </>
+    )
+  return null
+}
+
+function HairFrame({ hair, a, dark }: { hair: EcoHair; a: string; dark: string }): ReactNode {
+  if (hair === 'none') return null
+  return (
+    <>
+      <path d={FRAME} fill={a} />
+      <path d="M50 45.5 V53" stroke={dark} strokeWidth="1.6" strokeLinecap="round" />
+      {hair === 'long' && (
+        <path d="M17 84 C15 96 18 106 23 112 L31 111 C29 103 29 96 30 90 L23 90 Z M83 84 C85 96 82 106 77 112 L69 111 C71 103 71 96 70 90 L77 90 Z" fill={a} />
+      )}
+      {hair === 'wavy' && (
+        <path d="M17 84 C13 92 20 97 16 104 C14 110 20 114 25 113 L31 111 C27 106 32 101 29 96 C27 93 30 91 30 90 L23 90 Z M83 84 C87 92 80 97 84 104 C86 110 80 114 75 113 L69 111 C73 106 68 101 71 96 C73 93 70 91 70 90 L77 90 Z" fill={a} />
+      )}
+    </>
+  )
+}
+
+function HairFront({ hair, a, dark }: { hair: EcoHair; a: string; dark: string }): ReactNode {
+  if (hair === 'braid')
+    return (
+      <>
+        <g fill={a} stroke={dark} strokeWidth="1.2">
+          <ellipse cx="74" cy="94" rx="5" ry="5.5" />
+          <ellipse cx="76" cy="103" rx="4.6" ry="5.2" />
+          <ellipse cx="77.5" cy="111.5" rx="4.2" ry="4.8" />
+        </g>
+        <path d="M77.5 115 L73.5 123 L81.5 122 Z" fill={a} />
+      </>
+    )
+  if (hair === 'fringe')
+    return (
+      <>
+        <path d="M27 62 C29 50 42 45 57 48 C65 50 71 54 73 58 C63 54 53 55 45 59 C40 62 36 66 34 70 C31 66 29 64 27 62 Z" fill={a} />
+        <path d="M41 52 C48 50.5 56 51.5 63 54.5" fill="none" stroke={dark} strokeWidth="1.3" strokeLinecap="round" />
+      </>
+    )
+  return null
 }
 
 /**
@@ -212,7 +302,7 @@ export const Eco = memo(function Eco({
   size,
   className,
 }: {
-  spec?: EcoSpec
+  spec?: EcoLook
   state?: EcoState
   framing?: 'full' | 'avatar'
   /** Rendered height in px for "full" (width follows), the square side for "avatar". */
@@ -223,6 +313,8 @@ export const Eco = memo(function Eco({
   const eye = eyeColor(a)
   const [turnL, turnR] = ANTENNAE[state]
   const accessory = spec.accessory
+  const hair = spec.hair ?? 'none'
+  const dark = shade(a, 0.55)
   const full = framing === 'full'
   const lift = state === 'success' ? -4 : 0
   return (
@@ -235,15 +327,18 @@ export const Eco = memo(function Eco({
       focusable="false"
     >
       <g transform={lift ? `translate(0 ${lift})` : undefined}>
+        <HairBack hair={hair} a={a} dark={dark} />
         <path d={BODY} fill={GRAPHITE} stroke={a} strokeWidth="3.5" strokeLinejoin="round" />
         <path d={HOOD} fill={HOOD_FILL} />
         <path d={HOOD_EDGE} fill="none" stroke={a} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M24 90 C29 93 34 93.5 39.5 92.5" fill="none" stroke={a} strokeWidth="3.2" strokeLinecap="round" />
         <path d="M76 90 C71 93 66 93.5 60.5 92.5" fill="none" stroke={a} strokeWidth="3.2" strokeLinecap="round" />
+        <HairFrame hair={hair} a={a} dark={dark} />
         <rect x="28" y="55" width="44" height="22" rx="11" fill={VISOR} />
         {BEHIND.has(accessory) && <Accessory kind={accessory} a={a} />}
         <path d={ANT_L} fill={a} transform={turnL ? `rotate(${turnL} 46 41)` : undefined} />
         <path d={ANT_R} fill={a} transform={turnR ? `rotate(${turnR} 54 41)` : undefined} />
+        <HairFront hair={hair} a={a} dark={dark} />
         {!BEHIND.has(accessory) && accessory !== 'mask' && accessory !== 'shades' && <Accessory kind={accessory} a={a} />}
         {accessory === 'shades' ? (
           <>

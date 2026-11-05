@@ -1,5 +1,6 @@
 /** Wire models shared by server and desktop. Timestamps are ISO-8601 strings. */
 import type { EquippedCosmetics, PlanSummary, PlusBadge, SpaceUpgradeState, TryOn } from './billing.js'
+import type { EcoSpec } from './eco.js'
 import type { AgeBracket, StaffRole } from './trust-safety.js'
 import type { Activity, CustomStatus } from './activity.js'
 
@@ -16,6 +17,8 @@ export interface PublicUser {
   /** Profile accent color (hex, e.g. "#7c9cff") or null. */
   accentColor: string | null
   bio: string
+  /** The Eco this person picked (mascot avatar when there is no photo); omitted = the automatic one from their id. */
+  eco?: EcoSpec
   /**
    * Equipped cosmetics (catalog product ids, see GET /billing/catalog). Omitted when nothing is equipped; a
    * USER_UPDATE without it means everything was unequipped. Plan-included items are unequipped when the plan ends.

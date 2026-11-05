@@ -25,6 +25,7 @@ export const publicUser = (u: UserRow): PublicUser => {
     avatarUrl: u.avatarUrl,
     accentColor: u.accentColor,
     bio: u.bio,
+    ...(u.eco ? { eco: u.eco } : {}),
     ...(shown.length ? { cosmetics: Object.fromEntries(shown) } : {}),
     ...(badge ? { plusBadge: badge } : {}),
   }

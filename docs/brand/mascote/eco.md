@@ -40,13 +40,18 @@ Regras do desenho:
 
 Movimento reduzido: nada anima, mas o estado continua visível.
 
-## Avatares
+## Avatares e "Seu Eco"
 
-Quem não tem foto nem GIF ganha um Eco **derivado do próprio id** (`ecoFor` em `ecoRules.ts`): a mesma pessoa tem o mesmo Eco em qualquer aparelho. A combinação é 12 cores × 4 olhos × 13 acessórios.
-- **Acessórios:** nenhum, headset, boné, gorro, máscara, headset de gato, óculos, coroa, chifres, bandana, cachecol, brincos e visor rachado.
-- **Cor escolhida:** se a pessoa escolheu uma cor de destaque (`accentColor`), ela substitui a cor sorteada.
+- **Quem não tem foto nem GIF** aparece como um Eco.
+- **O Eco escolhido:** cada pessoa monta o seu em **Configurações › Minha conta › Seu Eco**.
+  - Opções: 16 cores × 6 olhos × 7 cabelos × 16 acessórios = **10.752 combinações**.
+  - Cada opção é mostrada no próprio Eco, ao lado de uma prévia grande e dos tamanhos de lista.
+  - Fica salvo na conta: `PATCH /users/@me { eco }`, coluna `users.eco`, migração 0015. Os amigos veem na hora (`USER_UPDATE`).
+  - O servidor só aceita partes do conjunto fechado (`EcoSpecSchema` em `@alga/shared`).
+- **O Eco automático** (quem não escolheu) nasce do id (`ecoFor`) e é **neutro de propósito**: sem cabelo, sem delineado e sem choker, presilha ou véu. Um sorteio não deve decidir a aparência de ninguém.
+- **Versões femininas** (a partir da leva do Gemini de 2026-11-05):
+  - **Cabelo** que sai do capuz em três camadas: atrás (coques, rabo de cavalo), moldura repartida em volta do visor, e na frente (trança por cima do ombro, franja).
+  - **Olhos** com delineado ou em amêndoa.
+  - **Acessórios:** choker, presilha de folha e véu.
 
-**Próximos passos:**
-- Camada **feminina**: cabelo saindo do capuz (trança, coque, rabo de cavalo, franja) e olhos com delineado, a partir da leva do Gemini pedida em 2026-11-05.
-- **Escolher o próprio Eco** no perfil. Exige guardar a escolha no servidor.
-- **O Eco no sistema:** sala vazia, conectando, erro de rede e boas-vindas, com os estados acima.
+**Próximos passos:** o Eco nas telas do sistema (sala vazia, conectando, erro de rede, boas-vindas), com os estados acima.

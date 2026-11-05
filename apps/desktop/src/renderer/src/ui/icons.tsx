@@ -132,6 +132,7 @@ export {
   ShieldCheck,
   ShieldSlash as ShieldOff,
   ShieldWarning as ShieldAlert,
+  Shuffle,
   SignOut as LogOut,
   SlidersHorizontal as Settings2,
   Smiley as Smile,
