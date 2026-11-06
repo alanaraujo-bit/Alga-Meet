@@ -671,9 +671,11 @@ describe('cinema', () => {
   })
 
   describe('switch', () => {
-    it('only the host, only an existing session, and the title is cleaned like in open', async () => {
+    it('only a seated host, only an existing session, and the title is cleaned like in open; a 24 h film has 8,640 heat slots', async () => {
       const x = await setup()
-      const st = await open(x)
+      x.ga.send({ op: 'cinema_open', channelId: x.voice.id, film: { ...film, durationS: 86_400 }, startS: 0 })
+      const st = await wait(x.ga, () => true)
+      expect(st.heat).toHaveLength(8_640)
       await seat(x.gb, st.sessionId, x.b.user.id)
       x.gb.send({ op: 'cinema_switch', sessionId: st.sessionId, film, startS: 0 })
       expect(await x.gb.waitFor('CINEMA_ERROR')).toMatchObject({ op: 'cinema_switch', reason: 'forbidden' })
@@ -683,6 +685,12 @@ describe('cinema', () => {
       expect(await x.ga.waitFor('CINEMA_ERROR', (d) => d.reason === 'invalid')).toMatchObject({ op: 'cinema_switch' })
       x.ga.send({ op: 'cinema_switch', sessionId: st.sessionId, film: { ...film, title: ' <b>Ep 2</b>\u0007' }, startS: 0 })
       expect((await wait(x.gb, (d) => d.film.title === '<b>Ep 2</b>')).film.title).toBe('<b>Ep 2</b>')
+      // A host who left their seat cannot switch (it would overwrite host_away).
+      x.ga.send({ op: 'cinema_seat', sessionId: st.sessionId, seated: false })
+      await wait(x.gb, (d) => !d.seats.some((e) => e.userId === x.a.user.id))
+      x.ga.send({ op: 'cinema_switch', sessionId: st.sessionId, film: { ...film, title: 'Ep 3' }, startS: 0 })
+      expect(await x.ga.waitFor('CINEMA_ERROR', (d) => d.reason === 'not_seated')).toMatchObject({ op: 'cinema_switch' })
+      expect(last(x.gb).film.title).toBe('<b>Ep 2</b>')
     })
 
     it('keeps the seats, wipes pieces and heat, and rebuffers at startS (clamped) with everyone preparing', async () => {

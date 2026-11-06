@@ -12,6 +12,8 @@ import { z } from 'zod'
  */
 
 export const CINEMA_MAX_SEATS = 8
+/** Longest film a host can announce (24 h): bounds what the server allocates per film (heat is one slot per 10 s). */
+export const CINEMA_MAX_DURATION_S = 86_400
 /** Scheduled commands (play/pause/seek) take effect this long after the server stamps them, so every client can arm. */
 export const CINEMA_LEAD_MS = 250
 export const CINEMA_HOST_AWAY_MS = 120_000
@@ -107,7 +109,7 @@ const SubtitleTrackSchema = z.object({
 })
 const FilmSchema = z.object({
   title: z.string().min(1).max(120),
-  durationS: seconds, width: z.number().int().min(1).max(16384), height: z.number().int().min(1).max(16384),
+  durationS: seconds.max(CINEMA_MAX_DURATION_S), width: z.number().int().min(1).max(16384), height: z.number().int().min(1).max(16384),
   hdr: z.enum(['sdr', 'hdr10', 'hlg', 'dv8']),
   videoCodec: z.enum(['h264', 'hevc', 'av1', 'vp9']), videoMime: text(200), bitrateKbps: z.number().finite().min(0),
   audio: z.array(AudioTrackSchema).max(32), subtitles: z.array(SubtitleTrackSchema).max(64),

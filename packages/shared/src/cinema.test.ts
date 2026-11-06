@@ -60,6 +60,13 @@ describe('CinemaClientFrameSchema', () => {
     expect(parse(bad(ok.cinema_control, { position: Infinity }))).toBe(false)
     expect(parse(bad(ok.cinema_time, { c: Infinity }))).toBe(false)
   })
+  it('bounds the film duration at 24 h in open and switch', () => {
+    for (const op of ['cinema_open', 'cinema_switch'] as const) {
+      expect(parse(bad(ok[op], { film: { ...film, durationS: 86_400 } }))).toBe(true)
+      expect(parse(bad(ok[op], { film: { ...film, durationS: 86_400.001 } }))).toBe(false)
+      expect(parse(bad(ok[op], { film: { ...film, durationS: 1e15 } }))).toBe(false)
+    }
+  })
   it('limits pieces', () => {
     expect(parse(bad(ok.cinema_pieces, { items: Array(120).fill(piece) }))).toBe(true)
     expect(parse(bad(ok.cinema_pieces, { items: Array(121).fill(piece) }))).toBe(false)

@@ -7,7 +7,7 @@
  */
 import { createHmac } from 'node:crypto'
 import {
-  CINEMA_COUNTDOWN_AFTER_PAUSE_MS, CINEMA_COUNTDOWN_MS, CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME, CINEMA_LEAD_MS, CINEMA_MAX_SEATS,
+  CINEMA_COUNTDOWN_AFTER_PAUSE_MS, CINEMA_COUNTDOWN_MS, CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME, CINEMA_LEAD_MS, CINEMA_MAX_DURATION_S, CINEMA_MAX_SEATS,
   CINEMA_READY_TIMEOUT_MS, CINEMA_REACTION_RATE, CINEMA_STATUS_INTERVAL_MS, CINEMA_TURN_TTL_S, Permission, hasPermission, positionAt, uuidv7,
   type CinemaClientFrame, type CinemaEndReason, type CinemaErrorReason, type CinemaFilm, type CinemaIceServer, type CinemaPieceMeta,
   type CinemaPlayback, type CinemaSeat, type CinemaSessionView, type CinemaTrackId, type DispatchOf, type DispatchType,
@@ -352,6 +352,9 @@ export class Cinema {
     const s = this.byId(conn, f)
     if (!s) return
     if (conn.userId !== s.hostId) return this.error(conn, f.op, 'forbidden', s.id)
+    // An absent host cannot switch: buffer() would overwrite host_away.
+    if (!s.seats.has(conn.userId)) return this.error(conn, f.op, 'not_seated', s.id)
+    if (s.hostAway) return this.error(conn, f.op, 'invalid', s.id)
     const film = cleanFilm(f.film)
     if (!film) return this.error(conn, f.op, 'invalid', s.id)
     // Bank the old episode's played time against the old duration, then stop the clock so buffer() does not bank it twice.
@@ -361,6 +364,7 @@ export class Cinema {
     s.pieces.clear()
     s.reactions = 0
     s.peaks.clear()
+    s.noWait.clear()
     this.buffer(s, conn.userId, Math.min(f.startS, film.durationS))
   }
 
@@ -613,7 +617,8 @@ export class Cinema {
 
   /** Reactions per PEAK_BUCKET_S slot; a reaction exactly at the end of the film counts in the last slot. */
   private heat(s: Session): number[] {
-    const heat = Array<number>(Math.ceil(s.film.durationS / PEAK_BUCKET_S)).fill(0)
+    // Capped even though the schema bounds durationS: one view is built per recipient per broadcast.
+    const heat = Array<number>(Math.min(Math.ceil(s.film.durationS / PEAK_BUCKET_S), CINEMA_MAX_DURATION_S / PEAK_BUCKET_S)).fill(0)
     for (const [bucket, n] of s.peaks) if (heat.length) heat[Math.min(bucket, heat.length - 1)]! += n
     return heat
   }
