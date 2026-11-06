@@ -7,9 +7,10 @@ const SID = '0190a0a0-0000-7000-8000-000000005e55'
 
 // ---- fakes: gateway, media/data stores, engine pieces and the main bridge -----------------------------------------------
 const sent: Record<string, unknown>[] = []
+const sessionFlags = { cinema: false }
 vi.mock('@/store/session', () => ({
   onDispatch: () => () => undefined,
-  useSession: { getState: () => ({ send: (f: Record<string, unknown>) => (sent.push(f), true) }) },
+  useSession: { getState: () => ({ cinema: sessionFlags.cinema, send: (f: Record<string, unknown>) => (sent.push(f), true) }) },
 }))
 vi.mock('@/store/data', async () => {
   const { create } = await import('zustand')
@@ -100,7 +101,7 @@ const bridge = {
 }
 vi.stubGlobal('window', { alga: { cinema: bridge, e2ee: { cinemaTag: async () => null } } })
 
-const { handleCinemaDispatch, onMediaChange, useCinema, resetCinema, attachVideo, detachVideo, readyAheadS, extraPiece } = await import('./store')
+const { handleCinemaDispatch, onMediaChange, useCinema, resetCinema, attachVideo, detachVideo, readyAheadS, extraPiece, startCinema } = await import('./store')
 const { useMedia } = await import('@/media/store')
 const { openFromFile, openSession } = await import('./actions')
 const { t } = await import('./strings')
@@ -136,6 +137,15 @@ describe('gateway', () => {
     dispatch({ t: 'READY', d: { cinema: true } })
     expect(sent).toContainEqual({ op: 'cinema_hello' })
     expect(useCinema.getState().enabled).toBe(true)
+  })
+
+  it('starting after READY already arrived (the shell mounts later) still shows the button and says hello', () => {
+    sessionFlags.cinema = true
+    const stop = startCinema()
+    expect(useCinema.getState().enabled).toBe(true)
+    expect(sent).toContainEqual({ op: 'cinema_hello' })
+    stop()
+    sessionFlags.cinema = false
   })
 
   it('READY without cinema:true (an older server) sends no cinema op and keeps the button off', () => {

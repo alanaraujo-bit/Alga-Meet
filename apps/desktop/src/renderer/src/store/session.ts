@@ -16,6 +16,8 @@ interface SessionState {
   retryInMs: number | null
   /** READY received at least once for this sign-in (data is usable). */
   hydrated: boolean
+  /** The last READY said this server runs the cinema (features started after READY read it here). */
+  cinema: boolean
   /** Login (or the birth-date declaration) answered 403 with a restriction: the restricted-account screen shows it. */
   restricted: AccountRestriction | null
   notice: AuthNotice | null
@@ -54,7 +56,7 @@ export const useSession = create<SessionState>()((set, get) => {
     gw = new Gateway(window.alga.config.gatewayUrl, token, {
       onDispatch: (d) => {
         useData.getState().apply(d)
-        if (d.t === 'READY') set({ hydrated: true })
+        if (d.t === 'READY') set({ hydrated: true, cinema: d.d.cinema === true })
         listeners.forEach((l) => l(d))
       },
       onStatus: (s, info) => set({ gateway: s, retryInMs: info?.retryInMs ?? null }),
@@ -76,7 +78,7 @@ export const useSession = create<SessionState>()((set, get) => {
     setApiToken(null)
     await tokenStore.set(null)
     useData.getState().reset()
-    set({ phase: 'signed_out', hydrated: false, gateway: 'idle', deletionCanceled: false, ...extra })
+    set({ phase: 'signed_out', hydrated: false, cinema: false, gateway: 'idle', deletionCanceled: false, ...extra })
   }
 
   const authCall = async (path: string, body: LoginBody | RegisterBody) => {
@@ -93,6 +95,7 @@ export const useSession = create<SessionState>()((set, get) => {
     gateway: 'idle',
     retryInMs: null,
     hydrated: false,
+    cinema: false,
     restricted: null,
     notice: null,
     deletionCanceled: false,

@@ -980,6 +980,8 @@ export function onMediaChange(c: Conn, p: Conn): void {
 /** Wired once per signed-in shell (voice.ts startVoiceSync). Returns the cleanup. */
 export function startCinema(): () => void {
   void clearStaleOpfs() // swarm caches a crash left behind (no session can be open yet)
+  // READY usually arrives before the shell starts us: replay what it said about the cinema
+  if (useSession.getState().cinema) handleCinemaDispatch({ t: 'READY', d: { cinema: true } } as Dispatch)
   const offs = [
     onDispatch(handleCinemaDispatch),
     useMedia.subscribe((s, prev) => {
