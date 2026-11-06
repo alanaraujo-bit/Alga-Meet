@@ -66,6 +66,12 @@
 }
 
 /* The screen light: the frame, 16×9, blurred into the dark (≤ 12 %). */
+.screenLightBox {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
 .screenLight {
   position: absolute;
   inset: -80px;
@@ -118,6 +124,13 @@
   opacity: 0;
 }
 
+/* Toasts ("Ana pulou para …") clear the room's timeline while the room is shown (the call's dock sets the variable inline). */
+:global(html:has([data-cinema-room='shown'])) {
+  --toast-bottom: 196px !important;
+}
+[data-screen='intermission'] .subs {
+  display: none;
+}
 /* Subtitles sit in the band under the frame (mockup 06: y 736–770). */
 .subs {
   position: absolute;

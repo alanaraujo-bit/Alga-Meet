@@ -51,7 +51,7 @@ export function Foyer({ channel }: { channel: Channel }) {
           <span className={f.chip}>{length(film.durationS)}</span>
           <span className={f.chip}>
             <Icon icon={ProjectorScreen} size={12} />
-            <span dir="auto">{t.foyer.projecting(hostName)}</span>
+            <span dir="auto">{t.foyer.projecting(firstName(hostName))}</span>
           </span>
         </div>
         <TrackPicker film={film} />

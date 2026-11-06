@@ -9,6 +9,7 @@ import * as act from '../actions'
 import { t } from '../strings'
 import { FilmTitle } from './CallCard'
 import { videoLabel } from './film'
+import { firstName } from './seats'
 import { SyncChip } from './SyncChip'
 import s from './room.module.css'
 
@@ -28,7 +29,7 @@ export function TopBar({ session, channel, right }: { session: CinemaSessionView
       </span>
       <span className={s.by}>
         <Icon icon={ProjectorScreen} size={14} />
-        <span dir="auto">{t.foyer.projecting(hostName)}</span>
+        <span dir="auto">{t.foyer.projecting(firstName(hostName))}</span>
       </span>
       <span className={s.topEnd}>{right ?? <SyncChip session={session} />}</span>
     </div>

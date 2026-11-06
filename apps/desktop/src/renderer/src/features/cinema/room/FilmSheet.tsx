@@ -117,7 +117,8 @@ export function FilmSheet({ channel }: { channel: Channel }) {
                 </div>
               )}
               {!draft.decodes && <Warning title={t.filmSheet.noDecodeTitle} body={t.filmSheet.noDecodeBody} />}
-              {draft.warnings.map((w) => <Warning key={w} title={t.warnings[w] ?? w} />)}
+              {/* audio_converted is the line under the chips already */}
+              {draft.warnings.filter((w) => w !== 'audio_converted').map((w) => <Warning key={w} title={t.warnings[w] ?? w} />)}
             </Section>
           </div>
         </div>

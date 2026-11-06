@@ -6,6 +6,7 @@ import { Play } from '@/ui/icons'
 import * as act from '../actions'
 import { clock, t } from '../strings'
 import { useSeatPerson } from './Seat'
+import { firstName } from './seats'
 import { INTERMISSION_MS } from './view'
 import s from './room.module.css'
 
@@ -17,7 +18,7 @@ export function Paused({ session, channel, who, pausedSince, now }: { session: C
   return (
     <>
       {who && <Avatar user={person.user} size={56} decorative />}
-      <h2 className={s.bigTitle} dir="auto">{away ? t.paused.hostAway(person.name) : who ? t.paused.title(person.name) : t.paused.plain}</h2>
+      <h2 className={s.bigTitle} dir="auto">{away ? t.paused.hostAway(firstName(person.name)) : who ? t.paused.title(firstName(person.name)) : t.paused.plain}</h2>
       <p className={s.bigSub}>{away ? t.paused.hostAwaySub : t.paused.at(clock(p.position))}</p>
       {!away && (
         <div className={s.actions}>

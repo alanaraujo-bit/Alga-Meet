@@ -12,6 +12,7 @@ import { useCinema } from '../store'
 import { length, t } from '../strings'
 import { cardMeta } from './film'
 import { useExtraUrl } from './poster'
+import { firstName } from './seats'
 import { splitTitle } from './view'
 import c from './call.module.css'
 
@@ -34,7 +35,7 @@ export function CallCard({ channel }: { channel: Channel }) {
   const session = useCinema((s) => s.session)
   const poster = useExtraUrl('poster')
   const host = useData((st) => (session ? st.users[session.hostId] : undefined))
-  const seatedNames = useData(useShallow((st) => (session ? session.seats.map((x) => displayName(st, x.userId, channel.spaceId)) : [])))
+  const seatedNames = useData(useShallow((st) => (session ? session.seats.map((x) => firstName(displayName(st, x.userId, channel.spaceId))) : [])))
   const hostName = useData((st) => (session ? displayName(st, session.hostId, channel.spaceId) : ''))
   if (!session) return null
   const f = session.film
@@ -64,7 +65,7 @@ export function CallCard({ channel }: { channel: Channel }) {
       <div className={c.cardRow}>
         <Avatar user={host ?? { id: session.hostId, displayName: hostName, avatarUrl: null }} size={32} decorative />
         <div className={c.cardRowText}>
-          <span className={c.cardRowTitle} dir="auto">{t.callCard.opened(hostName)}</span>
+          <span className={c.cardRowTitle} dir="auto">{t.callCard.opened(firstName(hostName))}</span>
           <span className={c.cardRowSub} dir="auto">{seatedNames.length ? t.callCard.seated(seatedNames, free) : t.callCard.empty(free)}</span>
         </div>
         <Button variant="primary" size="lg" icon={Armchair} onClick={() => act.seat(true)} disabled={free === 0}>

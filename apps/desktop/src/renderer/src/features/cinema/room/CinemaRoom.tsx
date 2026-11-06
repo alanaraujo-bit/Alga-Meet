@@ -154,6 +154,7 @@ function Room({ channel, onEngineering }: { channel: Channel; onEngineering: () 
       data-lights={view.lights}
       data-screen={view.screen}
       data-ui={uiShown ? 'on' : 'off'}
+      data-cinema-room={shown ? 'shown' : 'hidden'}
       aria-label={t.room.label(session.film.title)}
       aria-hidden={!shown || undefined}
       role="region"
@@ -223,7 +224,12 @@ function ScreenLight({ video }: { video: RefObject<HTMLVideoElement | null> }) {
     }, 250)
     return () => clearInterval(id)
   }, [video])
-  return <canvas ref={ref} width={16} height={9} className={s.screenLight} aria-hidden />
+  // its own clipping box: a canvas bleeding past the room would make the room scrollable (focus/scrollIntoView)
+  return (
+    <div className={s.screenLightBox} aria-hidden>
+      <canvas ref={ref} width={16} height={9} className={s.screenLight} />
+    </div>
+  )
 }
 
 /** Spec §7.4 shortcuts, in the capture phase (the DM chat's "type anywhere" skips defaultPrevented keys). */

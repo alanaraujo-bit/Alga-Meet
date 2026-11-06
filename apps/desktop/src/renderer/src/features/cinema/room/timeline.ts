@@ -7,7 +7,7 @@
 export function heatProfile(heat: number[], points: number): number[] {
   const n = heat.length
   if (!n || points < 2) return Array.from({ length: Math.max(0, points) }, () => 0)
-  const sigma = Math.max(1.5, (n / points) * 2)
+  const sigma = Math.max(2.5, (n / points) * 3)
   const reach = Math.ceil(sigma * 3)
   const out: number[] = []
   for (let i = 0; i < points; i++) {
