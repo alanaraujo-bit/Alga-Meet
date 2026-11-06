@@ -1,0 +1,1355 @@
+{
+  "at": "2026-11-06T01:35:05.821Z",
+  "tag": "t16-3x-lan-e2ee-late",
+  "instances": 3,
+  "e2ee": true,
+  "playS": 170,
+  "netem": null,
+  "hostCapKbps": null,
+  "route": "webaudio",
+  "film": {
+    "path": "<QA_WORK>/Noite.no.Cinema.Lab.84d4639f62b8.mkv",
+    "MiB": 611.6
+  },
+  "results": [
+    {
+      "name": "3 instâncias entram na call",
+      "pass": true,
+      "ms": 3199,
+      "detail": "chamada E2EE (MLS) em todas"
+    },
+    {
+      "name": "Abrir sessão → primeiro frame em todas as poltronas sentadas",
+      "pass": true,
+      "ms": 4059,
+      "detail": {
+        "firstFrameMs": {
+          "ana": 1472,
+          "bruno": 3034
+        },
+        "allReadyMs": 3684
+      }
+    },
+    {
+      "name": "Começar: as poltronas tocam; play agendado em ±1 frame de `at`",
+      "pass": true,
+      "ms": 3492,
+      "detail": null
+    },
+    {
+      "name": "Tocando 170 s (carla entra no meio, 5×)",
+      "pass": true,
+      "ms": 166606,
+      "detail": {
+        "trials": 5
+      }
+    },
+    {
+      "name": "Pausa 1: todos no mesmo frame em ≤ 300 ms",
+      "pass": true,
+      "ms": 8105,
+      "detail": {
+        "position": 167.987,
+        "atAfterClickMs": 281,
+        "per": {
+          "ana": {
+            "settledAfterAtMs": 259,
+            "settledAfterClickMs": 540,
+            "shownMediaS": 167.958,
+            "shownVsPositionFrames": -0.7,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          },
+          "bruno": {
+            "settledAfterAtMs": 123,
+            "settledAfterClickMs": 404,
+            "shownMediaS": 167.958,
+            "shownVsPositionFrames": -0.7,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          },
+          "carla": {
+            "settledAfterAtMs": 209,
+            "settledAfterClickMs": 490,
+            "shownMediaS": 167.958,
+            "shownVsPositionFrames": -0.7,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          }
+        },
+        "maxSettledAfterAtMs": 259,
+        "maxSettledAfterClickMs": 540,
+        "sameFrame": true
+      }
+    },
+    {
+      "name": "Pausa 2: todos no mesmo frame em ≤ 300 ms",
+      "pass": true,
+      "ms": 8106,
+      "detail": {
+        "position": 174.273,
+        "atAfterClickMs": 286,
+        "per": {
+          "ana": {
+            "settledAfterAtMs": 13,
+            "settledAfterClickMs": 299,
+            "shownMediaS": 174.25,
+            "shownVsPositionFrames": -0.6,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          },
+          "bruno": {
+            "settledAfterAtMs": 29,
+            "settledAfterClickMs": 315,
+            "shownMediaS": 174.25,
+            "shownVsPositionFrames": -0.6,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          },
+          "carla": {
+            "settledAfterAtMs": 25,
+            "settledAfterClickMs": 311,
+            "shownMediaS": 174.25,
+            "shownVsPositionFrames": -0.6,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          }
+        },
+        "maxSettledAfterAtMs": 29,
+        "maxSettledAfterClickMs": 315,
+        "sameFrame": true
+      }
+    },
+    {
+      "name": "Pausa 3: todos no mesmo frame em ≤ 300 ms",
+      "pass": true,
+      "ms": 8161,
+      "detail": {
+        "position": 180.579,
+        "atAfterClickMs": 286,
+        "per": {
+          "ana": {
+            "settledAfterAtMs": 36,
+            "settledAfterClickMs": 322,
+            "shownMediaS": 180.542,
+            "shownVsPositionFrames": -0.9,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          },
+          "bruno": {
+            "settledAfterAtMs": 31,
+            "settledAfterClickMs": 317,
+            "shownMediaS": 180.542,
+            "shownVsPositionFrames": -0.9,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          },
+          "carla": {
+            "settledAfterAtMs": 21,
+            "settledAfterClickMs": 307,
+            "shownMediaS": 180.542,
+            "shownVsPositionFrames": -0.9,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          }
+        },
+        "maxSettledAfterAtMs": 36,
+        "maxSettledAfterClickMs": 322,
+        "sameFrame": true
+      }
+    },
+    {
+      "name": "setAudio: Bruno troca a faixa e o frame de vídeo não muda",
+      "pass": true,
+      "ms": 4316,
+      "detail": {
+        "switchMs": 241,
+        "seeksDuringSwitch": 0,
+        "maxFrameJumpMs": 3.6,
+        "vsHost": {
+          "bins": 13,
+          "p50AbsMs": 11.2,
+          "p95AbsMs": 11.4,
+          "maxAbsMs": 11.4,
+          "over125LongestMs": 0
+        }
+      }
+    },
+    {
+      "name": "Painel de estatísticas: peças de amigos (screenshot)",
+      "pass": true,
+      "ms": 125,
+      "detail": {
+        "ana": "de quem projeta 0% · de amigos 0% · ↓ 0 ↑ 3,8 Mbps · 2 pares (6 conexões)",
+        "bruno": "de quem projeta 55% · de amigos 45% · ↓ 10,3 ↑ 2,5 Mbps · 2 pares (6 conexões)",
+        "carla": "de quem projeta 48% · de amigos 52% · ↓ 11,3 ↑ 8,7 Mbps · 2 pares (6 conexões)"
+      }
+    },
+    {
+      "name": "ASS: Bruno liga a legenda ASS e ela aparece (JASSUB)",
+      "pass": true,
+      "ms": 2241,
+      "detail": {
+        "canvas": {
+          "w": 668,
+          "h": 376
+        }
+      }
+    },
+    {
+      "name": "Encerrar",
+      "pass": true,
+      "ms": 576,
+      "detail": null
+    }
+  ],
+  "M": {
+    "firstFrameMs": {
+      "ana": 1472,
+      "bruno": 3034
+    },
+    "firstFrameAllMs": 3034,
+    "allReadyMs": 3684,
+    "lateTrials": [
+      {
+        "sitAt": 1793928734168,
+        "firstFrameMs": 1066,
+        "syncedMs": 1332,
+        "seeks": [
+          [
+            956,
+            28.1
+          ],
+          [
+            1365,
+            29.3
+          ]
+        ],
+        "trajectory": [
+          [
+            832,
+            -833.5
+          ],
+          [
+            1332,
+            -22.7
+          ],
+          [
+            1832,
+            -38.4
+          ],
+          [
+            2332,
+            -13.6
+          ],
+          [
+            2832,
+            -19.3
+          ],
+          [
+            3332,
+            -14
+          ],
+          [
+            3832,
+            -13.8
+          ],
+          [
+            4332,
+            22.6
+          ],
+          [
+            4832,
+            20.2
+          ],
+          [
+            5332,
+            -8.1
+          ],
+          [
+            5832,
+            -5.8
+          ],
+          [
+            6332,
+            -8
+          ],
+          [
+            6832,
+            -9
+          ],
+          [
+            7332,
+            -8.4
+          ],
+          [
+            7832,
+            -16.8
+          ],
+          [
+            8332,
+            -24.5
+          ],
+          [
+            8832,
+            -8.2
+          ],
+          [
+            9332,
+            -2.2
+          ],
+          [
+            9832,
+            -4.6
+          ],
+          [
+            10332,
+            -24.3
+          ],
+          [
+            10832,
+            -13.8
+          ],
+          [
+            11332,
+            -5.1
+          ],
+          [
+            11832,
+            3.1
+          ],
+          [
+            12332,
+            7.8
+          ],
+          [
+            12832,
+            -5.6
+          ],
+          [
+            13332,
+            -11.2
+          ],
+          [
+            13832,
+            22.3
+          ],
+          [
+            14332,
+            19.6
+          ],
+          [
+            14832,
+            14.5
+          ]
+        ],
+        "after": {
+          "bins": 55,
+          "p50AbsMs": 13.8,
+          "p95AbsMs": 25.3,
+          "maxAbsMs": 38.4,
+          "over125LongestMs": 0
+        }
+      },
+      {
+        "sitAt": 1793928754643,
+        "firstFrameMs": 1016,
+        "syncedMs": 2607,
+        "seeks": [
+          [
+            874,
+            48.5
+          ],
+          [
+            1366,
+            49.7
+          ]
+        ],
+        "trajectory": [
+          [
+            857,
+            -827.3
+          ],
+          [
+            1357,
+            -39.2
+          ],
+          [
+            1857,
+            -58.9
+          ],
+          [
+            2357,
+            -47.1
+          ],
+          [
+            2857,
+            -22.1
+          ],
+          [
+            3357,
+            -22.3
+          ],
+          [
+            3857,
+            -10.7
+          ],
+          [
+            4357,
+            -3.7
+          ],
+          [
+            4857,
+            -11
+          ],
+          [
+            5357,
+            -6
+          ],
+          [
+            5857,
+            -5.6
+          ],
+          [
+            6357,
+            -13.2
+          ],
+          [
+            6857,
+            -19.3
+          ],
+          [
+            7357,
+            -8
+          ],
+          [
+            9857,
+            29.8
+          ],
+          [
+            10357,
+            22.7
+          ],
+          [
+            10857,
+            19.4
+          ],
+          [
+            11357,
+            49.7
+          ],
+          [
+            11857,
+            38.5
+          ],
+          [
+            12357,
+            30.1
+          ],
+          [
+            12857,
+            24.4
+          ],
+          [
+            13357,
+            16.1
+          ],
+          [
+            13857,
+            19.1
+          ],
+          [
+            14357,
+            15.7
+          ],
+          [
+            14857,
+            8.1
+          ]
+        ],
+        "after": {
+          "bins": 42,
+          "p50AbsMs": 18.7,
+          "p95AbsMs": 38.5,
+          "maxAbsMs": 49.7,
+          "over125LongestMs": 0
+        }
+      },
+      {
+        "sitAt": 1793928774893,
+        "firstFrameMs": 909,
+        "syncedMs": 2107,
+        "seeks": [
+          [
+            857,
+            68.8
+          ],
+          [
+            1272,
+            69.9
+          ]
+        ],
+        "trajectory": [
+          [
+            857,
+            -751
+          ],
+          [
+            1357,
+            -44.5
+          ],
+          [
+            1857,
+            -47.6
+          ],
+          [
+            2357,
+            -19.4
+          ],
+          [
+            2857,
+            -25.5
+          ],
+          [
+            3357,
+            -22.3
+          ],
+          [
+            3857,
+            -16.8
+          ],
+          [
+            4357,
+            -14.2
+          ],
+          [
+            4857,
+            -8.7
+          ],
+          [
+            5357,
+            -10.5
+          ],
+          [
+            5857,
+            -0.1
+          ],
+          [
+            6357,
+            3.1
+          ],
+          [
+            6857,
+            -2.8
+          ],
+          [
+            7357,
+            -5.6
+          ],
+          [
+            7857,
+            -3.4
+          ],
+          [
+            8357,
+            24.9
+          ],
+          [
+            8857,
+            21.4
+          ],
+          [
+            9357,
+            22.1
+          ],
+          [
+            9857,
+            11
+          ],
+          [
+            10357,
+            5.1
+          ],
+          [
+            10857,
+            -2.9
+          ],
+          [
+            11357,
+            -27.3
+          ],
+          [
+            11857,
+            -14.2
+          ],
+          [
+            12357,
+            -5.7
+          ],
+          [
+            12857,
+            13.4
+          ],
+          [
+            13357,
+            9.1
+          ],
+          [
+            13857,
+            3.4
+          ],
+          [
+            14357,
+            -16.2
+          ],
+          [
+            14857,
+            -11.7
+          ]
+        ],
+        "after": {
+          "bins": 52,
+          "p50AbsMs": 11.2,
+          "p95AbsMs": 25.5,
+          "maxAbsMs": 27.9,
+          "over125LongestMs": 0
+        }
+      },
+      {
+        "sitAt": 1793928795072,
+        "firstFrameMs": 987,
+        "syncedMs": 1428,
+        "seeks": [
+          [
+            871,
+            88.9
+          ],
+          [
+            1331,
+            90.1
+          ]
+        ],
+        "trajectory": [
+          [
+            928,
+            -819.9
+          ],
+          [
+            1428,
+            13.6
+          ],
+          [
+            1928,
+            24.9
+          ],
+          [
+            2428,
+            32.9
+          ],
+          [
+            2928,
+            19.2
+          ],
+          [
+            3428,
+            13.3
+          ],
+          [
+            3928,
+            21.4
+          ],
+          [
+            4428,
+            36.1
+          ],
+          [
+            4928,
+            26.9
+          ],
+          [
+            5428,
+            18.8
+          ],
+          [
+            5928,
+            11.1
+          ],
+          [
+            6428,
+            29.9
+          ],
+          [
+            6928,
+            24.5
+          ],
+          [
+            7428,
+            27.3
+          ],
+          [
+            7928,
+            18.8
+          ],
+          [
+            8428,
+            10.7
+          ],
+          [
+            8928,
+            18.8
+          ],
+          [
+            9428,
+            35.5
+          ],
+          [
+            9928,
+            24.8
+          ],
+          [
+            10428,
+            24.5
+          ],
+          [
+            10928,
+            18.8
+          ],
+          [
+            11428,
+            10.8
+          ],
+          [
+            11928,
+            5.2
+          ],
+          [
+            12428,
+            2.8
+          ],
+          [
+            12928,
+            15.8
+          ],
+          [
+            13428,
+            24.5
+          ],
+          [
+            13928,
+            10.7
+          ],
+          [
+            14428,
+            2.7
+          ]
+        ],
+        "after": {
+          "bins": 54,
+          "p50AbsMs": 19.2,
+          "p95AbsMs": 36.1,
+          "maxAbsMs": 41.2,
+          "over125LongestMs": 0
+        }
+      },
+      {
+        "sitAt": 1793928815503,
+        "firstFrameMs": 2900,
+        "syncedMs": 3247,
+        "seeks": [
+          [
+            2062,
+            109.4
+          ],
+          [
+            3159,
+            112.4
+          ]
+        ],
+        "trajectory": [
+          [
+            2747,
+            -2625.5
+          ],
+          [
+            3247,
+            7.8
+          ],
+          [
+            3747,
+            -8.6
+          ],
+          [
+            4247,
+            -9.2
+          ],
+          [
+            4747,
+            -11.6
+          ],
+          [
+            5247,
+            5.2
+          ],
+          [
+            5747,
+            28
+          ],
+          [
+            6247,
+            19.4
+          ],
+          [
+            6747,
+            16.6
+          ],
+          [
+            7247,
+            10.4
+          ],
+          [
+            7747,
+            35.7
+          ],
+          [
+            8247,
+            27.6
+          ],
+          [
+            8747,
+            19.2
+          ],
+          [
+            9247,
+            13.1
+          ],
+          [
+            9747,
+            5.1
+          ],
+          [
+            10247,
+            11.1
+          ],
+          [
+            10747,
+            2.4
+          ],
+          [
+            11247,
+            7.6
+          ],
+          [
+            11747,
+            8.2
+          ],
+          [
+            12247,
+            5
+          ],
+          [
+            12747,
+            -24.5
+          ],
+          [
+            13247,
+            -16.7
+          ],
+          [
+            13747,
+            11.3
+          ],
+          [
+            14247,
+            8.6
+          ],
+          [
+            14747,
+            8.6
+          ]
+        ],
+        "after": {
+          "bins": 47,
+          "p50AbsMs": 11.1,
+          "p95AbsMs": 30.6,
+          "maxAbsMs": 35.7,
+          "over125LongestMs": 0
+        }
+      }
+    ],
+    "pauses": [
+      {
+        "position": 167.987,
+        "atAfterClickMs": 281,
+        "per": {
+          "ana": {
+            "settledAfterAtMs": 259,
+            "settledAfterClickMs": 540,
+            "shownMediaS": 167.958,
+            "shownVsPositionFrames": -0.7,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          },
+          "bruno": {
+            "settledAfterAtMs": 123,
+            "settledAfterClickMs": 404,
+            "shownMediaS": 167.958,
+            "shownVsPositionFrames": -0.7,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          },
+          "carla": {
+            "settledAfterAtMs": 209,
+            "settledAfterClickMs": 490,
+            "shownMediaS": 167.958,
+            "shownVsPositionFrames": -0.7,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          }
+        },
+        "maxSettledAfterAtMs": 259,
+        "maxSettledAfterClickMs": 540,
+        "sameFrame": true
+      },
+      {
+        "position": 174.273,
+        "atAfterClickMs": 286,
+        "per": {
+          "ana": {
+            "settledAfterAtMs": 13,
+            "settledAfterClickMs": 299,
+            "shownMediaS": 174.25,
+            "shownVsPositionFrames": -0.6,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          },
+          "bruno": {
+            "settledAfterAtMs": 29,
+            "settledAfterClickMs": 315,
+            "shownMediaS": 174.25,
+            "shownVsPositionFrames": -0.6,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          },
+          "carla": {
+            "settledAfterAtMs": 25,
+            "settledAfterClickMs": 311,
+            "shownMediaS": 174.25,
+            "shownVsPositionFrames": -0.6,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          }
+        },
+        "maxSettledAfterAtMs": 29,
+        "maxSettledAfterClickMs": 315,
+        "sameFrame": true
+      },
+      {
+        "position": 180.579,
+        "atAfterClickMs": 286,
+        "per": {
+          "ana": {
+            "settledAfterAtMs": 36,
+            "settledAfterClickMs": 322,
+            "shownMediaS": 180.542,
+            "shownVsPositionFrames": -0.9,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          },
+          "bruno": {
+            "settledAfterAtMs": 31,
+            "settledAfterClickMs": 317,
+            "shownMediaS": 180.542,
+            "shownVsPositionFrames": -0.9,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          },
+          "carla": {
+            "settledAfterAtMs": 21,
+            "settledAfterClickMs": 307,
+            "shownMediaS": 180.542,
+            "shownVsPositionFrames": -0.9,
+            "currentTimeDelta": 0,
+            "seekedBack": true
+          }
+        },
+        "maxSettledAfterAtMs": 36,
+        "maxSettledAfterClickMs": 322,
+        "sameFrame": true
+      }
+    ],
+    "audioSwitch": {
+      "switchMs": 241,
+      "seeksDuringSwitch": 0,
+      "maxFrameJumpMs": 3.6,
+      "vsHost": {
+        "bins": 13,
+        "p50AbsMs": 11.2,
+        "p95AbsMs": 11.4,
+        "maxAbsMs": 11.4,
+        "over125LongestMs": 0
+      }
+    },
+    "ass": {
+      "canvas": {
+        "w": 668,
+        "h": 376
+      }
+    },
+    "levels": {
+      "t": 1793928902699,
+      "label": "stats shot",
+      "ana": {
+        "stats": "VídeoH264 1920×1080 · 8,6 MbpsPosiçãosala 190,6 s · meu vídeo 190,7 sSincronia-13 ms · p95 18 ms · quadros perdidos 0Buffer à frente61,3 sRelógiooffset -0.5 ms · RTT 2 msPeçasde quem projeta 0% · de amigos 0% · ↓ 0 ↑ 3,8 Mbps · 2 pares (6 conexões)RelaynenhumCacheOPFS · 5,3 GBFaixa de áudioa0PoltronasAna Cine: pronto 411,2 s · Bruno Cine: pronto 35,2 s · Carla Cine: pronto 66,1 sSaída do som do filmeWebAudioMediaStream (<audio>) vale na próxima sessão",
+        "dc": {
+          "sent": 394766987,
+          "recv": 0,
+          "pairs": [
+            "host→host <addr>:54941 rtt 1 ms",
+            "host→host <addr>:62789 rtt 1 ms",
+            "host→host <addr>:62803 rtt 1 ms",
+            "host→host <addr>:53216 rtt 1 ms",
+            "host→host <addr>:53251 rtt 1 ms",
+            "host→host <addr>:53279 rtt 1 ms"
+          ]
+        },
+        "levels": [
+          {
+            "route": "webaudio",
+            "dbfs": -10.5
+          }
+        ],
+        "latencyMs": 57,
+        "biasMs": -0.199951171875,
+        "lanes": 6
+      },
+      "bruno": {
+        "stats": "VídeoH264 1920×1080 · 8,6 MbpsPosiçãosala 190,7 s · meu vídeo 190,8 sSincronia-12 ms · p95 19 ms · quadros perdidos 0Buffer à frente33,2 sRelógiooffset -0.5 ms · RTT 1 msPeçasde quem projeta 55% · de amigos 45% · ↓ 10,3 ↑ 2,5 Mbps · 2 pares (6 conexões)RelaynenhumCacheOPFS · 5,3 GBFaixa de áudioa1PoltronasAna Cine: pronto 411,2 s · Bruno Cine: pronto 35,2 s · Carla Cine: pronto 66,1 sSaída do som do filmeWebAudioMediaStream (<audio>) vale na próxima sessão",
+        "dc": {
+          "sent": 146951680,
+          "recv": 373819820,
+          "pairs": [
+            "host→host <addr>:54934 rtt 1 ms",
+            "host→host <addr>:62782 rtt 1 ms",
+            "host→host <addr>:62796 rtt 1 ms",
+            "host→host <addr>:53223 rtt 1 ms",
+            "host→host <addr>:53244 rtt 45 ms",
+            "host→host <addr>:53272 rtt 1 ms"
+          ]
+        },
+        "levels": [
+          {
+            "route": "webaudio",
+            "dbfs": -10.4
+          }
+        ],
+        "latencyMs": 51.00000000000001,
+        "biasMs": -0.300048828125,
+        "lanes": 6
+      },
+      "carla": {
+        "stats": "VídeoH264 1920×1080 · 8,6 MbpsPosiçãosala 190,8 s · meu vídeo 190,8 sSincronia-18 ms · p95 27 ms · quadros perdidos 0Buffer à frente61,2 sRelógiooffset -0.5 ms · RTT 2 msPeçasde quem projeta 48% · de amigos 52% · ↓ 11,3 ↑ 8,7 Mbps · 2 pares (6 conexões)RelaynenhumCacheOPFS · 4,8 GBFaixa de áudioa0PoltronasAna Cine: pronto 411,2 s · Bruno Cine: pronto 35,2 s · Carla Cine: pronto 66,1 sSaída do som do filmeWebAudioMediaStream (<audio>) vale na próxima sessão",
+        "dc": {
+          "sent": 114778409,
+          "recv": 282677256,
+          "pairs": [
+            "host→host <addr>:53209 rtt 1 ms",
+            "host→host <addr>:53237 rtt 1 ms",
+            "host→host <addr>:53265 rtt 1 ms",
+            "host→host <addr>:53202 rtt 1 ms",
+            "host→host <addr>:53230 rtt 0 ms",
+            "host→host <addr>:53258 rtt 1 ms"
+          ]
+        },
+        "levels": [
+          {
+            "route": "webaudio",
+            "dbfs": -22.7
+          },
+          {
+            "route": "webaudio",
+            "dbfs": -999
+          },
+          {
+            "route": "webaudio",
+            "dbfs": -23
+          },
+          {
+            "route": "webaudio",
+            "dbfs": -999
+          },
+          {
+            "route": "webaudio",
+            "dbfs": -10.4
+          }
+        ],
+        "latencyMs": 56,
+        "biasMs": -0.400146484375,
+        "lanes": 6
+      }
+    },
+    "start": {
+      "ana": {
+        "firstFrameAfterAtMs": 34.3,
+        "errMs": -8.3,
+        "leadMs": 57
+      },
+      "bruno": {
+        "firstFrameAfterAtMs": 34.4,
+        "errMs": -4.4,
+        "leadMs": 53
+      }
+    },
+    "roomWaits": [],
+    "roomPausedS": 0,
+    "runAfterFirstPlayS": 167.9,
+    "roomPausedPct": 0,
+    "sync": {
+      "bruno-vs-ana": {
+        "bins": 641,
+        "p50AbsMs": 8,
+        "p95AbsMs": 27.3,
+        "maxAbsMs": 38.9,
+        "over125LongestMs": 0
+      },
+      "carla-vs-ana": {
+        "bins": 174,
+        "p50AbsMs": 6.8,
+        "p95AbsMs": 22.1,
+        "maxAbsMs": 28.1,
+        "over125LongestMs": 0
+      },
+      "carla-vs-bruno": {
+        "bins": 174,
+        "p50AbsMs": 9.1,
+        "p95AbsMs": 27.2,
+        "maxAbsMs": 35.4,
+        "over125LongestMs": 0
+      }
+    },
+    "syncOutsideWaits": {
+      "bruno-vs-ana": {
+        "bins": 641,
+        "p50AbsMs": 8,
+        "p95AbsMs": 27.3,
+        "maxAbsMs": 38.9,
+        "over125LongestMs": 0
+      },
+      "carla-vs-ana": {
+        "bins": 174,
+        "p50AbsMs": 6.8,
+        "p95AbsMs": 22.1,
+        "maxAbsMs": 28.1,
+        "over125LongestMs": 0
+      },
+      "carla-vs-bruno": {
+        "bins": 174,
+        "p50AbsMs": 9.1,
+        "p95AbsMs": 27.2,
+        "maxAbsMs": 35.4,
+        "over125LongestMs": 0
+      }
+    },
+    "syncAllP95": 27.3,
+    "syncLongestOver125": 0,
+    "syncOutsideWaitsP95": 27.3,
+    "stalls": {
+      "ana": {
+        "waitingEvents": 0,
+        "over2s": 0,
+        "totalS": 0,
+        "longestS": 0
+      },
+      "bruno": {
+        "waitingEvents": 0,
+        "over2s": 0,
+        "totalS": 0,
+        "longestS": 0
+      },
+      "carla": {
+        "waitingEvents": 0,
+        "over2s": 0,
+        "totalS": 0,
+        "longestS": 0
+      }
+    },
+    "upload": {
+      "filmPiecesMiB": {
+        "v": 518.9,
+        "a0": 45.7,
+        "a1": 45.7
+      },
+      "hostSentMiB": 390.8,
+      "viewersRecvMiB": {
+        "bruno": 364.1,
+        "carla": 304.9
+      },
+      "viewersSentMiB": {
+        "bruno": 165.2,
+        "carla": 113
+      },
+      "pairs": {
+        "ana": [
+          "host→host <addr>:54941 rtt 1 ms",
+          "host→host <addr>:62789 rtt 1 ms",
+          "host→host <addr>:62803 rtt 2 ms",
+          "host→host <addr>:53216 rtt 56 ms",
+          "host→host <addr>:53251 rtt 1 ms",
+          "host→host <addr>:53279 rtt 30 ms"
+        ],
+        "bruno": [
+          "host→host <addr>:54934 rtt 1 ms",
+          "host→host <addr>:62782 rtt 1 ms",
+          "host→host <addr>:62796 rtt 1 ms",
+          "host→host <addr>:53223 rtt 40 ms",
+          "host→host <addr>:53244 rtt 1 ms",
+          "host→host <addr>:53272 rtt 1 ms"
+        ],
+        "carla": [
+          "host→host <addr>:53209 rtt 1 ms",
+          "host→host <addr>:53237 rtt 11 ms",
+          "host→host <addr>:53265 rtt 30 ms",
+          "host→host <addr>:53202 rtt 1 ms",
+          "host→host <addr>:53230 rtt 29 ms",
+          "host→host <addr>:53258 rtt 1 ms"
+        ]
+      },
+      "hostOverMeanViewer": 1.2,
+      "hostOverFilm": 0.7,
+      "netem": null,
+      "unionPieces": 273,
+      "unionMiB": 470.3,
+      "hostOverUnion": 0.83
+    },
+    "clockBiasMs": {
+      "ana": {
+        "min": -1,
+        "max": -0.2
+      },
+      "bruno": {
+        "min": -0.9,
+        "max": 0
+      },
+      "carla": {
+        "min": -1,
+        "max": -0.1
+      }
+    },
+    "lanes": {
+      "ana": [
+        3,
+        3,
+        3,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "bruno": [
+        3,
+        3,
+        3,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "carla": [
+        0,
+        0,
+        0,
+        6,
+        6,
+        6,
+        6,
+        6
+      ]
+    },
+    "memory": {
+      "ana": {
+        "samples": 20,
+        "baselineMiB": {
+          "total": 877.5,
+          "Browser": 124.2,
+          "Tab": 214.3,
+          "GPU": 147.4,
+          "Utility": 391.6
+        },
+        "peakMiB": {
+          "total": 1316.7,
+          "Browser": 184.7,
+          "Tab": 527.7,
+          "GPU": 240.8,
+          "Utility": 391.6
+        },
+        "cinemaDeltaMiB": 439.2
+      },
+      "bruno": {
+        "samples": 20,
+        "baselineMiB": {
+          "total": 986.4,
+          "Browser": 137.9,
+          "Tab": 218.4,
+          "GPU": 175.7,
+          "Utility": 454.5
+        },
+        "peakMiB": {
+          "total": 1355.9,
+          "Browser": 142.7,
+          "Tab": 509.4,
+          "GPU": 268.9,
+          "Utility": 454.1
+        },
+        "cinemaDeltaMiB": 369.5
+      },
+      "carla": {
+        "samples": 20,
+        "baselineMiB": {
+          "total": 965.5,
+          "Browser": 151.2,
+          "Tab": 180.8,
+          "GPU": 176.1,
+          "Utility": 457.4
+        },
+        "peakMiB": {
+          "total": 1585.8,
+          "Browser": 151.6,
+          "Tab": 700.1,
+          "GPU": 290.1,
+          "Utility": 456.7
+        },
+        "cinemaDeltaMiB": 620.3
+      }
+    },
+    "e2ee": {
+      "ana": {
+        "tagged": 18,
+        "untagged": 0
+      },
+      "bruno": {
+        "tagged": 18,
+        "untagged": 0
+      },
+      "carla": {
+        "tagged": 30,
+        "untagged": 0
+      }
+    },
+    "frameLoad": {
+      "ana": {
+        "total": 270,
+        "max60s": 119
+      },
+      "bruno": {
+        "total": 144,
+        "max60s": 54
+      },
+      "carla": {
+        "total": 145,
+        "max60s": 58
+      }
+    }
+  },
+  "jpgs": []
+}
