@@ -133,8 +133,16 @@ beforeEach(() => {
 
 describe('gateway', () => {
   it('READY asks for the call\'s session (cinema_hello)', () => {
-    dispatch({ t: 'READY', d: {} })
+    dispatch({ t: 'READY', d: { cinema: true } })
     expect(sent).toContainEqual({ op: 'cinema_hello' })
+    expect(useCinema.getState().enabled).toBe(true)
+  })
+
+  it('READY without cinema:true (an older server) sends no cinema op and keeps the button off', () => {
+    dispatch({ t: 'READY', d: {} })
+    dispatch({ t: 'READY', d: { cinema: false } })
+    expect(sent).toEqual([])
+    expect(useCinema.getState().enabled).toBe(false)
   })
 
   it('CINEMA_STATE sets the session; seated → swarm and mesh, mesh synced before any signal', async () => {
@@ -180,7 +188,7 @@ describe('gateway', () => {
     dispatch({ t: 'CINEMA_STATE', d: view() })
     await flush()
     sent.length = 0
-    dispatch({ t: 'READY', d: {} })
+    dispatch({ t: 'READY', d: { cinema: true } })
     expect(ops()).toContain('cinema_hello')
     dispatch({ t: 'CINEMA_STATE', d: view({ playback: { ...view().playback, seq: 1 } }) })
     await flush()
@@ -318,7 +326,7 @@ describe('index budget and repair (host)', () => {
     bridge.emitPieces!({ fileId: 'f1', track: 'v', from: 3, items: [meta(3)] }) // accepted by send(), lost with the socket
     await vi.advanceTimersByTimeAsync(2000)
     sent.length = 0
-    dispatch({ t: 'READY', d: {} })
+    dispatch({ t: 'READY', d: { cinema: true } })
     await vi.advanceTimersByTimeAsync(2000)
     expect(pieceFrames()).toEqual([]) // not before the session is confirmed
     dispatch({ t: 'CINEMA_STATE', d: hostView({ playback: { ...view().playback, seq: 3 } }) })
@@ -342,7 +350,7 @@ describe('session gone while the gateway was down', () => {
 
   it('hello answered not_found: session, engine and the host factory go, busy cleared, no error shown', async () => {
     await hosting()
-    dispatch({ t: 'READY', d: {} })
+    dispatch({ t: 'READY', d: { cinema: true } })
     dispatch({ t: 'CINEMA_ERROR', d: { op: 'cinema_hello', reason: 'not_found' } })
     expect(useCinema.getState()).toMatchObject({ session: null, busy: false, error: null, mine: { seated: false } })
     expect(engine.swarms[0].close).toHaveBeenCalled()
@@ -352,7 +360,7 @@ describe('session gone while the gateway was down', () => {
   it('an older server that answers nothing: dropped 5 s after hello', async () => {
     dispatch({ t: 'CINEMA_STATE', d: view() })
     await vi.advanceTimersByTimeAsync(0)
-    dispatch({ t: 'READY', d: {} })
+    dispatch({ t: 'READY', d: { cinema: true } })
     await vi.advanceTimersByTimeAsync(4000)
     expect(useCinema.getState().session).not.toBeNull()
     await vi.advanceTimersByTimeAsync(1500)
@@ -362,7 +370,7 @@ describe('session gone while the gateway was down', () => {
 
   it('a slow server (no state 5 s after hello) never costs the host its film: the file stays, and serves again when the state comes', async () => {
     await hosting()
-    dispatch({ t: 'READY', d: {} })
+    dispatch({ t: 'READY', d: { cinema: true } })
     await vi.advanceTimersByTimeAsync(6000)
     expect(useCinema.getState().session).toBeNull()
     expect(engine.swarms[0].close).toHaveBeenCalled()

@@ -39,6 +39,7 @@ export function ActivitySettings() {
     void bridge.setShare(v).then(
       () => {
         setShare(v)
+        useMyActivity.setState({ share: v })
         void bridge.apps().then(setApps)
       },
       (e: unknown) => toast.error(errorText(e)),

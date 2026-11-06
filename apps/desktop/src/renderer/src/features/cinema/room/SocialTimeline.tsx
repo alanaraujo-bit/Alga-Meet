@@ -44,6 +44,7 @@ export function SocialTimeline({ session, cur, bare }: { session: CinemaSessionV
     const to = e.key === 'ArrowLeft' ? cur - step : e.key === 'ArrowRight' ? cur + step : e.key === 'Home' ? 0 : e.key === 'End' ? D - 1 : null
     if (to === null || locked) return
     e.preventDefault()
+    if (e.repeat && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return // auto-repeat must not flood the gateway
     act.control('seek', to)
   }
 

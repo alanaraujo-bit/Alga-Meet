@@ -316,7 +316,10 @@ export class PieceFactory {
 
   /** Stops a run whose output is unusable; reported only when it made no progress (else generation simply resumes). */
   private kill(t: Track, run: Run, reason: string): void {
-    if (run.added === 0) this.emitError(t.id, `${reason} at ${run.from.toFixed(1)} s`)
+    if (run.added === 0) {
+      this.emitError(t.id, `${reason} at ${run.from.toFixed(1)} s`)
+      t.stopped = true // the host's setPlayhead tick must not respawn a run that fails at once; ensure() clears it
+    }
     run.dead = true
     run.abort.abort()
   }

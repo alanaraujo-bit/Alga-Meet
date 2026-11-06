@@ -289,6 +289,9 @@ describe.skipIf(!ready)('PieceFactory on real fixtures', () => {
     await waitFor(() => s.errors.some((e) => e.track === 'v'), 'init error')
     expect(s.errors.find((e) => e.track === 'v')!.reason).toMatch(/init segment changed/)
     expect(s.media('v').map(([n]) => n)).toEqual([1])
+    // the track stays stopped: the host's periodic setPlayhead does not respawn the failing run
+    for (let i = 0; i < 4; i++) { s.f.setPlayhead(4 + i); await sleep(150) }
+    expect(s.errors.filter((e) => e.track === 'v')).toHaveLength(1)
     await s.f.close()
   }, 30_000)
 

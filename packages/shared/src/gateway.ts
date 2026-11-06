@@ -90,6 +90,8 @@ export interface ReadyPayload {
   /** Users referenced by private channels that are not members of any shared space. */
   users: PublicUser[]
   heartbeatIntervalMs: number
+  /** The server has the Sala de Cinema on. Absent on older servers, which close the socket on cinema ops. */
+  cinema: boolean
 }
 
 export type Dispatch =

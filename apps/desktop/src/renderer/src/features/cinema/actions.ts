@@ -75,10 +75,27 @@ export function seat(seated: boolean): void {
   send({ op: 'cinema_seat', sessionId: s.sessionId, seated })
 }
 
-/** Play/pause/seek/start for the whole room; `seq` = the last timeline I saw (an older one is refused as stale). */
+export const SEEK_MIN_GAP_MS = 250 // ≤ 4 seeks per second
+let lastSeekAt = 0
+let seekTimer: ReturnType<typeof setTimeout> | undefined
+
+/** Play/pause/seek/start for the whole room; `seq` = the last timeline I saw (an older one is refused as stale). Seeks are throttled (the last target always goes out). */
 export function control(action: 'start' | 'play' | 'pause' | 'seek', position?: number): void {
+  if (action !== 'seek') {
+    clearTimeout(seekTimer)
+    seekTimer = undefined
+    return sendControl(action, position)
+  }
+  const wait = lastSeekAt + SEEK_MIN_GAP_MS - Date.now()
+  clearTimeout(seekTimer)
+  if (wait <= 0) return sendControl(action, position)
+  seekTimer = setTimeout(() => { seekTimer = undefined; sendControl(action, position) }, wait)
+}
+
+function sendControl(action: 'start' | 'play' | 'pause' | 'seek', position?: number): void {
   const s = useCinema.getState().session
   if (!s) return
+  if (action === 'seek') lastSeekAt = Date.now()
   useCinema.getState().audio?.resume() // a user gesture: the film audio may start now
   const pos = position === undefined ? undefined : Math.min(Math.max(0, position), s.film.durationS)
   send({ op: 'cinema_control', sessionId: s.sessionId, action, seq: s.playback.seq, ...(pos === undefined ? {} : { position: pos }) })

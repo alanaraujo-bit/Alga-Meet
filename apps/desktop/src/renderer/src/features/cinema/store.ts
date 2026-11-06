@@ -10,6 +10,7 @@ import { useMedia } from '@/media/store'
 import { useData } from '@/store/data'
 import { onDispatch, useSession } from '@/store/session'
 import { FilmAudio } from './audio'
+import { fitFilmFrame } from './frame'
 import { ClockEstimator } from './clock'
 import { Mesh } from './mesh'
 import { CinemaPlayer, canPlay } from './player'
@@ -24,6 +25,8 @@ export type NextFile = { fileId: string; name: string }
 type Warning = 'dv_profile5' | 'high_bitrate' | 'pgs_ignored' | 'audio_converted' | 'atmos_dropped' | 'tracks_truncated'
 
 export interface CinemaState {
+  /** READY.cinema === true: this server has the cinema. Otherwise (older server too) no cinema op is ever sent and the button hides. */
+  enabled: boolean
   session: CinemaSessionView | null
   /**
    * The last session of this call that ended (summary card; the ticket when I was seated). `film`/`createdAt` as the
@@ -92,7 +95,7 @@ const initialPrefs = (): CinemaState['prefs'] => {
 }
 const freshMine = (): CinemaState['mine'] => ({ seated: false, status: 'preparing', audioId: null, subtitleId: null, offsetS: 0, unsupported: null })
 const initial = (): CinemaState => ({
-  session: null, ended: null, mine: freshMine(), host: { fileId: null }, draft: null, subtitle: null, cache: null, audio: null,
+  enabled: false, session: null, ended: null, mine: freshMine(), host: { fileId: null }, draft: null, subtitle: null, cache: null, audio: null,
   prefs: initialPrefs(), stats: null, statsOpen: false, notices: [], error: null, busy: false,
 })
 
@@ -100,7 +103,8 @@ export const useCinema = create<CinemaState>(initial)
 
 // ---- plumbing ---------------------------------------------------------------------------------------------------------
 
-export const send = (f: CinemaClientFrame): boolean => useSession.getState().send(f)
+// a film frame that would pass CINEMA_MAX_FRAME_BYTES is trimmed first (the server closes the socket on it)
+export const send = (f: CinemaClientFrame): boolean => useSession.getState().send(f.op === 'cinema_open' || f.op === 'cinema_switch' ? fitFilmFrame(f) : f)
 const meId = (): string | undefined => useData.getState().me?.id
 /** My call's channel while I am in one. */
 export const callChannel = (): string | null => {
@@ -787,8 +791,10 @@ function hello(newSocket: boolean): void {
 export function handleCinemaDispatch(d: Dispatch): void {
   switch (d.t) {
     case 'READY':
-      // a new gateway session: ask for the call's cinema (seat sockets are rebound by hello)
-      return hello(true)
+      // a new gateway session: ask for the call's cinema (seat sockets are rebound by hello), if this server has one
+      // (an older server closes the socket on an unknown op: 4003, then a reconnect loop)
+      useCinema.setState({ enabled: d.d.cinema === true })
+      return d.d.cinema === true ? hello(true) : undefined
     case 'CINEMA_STATE':
       return onState(d.d)
     case 'CINEMA_PIECES':

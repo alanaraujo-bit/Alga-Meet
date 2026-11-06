@@ -58,8 +58,8 @@ export function ControlsDock({ channel }: { channel: Channel }) {
   const sbOpen = useSoundboard((st) => st.open)
   const [sbAnchor, setSbAnchor] = useState<HTMLElement | null>(null)
   useLayoutEffect(() => setSbAnchor(sbOpen ? sbButton.current : null), [sbOpen])
-  // Cinema (ruling R30: always offered; a server without it answers "Cinema desligado neste servidor").
-  const cinema = useCinema(useShallow((st) => ({ open: !!st.session, seated: st.mine.seated, busy: st.busy, host: !!st.session && st.session.hostId === meId })))
+  // Cinema: offered only when READY says this server has it (an older one would close the socket on a cinema op).
+  const cinema = useCinema(useShallow((st) => ({ enabled: st.enabled, open: !!st.session, seated: st.mine.seated, busy: st.busy, host: !!st.session && st.session.hostId === meId })))
 
   return (
     <div ref={dock} className={s.dock} role="toolbar" aria-label="Controles da chamada">
@@ -101,7 +101,7 @@ export function ControlsDock({ channel }: { channel: Channel }) {
           <CallButton icon={MonitorUp} label={t.dock.share} disabled={!connected} onClick={() => useVoice.setState({ picker: true })} />
         )}
       </MenuButton>
-      <CallButton
+      {cinema.enabled && <CallButton
         icon={ProjectorScreen}
         label={cinema.host ? cinemaT.stage.end : cinema.seated ? cinemaT.standUp : cinema.open ? cinemaT.sitHere : cinemaT.button}
         hint={cinema.open ? undefined : cinemaT.buttonHint}
@@ -109,7 +109,7 @@ export function ControlsDock({ channel }: { channel: Channel }) {
         aria-pressed={cinema.seated}
         disabled={!connected || cinema.busy}
         onClick={() => (cinema.host ? endCinema() : cinema.open ? seat(!cinema.seated) : void openFromFile())}
-      />
+      />}
       {channel.spaceId && (
         <CallButton
           ref={sbButton}

@@ -25,6 +25,8 @@ import { loadChannel } from './views.js'
 export interface CinemaTimings {
   leadMs: number; readyTimeoutMs: number; hostAwayMs: number
   countdownAfterPauseMs: number; countdownMs: number; statusIntervalMs: number
+  /** Min gap between state broadcasts caused only by a seat's aheadS changing. */
+  aheadBroadcastMs: number
 }
 
 /** Bounds on what a host can make the server keep in memory. */
@@ -81,6 +83,9 @@ interface Session {
   /** buffering → playing after CINEMA_READY_TIMEOUT_MS (start/seek only; a stall wait has no timeout). */
   holdTimer?: NodeJS.Timeout
   hostTimer?: NodeJS.Timeout
+  /** Last CINEMA_STATE broadcast, and the pending trailing one for aheadS-only changes. */
+  lastBroadcastAt: number
+  aheadTimer?: NodeJS.Timeout
   /** Piece index per track, in memory: late joiners get it replayed. */
   pieces: Map<CinemaTrackId, CinemaPieceMeta[]>
   /** Who blocked or was blocked by each user who sat, as of their last seat/hello (decides `direct`). */
@@ -99,6 +104,7 @@ export class Cinema {
   readonly timings: CinemaTimings = {
     leadMs: CINEMA_LEAD_MS, readyTimeoutMs: CINEMA_READY_TIMEOUT_MS, hostAwayMs: CINEMA_HOST_AWAY_MS,
     countdownAfterPauseMs: CINEMA_COUNTDOWN_AFTER_PAUSE_MS, countdownMs: CINEMA_COUNTDOWN_MS, statusIntervalMs: CINEMA_STATUS_INTERVAL_MS,
+    aheadBroadcastMs: 5_000,
   }
   private readonly sessions = new Map<string, Session>()
   private readonly cfg: Config['cinema']
@@ -221,7 +227,7 @@ export class Cinema {
       id: uuidv7(), channelId: f.channelId, hostId: conn.userId, film,
       playback: { playing: false, position: Math.min(f.startS, f.film.durationS), at: now, seq: 0, by: null, reason: 'foyer', waitingFor: [], countdown: false },
       options: { controlLock: false, waitForStalled: true },
-      seats: new Map(), createdAt: now, everSeated: new Set(), pausedAt: now, noWait: new Set(), hostAway: false, awayFromFoyer: false,
+      seats: new Map(), createdAt: now, everSeated: new Set(), pausedAt: now, noWait: new Set(), hostAway: false, awayFromFoyer: false, lastBroadcastAt: now,
       pieces: new Map(), blocks: new Map(), rate: new Map(), watchedS: 0, reactions: 0, peaks: new Map(), next: null,
     }
     this.sessions.set(f.channelId, s)
@@ -261,6 +267,7 @@ export class Cinema {
     const now = Date.now()
     // The throttle is for refreshes of the same status; a change is always applied.
     if (f.status === seat.status && now - seat.lastStatusAt < this.timings.statusIntervalMs) return
+    const statusChanged = f.status !== seat.status
     seat.status = f.status
     seat.aheadS = f.aheadS
     seat.lastStatusAt = now
@@ -280,7 +287,17 @@ export class Cinema {
       && (p.playing || (p.reason === 'waiting' && !p.waitingFor.includes(uid)))) {
       return this.pause(s, 'waiting', [uid])
     }
-    this.broadcast(s)
+    if (statusChanged) this.broadcast(s)
+    else this.broadcastAhead(s)
+  }
+
+  /** aheadS-only change: at most one broadcast per `aheadBroadcastMs` (a trailing one carries the latest values). */
+  private broadcastAhead(s: Session): void {
+    if (s.aheadTimer) return
+    const wait = s.lastBroadcastAt + this.timings.aheadBroadcastMs - Date.now()
+    if (wait <= 0) return this.broadcast(s)
+    s.aheadTimer = setTimeout(() => { s.aheadTimer = undefined; if (this.sessions.get(s.channelId) === s) this.broadcast(s) }, wait)
+    s.aheadTimer.unref()
   }
 
   private control(conn: Conn, f: Extract<CinemaClientFrame, { op: 'cinema_control' }>): void {
@@ -575,6 +592,8 @@ export class Cinema {
   private clearTimers(s: Session): void {
     this.clearHold(s)
     clearTimeout(s.hostTimer)
+    clearTimeout(s.aheadTimer)
+    s.aheadTimer = undefined
   }
 
   /** The session of the call the user is in. */
@@ -632,6 +651,7 @@ export class Cinema {
   }
 
   private broadcast(s: Session): void {
+    s.lastBroadcastAt = Date.now()
     this.hub.dispatch(this.voice.inChannel(s.channelId).map((v) => v.userId), 'CINEMA_STATE', (u) => this.view(s, u))
   }
 

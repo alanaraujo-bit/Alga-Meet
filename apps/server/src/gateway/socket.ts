@@ -77,6 +77,7 @@ export async function buildReady(ctx: Ctx, user: UserRow): Promise<ReadyPayload>
     readStates: reads.map((r) => ({ channelId: r.channelId, lastReadMessageId: r.lastReadMessageId, mentionCount: r.mentionCount })),
     users: strangers.map(publicUser),
     heartbeatIntervalMs: config.heartbeatIntervalMs,
+    cinema: config.cinema.enabled,
   }
 }
 

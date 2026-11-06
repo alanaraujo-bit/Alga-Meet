@@ -15,14 +15,16 @@ interface MyActivity {
   detected: LocalActivity | null
   /** "Pausar por 1 h": nothing is sent until this epoch ms (memory only; a restart ends the pause). */
   pausedUntil: number
+  /** The "share my activity" setting (main owns it). Off: the cinema activity stays home too. Unknown yet = off. */
+  share: boolean
 }
 
-export const useMyActivity = create<MyActivity>()(() => ({ detected: null, pausedUntil: 0, cinema: null }))
+export const useMyActivity = create<MyActivity>()(() => ({ detected: null, pausedUntil: 0, cinema: null, share: false }))
 
 /** What actually goes out: detection minus the pause. */
 export function sharedActivity(st: MyActivity = useMyActivity.getState(), now = Date.now()): Activity | null {
   if (st.pausedUntil > now) return null
-  if (st.cinema !== null) return cinemaActivity(st.cinema)
+  if (st.cinema !== null) return st.share ? cinemaActivity(st.cinema) : null
   if (!st.detected) return null
   const { key: _key, ...wire } = st.detected
   return wire
@@ -52,10 +54,20 @@ export function pauseSharing(ms: number | null): void {
 export function startActivitySync(): () => void {
   const bridge = window.alga?.activity
   if (!bridge) return () => undefined
+  // The setting changes in Settings and main answers with onChange: re-read it with every detection.
+  const refreshShare = () => void bridge.getShare().then((share) => {
+    useMyActivity.setState({ share })
+  }, () => undefined)
+  // the share flag changing (Settings switch, or the first read) re-sends: the cinema activity must appear / vanish at once
+  const offShare = useMyActivity.subscribe((st, prev) => {
+    if (st.share !== prev.share) send()
+  })
   const take = (a: LocalActivity | null) => {
     useMyActivity.setState({ detected: a })
     send()
+    refreshShare()
   }
+  refreshShare()
   void bridge.current().then(take, () => undefined)
   const offChange = bridge.onChange(take)
   const offPref = useData.subscribe((st, prev) => {
@@ -77,6 +89,7 @@ export function startActivitySync(): () => void {
     offCinema()
     offReady()
     offPref()
+    offShare()
   }
 }
 
@@ -88,7 +101,8 @@ export function useActivity(userId: string | undefined): Activity | undefined {
   const detected = useMyActivity((st) => (isMe ? st.detected : null))
   const cinema = useMyActivity((st) => (isMe ? st.cinema : null))
   const paused = useMyActivity((st) => st.pausedUntil > 0)
-  const mine = useMemo(() => (paused ? null : sharedActivity({ detected, pausedUntil: 0, cinema })), [detected, cinema, paused])
+  const share = useMyActivity((st) => st.share)
+  const mine = useMemo(() => (paused ? null : sharedActivity({ detected, pausedUntil: 0, cinema, share })), [detected, cinema, paused, share])
   return isMe ? (mine ?? undefined) : theirs
 }
 

@@ -284,6 +284,8 @@ function useRoomKeys(video: RefObject<HTMLVideoElement | null>, root: RefObject<
       const el = e.target as HTMLElement | null
       if (el?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], [role="listbox"], [role="radiogroup"], [role="slider"]')) return
       if (e.key === ' ' && el?.closest('button')) return // the focused button takes its own Space
+      // Windows auto-repeat would flood the gateway with controls: swallow it (volume is local and may repeat)
+      if (e.repeat && (e.key === ' ' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return void e.preventDefault()
       const st = useCinema.getState()
       const s = st.session
       if (!s || !st.mine.seated) return

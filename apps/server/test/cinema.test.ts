@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto'
 import {
   CINEMA_COUNTDOWN_AFTER_PAUSE_MS, CINEMA_FRAME_LIMIT, CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME, CINEMA_LEAD_MS,
-  CINEMA_READY_TIMEOUT_MS, CINEMA_TURN_TTL_S, GatewayClose, Permission, positionAt,
+  CINEMA_READY_TIMEOUT_MS, CINEMA_STATUS_INTERVAL_MS, CINEMA_TURN_TTL_S, GatewayClose, Permission, positionAt,
   type CinemaFilm, type CinemaPieceMeta, type CinemaSessionView, type Invite, type SpaceSnapshot,
 } from '@alga/shared'
 import { eq } from 'drizzle-orm'
@@ -347,6 +347,21 @@ describe('cinema', () => {
     await wait(x.ga, (d) => d.seats[0]!.status === 'stalled')
     expect(states(x.ga).some((d) => d.seats[0]!.aheadS === 5)).toBe(true)
     expect(states(x.ga).some((d) => d.seats[0]!.status === 'ready' && d.seats[0]!.aheadS === 9)).toBe(false)
+    expect((await x.ga.waitFor('READY')).cinema).toBe(s.config.cinema.enabled) // READY carries the flag
+    // aheadS-only refreshes are coalesced (one trailing broadcast); a status change broadcasts at once
+    const t = s.app.ctx.cinema.timings
+    t.statusIntervalMs = 0; t.aheadBroadcastMs = 600
+    try {
+      status(x.ga, st.sessionId, 'ready', 20)
+      await wait(x.ga, (d) => d.seats[0]!.status === 'ready' && d.seats[0]!.aheadS === 20)
+      const n = states(x.ga).length
+      status(x.ga, st.sessionId, 'ready', 30)
+      status(x.ga, st.sessionId, 'ready', 40)
+      await sleep(250)
+      expect(states(x.ga)).toHaveLength(n) // nothing yet
+      await wait(x.ga, (d) => d.seats[0]!.aheadS === 40) // the trailing one, with the latest value
+      expect(states(x.ga)).toHaveLength(n + 1)
+    } finally { t.statusIntervalMs = CINEMA_STATUS_INTERVAL_MS; t.aheadBroadcastMs = 5_000 }
   })
 
   it('controlLock: a non-host control is refused with locked', async () => {

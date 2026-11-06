@@ -24,7 +24,7 @@ const ready = (ownerId: string, myRoles: string[], modPerms = Permission.MANAGE_
     ],
     members: [{ spaceId: S, user: ME, nickname: null, roleIds: myRoles, joinedAt: '2026-01-01T00:00:00Z' }],
   }],
-  privateChannels: [], relationships: [], presences: [], voiceStates: [], readStates: [], users: [], heartbeatIntervalMs: 30_000,
+  privateChannels: [], relationships: [], presences: [], voiceStates: [], readStates: [], users: [], heartbeatIntervalMs: 30_000, cinema: false,
 })
 
 beforeEach(() => useData.getState().reset())
