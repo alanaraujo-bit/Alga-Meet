@@ -346,7 +346,7 @@
         "sameFrame": true
       }
     ],
-    "sameFrameShot": "D:\\PROJETOS\\alga-cinema\\docs\\screenshots\\2026-11-05-cinema-lab-same-frame.png",
+    "sameFrameShot": "<repo>/docs/screenshots/2026-11-05-cinema-lab-same-frame.png",
     "audioSwitch": {
       "switchMs": 231,
       "seeksDuringSwitch": 0,
@@ -359,7 +359,7 @@
         "over125LongestMs": 0
       }
     },
-    "statsShot": "D:\\PROJETOS\\alga-cinema\\docs\\screenshots\\2026-11-05-cinema-lab-stats.png",
+    "statsShot": "<repo>/docs/screenshots/2026-11-05-cinema-lab-stats.png",
     "levels": {
       "t": 1793919416721,
       "label": "stats shot",
@@ -369,8 +369,8 @@
           "sent": 658175934,
           "recv": 12640,
           "pairs": [
-            "host→host fdfd::1aed:8384:58716 rtt 0 ms",
-            "host→host fdfd::1aed:8384:58737 rtt 0 ms"
+            "host→host <addr>:58716 rtt 0 ms",
+            "host→host <addr>:58737 rtt 0 ms"
           ]
         },
         "levels": [
@@ -391,8 +391,8 @@
           "sent": 536035235,
           "recv": 638784523,
           "pairs": [
-            "host→host fdfd::1aed:8384:58709 rtt 0 ms",
-            "host→host fdfd::1aed:8384:58744 rtt 1 ms"
+            "host→host <addr>:58709 rtt 0 ms",
+            "host→host <addr>:58744 rtt 1 ms"
           ]
         },
         "levels": [
@@ -413,8 +413,8 @@
           "sent": 9585446,
           "recv": 564999452,
           "pairs": [
-            "host→host fdfd::1aed:8384:58727 rtt 0 ms",
-            "host→host fdfd::1aed:8384:58728 rtt 0 ms"
+            "host→host <addr>:58727 rtt 0 ms",
+            "host→host <addr>:58728 rtt 0 ms"
           ]
         },
         "levels": [
@@ -493,16 +493,16 @@
       },
       "pairs": {
         "ana": [
-          "host→host fdfd::1aed:8384:58716 rtt 0 ms",
-          "host→host fdfd::1aed:8384:58737 rtt 0 ms"
+          "host→host <addr>:58716 rtt 0 ms",
+          "host→host <addr>:58737 rtt 0 ms"
         ],
         "bruno": [
-          "host→host fdfd::1aed:8384:58709 rtt 0 ms",
-          "host→host fdfd::1aed:8384:58744 rtt 0 ms"
+          "host→host <addr>:58709 rtt 0 ms",
+          "host→host <addr>:58744 rtt 0 ms"
         ],
         "carla": [
-          "host→host fdfd::1aed:8384:58727 rtt 1 ms",
-          "host→host fdfd::1aed:8384:58728 rtt 1 ms"
+          "host→host <addr>:58727 rtt 1 ms",
+          "host→host <addr>:58728 rtt 1 ms"
         ]
       },
       "hostOverMeanViewer": 1.1,

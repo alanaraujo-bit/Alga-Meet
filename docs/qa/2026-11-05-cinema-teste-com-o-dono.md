@@ -6,15 +6,19 @@
 
 ## Antes (Maestro, não o dono)
 
-1. **Servidor:** staging com o servidor desta branch (`feat/sala-de-cinema`) e `CINEMA=true`.
+**Quando:** depois que o Plano 2 (a experiência) for lançado. O dono decidiu que **não haverá app de teste separado**:
+o teste com o amigo acontece no **Alga Meet normal**, na versão que já traz o cinema. Nada de instalador "Sandbox".
+
+1. **Servidor:** o servidor desta branch (`feat/sala-de-cinema`) com `CINEMA=true`. Para implantar a branch no staging a
+   partir deste worktree, **ligar o worktree ao projeto do Railway primeiro** (`railway link`, projeto alga-meet, ambiente
+   staging, serviço api): um `railway up` num worktree sem link cria um projeto novo.
 2. **Relay:** o coturn do `home-server` **ainda não está no ar**: este PC (outra sub-rede da casa) não alcança o servidor de
-   casa (192.168.1.110). Sem ele, quem não conecta direto não assiste: o teste registra se isso acontece. Se o relay
-   for publicado antes, configurar `CINEMA_TURN_*` no staging e avisar o dono.
-3. **App de teste:** instalador desta branch com a identidade de teste ("Alga Meet Sandbox"), para não mexer no app de
-   todo dia. Um para o dono, outro para o amigo.
-4. **Espaço:** um espaço de teste com o dono e o amigo, com E2EE ligado (`PATCH /spaces/:id { "e2ee": true }` com o
-   token do dono: ainda não há tela para isso). A sessão de cinema numa chamada E2EE amarra as conexões diretas à
-   chave do grupo.
+   casa. Sem ele, quem não conecta direto não assiste: o teste registra se isso acontece. Se o relay for publicado
+   antes, configurar `CINEMA_TURN_*` no servidor e avisar o dono.
+3. **App:** o Alga Meet normal, atualizado para a versão com o cinema (o dono e o amigo, cada um no seu PC).
+4. **Espaço com E2EE:** um espaço com o dono e o amigo, com E2EE ligado. Ainda não há tela para isso: **o Maestro liga a
+   flag** (`PATCH /spaces/:id { "e2ee": true }`) com a própria sessão de administrador ou por um script dele; **o dono
+   nunca copia nem cola token nenhum**. A sessão de cinema numa chamada E2EE amarra as conexões diretas à chave do grupo.
 
 ## O que o dono precisa ter
 
@@ -27,7 +31,7 @@
 
 ### Bloco 1 — 1080p, conexão direta (25 min)
 
-1. Os dois abrem o app de teste, entram no espaço de teste e na mesma sala de voz. Conferir no topo da sala:
+1. Os dois abrem o Alga Meet, entram no espaço do teste e na mesma sala de voz. Conferir no topo da sala:
    **"Criptografia de ponta a ponta"**.
 2. O dono clica em **Cinema** (no dock da chamada) e escolhe o filme 1080p.
    - **Anotar o que a ficha mostra:** resolução, codec, Mbps, faixas de áudio, avisos (por exemplo "o áudio vai ser
@@ -80,7 +84,8 @@ Nota: 0 = não ouço o filme vindo do dono; 1 = ouço baixinho; 2 = ouço claro;
 - O plano de internet do dono e do amigo (velocidade de **upload** do dono, principalmente).
 - Se apareceu **Relay** com nome em algum momento, ou se o amigo não conseguiu assistir (e a mensagem).
 - Quantas vezes apareceu "Esperando o(a) …" e quanto tempo durou.
-- Os logs do app de teste dos dois: `%APPDATA%\Alga Meet Sandbox\logs` (zip da pasta).
+- Os logs do app dos dois: `%APPDATA%\Alga Meet\logs` (zip da pasta). **Atenção:** os logs podem conter o IP do amigo
+  (as conexões diretas do cinema mostram o endereço de cada um): mandar só para o Maestro, não postar em lugar público.
 
 ## Como o Maestro lê o resultado
 

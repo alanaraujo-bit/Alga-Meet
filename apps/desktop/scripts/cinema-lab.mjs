@@ -13,8 +13,9 @@
 // --netem=<profile per direction, udp-impair keys> · --host-cap=<kbit/s, host upload, needs --netem> ·
 // --route=webaudio|mediastream · --e2ee (the space's calls are E2EE: meshes tagged) · --film=<path> · --shots · --tag=<name> · --keep
 // Output: <QA_WORK>/cinema-lab-<tag>.json (summary + raw logs) and docs/benchmarks/cinema-engine-<tag>.json (summary).
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { networkInterfaces } from 'node:os'
 import { basename, join } from 'node:path'
@@ -99,7 +100,10 @@ async function account(tag, displayName) {
 
 /** The lab film: the fixture's video + its audio twice (an audio switch to prove) + the SRT and ASS tracks and font. */
 function film() {
-  const out = join(Q.WORK, `Noite.no.Cinema.Lab.${SRC.length % 97}.mkv`)
+  // keyed by the source's path, size and mtime: another --film (or a re-encoded fixture) never reuses a stale remux
+  const st = statSync(SRC)
+  const key = createHash('sha256').update(`${SRC}|${st.size}|${st.mtimeMs}`).digest('hex').slice(0, 12)
+  const out = join(Q.WORK, `Noite.no.Cinema.Lab.${key}.mkv`)
   if (existsSync(out)) return out
   const r = spawnSync(FFMPEG, ['-y', '-hide_banner', '-loglevel', 'error', '-i', SRC, '-i', SUBS, '-map', '0:v', '-map', '0:a:0', '-map', '0:a:0',
     '-map', '1:s:0', '-map', '1:s:1', '-map', '1:t', '-c', 'copy',
@@ -139,6 +143,9 @@ function netemWorker() {
     const hostProf = { ...base, rate: W.hostCapKbps || 0 }
     const bucket = { busy: 0 } // every host-outbound link shares it: the cap is on the host's total upload
     const share = (l) => Object.defineProperty(l, 'busyUntil', { get: () => bucket.busy, set: (v) => { bucket.busy = v } })
+    // what a voice packet leaving the host would wait in its capped uplink right now (ms), every 100 ms
+    const queue = []
+    if (W.hostCapKbps) setInterval(() => queue.push([Date.now(), Math.round(Math.max(0, bucket.busy - now()))]), 100)
     const proxies = []
     parentPort.on('message', (m) => {
       if (m.type === 'open') {
@@ -178,6 +185,8 @@ function netemWorker() {
           for (const k in s) s[k] += l.stats[k] ?? 0
         }
         parentPort.postMessage({ type: 'stats', id: m.id, proxies: proxies.length, bySender })
+      } else if (m.type === 'queue') {
+        parentPort.postMessage({ type: 'queue', id: m.id, samples: queue })
       } else if (m.type === 'close') {
         for (const px of proxies) {
           px.listen?.close()
@@ -223,6 +232,7 @@ async function startNetem() {
       return proxyOf.get(key)
     },
     stats: () => call({ type: 'stats' }),
+    queue: () => call({ type: 'queue' }),
     async close() {
       const done = new Promise((r) => worker.on('message', (m) => m.type === 'closed' && r()))
       worker.postMessage({ type: 'close' })
@@ -357,7 +367,7 @@ const LAB = ({ netem, lan, route }) => {
           })
           const lc = pair && st.get(pair.localCandidateId)
           const rc = pair && st.get(pair.remoteCandidateId)
-          pc.__last = { sent, recv, pair: pair ? `${lc?.candidateType}→${rc?.candidateType} ${rc?.address === lan ? '<LAN>' : rc?.address}:${rc?.port} rtt ${Math.round((pair.currentRoundTripTime ?? 0) * 1000)} ms` : null }
+          pc.__last = { sent, recv, pair: pair ? `${lc?.candidateType}→${rc?.candidateType} ${rc?.address === lan ? '<LAN>' : '<addr>'}:${rc?.port} rtt ${Math.round((pair.currentRoundTripTime ?? 0) * 1000)} ms` : null }
         } catch {}
       }
       if (pc.__last) { out.sent += pc.__last.sent; out.recv += pc.__last.recv; out.pairs.push(pc.__last.pair) }
@@ -403,6 +413,9 @@ const LAB = ({ netem, lan, route }) => {
     return { route, dbfs: rms > 0 ? Math.round(20 * Math.log10(rms) * 10) / 10 : -999 }
   })
   L.latencyMs = () => (L.filmCtx ? ((L.filmCtx.outputLatency || 0) + L.filmCtx.baseLatency) * 1000 : 0)
+  // wall clock vs the rVFC timeline (performance.timeOrigin + now): bounds the error when windows are compared
+  L.bias = () => Date.now() - (performance.timeOrigin + performance.now())
+  L.lanes = () => L.pcs.filter((pc) => pc.connectionState === 'connected').length
 }
 
 // ── windows ─────────────────────────────────────────────────
@@ -534,6 +547,8 @@ function grid(name, files) {
   else ff([...inputs, '-filter_complex', `${files.map((_, i) => `[${i}]`).join('')}hstack=inputs=${files.length}`, out])
   return out
 }
+/** Repo-relative (committed summaries carry no local paths). */
+const rel = (p) => p.replace(Q.repo, '<repo>').replace(/\\/g, '/')
 const jpg = (png) => (ff(['-i', png, '-vf', 'scale=1440:-2:flags=lanczos', '-q:v', '3', png.replace(/\.png$/, '.jpg')]), png.replace(/\.png$/, '.jpg'))
 
 // ── offline analysis ────────────────────────────────────────
@@ -682,7 +697,7 @@ await check('Abrir sessão → primeiro frame em todas as poltronas sentadas', a
   }, 'first frame everywhere', 60_000, 50)
   M.firstFrameMs = first
   M.firstFrameAllMs = Math.max(...Object.values(first))
-  await until(async () => ((await seatsText(A.page)).match(/pronto/g)?.length ?? 0) >= early.length, 'all seats ready', 60_000)
+  await until(async () => ((await seatsText(A.page)).match(/pronto/g)?.length ?? 0) >= early.length, 'all seats ready', 180_000) // a poor network pre-rolls 30 s (adaptive pre-roll)
   M.allReadyMs = Date.now() - T.open
   for (const x of inst) await closeNotices(x.page)
   if (M.firstFrameAllMs > 10_000) throw new Error(`first frame ${M.firstFrameAllMs} ms > 10 s`)
@@ -707,7 +722,7 @@ const swarmTexts = []
 async function sampleSwarm(label) {
   const row = { t: Date.now(), label }
   for (const x of inst) {
-    row[x.k] = { stats: (await statsText(x.page).catch(() => '')).replace(/\s+/g, ' ').slice(0, 900), dc: await x.page.evaluate(() => window.__lab.dc()).catch(() => null), levels: await x.page.evaluate(() => window.__lab.levels()).catch(() => null), latencyMs: await x.page.evaluate(() => window.__lab.latencyMs()).catch(() => null) }
+    row[x.k] = { stats: (await statsText(x.page).catch(() => '')).replace(/\s+/g, ' ').slice(0, 900), dc: await x.page.evaluate(() => window.__lab.dc()).catch(() => null), levels: await x.page.evaluate(() => window.__lab.levels()).catch(() => null), latencyMs: await x.page.evaluate(() => window.__lab.latencyMs()).catch(() => null), biasMs: await x.page.evaluate(() => window.__lab.bias()).catch(() => null), lanes: await x.page.evaluate(() => window.__lab.lanes()).catch(() => null) }
   }
   if (netem) row.netem = await netem.stats()
   swarmTexts.push(row)
@@ -786,14 +801,19 @@ for (let i = 0; i < PAUSES; i++) {
       const v = await video(x.page)
       if (!p) throw new Error(`${x.k}: no pause event`)
       const settled = Math.max(p[0], seeked?.[0] ?? 0)
-      per[x.k] = { settledAfterAtMs: settled - at, settledAfterClickMs: settled - click, frameDelta: r1((v.t - position) * FPS), seekedBack: !!seeked }
+      // the frame on screen: the last one rVFC presented (a seek while paused presents one too)
+      const shown = x.logs.frames.at(-1)?.[1] ?? null
+      per[x.k] = {
+        settledAfterAtMs: settled - at, settledAfterClickMs: settled - click, shownMediaS: shown,
+        shownVsPositionFrames: shown === null ? null : r1((shown - position) * FPS), currentTimeDelta: r1((v.t - position) * FPS), seekedBack: !!seeked,
+      }
     }
     if (i === 0 && SHOTS_ON) {
       const files = []
       for (const x of seated()) files.push(await shot(x, 'paused'))
-      M.sameFrameShot = grid('same-frame', files)
+      M.sameFrameShot = rel(grid('same-frame', files))
     }
-    const row = { position, atAfterClickMs: at - click, per, maxSettledAfterAtMs: Math.max(...Object.values(per).map((p) => p.settledAfterAtMs)), maxSettledAfterClickMs: Math.max(...Object.values(per).map((p) => p.settledAfterClickMs)), sameFrame: Object.values(per).every((p) => Math.abs(p.frameDelta) < 0.5) }
+    const row = { position, atAfterClickMs: at - click, per, maxSettledAfterAtMs: Math.max(...Object.values(per).map((p) => p.settledAfterAtMs)), maxSettledAfterClickMs: Math.max(...Object.values(per).map((p) => p.settledAfterClickMs)), sameFrame: Object.values(per).every((p) => p.shownMediaS !== null) && new Set(Object.values(per).map((p) => Math.round(p.shownMediaS * 1000))).size === 1 }
     M.pauses.push(row)
     await A.page.getByRole('button', { name: 'Tocar', exact: true }).click()
     await until(async () => !(await video(A.page))?.paused, 'resumed', 10_000)
@@ -828,7 +848,7 @@ await check('Painel de estatísticas: peças de amigos (screenshot)', async () =
   if (SHOTS_ON) {
     const files = []
     for (const x of seated()) files.push(await shot(x, 'stats'))
-    M.statsShot = grid('stats', files)
+    M.statsShot = rel(grid('stats', files))
   }
   return Object.fromEntries(seated().map((x) => [x.k, /Peças\s*([^R]*)Relay/.exec(row[x.k].stats)?.[1]?.trim() ?? row[x.k].stats.slice(0, 120)]))
 })
@@ -855,7 +875,7 @@ await check('ASS: Bruno liga a legenda ASS e ela aparece (JASSUB)', async () => 
     throw e
   })
   await sleep(600)
-  if (SHOTS_ON) M.assShot = await shot(x, 'ass')
+  if (SHOTS_ON) M.assShot = rel(await shot(x, 'ass'))
   M.ass = { canvas }
   return M.ass
 })
@@ -881,12 +901,41 @@ if (startState) {
     if (f) M.start[x.k] = { firstFrameAfterAtMs: r1(f[0] - at), errMs: r1((f[1] - (position + (f[0] + lat - at) / 1000)) * 1000), leadMs: r1(lat) }
   }
 }
+// room pauses for a stalled seat (waitForStalled) after the room first played: episodes of playback.reason
+// waiting/buffering (the sync filter below uses them)
+const firstPlay = host.logs.states.find((s) => s.r >= T.start && s.playback?.playing)?.r ?? T.start
+M.roomWaits = []
+for (const st of host.logs.states.filter((s) => s.r > firstPlay && s.r < T.playEnd && s.playback)) {
+  const waiting = ['waiting', 'buffering'].includes(st.playback.reason)
+  const open = M.roomWaits.at(-1)
+  if (waiting && (!open || open.endS !== null)) M.roomWaits.push({ atS: r1((st.r - T.start) / 1000), reason: st.playback.reason, waitingFor: st.playback.waitingFor, endS: null })
+  else if (!waiting && open && open.endS === null) open.endS = r1((st.r - T.start) / 1000)
+}
+M.roomPausedS = r1(M.roomWaits.reduce((a, w) => a + (w.endS ?? PLAY_S) - w.atS, 0))
+M.runAfterFirstPlayS = r1((T.playEnd - firstPlay) / 1000)
+M.roomPausedPct = r1((100 * M.roomPausedS) / M.runAfterFirstPlayS)
+// sync: EVERY pair of seated windows (the late joiner without the first 15 s of each of its joins), from 10 s after
+// the start. Frozen seats show no frames (rVFC), so a pair has no bins while either side is frozen: a blind spot; the
+// error built up meanwhile shows once it moves again. `syncOutsideWaits` = the same bins minus room waits ± 3 s.
 const syncFrom = T.start + 10_000
+const waitSpans = M.roomWaits.map((w) => [T.start + w.atS * 1000 - 3000, (w.endS === null ? T.playEnd : T.start + w.endS * 1000) + 3000])
+const joinSpans = M.lateTrials.map((tr) => [tr.sitAt, tr.sitAt + 15_000])
+const outside = (errs, spans) => errs.filter(([t]) => !spans.some(([a, b]) => t >= a && t < b))
+const seatedAll = inst.filter((x) => x !== late || M.lateTrials.length)
 M.sync = {}
-for (const x of early.slice(1)) M.sync[`${x.k}-vs-${host.k}`] = syncSummary(pairErrors(x, host, syncFrom, T.playEnd))
-for (let i = 1; i < early.length; i++) for (let j = i + 1; j < early.length; j++) M.sync[`${early[j].k}-vs-${early[i].k}`] = syncSummary(pairErrors(early[j], early[i], syncFrom, T.playEnd))
-M.syncAllP95 = Math.max(...Object.values(M.sync).map((s) => s.p95AbsMs ?? Infinity))
-M.syncLongestOver125 = Math.max(...Object.values(M.sync).map((s) => s.over125LongestMs))
+M.syncOutsideWaits = {}
+for (let i = 0; i < seatedAll.length; i++) {
+  for (let j = i + 1; j < seatedAll.length; j++) {
+    const [a, b] = [seatedAll[i], seatedAll[j]]
+    const errs = outside(pairErrors(b, a, syncFrom, T.playEnd), a === late || b === late ? joinSpans : [])
+    M.sync[`${b.k}-vs-${a.k}`] = syncSummary(errs)
+    M.syncOutsideWaits[`${b.k}-vs-${a.k}`] = syncSummary(outside(errs, waitSpans))
+  }
+}
+const worst = (o, k) => Math.max(...Object.values(o).map((s) => s[k] ?? -Infinity))
+M.syncAllP95 = worst(M.sync, 'p95AbsMs')
+M.syncLongestOver125 = worst(M.sync, 'over125LongestMs')
+M.syncOutsideWaitsP95 = worst(M.syncOutsideWaits, 'p95AbsMs')
 for (const tr of M.lateTrials) {
   const errs = pairErrors(late, host, tr.sitAt, tr.sitAt + 15_000)
   const at = syncedAt(errs, tr.sitAt)
@@ -910,15 +959,6 @@ for (const x of inst) {
   const durs = waits.map(([a, b]) => (b ?? T.playEnd) - a)
   M.stalls[x.k] = { waitingEvents: waits.length, over2s: durs.filter((d) => d > 2000).length, totalS: r1(durs.reduce((s, d) => s + d, 0) / 1000), longestS: r1(durs.length ? Math.max(...durs) / 1000 : 0) }
 }
-// room pauses for a stalled seat (waitForStalled): episodes of playback.reason waiting/buffering while playing time ran
-M.roomWaits = []
-for (const st of host.logs.states.filter((s) => s.r > T.start + 5000 && s.r < T.playEnd && s.playback)) {
-  const waiting = ['waiting', 'buffering'].includes(st.playback.reason)
-  const open = M.roomWaits.at(-1)
-  if (waiting && (!open || open.endS !== null)) M.roomWaits.push({ atS: r1((st.r - T.start) / 1000), reason: st.playback.reason, waitingFor: st.playback.waitingFor, endS: null })
-  else if (!waiting && open && open.endS === null) open.endS = r1((st.r - T.start) / 1000)
-}
-M.roomPausedS = r1(M.roomWaits.reduce((a, w) => a + (w.endS ?? PLAY_S) - w.atS, 0))
 // upload: data-channel bytes of the cinema mesh
 const last = swarmTexts.at(-1)
 const viewers = inst.slice(1).filter((x) => last[x.k]?.dc)
@@ -936,6 +976,24 @@ const meanRecv = viewers.reduce((s, x) => s + last[x.k].dc.recv, 0) / Math.max(1
 M.upload.hostOverMeanViewer = r1(last[host.k].dc.sent / meanRecv)
 M.upload.hostOverFilm = r1(last[host.k].dc.sent / 1048576 / ((M.upload.filmPiecesMiB.v ?? 0) + (M.upload.filmPiecesMiB.a0 ?? 0)))
 M.upload.netem = last.netem ?? null
+// super-seed: what the host sent against the union of distinct pieces any viewer received (wire log of the last chunk)
+const union = new Map()
+for (const x of viewers) for (const [, kind, tr, n, total] of x.logs.wire) if (kind === 'done') union.set(`${tr}:${n}`, total)
+const unionBytes = [...union.values()].reduce((a, b) => a + b, 0)
+M.upload.unionPieces = union.size
+M.upload.unionMiB = r1(unionBytes / 1048576)
+M.upload.hostOverUnion = unionBytes ? Math.round((100 * last[host.k].dc.sent) / unionBytes) / 100 : null
+// the host's capped uplink: queueing delay a voice packet would see while the film is seeded (sampled every 100 ms)
+if (netem && HOST_CAP) {
+  const q = (await netem.queue()).samples.filter(([t]) => t >= firstPlay && t <= T.playEnd).map(([, d]) => d)
+  M.hostUplinkQueueMs = { samples: q.length, p50: pct(q, 0.5), p95: pct(q, 0.95), max: q.length ? Math.max(...q) : null, over150msPct: q.length ? r1((100 * q.filter((d) => d > 150).length) / q.length) : null }
+}
+// each window's wall clock against its rVFC timeline (bounds the cross-window error), and its connected cinema lanes
+M.clockBiasMs = Object.fromEntries(inst.map((x) => {
+  const b = swarmTexts.map((r) => r[x.k]?.biasMs).filter((v) => typeof v === 'number')
+  return [x.k, b.length ? { min: r1(Math.min(...b)), max: r1(Math.max(...b)) } : null]
+}))
+M.lanes = Object.fromEntries(inst.map((x) => [x.k, swarmTexts.map((r) => r[x.k]?.lanes ?? null)]))
 // memory: peak working set per process type (MiB)
 M.memory = {}
 const mib = (m, ty) => r1(m.filter((p) => !ty || p.type === ty).reduce((a, p) => a + p.ws, 0) / 1024)
@@ -969,7 +1027,7 @@ writeFileSync(join(Q.WORK, `cinema-lab-${TAG}.json`), JSON.stringify({ ...summar
 writeFileSync(join(Q.repo, 'docs', 'benchmarks', `cinema-engine-${TAG}.json`), JSON.stringify(summary, null, 2) + '\n')
 const failed = results.filter((r) => !r.pass)
 log(`${results.length - failed.length}/${results.length} ok; summary docs/benchmarks/cinema-engine-${TAG}.json`)
-log(JSON.stringify({ firstFrameAllMs: M.firstFrameAllMs, start: M.start, syncAllP95: M.syncAllP95, syncLongestOver125: M.syncLongestOver125, pauses: M.pauses.map((p) => [p.maxSettledAfterAtMs, p.sameFrame]), late: M.lateTrials.map((t) => [t.firstFrameMs, t.syncedMs]), upload: M.upload.hostOverMeanViewer, stalls: M.stalls, roomWaits: M.roomWaits.length }))
+log(JSON.stringify({ firstFrameAllMs: M.firstFrameAllMs, start: M.start, syncAllP95: M.syncAllP95, syncLongestOver125: M.syncLongestOver125, pauses: M.pauses.map((p) => [p.maxSettledAfterAtMs, p.sameFrame]), late: M.lateTrials.map((t) => [t.firstFrameMs, t.syncedMs]), upload: M.upload.hostOverMeanViewer, hostOverUnion: M.upload.hostOverUnion, stalls: M.stalls, roomWaits: M.roomWaits.length, roomPausedS: M.roomPausedS, roomPausedPct: M.roomPausedPct, syncOutsideWaitsP95: M.syncOutsideWaitsP95, queue: M.hostUplinkQueueMs ?? null, frames60: Object.fromEntries(Object.entries(M.frameLoad).map(([k, v]) => [k, v.max60s])), lanes: Object.fromEntries(Object.entries(M.lanes).map(([k, v]) => [k, v.at(-1)])), allReadyMs: M.allReadyMs ?? null }))
 if (!KEEP) for (const x of inst) await x?.app.close().catch(() => undefined)
 await netem?.close()
 process.exit(failed.length ? 1 : 0)

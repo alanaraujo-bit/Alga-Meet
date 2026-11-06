@@ -124,7 +124,7 @@
           "sent": 585666233,
           "recv": 5985,
           "pairs": [
-            "host→host fdfd::1aed:8384:58771 rtt 0 ms"
+            "host→host <addr>:58771 rtt 0 ms"
           ]
         },
         "levels": [
@@ -141,7 +141,7 @@
           "sent": 5985,
           "recv": 585666233,
           "pairs": [
-            "host→host fdfd::1aed:8384:58764 rtt 0 ms"
+            "host→host <addr>:58764 rtt 0 ms"
           ]
         },
         "levels": [
@@ -206,10 +206,10 @@
       },
       "pairs": {
         "ana": [
-          "host→host fdfd::1aed:8384:58771 rtt 1 ms"
+          "host→host <addr>:58771 rtt 1 ms"
         ],
         "bruno": [
-          "host→host fdfd::1aed:8384:58764 rtt 1 ms"
+          "host→host <addr>:58764 rtt 1 ms"
         ]
       },
       "hostOverMeanViewer": 1,

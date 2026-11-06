@@ -336,7 +336,7 @@
         "sameFrame": true
       }
     ],
-    "sameFrameShot": "D:\\PROJETOS\\alga-cinema\\docs\\screenshots\\2026-11-05-cinema-lab-same-frame.png",
+    "sameFrameShot": "<repo>/docs/screenshots/2026-11-05-cinema-lab-same-frame.png",
     "audioSwitch": {
       "switchMs": 227,
       "seeksDuringSwitch": 0,
@@ -349,7 +349,7 @@
         "over125LongestMs": 0
       }
     },
-    "statsShot": "D:\\PROJETOS\\alga-cinema\\docs\\screenshots\\2026-11-05-cinema-lab-stats.png",
+    "statsShot": "<repo>/docs/screenshots/2026-11-05-cinema-lab-stats.png",
     "levels": {
       "t": 1793919274024,
       "label": "stats shot",
@@ -359,7 +359,7 @@
           "sent": 635306825,
           "recv": 9072,
           "pairs": [
-            "host→host fdfd::1aed:8384:53436 rtt 0 ms"
+            "host→host <addr>:53436 rtt 0 ms"
           ]
         },
         "levels": [
@@ -400,7 +400,7 @@
           "sent": 9072,
           "recv": 635306825,
           "pairs": [
-            "host→host fdfd::1aed:8384:53429 rtt 0 ms"
+            "host→host <addr>:53429 rtt 0 ms"
           ]
         },
         "levels": [
@@ -470,10 +470,10 @@
       },
       "pairs": {
         "ana": [
-          "host→host fdfd::1aed:8384:53436 rtt 0 ms"
+          "host→host <addr>:53436 rtt 0 ms"
         ],
         "bruno": [
-          "host→host fdfd::1aed:8384:53429 rtt 0 ms"
+          "host→host <addr>:53429 rtt 0 ms"
         ]
       },
       "hostOverMeanViewer": 1,

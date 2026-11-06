@@ -13,14 +13,14 @@
 | Critério (§8) | Meta | Medido | |
 |---|---|---|---|
 | Vídeo nativo | amostras idênticas ao arquivo | teste da Task 6 (`pieces.test.ts`, cópia de vídeo); a ficha diz "Nativo" | passa (teste) |
-| Primeiro frame | ≤ 10 s de "Abrir sessão" a todos vendo (1080p 8 Mbps, upload ≥ 20 Mbps) | rede local: **2,8 s** (depois da correção do índice; antes 3,4–6,7 s). Rede emulada, RTT 40 ms: 4 janelas com 0,1 % de perda **9,1 s**; 2 janelas, upload 20 Mbps: **4,4 s** (fila de 1 s) ou **25,5 s** (fila de 300 ms); 1 % de perda: 23–38 s | **passa na rede local e com 0,1 %; reprova com fila curta ou 1 % de perda** |
-| Sincronia | p95 ≤ 42 ms após 10 s; nunca > 125 ms por > 1 s | rede local: p95 **25–33 ms**, máximo 53 ms, nunca > 125 ms. 4 janelas, 1 % de perda, fora das esperas: p95 5,6–13,8 ms. Com 0,1 %: excursões de até 2,4 s por 2,75 s em travamentos curtos | **passa quando há dados**; reprova quando alguém trava < 2 s |
-| Pausa | todos no mesmo frame em ≤ 300 ms | mesmo frame em **8/8** pausas; pior poltrona **12–231 ms** depois do instante agendado (`at`); 285–500 ms depois do clique (inclui os 250 ms de `CINEMA_LEAD_MS`) | **passa** |
+| Primeiro frame | ≤ 10 s de "Abrir sessão" a todos vendo (1080p 8 Mbps, upload ≥ 20 Mbps) | rede local: **2,8 s** (depois da correção do índice; antes 3,8–6,7 s). Rede emulada, RTT 40 ms: 4 janelas com 0,1 % de perda **9,1 s**; 2 janelas, upload 20 Mbps: **4,4 s** (fila de 1 s) ou **25,5 s** (fila de 300 ms); 1 % de perda: 23–38 s | **passa na rede local e com 0,1 %; reprova com fila curta ou 1 % de perda** |
+| Sincronia | p95 ≤ 42 ms após 10 s; nunca > 125 ms por > 1 s | rede local: p95 **25–33 ms**, máximo 53 ms, nunca > 125 ms (nas rodadas de 3 janelas só o par Bruno × Ana foi comparado). 4 janelas, por par e sem filtro (sem quem entrou no meio): 1 % p95 7,6–18,8 ms; 0,1 % p95 **55,5–300,1 ms**, excursões de até 2,4 s por 2,75 s em travamentos curtos | **passa quando há dados**; reprova quando alguém trava < 2 s |
+| Pausa | todos no mesmo frame em ≤ 300 ms | mesmo frame em **8/8** pausas; pior poltrona **12–231 ms** depois do instante agendado (`at`); 285–500 ms depois do clique (inclui os 250 ms de `CINEMA_LEAD_MS`); "mesmo frame" medido pelo `currentTime` depois do seek (o script atual usa o último quadro rVFC) | **passa** |
 | Entrar no meio | ≤ 8 s até sincronizado | rede local, 7 entradas: **1,2–3,8 s** em 6; **9,8 s** em 1 (e a sala pausou 7 s para todos) → **corrigido**. Rede emulada: primeiro quadro 1,7 s (0,1 %) e 14,2 s (1 %), sincronia não medível (a sala estava parada esperando outra poltrona) | 6/7 na rede local; correção sem nova medida |
 | Travamentos | zero com 4 pessoas, upload de quem projeta ≥ 1,5× o bitrate | rede local (3 janelas): **zero**. 4 janelas, upload de quem projeta 12 Mbps (1,5×), RTT 40 ms: **1 % de perda: sala parada 343 s de 560**; **0,1 %: 118 s de 300** | **reprova** na rede emulada |
 | Eco | filme vazando pelo microfone atenuado ≥ 30 dB | **não medido** (precisa de caixa de som e de duas casas) | pendente: teste com o dono |
 | RAM | cinema ≤ 1,5 GB por cliente | **354–597 MiB** a mais que a chamada sozinha (pico do app inteiro 1,27–1,53 GiB) | **passa** |
-| Instalador | ≤ 40 MB a mais | **+48,6 MiB (+51,0 MB)**: 159,4 MiB contra 110,8 MiB da v0.1.8 | **reprova** |
+| Instalador | ≤ 40 MB a mais | **+48,6 MiB (+51,0 MB)**: 159,4 MiB contra 110,8 MiB da v0.1.8 | **reprova** a meta original; o dono aceitou o crescimento do instalador, até ~150 MB (R34) |
 
 Também verificado: **E2EE** (ofertas/respostas com tag MLS em todas as conexões da malha: 50 de 50 em 3 rodadas, 0 sem tag),
 **legenda ASS** (estava quebrada no app construído; corrigida), **as duas rotas do som do filme** tocam (nível
@@ -66,8 +66,12 @@ Também verificado: **E2EE** (ofertas/respostas com tag MLS em todas as conexõe
 - **Pausa no frame exato:** em todas as 8 pausas (2 e 3 janelas) a posição final de cada poltrona é **exatamente** a
   posição calculada pelo servidor (diferença 0 frame); quem passou volta com um seek. Captura:
   `docs/screenshots/2026-11-05-cinema-lab-same-frame.jpg`.
-- **`setAudio`:** troca em 227–232 ms, **0 seeks**, maior salto entre quadros consecutivos 3,6–24,2 ms (a cadência
-  normal 24p em 60 Hz; um frame pulado seria > 41,7 ms), erro contra quem projeta ≤ 33 ms durante a troca. Passa.
+- **`setAudio`: passa na rede local; com perda falha (Task 15).** Rede local: troca em 227–232 ms, **0 seeks**, maior
+  salto entre quadros consecutivos 3,6–24,2 ms (a cadência normal 24p em 60 Hz; um frame pulado seria > 41,7 ms), erro
+  contra quem projeta ≤ 33 ms durante a troca. Rede emulada (a nova faixa precisa chegar pelo enxame): 4 janelas com
+  0,1 % de perda **8 597 ms** e salto de **391,7 ms** (o vídeo parou esperando a faixa); 4 janelas com 1 % **20,6 s**;
+  2 janelas, upload 20 Mbps, fila 1 s: **nunca terminou** (timeout `on a1`); 2 janelas com 0,1 % 4,4 s, com 1 % 18,7 s.
+  Re-medido depois da Task 16: ver "Vazão sob perda".
 - **`canPlay` por fixture** (esta máquina, RTX 3070):
 
 | Fixture | Resultado |
@@ -82,17 +86,23 @@ Também verificado: **E2EE** (ofertas/respostas com tag MLS em todas as conexõe
 
 ### Primeiro frame
 
-| Rodada | Quem projeta | Amigo | Observação |
-|---|---|---|---|
-| Rede local, antes da correção (5 rodadas) | 1,2–1,3 s | 3,4–6,7 s | o índice do áudio padrão chegava ~6 s depois de sentar |
-| Rede local, depois da correção | 1,2 s | **2,8 s** | |
-| RTT 40 ms, upload 12 Mbps, fila 300 ms | 1,2 s | 23,8 s | |
-| RTT 40 ms + 0,1 % de perda, upload 12 Mbps | 1,0 s | 17,4 s | |
-| RTT 40 ms + 1 % de perda, upload 12 Mbps | 1,2 s | 38,5 s | |
-| RTT 40 ms, upload 20 Mbps, fila 300 ms (antes / depois da correção) | 1,2 / 1,5 s | 29,5 / **25,5 s** | |
-| RTT 40 ms, upload 20 Mbps, fila 1000 ms (depois da correção) | 1,1 s | **4,4 s** | |
-| 4 janelas, RTT 40 ms + 0,1 %, upload 12 Mbps, fila 1 s (depois) | 1,2 s | 8,1 e **9,1 s** | |
-| 4 janelas, RTT 40 ms + 1 %, upload 12 Mbps, fila 1 s (depois) | 1,5 s | 14,3 e **23,1 s** | |
+"Antes" = rodada feita antes da correção do índice (abaixo); "depois" = com ela. Cada linha cita o resumo
+`docs/benchmarks/cinema-engine-<tag>.json` de onde vem (a correção entrou entre `2x-lan-trace` e `2x-lan-trace-fix`).
+
+| Rodada | Índice | Quem projeta | Amigo | JSON |
+|---|---|---|---|---|
+| Rede local, 2 e 3 janelas (4 rodadas) | antes | 1,2–1,3 s | 3,8–6,7 s | `2x-lan`, `2x-lan-trace`, `3x-lan-e2ee`, `3x-lan-late` |
+| Rede local, 2 janelas | depois | 1,2 s | **2,8 s** | `2x-lan-trace-fix` |
+| RTT 40 ms, upload 12 Mbps, fila 300 ms | antes | 1,2 s | 23,8 s | `2x-rtt40` |
+| RTT 40 ms + 0,1 % de perda, upload 12 Mbps | antes | 1,0 s | 17,4 s | `2x-rtt40-loss0.1` |
+| RTT 40 ms + 1 % de perda, upload 12 Mbps | antes | 1,2 s | 38,5 s | `2x-rtt40-loss1` |
+| RTT 40 ms, upload 20 Mbps, fila 300 ms | antes / depois | 1,2 / 1,5 s | 29,5 / **25,5 s** | `2x-rtt40-cap20`, `2x-rtt40-cap20-fix` |
+| RTT 40 ms, upload 20 Mbps, fila 1000 ms | depois | 1,1 s | **4,4 s** | `2x-rtt40-cap20-q1000` |
+| 4 janelas, RTT 40 ms + 0,1 %, upload 12 Mbps, fila 1 s | depois | 1,2 s | 8,1 e **9,1 s** | `4x-loss0.1-rtt40-cap12` |
+| 4 janelas, RTT 40 ms + 1 %, upload 12 Mbps, fila 1 s | depois | 1,5 s | 14,3 e **23,1 s** | `4x-loss1-rtt40-cap12` |
+
+(A versão anterior deste documento dizia "3,4–6,7 s em 5 rodadas": o 3,4 s e a quinta rodada não têm resumo
+commitado; ficam fora.)
 
 **Duas causas, achadas pelo rastro do enxame:**
 1. **Índice do áudio atrasado (corrigido).** Quem projeta manda o índice em no máximo 3 frames a cada 2 s (cota do
@@ -125,9 +135,14 @@ reage a cada perda; bate com a fórmula de Mathis, ~2,9 Mbps para MTU ~1200 B). 
 
 | Rodada | Pares de quadros (bins de 250 ms) | p50 | p95 | máx. | > 125 ms |
 |---|---|---|---|---|---|
-| 2 janelas, 90 s | 322 | 8,5 ms | 27,8 ms | 36,5 ms | nunca |
-| 3 janelas, 40 s | 143 | 8,1 ms | 25,1 ms | 31,9 ms | nunca |
-| 3 janelas, E2EE, 170 s | 612 | 11,1 ms | 33,3 ms | 52,9 ms | nunca |
+| 2 janelas, 90 s (`2x-lan`) | 322 | 8,5 ms | 27,8 ms | 36,5 ms | nunca |
+| 3 janelas, 40 s (`3x-lan-late`) | 143 | 8,1 ms | 25,1 ms | 31,9 ms | nunca |
+| 3 janelas, E2EE, 170 s (`3x-lan-e2ee`) | 612 | 11,1 ms | 33,3 ms | 52,9 ms | nunca |
+
+Atenção (revisão da Task 15): nas rodadas de 3 janelas o script da Task 15 só comparou **Bruno × Ana** (a terceira
+janela, quem entrou no meio, ficou fora de `early.slice(1)`). O script atual compara **todos os pares**, e a Task 16
+re-mediu a rede local assim (seção "Vazão sob perda"). Ponto cego do método: uma poltrona congelada não apresenta
+quadros (rVFC), então não há amostra de sincronia enquanto ela está parada; o erro acumulado aparece quando ela volta.
 
 Com a rede emulada (2 janelas) o p95 ficou em 19,8–27,5 ms enquanto havia dados; o único trecho > 125 ms (250 ms) foi
 na rodada com 1 % de perda, junto de um travamento.
@@ -137,6 +152,11 @@ na rodada com 1 % de perda, junto de um travamento.
 8 pausas: todas as poltronas no **mesmo frame** (diferença 0) e paradas **12–231 ms** depois do instante agendado
 (`at`), 285–500 ms depois do clique. O `at` é o clique + ida ao servidor + `CINEMA_LEAD_MS` (250 ms), de propósito: é o
 que deixa todos pararem juntos. O pior caso (231 ms) foi uma poltrona que precisou voltar com um seek.
+
+Limite do método da Task 15: o "mesmo frame" comparava o `currentTime` de cada janela **depois** do seek de volta, não
+o quadro que estava na tela. O script atual compara o `mediaTime` do **último quadro apresentado** (rVFC) de cada
+janela e registra o viés de relógio de cada uma (`Date.now() − (performance.timeOrigin + performance.now())`, em
+`M.clockBiasMs`), que limita o erro entre janelas. Re-medido na Task 16 (seção "Vazão sob perda").
 
 ### Entrar no meio, e o `LATE_SEEK_S`
 
@@ -174,17 +194,24 @@ quem projeta limitado a **12 Mbps (1,5× o filme)**, fila de 1 s, RTT +40 ms. Du
 | Davi entra no meio | primeiro quadro 14,2 s; sem medida de sincronia: a sala estava parada esperando outra poltrona | primeiro quadro 1,7 s; idem (sala parada esperando o Bruno) |
 | Sala esperando alguém travado | **10 vezes**, ~35–40 s cada: **343 s parada em 560 s** | **6 vezes**, 15–25 s cada: **118 s parada em 300 s** |
 | Eventos `waiting` por amigo | 11–12 | 6–14 (vários < 2 s, que não pausam a sala) |
-| Sincronia enquanto toca (p95 / máx.) | fora das esperas (±3 s): **5,6–13,8 ms / 38 ms**, nunca > 125 ms | fora das esperas: 46–50 ms / **2,4 s**, > 125 ms por até 2,75 s (travamentos curtos, < 2 s, que não pausam a sala: quem travou fica para trás e volta com um seek) |
+| Sincronia por par, sem filtro (p95; máx.; maior trecho > 125 ms), Davi fora | Bruno×Ana 13,2 ms, Carla×Ana 18,8 ms, Carla×Bruno 7,6 ms; máx. 1,6–1,9 s; 250 ms | Bruno×Ana **300,1 ms**, Carla×Ana **175,8 ms**, Carla×Bruno 55,5 ms; máx. 2,2–2,4 s; **2,75 s** (travamentos curtos, < 2 s, que não pausam a sala: quem travou fica para trás e volta com um seek) |
 | Pausa (3 / 2) | mesmo frame em todas; ≤ 44 ms depois de `at` | mesmo frame em todas; ≤ 31 ms depois de `at` |
 | Quem projeta enviou | 591 MiB (**1,05× o filme**, a 9,7 Mbps: o teto de 12 não foi atingido, 0 descartes na fila) | 484 MiB em ~5 min (no teto de 12 Mbps) |
 | Cada amigo recebeu | 235–272 MiB (~44 % do filme; ~3,5 Mbps), 12–28 % de amigos | 219–245 MiB (~6 Mbps, abaixo dos 7,9 do filme); os amigos repassaram só ~5,4 Mbps somados |
 | Descrições com tag E2EE | 12 de 12 | 12 de 12 |
 
+Correção (revisão da Task 15): a versão anterior desta tabela citava p95 "fora das esperas (±3 s)" de 5,6–13,8 ms e
+46–50 ms, mas esse filtro não estava no script nem nos JSONs commitados. Os números acima são os do JSON, por par e
+sem filtro. O script atual calcula as duas coisas (`M.sync` sem filtro e `M.syncOutsideWaits` sem as esperas ± 3 s),
+para todos os pares, inclusive quem entrou no meio.
+
 Com 1 % de perda **o gargalo não é o upload de quem projeta, é cada conexão** (~2,5 Mbps, ver acima): três
 conexões por amigo não chegam aos 7,9 Mbps do filme, então a sala para a cada ~60 s para esperar alguém. Com 0,1 % o
 gargalo passa a ser o upload de quem projeta (12 Mbps) somado ao repasse entre amigos: três amigos precisam de
-23,7 Mbps, quem projeta dá 12, e os amigos só repassaram ~5,4 Mbps (precisariam de ~11,7). O super-seed funciona
-(quem projeta manda cada peça ~1×), mas o repasse entre amigos numa rede com perda não rende o suficiente.
+23,7 Mbps, quem projeta dá 12, e os amigos só repassaram ~5,4 Mbps (precisariam de ~11,7). O repasse entre amigos numa
+rede com perda não rendeu o suficiente. (A versão anterior dizia "o super-seed funciona, cada peça ~1×": os JSONs da
+Task 15 só têm bytes enviados ÷ tamanho do filme, `hostOverFilm` 1,0 e 0,9, o que não prova isso; a métrica certa,
+bytes enviados ÷ a união das peças que os amigos receberam, `hostOverUnion`, entrou no script na Task 16.)
 **Travamentos: reprova nos dois perfis.** Na rede local (3 janelas, 170 s) houve zero travamentos.
 
 ### Enxame: de amigo para amigo e upload de quem projeta

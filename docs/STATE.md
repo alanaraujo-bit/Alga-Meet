@@ -8,9 +8,11 @@
   O cinema fica ligado no servidor fora de produção.
 - **Números do §8** (`docs/benchmarks/cinema-engine.md`, lab `apps/desktop/scripts/cinema-lab.mjs` com 2–4 janelas reais):
   - **Passa na rede local:** primeiro frame 2,8 s; sincronia p95 25–33 ms (nunca > 125 ms); pausa no mesmo frame
-    em 8/8, ≤ 231 ms depois do instante agendado; entrar no meio 1,2–3,8 s; play agendado em ±1 frame; troca de áudio
+    em 8/8, ≤ 231 ms depois do instante agendado; entrar no meio 1,2–3,8 s em **6 de 7** entradas (a sétima levou 9,85 s e
+    pausou a sala 7 s: corrigido na Task 15, ainda sem nova medida); play agendado em ±1 frame; troca de áudio
     sem mexer no vídeo; quem projeta envia 1,1× o filme (a terceira pessoa recebe 95–99 % de amigos).
-  - **Reprova:** instalador **+48,6 MiB** (meta ≤ 40 MB; o ffmpeg LGPL genérico comprime para 39,7 MiB sozinho);
+  - **Reprova:** instalador **+48,6 MiB** (meta ≤ 40 MB; o ffmpeg LGPL genérico comprime para 39,7 MiB sozinho; **o dono
+    aceitou o crescimento do instalador, até ~150 MB — R34**);
     **rede emulada** (RTT 40 ms, upload de quem projeta 12–20 Mbps): primeiro frame 17–38 s e, com 1 % de perda,
     ~2,5 Mbps por conexão (o data channel não aguenta um gargalo saturado nem perda aleatória alta); **travamentos com
     4 pessoas e upload de 1,5× o bitrate**: com 1 % de perda a sala ficou parada 343 s de 560, com 0,1 % 118 s de 300
