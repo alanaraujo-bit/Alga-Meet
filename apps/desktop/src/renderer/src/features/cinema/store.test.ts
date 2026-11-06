@@ -1,5 +1,5 @@
 import type { CinemaPieceMeta, CinemaSessionView, Dispatch } from '@alga/shared'
-import { CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME, CINEMA_READY_TIMEOUT_MS } from '@alga/shared'
+import { CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME, CINEMA_READY_TIMEOUT_MS, CINEMA_SEEK_READY_S } from '@alga/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const CH = '0190a0a0-0000-7000-8000-00000000c0c0'
@@ -27,7 +27,12 @@ vi.mock('./swarm/swarm', () => ({
     setPlayhead = vi.fn()
     addPeer = vi.fn()
     removePeer = vi.fn()
-    aheadS = () => 0
+    aheadS = (_track?: string) => 0
+    recvMbps = (): number | null => null
+    setCriticalS = vi.fn()
+    addLane = vi.fn()
+    removeLane = vi.fn()
+    setRtt = vi.fn()
     pieces = () => []
     get = async () => null
     stats = () => ({ fromHostPct: 0, fromPeersPct: 0, downMbps: 0, upMbps: 0, peers: 0 })
@@ -95,7 +100,7 @@ const bridge = {
 }
 vi.stubGlobal('window', { alga: { cinema: bridge, e2ee: { cinemaTag: async () => null } } })
 
-const { handleCinemaDispatch, onMediaChange, useCinema, resetCinema, attachVideo, detachVideo } = await import('./store')
+const { handleCinemaDispatch, onMediaChange, useCinema, resetCinema, attachVideo, detachVideo, readyAheadS } = await import('./store')
 const { useMedia } = await import('@/media/store')
 const { openFromFile, openSession } = await import('./actions')
 const { t } = await import('./strings')
@@ -526,5 +531,72 @@ describe('late join (sat into a room already playing)', () => {
     dispatch({ t: 'CINEMA_STATE', d: view({ playback: playing() }) })
     players.list.at(-1).stall(true)
     expect(lastStatus()).toBe('stalled')
+  })
+})
+
+describe('adaptive pre-roll (poor networks start later instead of stalling again and again)', () => {
+  const base = { isHost: false, bitrateKbps: 8000, afterStall: false, leftS: 600 }
+  it('readyAheadS: 3 s on a good network; 30 s below 1.1× the bitrate or before any measure; 60 s after a stall', () => {
+    expect(readyAheadS({ ...base, recvMbps: 8.8 })).toBe(CINEMA_SEEK_READY_S)
+    expect(readyAheadS({ ...base, recvMbps: 8.7 })).toBe(30)
+    expect(readyAheadS({ ...base, recvMbps: null })).toBe(30)
+    expect(readyAheadS({ ...base, recvMbps: 5, afterStall: true })).toBe(60)
+    expect(readyAheadS({ ...base, recvMbps: 50, afterStall: true })).toBe(CINEMA_SEEK_READY_S)
+  })
+  it('readyAheadS: the host is the source (3 s); never more than what is left of the film', () => {
+    expect(readyAheadS({ ...base, isHost: true, recvMbps: null, afterStall: true })).toBe(CINEMA_SEEK_READY_S)
+    expect(readyAheadS({ ...base, recvMbps: 1, leftS: 12 })).toBe(12)
+    expect(readyAheadS({ ...base, recvMbps: 1, leftS: -1 })).toBe(0)
+  })
+
+  const el = { currentTime: 100 } as HTMLVideoElement
+  const lastStatus = () => (sent.filter((f) => f.op === 'cinema_status').at(-1) as { status?: string } | undefined)?.status
+  const seated = async (ahead: number, mbps: number | null) => {
+    attachVideo(el)
+    dispatch({ t: 'CINEMA_STATE', d: view() })
+    await vi.advanceTimersByTimeAsync(0)
+    const s = engine.swarms.at(-1)
+    s.aheadS = () => ahead
+    s.recvMbps = () => mbps
+    return s
+  }
+  beforeEach(() => {
+    vi.useFakeTimers()
+    players.list.length = 0
+  })
+  afterEach(() => {
+    detachVideo(el)
+    vi.useRealTimers()
+  })
+
+  it('poor network: preparing with 20 s ahead, ready at 30 s; a good one is ready at 3 s', async () => {
+    const s = await seated(20, 4)
+    await vi.advanceTimersByTimeAsync(2500)
+    expect(lastStatus()).toBe('preparing')
+    s.aheadS = () => 30
+    await vi.advanceTimersByTimeAsync(600)
+    expect(lastStatus()).toBe('ready')
+    resetCinema()
+    sent.length = 0
+    await seated(3, 40)
+    await vi.advanceTimersByTimeAsync(600)
+    expect(lastStatus()).toBe('ready')
+  })
+
+  it('after a stall on a poor network: stays stalled until 60 s ahead (the swarm fetches 60 s as critical), then ready', async () => {
+    const s = await seated(12, 4)
+    const player = players.list.at(-1)
+    dispatch({ t: 'CINEMA_STATE', d: view({ playback: { ...view().playback, playing: true, reason: 'user', at: Date.now(), seq: 2 } }) })
+    player.stall(true)
+    expect(lastStatus()).toBe('stalled')
+    player.stall(false) // the player holds CINEMA_RESUME_AHEAD_S again
+    s.aheadS = () => 40
+    await vi.advanceTimersByTimeAsync(2500)
+    expect(lastStatus()).toBe('stalled')
+    expect(s.setCriticalS).toHaveBeenLastCalledWith(60)
+    s.aheadS = () => 60
+    await vi.advanceTimersByTimeAsync(600)
+    expect(lastStatus()).toBe('ready')
+    expect(s.setCriticalS).toHaveBeenLastCalledWith(30)
   })
 })

@@ -33,6 +33,12 @@ describe('nextRequests', () => {
     expect(nextRequests(v, 4).map((r) => r.n)).toEqual([2, 3, 4, 5])
   })
 
+  it('a wider criticalS (a longer pre-roll) fetches that far ahead as critical: urgent and in time order', () => {
+    const v = view({ playheadS: 0, criticalS: 60, index: new Map([['v', track(0, 10, 20, 30, 40, 50, 60)]]), mine: new Map([['v', new Set([0])]]), peers: [peer('a', 1, all(8)), peer('b', 1, all(8)), peer('c', 1, all(8))] })
+    const r = nextRequests(v, 7)
+    expect(r.map((x) => [x.n, x.urgent])).toEqual([[1, true], [2, true], [3, true], [4, true], [5, true], [6, true], [7, false]])
+  })
+
   it('outside the window takes the rarest piece first, nearest on a tie', () => {
     const v = view({
       index: new Map([['v', track(0, 10, 20, 30, 40, 50, 60)]]),

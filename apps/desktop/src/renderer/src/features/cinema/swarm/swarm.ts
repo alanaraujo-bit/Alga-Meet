@@ -2,7 +2,7 @@ import type { CinemaPieceMeta, CinemaTrackId } from '@alga/shared'
 import { Assembler } from './assembler'
 import type { PieceCache } from './cache'
 import { bitsOf, decode, encode, setOf, verOf, type WireMsg } from './protocol'
-import { hostShouldSend, isCritical, isLate, nextRequests, pieceKey, type SwarmView } from './scheduler'
+import { CRITICAL_S, hostShouldSend, isCritical, isLate, nextRequests, pieceKey, type SwarmView } from './scheduler'
 import { PeerUploader, type ChannelLike } from './uploader'
 
 export { HIGH_WATER, LOW_WATER, type ChannelLike } from './uploader'
@@ -31,6 +31,8 @@ const DEFAULT_CAP_BYTES = 4 * 1024 ** 3
 const BEHIND_S = 600
 /** Prefetch toward each peer is paced at this × the film's bitrate (halved while its RTT says a queue is building). */
 export const PREFETCH_PACE = 1.5
+/** recvMbps averages this many busy seconds. */
+const RATE_WINDOW = 10
 
 type Source = (track: CinemaTrackId, n: number) => Promise<ArrayBuffer | null>
 /** `at` = last accepted chunk (request time before); `done` = every byte is in (being verified/stored): later chunks are ignored. */
@@ -88,6 +90,9 @@ export class Swarm {
   private up = 0
   private downMbps = 0
   private upMbps = 0
+  /** Bytes received in each of the last RATE_WINDOW seconds that had a download running (recvMbps). */
+  private busy: number[] = []
+  private criticalS = CRITICAL_S
   private cap: number
   /** Stores run one at a time so eviction and the byte count stay in step. */
   private storing: Promise<unknown> = Promise.resolve()
@@ -214,6 +219,23 @@ export class Swarm {
       }
     })
     this.schedule()
+  }
+
+  /** Seconds ahead fetched as critical: CRITICAL_S, or more while the seat needs a longer pre-roll (never less). */
+  setCriticalS(s: number): void {
+    const next = Math.max(CRITICAL_S, s)
+    if (next === this.criticalS) return
+    this.criticalS = next
+    this.schedule()
+  }
+
+  /**
+   * Receive rate (Mbps) over the last RATE_WINDOW seconds that had a download running (idle seconds don't count: a full
+   * buffer is not a slow network). Null before 2 such seconds.
+   */
+  recvMbps(): number | null {
+    if (this.busy.length < 2) return null
+    return (this.busy.reduce((a, b) => a + b, 0) * 8) / 1e6 / this.busy.length
   }
 
   setPlayhead(s: number): void {
@@ -467,7 +489,7 @@ export class Swarm {
     for (const [track, set] of this.mine) {
       for (const n of set) {
         const m = this.index.get(track)?.[n]
-        if (!m || isCritical(m, this.playheadS)) continue
+        if (!m || isCritical(m, this.playheadS, this.criticalS)) continue
         const behind = this.playheadS - m[0] - m[1]
         victims.push([behind > BEHIND_S ? 2e9 + behind : behind >= 0 ? 1e9 + behind : m[0], track, n, m[2]])
       }
@@ -516,6 +538,7 @@ export class Swarm {
       })),
       inflight,
       budgetPieces: this.opts.isHost ? 0 : this.budget(),
+      criticalS: this.criticalS,
     }
   }
 
@@ -565,6 +588,7 @@ export class Swarm {
     }
     this.downMbps = ewma(this.downMbps, this.down)
     this.upMbps = ewma(this.upMbps, this.up)
+    if (this.down > 0 || [...this.inflight.values()].some((f) => !f.done)) this.busy = [...this.busy, this.down].slice(-RATE_WINDOW)
     this.down = this.up = 0
     for (const [k, f] of this.inflight) {
       if (f.done) {
@@ -580,7 +604,7 @@ export class Swarm {
       const silent = now - Math.max(f.start, p.lastByte) >= REQ_TIMEOUT_MS // nothing at all from that peer
       const stale = now - f.at >= STALE_MS // busy with other pieces, never this one
       // a critical download that will miss the playhead moves (once) to another holder
-      const late = !silent && !stale && !this.moved.has(k) && isCritical(m, this.playheadS) &&
+      const late = !silent && !stale && !this.moved.has(k) && isCritical(m, this.playheadS, this.criticalS) &&
         isLate(m, f.got, (now - f.start) / 1000, this.playheadS) && this.otherHolder(p, f.track, f.n)
       if (!silent && !stale && !late) continue
       this.cancelFlight(k)

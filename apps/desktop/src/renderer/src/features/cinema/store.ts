@@ -130,6 +130,8 @@ interface Engine {
    * preparing, so the room does not pause for everyone while I load (measured: a 7 s room pause on a late join).
    */
   arrivingUntil: number
+  /** Stalled (not while arriving) and not `ready` since: on a poor network the pre-roll is POOR_RESUME_S. */
+  afterStall: boolean
   checked: boolean
   /** Audio track the player could not switch to yet (its init is still on the way). */
   pendingAudio: number | null
@@ -186,7 +188,7 @@ function createEngine(v: CinemaSessionView): void {
   const e: Engine = {
     sessionId: v.sessionId, hostId: v.hostId, isHost, film: v.film, swarm: null, mesh: null, player: null, earlyPieces: [], earlySignals: [],
     offs: [], timer: setInterval(() => tick(e), 500), stalled: false, unsupported: false, e2eeFailed: false,
-    arrivingUntil: v.playback.playing ? Date.now() + CINEMA_READY_TIMEOUT_MS : 0, checked: false, pendingAudio: null, sentStatus: null,
+    arrivingUntil: v.playback.playing ? Date.now() + CINEMA_READY_TIMEOUT_MS : 0, afterStall: false, checked: false, pendingAudio: null, sentStatus: null,
     sentAt: 0, closed: false,
   }
   eng = e
@@ -286,6 +288,7 @@ function attachPlayer(e: Engine): void {
   e.offs.push(
     player.onStall((stalled) => {
       e.stalled = stalled
+      if (stalled && Date.now() >= e.arrivingUntil) e.afterStall = true
       pushStatus(e)
     }),
     player.onError(() => {
@@ -340,13 +343,39 @@ function aheadS(e: Engine): number {
   return Math.min(s.aheadS('v'), ...audioTrack(m.audioId).map((tr) => s.aheadS(tr)))
 }
 
+/** A seat receiving the film slower than this × its bitrate (or not measured yet) is on a poor network. */
+export const POOR_RATE_X = 1.1
+/** Seconds ahead a seat on a poor network needs before `ready`: after a start/seek, and after a stall of its own. */
+export const POOR_READY_S = 30
+export const POOR_RESUME_S = 60
+
+/**
+ * Seconds a seat must hold ahead of its playhead before it reports `ready` (adaptive pre-roll): CINEMA_SEEK_READY_S on a
+ * good network; on a poor one (receive rate < POOR_RATE_X × the bitrate, or no measure yet) POOR_READY_S, and
+ * POOR_RESUME_S after a stall, so the room starts later instead of stalling again and again. The host is the source.
+ * Never more than what is left of the film. The server's CINEMA_READY_TIMEOUT_MS still starts a start/seek without us.
+ */
+export function readyAheadS(o: { isHost: boolean; recvMbps: number | null; bitrateKbps: number; afterStall: boolean; leftS: number }): number {
+  const poor = !o.isHost && (o.recvMbps === null || o.recvMbps < (POOR_RATE_X * o.bitrateKbps) / 1000)
+  const need = !poor ? CINEMA_SEEK_READY_S : o.afterStall ? POOR_RESUME_S : POOR_READY_S
+  return Math.max(0, Math.min(need, o.leftS))
+}
+
 function statusNow(e: Engine): Status {
   if (e.unsupported) return 'unsupported'
   if (e.e2eeFailed) return 'preparing'
   if (e.stalled) return Date.now() < e.arrivingUntil ? 'preparing' : 'stalled'
   const pos = playheadS(e)
-  const need = Math.max(0, Math.min(CINEMA_SEEK_READY_S, e.film.durationS - pos - 0.5))
-  if (aheadS(e) >= need) return 'ready'
+  const need = (afterStall: boolean) => readyAheadS({
+    isHost: e.isHost, recvMbps: e.swarm?.recvMbps() ?? null, bitrateKbps: e.film.bitrateKbps, afterStall, leftS: e.film.durationS - pos - 0.5,
+  })
+  const ready = aheadS(e) >= need(e.afterStall)
+  if (ready) e.afterStall = false
+  // a longer pre-roll is fetched as critical (in time order, not paced), else it could wait behind rarest-first prefetch
+  e.swarm?.setCriticalS(need(e.afterStall))
+  if (ready) return 'ready'
+  // recovering from my own stall: the room keeps waiting for me until the longer pre-roll is in
+  if (e.afterStall) return 'stalled'
   // ready stays ready while playing; a start/seek resets the seat to preparing on the server, and then we follow
   const seat = useCinema.getState().session?.seats.find((x) => x.userId === meId())
   return seat?.status === 'ready' && e.sentStatus === 'ready' ? 'ready' : 'preparing'

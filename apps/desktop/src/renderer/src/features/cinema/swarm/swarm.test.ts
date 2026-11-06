@@ -541,6 +541,30 @@ describe('Swarm', () => {
     expect(inner.bytes()).toBe(0)
   })
 
+  it('recvMbps: bytes per second over the seconds with a download running; idle seconds do not count; null before two', async () => {
+    fakeClock()
+    const f = await film(6, 250_000)
+    const a = friend(f)
+    const got = count(a)
+    const s = raw(a, 'S', f)
+    s.ch.send(encode(haveAll(f)))
+    await until(() => s.reqs.length === 3)
+    const first = s.reqs.splice(0)
+    for (const r of first) s.serve(r.n, r.v)
+    await until(() => got.size === 3)
+    const bytes = first.reduce((sum, r) => sum + f.bytes[r.n]!.length, 0)
+    vi.advanceTimersByTime(1000)
+    expect(a.recvMbps()).toBeNull()
+    await until(() => s.reqs.length === 3)
+    vi.advanceTimersByTime(1000) // requests out, nothing came: a busy second with 0 bytes
+    expect(a.recvMbps()).toBeCloseTo((bytes * 8) / 1e6 / 2)
+    a.setPlayhead(10_000) // past the film: nothing more to fetch
+    for (const r of s.reqs.splice(0)) s.ch.send(encode({ t: 'none', track: 'v', n: r.n }))
+    await sleep(20)
+    vi.advanceTimersByTime(5000) // idle
+    expect(a.recvMbps()).toBeCloseTo((bytes * 8) / 1e6 / 2)
+  })
+
   it('ignores text and malformed messages; close() empties the cache', async () => {
     const f = await film(2)
     const cache = memoryCache()

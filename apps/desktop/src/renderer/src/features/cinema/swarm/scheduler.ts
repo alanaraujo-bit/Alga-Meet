@@ -17,6 +17,8 @@ export interface SwarmView {
   inflight: Map<string, string>
   /** Cache capacity left, in pieces (limits prefetch only: the critical window is always fetched). */
   budgetPieces: number
+  /** Seconds ahead fetched as critical (default CRITICAL_S; more while a seat needs a longer pre-roll). */
+  criticalS?: number
 }
 
 /** `urgent` = in our critical window (the uploader serves it first); `preempt` = in-flight prefetch to cancel for it. */
@@ -25,8 +27,8 @@ export interface PieceRequest { peer: string; track: CinemaTrackId; n: number; u
 export const pieceKey = (track: CinemaTrackId, n: number): string => `${track}:${n}`
 
 /** Init segments and single-file pieces (durS 0) are always critical; media pieces when they overlap the window. */
-export function isCritical(m: CinemaPieceMeta, playheadS: number): boolean {
-  return m[1] === 0 || (m[0] + m[1] > playheadS && m[0] < playheadS + CRITICAL_S)
+export function isCritical(m: CinemaPieceMeta, playheadS: number, criticalS = CRITICAL_S): boolean {
+  return m[1] === 0 || (m[0] + m[1] > playheadS && m[0] < playheadS + criticalS)
 }
 
 /** At its own average rate so far, the download ends after the playhead reaches the piece (playing at 1×). */
@@ -55,7 +57,7 @@ export function nextRequests(v: SwarmView, maxNew: number): PieceRequest[] {
     for (let n = 0; n < list.length; n++) {
       const m = list[n]
       if (!m || mine?.has(n) || v.inflight.has(pieceKey(track, n))) continue
-      if (isCritical(m, v.playheadS)) crit.push([track, n, m[1] === 0 ? -Infinity : m[0]])
+      if (isCritical(m, v.playheadS, v.criticalS)) crit.push([track, n, m[1] === 0 ? -Infinity : m[0]])
       else if (m[0] + m[1] > v.playheadS) rest.push([track, n, m[0], v.peers.filter((p) => p.has.get(track)?.has(n)).length])
     }
   }
@@ -81,7 +83,7 @@ export function nextRequests(v: SwarmView, maxNew: number): PieceRequest[] {
       if (id !== peer || preempted.has(k)) continue
       const i = k.lastIndexOf(':')
       const m = v.index.get(k.slice(0, i) as CinemaTrackId)?.[Number(k.slice(i + 1))]
-      if (m && !isCritical(m, v.playheadS) && m[0] > farthest) [victim, farthest] = [k, m[0]]
+      if (m && !isCritical(m, v.playheadS, v.criticalS) && m[0] > farthest) [victim, farthest] = [k, m[0]]
     }
     return victim
   }
@@ -124,5 +126,5 @@ export function nextRequests(v: SwarmView, maxNew: number): PieceRequest[] {
 export function hostShouldSend(hostView: SwarmView, peerId: string, track: CinemaTrackId, n: number): boolean {
   const m = hostView.index.get(track)?.[n]
   if (!m) return false
-  return isCritical(m, hostView.playheadS) || !hostView.peers.some((p) => p.id !== peerId && p.has.get(track)?.has(n))
+  return isCritical(m, hostView.playheadS, hostView.criticalS) || !hostView.peers.some((p) => p.id !== peerId && p.has.get(track)?.has(n))
 }
