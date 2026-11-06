@@ -14,7 +14,7 @@ const RETRY_MS = 3_000
 
 /** While seated: fetch the poster and the sprite once each, and tally the reactions. */
 export function useKeepArt(session: CinemaSessionView): void {
-  const key = `${session.sessionId}:${session.film.durationS}`
+  const key = `${session.sessionId}:${session.film.durationS}:${JSON.stringify(session.film.episode)}`
   const sessionId = session.sessionId
   useEffect(() => {
     const cur = useArt.getState()

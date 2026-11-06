@@ -29,8 +29,9 @@
 }
 .leaveEngineering {
   position: absolute;
-  right: calc(var(--caption-w) + 12px);
-  top: 6px;
+  left: 50%;
+  top: 44px; /* under the engineering stage's own top row, over the film */
+  transform: translateX(-50%);
   z-index: 20;
 }
 .lightHalf,

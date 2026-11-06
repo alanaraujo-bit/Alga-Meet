@@ -358,6 +358,9 @@
   gap: 10px;
   color: var(--text-secondary);
 }
+.goesOn > :first-child {
+  box-shadow: 0 0 0 3px #0f1011, 0 0 0 4.5px rgba(139, 142, 247, 0.55);
+}
 .goesOn b {
   font-weight: 510;
   color: var(--text-primary);

@@ -102,7 +102,8 @@ function Room({ channel, mini, onEngineering }: { channel: Channel; mini: boolea
   const inRoom = IN_ROOM.has(view.screen)
   const shown = inRoom && !mini
   const playingScreen = view.screen === 'watching' || view.screen === 'credits'
-  const idle = useIdle(IDLE_MS, shown && playingScreen)
+  // the next-episode card keeps the top bar up (mockup 10)
+  const idle = useIdle(IDLE_MS, shown && playingScreen && !(view.screen === 'credits' && session.next))
   const uiShown = view.screen !== 'countdown' && !(playingScreen && idle)
   useFilmAudio(audio)
 

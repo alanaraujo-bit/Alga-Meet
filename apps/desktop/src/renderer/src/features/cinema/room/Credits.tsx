@@ -38,7 +38,7 @@ export function NextUp({ session, channel, nextUpS }: { session: CinemaSessionVi
         </div>
         {isHost && (
           <div className={s.nextActions}>
-            <Button variant="primary" icon={Play} onClick={hostSwitchNext}>{t.next.watchNow}</Button>
+            <Button variant="primary" onClick={hostSwitchNext}><Icon icon={Play} size={14} filled />{t.next.watchNow}</Button>
             <Button variant="secondary" onClick={hostCancelNext}>{t.next.cancel}</Button>
           </div>
         )}

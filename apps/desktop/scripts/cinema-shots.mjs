@@ -138,7 +138,7 @@ const video = (page) => page.evaluate(() => {
   return v && { t: v.currentTime, paused: v.paused, ready: v.readyState }
 })
 
-/** Screenshot of one window + the composite mockup | app (≈1440 px wide JPG). */
+/** Screenshot of one window + the composite mockup | app (≈1440 px wide JPG); `mock` null = a check, kept in SHOTS only. */
 async function shot(k, name, mock = name) {
   const png = join(SHOTS, `${name}.png`)
   // toasts from earlier steps ("Ana pulou para …") are not part of the state being compared
@@ -147,12 +147,13 @@ async function shot(k, name, mock = name) {
   for (let i = 0; i < 5 && (await toasts.count()) > 0; i++) await toasts.first().evaluate((el) => el.click()).catch(() => undefined)
   await sleep(250)
   await apps[k].page.screenshot({ path: png })
+  if (mock === null) return log('check', name, png)
   const m = join(MOCK, `${mock}.jpg`)
   const out = join(COMPARE, `${name}.jpg`)
   // no mockup for this state (countdown): the app alone
   const args = existsSync(m)
-    ? ['-i', m, '-i', png, '-filter_complex', '[0]scale=1440:900[a];[1]scale=1440:900[b];[a][b]hstack=inputs=2,scale=1440:-2:flags=lanczos']
-    : ['-i', png, '-vf', 'scale=1440:900:flags=lanczos']
+    ? ['-i', m, '-i', png, '-filter_complex', '[0]scale=-2:900[a];[1]scale=-2:900[b];[a][b]hstack=inputs=2,scale=1440:-2:flags=lanczos']
+    : ['-i', png, '-vf', 'scale=1440:-2:flags=lanczos']
   const r = spawnSync(FFMPEG, ['-y', '-hide_banner', '-loglevel', 'error', ...args, '-q:v', '3', out], { encoding: 'utf8' })
   if (r.status !== 0) throw new Error(`compose: ${r.stderr}`)
   log('shot', name, png)
@@ -309,6 +310,7 @@ await step('06-assistindo-limpo', async () => {
 
 await step('07-pausa', async () => {
   await pa.keyboard.press('Escape')
+  await pa.evaluate(() => document.activeElement?.blur()) // a focused emoji would take the Space
   await pa.locator('body').press('Space')
   await until(async () => (await video(pb))?.paused, 'B paused', 10_000)
   await pb.mouse.move(900, 200)
@@ -345,6 +347,144 @@ await step('08-esperando', async () => {
   await sleep(400)
   await shot('a', '08-esperando')
   await pb.evaluate(() => (window.__holdStatus = false))
+})
+
+// ── Batch B: engineering mode, reduced motion, small window, fullscreen, host away, the ticket, the next episode ──
+const setSize = (k, w, h) => apps[k].app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0].setContentSize(w, h), [w, h])
+const playing = (page) => until(async () => {
+  const v = await video(page)
+  return v && !v.paused && v.t > 0.5
+}, 'playing', 30_000)
+
+await step('engenharia', async () => {
+  await playing(pb)
+  await pb.mouse.move(700, 320)
+  await pb.getByRole('button', { name: 'Mais opções' }).click()
+  await pb.getByRole('menuitem', { name: 'Modo engenharia' }).click()
+  await pb.getByRole('button', { name: 'Sair do modo engenharia' }).waitFor({ timeout: 5000 })
+  await sleep(600)
+  await shot('b', 'engenharia', null)
+  await pb.getByRole('button', { name: 'Sair do modo engenharia' }).click()
+  await playing(pb)
+})
+
+await step('reduzido', async () => {
+  await pb.emulateMedia({ reducedMotion: 'reduce' })
+  await pb.mouse.move(720, 330)
+  await sleep(700)
+  await shot('b', '05-assistindo-ui-reduzido', '05-assistindo-ui')
+  await pa.locator('body').press('Space')
+  await until(async () => (await video(pb))?.paused, 'B paused', 10_000)
+  await pb.mouse.move(900, 200)
+  await sleep(800)
+  await shot('b', '07-pausa-reduzido', '07-pausa')
+  await sleep(16_000) // a long pause resumes with the countdown (text with reduced motion)
+  await pa.locator('body').press('Space')
+  await sleep(900)
+  await shot('b', 'countdown-reduzido')
+  await pb.emulateMedia({ reducedMotion: null })
+})
+
+await step('small-window', async () => {
+  await playing(pb)
+  await setSize('b', 960, 600)
+  await sleep(1200)
+  await pb.mouse.move(500, 300)
+  await sleep(600)
+  await shot('b', 'small-window', '05-assistindo-ui')
+  await pa.locator('body').press('Space')
+  await until(async () => (await video(pb))?.paused, 'B paused', 10_000)
+  await sleep(900)
+  await shot('b', 'small-window-pausa', '07-pausa')
+  await pa.locator('body').press('Space')
+  await setSize('b', 1440, 900)
+  await sleep(1000)
+})
+
+await step('fullscreen', async () => {
+  await playing(pb)
+  await pb.locator('body').press('f')
+  await until(() => pb.evaluate(() => !!document.fullscreenElement), 'fullscreen', 5000)
+  await sleep(1500)
+  await pb.mouse.move(800, 400)
+  await sleep(600)
+  await shot('b', 'fullscreen', '05-assistindo-ui')
+  await pb.locator('body').press('Escape')
+  await until(() => pb.evaluate(() => !document.fullscreenElement), 'out of fullscreen', 5000)
+  await sleep(800)
+})
+
+await step('host-away', async () => {
+  // the host's socket drops and stays down for 4 s (its reconnect would otherwise end host_away at once)
+  await pa.evaluate(() => {
+    const W = window.WebSocket
+    // a socket to a closed port fails like a dropped network; the app's own backoff retries
+    window.WebSocket = Object.assign(function (_url, protocols) { return new W('ws://127.0.0.1:9/', protocols) }, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 })
+    setTimeout(() => (window.WebSocket = W), 4000)
+    window.__ws.close()
+  })
+  await pb.getByText(/saiu da sessão/).first().waitFor({ timeout: 8000 })
+  await sleep(300)
+  await shot('b', 'host-away', null)
+  await pb.getByText(/saiu da sessão/).first().waitFor({ state: 'hidden', timeout: 30_000 })
+})
+
+await step('11-canhoto', async () => {
+  // the end of the film with no next file: the host's client ends the session and everyone gets the ticket
+  if (await video(pa).then((v) => v?.paused)) await pa.locator('body').press('Space')
+  await playing(pa)
+  await pa.mouse.move(700, 400)
+  await pa.getByRole('slider', { name: 'Linha do tempo' }).focus()
+  await pa.keyboard.press('End')
+  const ticket = (page) => page.getByRole('dialog', { name: /^Canhoto da sessão/ })
+  await ticket(pa).waitFor({ timeout: 40_000 })
+  await ticket(pb).waitFor({ timeout: 10_000 })
+  await sleep(3600) // the lights come up over 3 s, then the stub
+  await pa.mouse.move(1300, 800)
+  await shot('a', '11-canhoto')
+  await shot('b', '11-canhoto-bia', null)
+  for (const page of [pa, pb]) await page.getByRole('button', { name: 'Voltar para a chamada' }).click()
+})
+
+await step('10-proximo-episodio', async () => {
+  // two episodes in one folder (copies of the film: the room only needs S01E02 -> S01E03 by name)
+  const dir = join(SHOTS, 'series')
+  mkdirSync(dir, { recursive: true })
+  const ep = (n) => join(dir, `A.Travessia.S01E0${n}.1080p.WEB-DL.mkv`)
+  for (const n of [2, 3]) if (!existsSync(ep(n))) cpSync(FILM, ep(n))
+  await apps.a.app.evaluate(({ dialog }, file) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] })
+  }, ep(2))
+  await dock(pa).getByRole('button', { name: 'Cinema' }).click()
+  await pa.getByRole('dialog', { name: 'Projetar para a sala' }).waitFor({ timeout: 30_000 })
+  await pa.getByRole('dialog').getByRole('button', { name: /^(Abrir sessão|Do começo)/ }).first().click()
+  await pb.getByRole('button', { name: 'Sentar', exact: true }).click({ timeout: 20_000 })
+  await until(async () => !(await pa.getByRole('button', { name: /^Começar/ }).isDisabled()), 'all ready', 60_000)
+  // Bia leaves the call's screen while seated: the film goes on in a corner (mini)
+  await pb.getByRole('complementary', { name: 'Canais' }).getByRole('button', { name: /geral/ }).first().click()
+  await pa.getByRole('button', { name: /^Começar/ }).click()
+  await playing(pa)
+  await playing(pb)
+  await sleep(1500)
+  await shot('b', 'mini', null)
+  await pb.getByRole('button', { name: 'Voltar para a sala' }).evaluate((el) => el.click())
+  await sleep(1200)
+  // to just before the credits chapter (540 s of 600)
+  await pa.mouse.move(700, 400)
+  const bar = pa.getByRole('slider', { name: 'Linha do tempo' })
+  const box = await bar.boundingBox()
+  await pa.mouse.click(box.x + (box.width * 533) / 600, box.y + box.height / 2)
+  await pa.locator('section[aria-label^="Próximo:"]').waitFor({ timeout: 40_000 })
+  await sleep(700)
+  await shot('a', '10-proximo-episodio')
+  await shot('b', '10-proximo-episodio-bia', null)
+  // the switch: same session, same seats, S01E03 from its start
+  await pb.getByText('· S01E03').first().waitFor({ timeout: 30_000 })
+  await until(async () => {
+    const v = await video(pb)
+    return v && !v.paused && v.t > 1 && v.t < 60
+  }, 'B playing S01E03', 40_000)
+  await shot('b', 'switched-s01e03', null)
 })
 
 log('composites in', COMPARE)
