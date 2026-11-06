@@ -668,3 +668,192 @@
   right: 32px;
   bottom: 176px;
 }
+
+/* ── Paused / waiting / countdown (mockups 07, 08): the middle of the frame ─────────────── */
+.center > :global(span[role='img']),
+.center > :global(span[aria-hidden='true']) {
+  flex: none;
+}
+.bigTitle {
+  margin-top: 18px;
+  font: 590 30px/38px var(--font-ui);
+  font-variation-settings: var(--opsz-display);
+  letter-spacing: -0.022em;
+  color: var(--text-primary);
+}
+.afterRing {
+  margin-top: 22px;
+}
+.bigSub {
+  margin-top: 4px;
+  font: 400 15px/22px var(--font-ui);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.afterRing + .bigSub {
+  margin-top: 6px;
+}
+.progress {
+  margin-top: 10px;
+  font: 510 12px/16px var(--font-ui);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+.progress + .actions {
+  margin-top: 22px;
+}
+.note {
+  margin-top: 16px;
+  font: 400 12px/16px var(--font-ui);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.count {
+  display: block;
+}
+.countArc {
+  animation-name: drain;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes drain {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: var(--c);
+  }
+}
+.countText {
+  font: 510 15px/22px var(--font-ui);
+  color: var(--text-secondary);
+}
+
+/* ── Intermission (mockup 09): lights on, the cover soft behind, bigger seats ─────────────── */
+.intermission {
+  position: absolute;
+  inset: 0;
+  --seat-bg: #0f1011;
+  --gap-bg: #0f1011;
+}
+.interBackdrop {
+  position: absolute;
+  inset: 0;
+  opacity: 0.52;
+  overflow: hidden;
+}
+.interBackdropImg {
+  filter: blur(64px) saturate(1.15);
+  transform: scale(1.2);
+}
+.interShade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 16, 17, 0.55), rgba(15, 16, 17, 0.3) 35%, rgba(15, 16, 17, 0.7) 70%, #0f1011);
+}
+.interCover {
+  position: absolute;
+  left: 50%;
+  top: 112px;
+  width: 560px;
+  height: 234px;
+  transform: translateX(-50%);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: var(--elev-modal);
+}
+.interCover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.interText {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 372px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.overline {
+  font: 590 11px/14px var(--font-ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.interLeft {
+  margin-top: 6px;
+  font: 590 44px/52px var(--font-ui);
+  font-variation-settings: var(--opsz-display);
+  letter-spacing: -0.024em;
+  font-variant-numeric: tabular-nums;
+}
+.interSub {
+  margin-top: 4px;
+  font: 400 14px/20px var(--font-ui);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.interSeats {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 552px;
+  display: flex;
+  justify-content: center;
+  gap: 0;
+}
+.interSeats > [role] {
+  width: 140px;
+}
+.seatOk,
+.seatNo {
+  margin-top: 2px;
+  font: 510 12px/16px var(--font-ui);
+  color: var(--accent);
+}
+.seatNo {
+  color: var(--text-tertiary);
+}
+.backBtn {
+  margin-top: 8px;
+  height: 26px;
+}
+.interHint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 720px;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+.interBar {
+  position: absolute;
+  left: 32px;
+  right: 32px;
+  bottom: 32px;
+}
+.interBar .timeline {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+}
+.interTimes {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font: 400 12px/16px var(--font-ui);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}

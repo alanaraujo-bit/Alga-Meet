@@ -16,7 +16,11 @@ import { clock, t } from '../strings'
 import { SubtitleOverlay } from '../SubtitleOverlay'
 import { useFilmAudio } from '../useFilmAudio'
 import { reducedMotion } from './prefs'
+import { Countdown } from './Countdown'
+import { Intermission } from './Intermission'
+import { Paused } from './Paused'
 import { useIdle } from './useIdle'
+import { Waiting } from './Waiting'
 import { Watching } from './Watching'
 import { creditsAt, roomView, type RoomScreen, type RoomView } from './view'
 import s from './room.module.css'
@@ -42,7 +46,7 @@ export function useServerNow(ms: number): number {
 }
 
 /** The room's view of the session now (see view.ts). */
-export function useRoomView(session: CinemaSessionView, now: number): RoomView & { position: number } {
+export function useRoomView(session: CinemaSessionView, now: number): RoomView & { position: number; pausedSince: number | null } {
   const seated = useCinema((st) => st.mine.seated)
   const ended = useCinema((st) => !!st.ended)
   const p = session.playback
@@ -53,7 +57,7 @@ export function useRoomView(session: CinemaSessionView, now: number): RoomView &
     session, seated, draft: false, ended, serverNow: now, pausedSince, durationS: session.film.durationS,
     creditsAtS: creditsAt(session.film.chapters), position,
   })
-  return { ...v, position }
+  return { ...v, position, pausedSince }
 }
 
 /** Seat names of the session (display names in this space). */
@@ -167,8 +171,17 @@ function Room({ channel, onEngineering }: { channel: Channel; onEngineering: () 
         </div>
       )}
       {shown && view.screen !== 'intermission' && (
-        <Watching session={session} channel={channel} view={view} video={vref} root={root} uiShown={uiShown} onEngineering={onEngineering} />
+        <Watching
+          session={session} channel={channel} view={view} video={vref} root={root} uiShown={uiShown} onEngineering={onEngineering}
+          center={
+            view.screen === 'paused' ? <Paused session={session} channel={channel} who={view.who} pausedSince={view.pausedSince} now={now} />
+            : view.screen === 'waiting' ? <Waiting session={session} channel={channel} who={view.who} />
+            : view.screen === 'countdown' ? <Countdown key={p.at} at={p.at} now={now} />
+            : null
+          }
+        />
       )}
+      {view.screen === 'intermission' && <Intermission session={session} channel={channel} video={vref} who={view.who} />}
       {statsOpen && (
         <div className={s.stats}>
           <StatsPanel names={names}>
@@ -177,10 +190,22 @@ function Room({ channel, onEngineering }: { channel: Channel; onEngineering: () 
         </div>
       )}
       {shown && <CinemaNotices />}
-      <div className={s.sr} aria-live="polite">{p.playing ? '' : p.by && view.screen === 'paused' ? t.stage.paused(names[p.by] ?? t.someone) : ''}</div>
+      <div className={s.sr} aria-live="polite">{announce(view, names)}</div>
     </div>,
     document.body,
   )
+}
+
+/** What the polite live region says when the room changes (spec §7.5). */
+function announce(view: RoomView, names: Record<string, string>): string {
+  const name = view.who ? (names[view.who] ?? t.someone) : t.someone
+  switch (view.screen) {
+    case 'paused': return view.who ? t.paused.title(name) : t.paused.plain
+    case 'waiting': return view.who ? t.waiting.title(name) : t.waiting.loading
+    case 'intermission': return t.intermission.overline
+    case 'countdown': return t.countdown(3)
+    default: return ''
+  }
 }
 
 /**

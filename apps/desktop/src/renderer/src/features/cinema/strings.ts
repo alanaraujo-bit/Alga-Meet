@@ -229,6 +229,37 @@ export const t = {
     start: 'Começar',
     startAnyway: 'Começar mesmo assim',
   },
+  /** Paused at half light (mockup 07). */
+  paused: {
+    title: (name: string) => `${name} pausou`,
+    plain: 'Pausado',
+    at: (at: string) => `em ${at} · o mesmo frame para todos`,
+    resume: 'Continuar',
+    space: 'Espaço',
+    toIntermission: (left: string) => `Vira intervalo em ${left}`,
+    hostAway: (name: string) => `${name} saiu da sessão`,
+    hostAwaySub: 'O filme espera quem projeta voltar.',
+  },
+  /** Waiting for someone (mockup 08). */
+  waiting: {
+    title: (name: string) => `Esperando ${name}`,
+    sub: (ahead: number) => `A conexão oscilou. A sala volta sozinha com ${ahead} s carregados à frente.`,
+    progress: (n: number, of: number) => `${n} de ${of} s`,
+    continueWithout: (name: string) => `Continuar sem ${name}`,
+    loading: 'Carregando para todos…',
+    loadingWho: (names: string) => `${names} ainda ${names.includes(' e ') ? 'carregam' : 'carrega'} este trecho`,
+  },
+  /** The intermission, lights on (mockup 09). */
+  intermission: {
+    overline: 'Intervalo',
+    left: (len: string) => `Faltam ${len}`,
+    pausedAt: (at: string, name: string | null) => `Pausado em ${at}${name ? ` por ${name}` : ''} · conversem à vontade`,
+    back: 'Voltar',
+    notYet: 'Ainda não',
+    hint: 'Quando todos estiverem prontos, as luzes apagam.',
+    standUp: 'Levantar',
+  },
+  countdown: (n: number) => `Começa em ${n}`,
   /** The room (Plan 2): screens, lights, controls. */
   room: {
     label: (title: string) => `Sala de cinema: ${title}`,
