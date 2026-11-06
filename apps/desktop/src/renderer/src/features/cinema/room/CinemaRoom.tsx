@@ -7,12 +7,12 @@ import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { useData } from '@/store/data'
 import { displayName } from '@/store/selectors'
-import { Button } from '@/ui'
+import { Button, toast } from '@/ui'
 import * as act from '../actions'
 import { createAss, destroyAss, setAssOffset } from '../ass'
 import { CinemaDev, CinemaNotices, StatsPanel } from '../CinemaDev'
 import { attachVideo, detachVideo, serverNow, useCinema } from '../store'
-import { t } from '../strings'
+import { clock, t } from '../strings'
 import { SubtitleOverlay } from '../SubtitleOverlay'
 import { useFilmAudio } from '../useFilmAudio'
 import { reducedMotion } from './prefs'
@@ -128,6 +128,19 @@ function Room({ channel, onEngineering }: { channel: Channel; onEngineering: () 
   }, [isHost, hostFileId])
 
   useRoomKeys(vref, root)
+
+  // "Ana pulou para 1:12:40 · Desfazer": every seek of the room, undone by seeking back to where it was.
+  const last = useRef(session.playback)
+  useEffect(() => {
+    const prev = last.current
+    const p = session.playback
+    last.current = p
+    if (p.seq === prev.seq || p.reason !== 'buffering' || !p.by) return
+    const from = positionAt(prev, p.at, session.film.durationS)
+    if (Math.abs(p.position - from) < 15) return
+    const who = p.by === meId ? t.room.you : (names[p.by] ?? t.someone)
+    toast.info(t.room.seeked(who, clock(p.position)), { action: { label: t.room.undo, run: () => act.control('seek', from) } })
+  }, [session.playback, session.film.durationS, meId, names])
 
   const p = session.playback
   return createPortal(

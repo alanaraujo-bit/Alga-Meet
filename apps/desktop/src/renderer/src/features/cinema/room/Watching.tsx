@@ -3,9 +3,14 @@
 // still lights up. `center` is the screen of the moment (paused, waiting, countdown).
 import type { Channel, CinemaSessionView } from '@alga/shared'
 import { useEffect, useState, type ReactNode, type RefObject } from 'react'
+import { Button } from '@/ui'
+import * as act from '../actions'
+import { t } from '../strings'
 import { Controls } from './Controls'
 import { ReactionLayer } from './ReactionLayer'
 import { SeatRow } from './SeatRow'
+import { SocialTimeline } from './SocialTimeline'
+import { skipIntroTo } from './timeline'
 import { TopBar } from './TopBar'
 import type { RoomView } from './view'
 import s from './room.module.css'
@@ -45,6 +50,7 @@ export function Watching({ session, channel, view, video, root, uiShown, onEngin
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [])
+  const skipTo = view.screen === 'watching' ? skipIntroTo(session.film.chapters, cur) : null
   return (
     <>
       {center && <div className={s.center}>{center}</div>}
@@ -52,6 +58,10 @@ export function Watching({ session, channel, view, video, root, uiShown, onEngin
         <div className={s.scrimTop} aria-hidden />
         <div className={s.scrimBottom} aria-hidden />
         <TopBar session={session} channel={channel} />
+        {skipTo !== null && (
+          <Button variant="secondary" className={s.skipIntro} onClick={() => act.control('seek', skipTo)}>{t.room.skipIntro}</Button>
+        )}
+        <SocialTimeline session={session} cur={cur} />
         <Controls session={session} video={video} root={root} cur={cur} reactOpen={reactOpen} setReactOpen={setReactOpen} onEngineering={onEngineering} />
       </div>
       <div className={s.stripWrap}>

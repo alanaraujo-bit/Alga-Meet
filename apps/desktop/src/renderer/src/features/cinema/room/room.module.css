@@ -527,3 +527,144 @@
   animation-name: appear;
   transform: translateX(-50%);
 }
+
+/* ── Timeline (mockup 05): heat 20 px at y 738, the bar at y 764, chapter gaps 3 px ─────────────── */
+.timeline {
+  position: absolute;
+  left: 32px;
+  right: 32px;
+  bottom: 128px;
+  height: 34px;
+  --gap-bg: #020203;
+}
+.timelineBare {
+  height: 12px;
+}
+.heat {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 20px;
+  pointer-events: none;
+}
+.hit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 18px;
+  bottom: 0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.timelineBare .hit {
+  top: 0;
+  cursor: default;
+}
+.hit[aria-disabled='true'] {
+  cursor: default;
+}
+.hit:focus-visible {
+  outline: none;
+}
+.hit:focus-visible .knob {
+  box-shadow: 0 0 0 3px var(--accent-tint-strong), 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+.track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.timelineBare .track {
+  top: 4px;
+}
+.track > i {
+  position: absolute;
+  top: 0;
+  height: 4px;
+}
+.loaded {
+  left: 0;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+}
+.played {
+  left: 0;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.track > .gap {
+  top: -1px;
+  width: 3px;
+  height: 6px;
+  margin-left: -1.5px;
+  background: var(--gap-bg);
+}
+.track > .knob {
+  top: -4px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+.hoverLine {
+  position: absolute;
+  top: -14px;
+  height: 42px;
+  width: 1px;
+  margin-left: -0.5px;
+  background: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
+.hoverCard {
+  position: absolute;
+  bottom: 32px;
+  width: 240px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--bg-overlay);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 12px 32px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.thumb {
+  width: 240px;
+  background-repeat: no-repeat;
+  background-color: #000;
+}
+.hoverRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px;
+  font: 400 12px/1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+.hoverRow b {
+  font-weight: var(--w-semibold);
+}
+.hoverChapter {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-tertiary);
+}
+.hoverCount {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+}
+.skipIntro {
+  position: absolute;
+  right: 32px;
+  bottom: 176px;
+}

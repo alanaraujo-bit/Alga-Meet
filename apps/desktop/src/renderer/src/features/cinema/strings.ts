@@ -260,6 +260,10 @@ export const t = {
     screenLight: 'Luz da tela',
     ducking: 'Baixar o filme quando alguém falar',
     report: 'Denunciar sessão',
+    skipIntro: 'Pular abertura',
+    seeked: (name: string, at: string) => `${name} pulou para ${at}`,
+    you: 'Você',
+    undo: 'Desfazer',
     time: (cur: string, total: string) => `${cur} de ${total}`,
   },
 }
