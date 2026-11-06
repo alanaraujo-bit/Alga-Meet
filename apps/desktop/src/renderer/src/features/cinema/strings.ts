@@ -199,6 +199,36 @@ export const t = {
     resume: (at: string) => `Continuar de ${at}`,
     fromStart: 'Do começo',
   },
+  /** Seats (foyer, strip, intermission). */
+  seats: {
+    ready: 'Pronto',
+    preparing: (pct: number) => `Preparando · ${pct}%`,
+    stalled: 'Travou',
+    unsupported: 'Não toca neste PC',
+    you: '(você)',
+    free: 'Livre',
+    ecoTitle: 'Esperando a galera sentar',
+    ecoSub: 'O Eco guarda os lugares',
+    seatOf: (name: string, status: string) => `${name}, ${status}`,
+  },
+  /** The foyer (mockups 03/04). */
+  foyer: {
+    session: 'Sessão de cinema',
+    endSession: 'Encerrar sessão',
+    standUp: 'Levantar',
+    watch: 'Você assiste',
+    projecting: (name: string) => `${name} está projetando`,
+    readyOf: (ready: number, all: number) => `${ready} de ${all} ${all === 1 ? 'pronto' : 'prontos'}`,
+    loading: (name: string) => `${name} está carregando o começo`,
+    loadingMany: (n: number) => `${n} ainda carregando o começo`,
+    allReady: 'Todos prontos. Começa quando quiser.',
+    alone: 'Só você sentou',
+    sawCard: (names: string[]) => `${names.length <= 3 ? names.join(', ').replace(/, ([^,]*)$/, ' e $1') : `${names.slice(0, 2).join(', ')} e mais ${names.length - 2}`} ${names.length === 1 ? 'viu' : 'viram'} o cartão`,
+    nobodyElse: 'Ninguém mais na chamada',
+    waitHost: (name: string) => `Esperando ${name} começar`,
+    start: 'Começar',
+    startAnyway: 'Começar mesmo assim',
+  },
   /** The room (Plan 2): screens, lights, controls. */
   room: {
     label: (title: string) => `Sala de cinema: ${title}`,

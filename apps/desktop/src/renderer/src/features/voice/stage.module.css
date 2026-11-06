@@ -21,6 +21,12 @@
 .headerEnd {
   gap: var(--s-2);
 }
+/* Seated in a cinema session: the header says so (mockup 03). */
+.cinemaTopic {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 
 .area {
   position: relative;

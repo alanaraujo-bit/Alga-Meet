@@ -183,12 +183,14 @@ function useRoomKeys(video: RefObject<HTMLVideoElement | null>, root: RefObject<
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return
       const el = e.target as HTMLElement | null
-      if (el?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], [role="listbox"]')) return
+      if (el?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], [role="listbox"], [role="radiogroup"], [role="slider"]')) return
       if (e.key === ' ' && el?.closest('button')) return // the focused button takes its own Space
       const st = useCinema.getState()
       const s = st.session
       if (!s || !st.mine.seated) return
       const pr = st.prefs
+      // the foyer only starts (host) and opens the numbers; seeking there is refused by the server
+      if (s.playback.reason === 'foyer' && e.key !== ' ' && e.key.toLowerCase() !== 's') return
       const seekBy = (d: number) => act.control('seek', (video.current?.currentTime ?? s.playback.position) + d)
       switch (e.key.length === 1 ? e.key.toLowerCase() : e.key) {
         case ' ':

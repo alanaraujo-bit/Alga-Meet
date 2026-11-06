@@ -1,0 +1,123 @@
+/* Seats (mockups 03, 04, 05–09): values from mockups.css (.seat, .check, .empty-seat, .thinseats). */
+.row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+.seat {
+  position: relative;
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.face {
+  position: relative;
+  flex: none;
+}
+.ring {
+  position: absolute;
+  pointer-events: none;
+}
+.arc {
+  transition: stroke-dasharray 400ms var(--ease-out-quart);
+}
+.check {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 2px var(--seat-bg, var(--bg-content));
+}
+.name {
+  display: flex;
+  max-width: 140px;
+  margin-top: 12px;
+  font: 510 14px/20px var(--font-ui);
+  letter-spacing: -0.011em;
+  color: var(--text-primary);
+}
+.nameText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.name small {
+  flex: none;
+  font-size: 13px;
+  font-weight: var(--w-regular);
+  color: var(--text-tertiary);
+  white-space: pre;
+}
+.status,
+.ok,
+.choice {
+  margin-top: 2px;
+  font: 510 12px/16px var(--font-ui);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ok {
+  color: var(--accent);
+}
+.choice {
+  color: var(--text-disabled);
+}
+.seat[data-status='unsupported'] .face {
+  opacity: 0.45;
+}
+.eco {
+  margin-top: -34px;
+}
+.eco svg {
+  display: block;
+}
+.ecoTitle {
+  margin-top: 8px;
+  font: 510 14px/20px var(--font-ui);
+  letter-spacing: -0.011em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.free {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.015);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  color: var(--text-disabled);
+}
+.freeName {
+  color: var(--text-tertiary);
+}
+
+/* ── Strip: 28 px, 14 px apart, resting at --seat-dim; the voice envelope (--speak) lifts a seat to full ── */
+.strip {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 14px;
+  --halo-k: 0.6;
+}
+.stripSeat .face {
+  opacity: max(var(--seat-dim, 1), min(1, calc(var(--speak, 0) * 3)));
+  transition: opacity 300ms var(--ease-out-quart);
+}
+.stripSeat[data-ring] .face {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .arc,
+  .stripSeat .face {
+    transition: none;
+  }
+}

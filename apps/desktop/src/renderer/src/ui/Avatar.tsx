@@ -7,9 +7,9 @@ import { Icon, type IconSize } from './Icon'
 import { Users } from './icons'
 import type { EcoSpec } from '@alga/shared'
 
-export type AvatarSize = 16 | 20 | 24 | 32 | 36 | 40 | 48 | 56 | 64 | 80 | 88 | 96 | 112 | 128
+export type AvatarSize = 16 | 20 | 24 | 28 | 32 | 36 | 40 | 48 | 56 | 64 | 80 | 88 | 96 | 112 | 128
 
-const DOT: Record<AvatarSize, number> = { 16: 0, 20: 8, 24: 8, 32: 10, 36: 11, 40: 12, 48: 13, 56: 14, 64: 16, 80: 18, 88: 19, 96: 20, 112: 22, 128: 24 }
+const DOT: Record<AvatarSize, number> = { 16: 0, 20: 8, 24: 8, 28: 9, 32: 10, 36: 11, 40: 12, 48: 13, 56: 14, 64: 16, 80: 18, 88: 19, 96: 20, 112: 22, 128: 24 }
 
 export const PRESENCE_LABEL: Record<PresenceStatus, string> = {
   online: 'Online',

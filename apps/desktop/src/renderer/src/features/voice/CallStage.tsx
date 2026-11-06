@@ -1,5 +1,5 @@
 import { Permission, type Channel } from '@alga/shared'
-import { ArrowLeftRight, BarChart3, Headphones, Mic, Minimize, MonitorUp, MoreHorizontal, PictureInPicture2, Scan, ShieldOff, Square, Volume2, WifiOff, X, Signal, type Glyph } from '@/ui/icons'
+import { ArrowLeftRight, BarChart3, Headphones, LogOut, Mic, Minimize, MonitorUp, MoreHorizontal, PictureInPicture2, ProjectorScreen, Scan, ShieldOff, Square, Volume2, WifiOff, X, Signal, type Glyph } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
@@ -19,6 +19,8 @@ import { CinemaCard, CinemaNotices, useCinemaDrop } from '../cinema/CinemaDev'
 import { CallCard } from '../cinema/room/CallCard'
 import { CinemaRoom } from '../cinema/room/CinemaRoom'
 import { FilmSheet } from '../cinema/room/FilmSheet'
+import { Foyer } from '../cinema/room/Foyer'
+import { end as endCinema, seat as seatCinema } from '../cinema/actions'
 import cc from '../cinema/room/call.module.css'
 import { useCinema } from '../cinema/store'
 import { t as cinemaT } from '../cinema/strings'
@@ -67,7 +69,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
   const mover = useData((st) => !!channel.spaceId && can(spacePermissions(st, channel.spaceId), Permission.MOVE_MEMBERS))
   const full = !!channel.userLimit && !mover && people.filter((p) => p.userId !== meId).length >= channel.userLimit
   // Sala de Cinema: seated → the room (its own full-window layer, cinema/room); a session I'm not in → a card with Sentar.
-  const cinema = useCinema(useShallow((st) => ({ id: st.session?.channelId === channel.id ? st.session.sessionId : null, seated: st.mine.seated })))
+  const cinema = useCinema(useShallow((st) => ({ id: st.session?.channelId === channel.id ? st.session.sessionId : null, seated: st.mine.seated, host: st.session?.hostId === meId })))
   const watching = live && cinema.id !== null && cinema.seated
   const drop = useCinemaDrop(live && cinema.id === null)
 
@@ -92,13 +94,23 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
           <Icon icon={Volume2} size={18} />
           {channel.name}
         </h1>
-        {channel.topic && (
+        {watching ? (
+          <>
+            <span className={sh.headerSep} />
+            <span className={`${sh.headerTopic} ${s.cinemaTopic}`}><Icon icon={ProjectorScreen} size={14} />{cinemaT.foyer.session}</span>
+          </>
+        ) : channel.topic && (
           <>
             <span className={sh.headerSep} />
             <span className={sh.headerTopic}>{channel.topic}</span>
           </>
         )}
         <div className={`${sh.headerActions} ${s.headerEnd}`}>
+          {watching && (
+            <Button variant="ghost" size="sm" icon={LogOut} onClick={() => (cinema.host ? endCinema() : seatCinema(false))}>
+              {cinema.host ? cinemaT.foyer.endSession : cinemaT.foyer.standUp}
+            </Button>
+          )}
           <E2eeChip channelId={channel.id} showOff />
         </div>
       </header>
@@ -115,7 +127,9 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
           </div>
         )}
         {watching && <CinemaRoom key={cinema.id} channel={channel} />}
-        {live && cinema.id !== null && !cinema.seated ? (
+        {watching ? (
+          <Foyer channel={channel} />
+        ) : live && cinema.id !== null && !cinema.seated ? (
           // the session's card above the faces (mockup 01)
           <div className={cc.withCard}>
             <CallCard channel={channel} />
