@@ -16,6 +16,8 @@ import { t } from '../strings'
 import { SubtitleOverlay } from '../SubtitleOverlay'
 import { useFilmAudio } from '../useFilmAudio'
 import { reducedMotion } from './prefs'
+import { useIdle } from './useIdle'
+import { Watching } from './Watching'
 import { creditsAt, roomView, type RoomScreen, type RoomView } from './view'
 import s from './room.module.css'
 
@@ -24,6 +26,8 @@ const SEEK_LONG_S = 60
 const VOLUME_STEP = 0.05
 /** Screens shown in the full-window room; the rest (foyer, card, sheet) live on the call's stage. */
 const IN_ROOM: ReadonlySet<RoomScreen> = new Set(['countdown', 'watching', 'credits', 'paused', 'waiting', 'intermission'])
+/** The interface hides after this long without the mouse while the film plays (spec Â§7.3.5). */
+const IDLE_MS = 2_000
 /** Harness only: shifts when a pause began (sessionStorage), to reach the intermission without waiting 3 min. */
 const DEV_PAUSE_SHIFT_KEY = 'alga.cinema.devPauseShiftMs'
 
@@ -85,6 +89,9 @@ function Room({ channel, onEngineering }: { channel: Channel; onEngineering: () 
   const now = useServerNow(250)
   const view = useRoomView(session, now)
   const shown = IN_ROOM.has(view.screen)
+  const playingScreen = view.screen === 'watching' || view.screen === 'credits'
+  const idle = useIdle(IDLE_MS, shown && playingScreen)
+  const uiShown = view.screen !== 'countdown' && !(playingScreen && idle)
   useFilmAudio(audio)
 
   useEffect(() => {
@@ -129,6 +136,7 @@ function Room({ channel, onEngineering }: { channel: Channel; onEngineering: () 
       className={`${s.room} ${shown ? s.visible : ''}`}
       data-lights={view.lights}
       data-screen={view.screen}
+      data-ui={uiShown ? 'on' : 'off'}
       aria-label={t.room.label(session.film.title)}
       aria-hidden={!shown || undefined}
       role="region"
@@ -137,13 +145,16 @@ function Room({ channel, onEngineering }: { channel: Channel; onEngineering: () 
       <div className={s.lightOn} aria-hidden />
       {ambient && <ScreenLight video={vref} />}
       <div className={s.drag} aria-hidden />
-      <div className={s.frame}>
+      <div className={s.frame} onClick={() => playingScreen && act.control('pause')} onDoubleClick={() => toggleFullscreen(root.current)}>
         <video ref={vref} className={s.video} playsInline disablePictureInPicture />
       </div>
       {subtitle?.format === 'vtt' && (
         <div className={s.subs}>
-          <SubtitleOverlay cues={subtitle.cues} getTime={() => vref.current?.currentTime ?? 0} size="M" offsetS={mine.offsetS} controlsVisible={false} />
+          <SubtitleOverlay cues={subtitle.cues} getTime={() => vref.current?.currentTime ?? 0} size="M" offsetS={mine.offsetS} controlsVisible={uiShown && shown} />
         </div>
+      )}
+      {shown && view.screen !== 'intermission' && (
+        <Watching session={session} channel={channel} view={view} video={vref} root={root} uiShown={uiShown} onEngineering={onEngineering} />
       )}
       {statsOpen && (
         <div className={s.stats}>
