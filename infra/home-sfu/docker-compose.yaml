@@ -87,8 +87,10 @@ services:
     restart: unless-stopped
     network_mode: host
     read_only: true
+    # The image's turnserver carries file capability cap_net_bind_service=+ep: without it in the bounding set (or with
+    # no-new-privileges) exec fails with "Operation not permitted". Keep only that one capability.
     cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
+    cap_add: [NET_BIND_SERVICE]
     environment:
       REALM: "${DUCKDNS_SUBDOMAIN:?missing in .env}.duckdns.org"
       CINEMA_TURN_SECRET: "${CINEMA_TURN_SECRET:-}"

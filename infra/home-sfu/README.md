@@ -328,7 +328,7 @@ aceita credenciais do LiveKit. Por isso o kit tem um **coturn** (serviço `cotur
 |---|---|
 | Porta de escuta | **3479** TCP e UDP |
 | Portas de relay | **49160-49200/udp** (41 portas) |
-| Teto | **30 Mbps somando todos os relays** (`bps-capacity=3750000` bytes/s) e **10 Mbps por sessão** (`max-bps=1250000` bytes/s). O coturn conta em **bytes** por segundo. Cotas: 4 alocações por credencial, 12 no total |
+| Teto | **~30 Mbps somando todos os relays**, por cota: cada alocação até `max-bps=416666` bytes/s (~3,3 Mbps), um par usa até 3 (uma por pista do cinema, ~10 Mbps), `total-quota=9` (3 pares). O coturn conta em **bytes** por segundo; `bps-capacity` não é usado (o coturn 4.7 recusava a primeira alocação com 486). 6 alocações por credencial |
 | Credenciais | TURN REST: usuário `<expiraUnix>:<idDoUsuario>`, senha `base64(HMAC-SHA1(segredo, usuário))`, emitidas pela API |
 | Segredo | `CINEMA_TURN_SECRET`, o mesmo na API (Railway) e no `.env` do servidor. Nunca no git |
 | Realm / IP | `<sub>.duckdns.org`; o IP público é lido desse nome ao subir, e o `ipwatch.sh` recria o coturn se mudar |
