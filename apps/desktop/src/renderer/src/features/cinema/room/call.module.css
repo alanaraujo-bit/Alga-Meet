@@ -1,0 +1,334 @@
+/* The cinema on the call's stage: card (mockup 01), film sheet (02), foyer (03/04). Values from mockups.css. */
+
+.year {
+  font-weight: var(--w-regular);
+  color: var(--text-secondary);
+}
+.coverImg,
+.placeholder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Before the poster exists: a neutral, faintly indigo dusk (no stock art). */
+.placeholder {
+  background:
+    radial-gradient(120% 90% at 68% 108%, rgba(139, 142, 247, 0.16), transparent 62%),
+    radial-gradient(80% 60% at 20% 0%, rgba(255, 255, 255, 0.05), transparent 70%),
+    linear-gradient(180deg, #1c1d21, #111214);
+}
+
+/* ── 01 · the card ─────────────────────────────────────────── */
+.withCard {
+  align-self: stretch;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: clamp(0px, calc(12vh - 4px), 104px);
+}
+.withCard > :last-child {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+}
+.card {
+  flex: none;
+  width: min(560px, 100%);
+  border-radius: var(--r-lg);
+  background: var(--bg-raised);
+  box-shadow: var(--elev-overlay);
+  overflow: hidden;
+  position: relative;
+  z-index: 2;
+}
+.cover {
+  position: relative;
+  height: 234px;
+  overflow: hidden;
+}
+.coverShade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.25) 0%, transparent 30%, transparent 45%, rgba(0, 0, 0, 0.72) 100%);
+}
+.badge {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 12px;
+  background: rgba(27, 27, 30, 0.72);
+  backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  font: 510 12px/1 var(--font-ui);
+  color: var(--text-primary);
+}
+.coverText {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 16px;
+}
+.cardTitle {
+  font: 590 22px/28px var(--font-ui);
+  font-variation-settings: var(--opsz-display);
+  letter-spacing: -0.016em;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font: 510 13px/20px var(--font-ui);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.metaDot {
+  color: var(--text-tertiary);
+}
+.cardRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 68px;
+  padding: 0 16px;
+}
+.cardRowText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  line-height: 18px;
+}
+.cardRowTitle {
+  font: 510 14px/18px var(--font-ui);
+  color: var(--text-primary);
+}
+.cardRowSub {
+  font: 400 12px/18px var(--font-ui);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── 02 · the film sheet ───────────────────────────────────── */
+.sheet {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 28px;
+}
+.sheetCover {
+  position: relative;
+  height: 169px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.sheetCover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--border-default);
+}
+.small {
+  margin-top: 8px;
+  font: 400 12px/16px var(--font-ui);
+  color: var(--text-tertiary);
+  text-wrap: pretty;
+}
+.fileBlock {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+.fileBlock .small {
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.fileName {
+  font: 400 11.5px/17px var(--font-mono);
+  color: var(--text-tertiary);
+  word-break: break-all;
+}
+.upload {
+  margin-top: 18px;
+  padding: 12px;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.uploadHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.uploadValue {
+  font: 510 12px/16px var(--font-ui);
+  color: var(--text-secondary);
+}
+.label {
+  display: block;
+  font: 510 12px/16px var(--font-ui);
+  color: var(--text-tertiary);
+}
+.titleField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  margin-top: 6px;
+  padding: 0 12px;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 0 0 1px var(--border-default);
+  color: var(--text-tertiary);
+  transition: box-shadow var(--dur-base) var(--ease-out-quad);
+}
+.titleField:focus-within {
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 4px var(--accent-tint-strong);
+}
+.titleField input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: 590 17px/24px var(--font-ui);
+  font-variation-settings: var(--opsz-display);
+  letter-spacing: -0.016em;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.06);
+  font: 510 12px/1 var(--font-ui);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.chip b {
+  font-weight: var(--w-semibold);
+  color: var(--text-primary);
+}
+.chip > :global(svg) {
+  color: var(--text-tertiary);
+}
+.accent {
+  display: inline-flex;
+  color: var(--accent);
+}
+.section {
+  margin-top: 18px;
+}
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.track {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  min-width: 0;
+}
+.code {
+  flex: none;
+  width: 30px;
+  height: 18px;
+  border-radius: var(--r-xs);
+  background: rgba(255, 255, 255, 0.07);
+  display: grid;
+  place-items: center;
+  font: 590 10px/1 var(--font-ui);
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+.trackName {
+  font-weight: var(--w-medium);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.trackKind {
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.trackRight {
+  margin-left: auto;
+  flex: none;
+  font: 400 12px/16px var(--font-ui);
+  color: var(--text-tertiary);
+}
+.okRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  color: var(--text-secondary);
+}
+.warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--warning-tint);
+  box-shadow: inset 0 0 0 1px rgba(230, 180, 99, 0.14);
+}
+.warningIcon {
+  display: inline-flex;
+  margin-top: 1px;
+  color: var(--warning);
+}
+.warningTitle {
+  font-weight: var(--w-medium);
+  color: var(--text-primary);
+}
+.warningBody {
+  margin-top: 2px;
+  font: 400 12px/16px var(--font-ui);
+  color: var(--text-secondary);
+}
+.privacy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: auto;
+  max-width: 430px;
+  font: 400 12px/16px var(--font-ui);
+  color: var(--text-tertiary);
+}

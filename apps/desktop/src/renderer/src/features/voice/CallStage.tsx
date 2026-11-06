@@ -15,8 +15,11 @@ import { useLook } from '../billing/store'
 import { personEntries } from '../shell/people'
 import { ActivityLine } from '../activity/Activity'
 import { Eco } from '@/ui/eco/Eco'
-import { CinemaCard, CinemaNotices, FilmSheet, useCinemaDrop } from '../cinema/CinemaDev'
+import { CinemaCard, CinemaNotices, useCinemaDrop } from '../cinema/CinemaDev'
+import { CallCard } from '../cinema/room/CallCard'
 import { CinemaRoom } from '../cinema/room/CinemaRoom'
+import { FilmSheet } from '../cinema/room/FilmSheet'
+import cc from '../cinema/room/call.module.css'
 import { useCinema } from '../cinema/store'
 import { t as cinemaT } from '../cinema/strings'
 import cs from '../cinema/cinema.module.css'
@@ -112,12 +115,20 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
           </div>
         )}
         {watching && <CinemaRoom key={cinema.id} channel={channel} />}
-        {live ? (
+        {live && cinema.id !== null && !cinema.seated ? (
+          // the session's card above the faces (mockup 01)
+          <div className={cc.withCard}>
+            <CallCard channel={channel} />
+            <div>
+              <LiveRoom channel={channel} people={people.map((p) => p.userId)} meId={meId} />
+            </div>
+          </div>
+        ) : live ? (
           <LiveRoom channel={channel} people={people.map((p) => p.userId)} meId={meId} />
         ) : (
           <PreJoin channel={channel} people={people.map((p) => p.userId)} streaming={people.filter((p) => p.streaming).map((p) => p.userId)} variant={variant} />
         )}
-        {live && !watching && <CinemaCard channel={channel} />}
+        {live && cinema.id === null && <CinemaCard channel={channel} />}
         {live && <CinemaNotices />}
         {drop.dragging && <div className={cs.dropHint}>{cinemaT.dropHint}</div>}
         {here && conn.state === 'reconnecting' && (
@@ -133,7 +144,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
           </Notice>
         )}
       </Room>
-      {live && <FilmSheet />}
+      {live && <FilmSheet channel={channel} />}
       {live ? (
         <ControlsDock channel={channel} />
       ) : (

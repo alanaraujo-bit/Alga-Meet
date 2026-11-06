@@ -100,7 +100,7 @@ const bridge = {
 }
 vi.stubGlobal('window', { alga: { cinema: bridge, e2ee: { cinemaTag: async () => null } } })
 
-const { handleCinemaDispatch, onMediaChange, useCinema, resetCinema, attachVideo, detachVideo, readyAheadS } = await import('./store')
+const { handleCinemaDispatch, onMediaChange, useCinema, resetCinema, attachVideo, detachVideo, readyAheadS, extraPiece } = await import('./store')
 const { useMedia } = await import('@/media/store')
 const { openFromFile, openSession } = await import('./actions')
 const { t } = await import('./strings')
@@ -621,5 +621,25 @@ describe('adaptive pre-roll (poor networks start later instead of stalling again
     await vi.advanceTimersByTimeAsync(600)
     expect(lastStatus()).toBe('ready')
     expect(s.setCriticalS).toHaveBeenLastCalledWith(30)
+  })
+})
+
+describe('room extras (poster, thumbnails)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('a seat fetches the poster from the start and the thumbnails once it has been ready; extraPiece reads them from the swarm', async () => {
+    expect(await extraPiece('poster')).toBeNull() // no engine
+    dispatch({ t: 'CINEMA_STATE', d: view() })
+    await vi.advanceTimersByTimeAsync(0)
+    const s = engine.swarms.at(-1)
+    expect(s.setTracks.mock.calls.at(-1)[0]).toEqual(['v', 'a0', 'poster'])
+    s.aheadS = () => 40
+    await vi.advanceTimersByTimeAsync(600)
+    expect(s.setTracks.mock.calls.at(-1)[0]).toEqual(['v', 'a0', 'poster', 'thumbs'])
+    const bytes = new ArrayBuffer(4)
+    s.get = vi.fn(async () => bytes)
+    expect(await extraPiece('thumbs')).toBe(bytes)
+    expect(s.get).toHaveBeenCalledWith('thumbs', 0)
   })
 })

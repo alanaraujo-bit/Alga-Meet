@@ -46,8 +46,8 @@ export const openFromFile = (): Promise<void> => prepare(() => window.alga.cinem
 /** A video dropped on the stage (the preload resolves its path; only the fileId comes back). */
 export const openFromDrop = (file: File): Promise<void> => prepare(() => window.alga.cinema.fromDrop(file))
 
-/** "Abrir sessão" on the sheet: the film goes to the server under the (edited) title; the factory starts with the session. */
-export function openSession(title: string): void {
+/** "Abrir sessão" on the sheet: the film goes to the server under the (edited) title; the factory starts with the session at `startS` ("Continuar de …"). */
+export function openSession(title: string, startS = 0): void {
   const d = useCinema.getState().draft
   const channelId = callChannel()
   if (!d || !channelId) return
@@ -55,7 +55,7 @@ export function openSession(title: string): void {
   hostBegin(d.fileId, film)
   ipNoticeOnce() // the host sits on open
   useCinema.setState({ draft: null, busy: true, error: null })
-  if (!send({ op: 'cinema_open', channelId, film, startS: 0 })) {
+  if (!send({ op: 'cinema_open', channelId, film, startS: Math.min(Math.max(0, startS), film.durationS) })) {
     hostEnd()
     useCinema.setState({ busy: false })
   }

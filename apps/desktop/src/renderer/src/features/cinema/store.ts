@@ -173,10 +173,16 @@ let hostFile: HostFile | null = null
 
 const audioTrack = (id: number | null): CinemaTrackId[] => (id === null ? [] : [`a${id}`])
 const subTrack = (id: number | null): CinemaTrackId[] => (id === null ? [] : [`s${id}`])
-/** What this seat downloads: video, its audio track (and the one it is switching to), its subtitle. */
+/**
+ * What this seat downloads: video, its audio track (and the one it is switching to), its subtitle, the poster (small),
+ * and once it has been ready, the timeline thumbnails (single-file pieces are always critical: never before the start).
+ */
 function syncTracks(e: Engine): void {
   const m = useCinema.getState().mine
-  e.swarm?.setTracks(['v', ...audioTrack(m.audioId), ...(e.pendingAudio !== null && e.pendingAudio !== m.audioId ? audioTrack(e.pendingAudio) : []), ...subTrack(m.subtitleId)])
+  e.swarm?.setTracks([
+    'v', ...audioTrack(m.audioId), ...(e.pendingAudio !== null && e.pendingAudio !== m.audioId ? audioTrack(e.pendingAudio) : []), ...subTrack(m.subtitleId),
+    'poster', ...(e.everReady ? ['thumbs' as const] : []),
+  ])
 }
 
 /** Where the room is now (film seconds, server clock). */
@@ -377,7 +383,10 @@ function statusNow(e: Engine): Status {
   const ready = aheadS(e) >= need(e.afterStall)
   if (ready) {
     e.afterStall = false
-    e.everReady = true
+    if (!e.everReady) {
+      e.everReady = true
+      syncTracks(e)
+    }
   }
   // a longer pre-roll is fetched as critical (in time order, not paced), else it could wait behind rarest-first prefetch
   e.swarm?.setCriticalS(need(e.afterStall))
@@ -787,6 +796,13 @@ export function cinemaStats(): CinemaStats {
       return id === null ? null : `a${id}${e?.pendingAudio !== null && e?.pendingAudio !== undefined ? ` → a${e.pendingAudio}` : ''}`
     })(),
   }
+}
+
+/** The session's poster / thumbnail sprite (single-file pieces, R27) once held; null before, or without an engine. */
+export function extraPiece(track: 'poster' | 'thumbs'): Promise<ArrayBuffer | null> {
+  if (eng?.swarm) return eng.swarm.get(track, 0)
+  const h = hostFile // the host standing up still has its factory
+  return h?.sessionId ? window.alga.cinema.piece(h.fileId, track, 0).catch(() => null) : Promise.resolve(null)
 }
 
 /** Server time now (ms), for the stage's countdowns and time display. */

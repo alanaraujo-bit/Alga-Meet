@@ -1,6 +1,6 @@
 import type { Channel } from '@alga/shared'
 import type { Glyph } from '@/ui/icons'
-import { ArrowLeftRight, FilmStrip, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, Settings2, Square, Volume2, Waveform } from '@/ui/icons'
+import { ArrowLeftRight, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, ProjectorScreen, Settings2, Square, Volume2, Waveform } from '@/ui/icons'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Ref, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
@@ -102,7 +102,7 @@ export function ControlsDock({ channel }: { channel: Channel }) {
         )}
       </MenuButton>
       <CallButton
-        icon={FilmStrip}
+        icon={ProjectorScreen}
         label={cinema.host ? cinemaT.stage.end : cinema.seated ? cinemaT.standUp : cinema.open ? cinemaT.sitHere : cinemaT.button}
         hint={cinema.open ? undefined : cinemaT.buttonHint}
         on={cinema.seated}

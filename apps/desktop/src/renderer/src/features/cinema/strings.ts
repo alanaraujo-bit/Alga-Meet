@@ -143,6 +143,62 @@ export const t = {
     loadFailed: 'Não deu para carregar esta legenda.',
   },
   trackName: (lang: string | null, title: string | null, i: number) => [title, lang?.toUpperCase()].filter(Boolean).join(' · ') || `Faixa ${i + 1}`,
+  /** How a film is described (chips, tracks). */
+  film: {
+    channels: (n: number) => (n === 1 ? 'Mono' : n === 2 ? 'Estéreo' : n === 6 ? '5.1' : n === 8 ? '7.1' : `${n} canais`),
+    langs: {
+      por: ['PT', 'Português'], pt: ['PT', 'Português'], eng: ['EN', 'Inglês'], en: ['EN', 'Inglês'], spa: ['ES', 'Espanhol'], es: ['ES', 'Espanhol'],
+      fre: ['FR', 'Francês'], fra: ['FR', 'Francês'], fr: ['FR', 'Francês'], ita: ['IT', 'Italiano'], it: ['IT', 'Italiano'], ger: ['DE', 'Alemão'],
+      deu: ['DE', 'Alemão'], de: ['DE', 'Alemão'], jpn: ['JA', 'Japonês'], ja: ['JA', 'Japonês'], kor: ['KO', 'Coreano'], ko: ['KO', 'Coreano'],
+    } as Record<string, [string, string]>,
+    unknownLang: 'Faixa',
+    codecs: { ac3: 'Dolby Digital', eac3: 'Dolby Digital Plus', dts: 'DTS', truehd: 'Dolby TrueHD', aac: 'AAC', opus: 'Opus', flac: 'FLAC', mp3: 'MP3', vorbis: 'Vorbis', pcm: 'PCM' } as Record<string, string>,
+    out: { aac: 'AAC', opus: 'Opus', flac: 'FLAC' } as Record<string, string>,
+    hdr: { hdr10: 'HDR10', hlg: 'HLG', dv8: 'Dolby Vision' } as Record<string, string>,
+    hdrShort: 'HDR',
+    video: { h264: 'H.264', hevc: 'HEVC', av1: 'AV1', vp9: 'VP9' } as Record<string, string>,
+    audio: (ch: string) => `Áudio ${ch}`,
+    dubbed: 'Dublado',
+    subtitled: 'Legendado',
+    sub: { vtt: 'Texto', ass: 'ASS' } as Record<string, string>,
+    chapters: (n: number) => `${n} ${n === 1 ? 'capítulo' : 'capítulos'}`,
+    mbps: (v: number) => `${String(Math.round(v * 10) / 10).replace('.', ',')} Mb/s`,
+  },
+  /** The call's card for whoever is not seated (mockup 01). */
+  callCard: {
+    badge: 'Sessão de cinema',
+    opened: (name: string) => `${name} abriu uma sessão`,
+    seated: (names: string[], free: number) =>
+      `${names.length <= 2 ? names.join(' e ') : `${names.slice(0, 2).join(', ')} e mais ${names.length - 2}`} já ${names.length === 1 ? 'sentou' : 'sentaram'} · ${free} ${free === 1 ? 'poltrona livre' : 'poltronas livres'}`,
+    empty: (free: number) => `${free} poltronas livres`,
+    sit: 'Sentar',
+  },
+  /** The host's film sheet (mockup 02). */
+  filmSheet: {
+    title: 'Projetar para a sala',
+    sub: (channel: string, n: number) => `${channel} · ${n} ${n === 1 ? 'pessoa' : 'pessoas'} na chamada`,
+    name: 'Título',
+    native: 'Vídeo nativo',
+    explainCopy: 'O vídeo e o áudio chegam como estão no arquivo.',
+    explainConverted: (codec: string) => `O vídeo chega como está no arquivo. Só o áudio ${codec} é convertido, sem perder canais.`,
+    audioTracks: (n: number) => `Áudio · ${n} ${n === 1 ? 'faixa' : 'faixas'}`,
+    subtitleTracks: (n: number) => `Legendas · ${n} ${n === 1 ? 'faixa' : 'faixas'}`,
+    noTracks: 'Nenhuma',
+    cover: 'A capa sai de um frame do próprio arquivo quando a sessão abre. Nada vai para serviços de fora.',
+    upload: 'Seu upload',
+    uploadValue: (mbps: string) => `~${mbps}`,
+    uploadBody: (mbps: string, others: number) =>
+      others > 1 ? `Filme a ${mbps}. Os amigos repassam as peças entre si, então você envia cerca de 1,5× o filme, não ${others}×.` : `Filme a ${mbps}. Quem sentar recebe as peças direto do seu PC.`,
+    thisPc: 'Neste PC',
+    plays: (what: string) => `Este PC toca ${what}`,
+    noDecodeTitle: 'Este PC não decodifica o vídeo deste arquivo',
+    noDecodeBody: 'Dá para abrir a sessão, mas você não assiste aqui. Uma versão H.264 do arquivo resolve.',
+    privacy: 'Vai direto do seu PC para quem sentar, criptografado. O Alga não vê nem guarda o filme.',
+    cancel: 'Cancelar',
+    open: 'Abrir sessão',
+    resume: (at: string) => `Continuar de ${at}`,
+    fromStart: 'Do começo',
+  },
   /** The room (Plan 2): screens, lights, controls. */
   room: {
     label: (title: string) => `Sala de cinema: ${title}`,

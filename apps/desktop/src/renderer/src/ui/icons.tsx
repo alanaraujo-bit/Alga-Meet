@@ -38,6 +38,8 @@ export const MonitorOff = slashed(PhMonitor, 'MonitorOff')
 
 export {
   AppWindow,
+  Armchair,
+  ArrowLeft,
   ArrowBendDownLeft as CornerDownLeft,
   ArrowBendUpLeft as CornerUpLeft,
   ArrowClockwise as RefreshCw,
@@ -123,6 +125,7 @@ export {
   PictureInPicture as PictureInPicture2,
   Play,
   Plus,
+  ProjectorScreen,
   Repeat,
   Power,
   Prohibit as Ban,
@@ -140,6 +143,7 @@ export {
   SpeakerHigh as Volume2,
   SpeakerSlash as VolumeX,
   Square,
+  Subtitles,
   SquaresFour as LayoutGrid,
   Trash as Trash2,
   User,
