@@ -7,16 +7,26 @@
   `requestVideoFrameCallback`, som do filme com ducking, legendas SRT/ASS, e um palco de desenvolvimento (`CinemaDev`).
   O cinema fica ligado no servidor fora de produção.
 - **Números do §8** (`docs/benchmarks/cinema-engine.md`, lab `apps/desktop/scripts/cinema-lab.mjs` com 2–4 janelas reais):
-  - **Passa na rede local:** primeiro frame 2,8 s; sincronia p95 25–33 ms (nunca > 125 ms); pausa no mesmo frame
-    em 8/8, ≤ 231 ms depois do instante agendado; entrar no meio 1,2–3,8 s em **6 de 7** entradas (a sétima levou 9,85 s e
-    pausou a sala 7 s: corrigido na Task 15, ainda sem nova medida); play agendado em ±1 frame; troca de áudio
-    sem mexer no vídeo; quem projeta envia 1,1× o filme (a terceira pessoa recebe 95–99 % de amigos).
+  - **Passa na rede local:** primeiro frame 2,8 s (Task 15; **3,0–5,8 s depois da Task 16**, ver abaixo); sincronia p95
+    25–33 ms (Task 15, só um par) e **22,1–27,3 ms em todos os pares** (Task 16), nunca > 125 ms; pausa no mesmo frame
+    em 8/8 (Task 15) e 6/6 pelo último quadro rVFC (Task 16); entrar no meio: Task 15 1,2–3,8 s em **6 de 7** (a sétima
+    9,85 s, corrigida); **re-medido na Task 16: 9 de 10 em 1,1–3,2 s, 1 em 7,5 s**; play agendado em ±1 frame; troca de
+    áudio sem mexer no vídeo; quem projeta envia 0,7–1,1× o filme.
   - **Reprova:** instalador **+48,6 MiB** (meta ≤ 40 MB; o ffmpeg LGPL genérico comprime para 39,7 MiB sozinho; **o dono
     aceitou o crescimento do instalador, até ~150 MB — R34**);
-    **rede emulada** (RTT 40 ms, upload de quem projeta 12–20 Mbps): primeiro frame 17–38 s e, com 1 % de perda,
-    ~2,5 Mbps por conexão (o data channel não aguenta um gargalo saturado nem perda aleatória alta); **travamentos com
-    4 pessoas e upload de 1,5× o bitrate**: com 1 % de perda a sala ficou parada 343 s de 560, com 0,1 % 118 s de 300
-    (zero na rede local). Primeiro frame com 0,1 % de perda: 9,1 s. RAM: o cinema soma 354–597 MiB à chamada (passa).
+    na Task 15, a **rede emulada** (RTT 40 ms, upload de quem projeta 12 Mbps, 4 pessoas): ~2,5 Mbps por conexão com 1 %
+    de perda; sala parada 343 s de 560 (1 %) e 118 s de 300 (0,1 %). **Resolvido na Task 16** (abaixo). Troca de áudio
+    com perda continua reprovando (salto de 191,5–975,5 ms). RAM: o cinema soma 354–703 MiB à chamada (passa).
+  - **Task 16 — vazão sob perda** (mesmo lab, build `4cde089`): 3 conexões (RTCPeerConnection) por par, cada uma com
+    canal de controle ordenado + canal de dados sem ordem, pedaços divididos entre elas; ritmo do pré-carregamento com
+    corte pelo RTT; pré-carga adaptativa (30 s / 60 s numa rede ruim); super-seed também para pedidos urgentes (a menos
+    de 10 s da posição da sala, quem projeta repete). **1 %: zero esperas** (antes 343 s), primeiro frame **9,1 s**
+    (23,1 s), cada amigo recebeu o filme inteiro, quem projeta mandou 1,04× as peças. **0,1 %: zero esperas** (antes
+    118 s), primeiro frame **12,1 s**. Rede local: tudo passa, mas o primeiro frame foi de 2,8 para 3,0–5,8 s (uma peça
+    atrasa quando a 2ª conexão abre). Fila do upload de quem projeta (o que a voz dele esperaria): 1 % p95 61 ms; 0,1 %
+    p50 77 / p95 249 ms (**a voz não fica protegida num upload saturado**). Sinalização: 35 frames de malha por cliente
+    em 60 s com 8 poltronas (simulado), 119 no pior minuto de quem projeta no lab (cota 300). Uma rodada por perfil, e a
+    variação entre rodadas é grande (durante o ajuste, 0,1 % deu de 0 a 98 s parada).
   - **Não medido aqui:** eco com caixa de som, internet real entre casas, relay, sessão de 2 h.
 - **Corrigido na Task 15:** quem projeta não perde o arquivo num `cinema_hello` lento; aviso quando a E2EE falha com
   alguém sentado; índice do áudio padrão antes dos extras (primeiro frame 6,7 → 2,8 s); quem entra no meio não pausa a
@@ -28,7 +38,8 @@
     `docs/qa/2026-11-05-cinema-teste-com-o-dono.md`.
   - **Relay (coturn no `home-server`) não implantado:** este PC fica numa sub-rede da casa que não alcança o servidor de casa
     (192.168.1.110).
-  - Ritmo do pré-carregamento / mais conexões por par (rede emulada) e um ffmpeg LGPL mínimo (instalador).
+  - Teto do envio de quem projeta (voz num upload saturado), primeiro frame na rede local com as conexões extras, troca
+    de áudio com perda, repetir os perfis de rede 3×; um ffmpeg LGPL mínimo se o instalador voltar a importar.
 
 ## 2026-11-05 noite — Loja (pacote C) e transmissão de jogos terminadas (release v0.1.8)
 - **Origem:** o trabalho que estava parado sem commit no checkout principal desde 01/11 (agentes interrompidos). Foi salvo

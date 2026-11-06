@@ -13,18 +13,21 @@
 | Critério (§8) | Meta | Medido | |
 |---|---|---|---|
 | Vídeo nativo | amostras idênticas ao arquivo | teste da Task 6 (`pieces.test.ts`, cópia de vídeo); a ficha diz "Nativo" | passa (teste) |
-| Primeiro frame | ≤ 10 s de "Abrir sessão" a todos vendo (1080p 8 Mbps, upload ≥ 20 Mbps) | rede local: **2,8 s** (depois da correção do índice; antes 3,8–6,7 s). Rede emulada, RTT 40 ms: 4 janelas com 0,1 % de perda **9,1 s**; 2 janelas, upload 20 Mbps: **4,4 s** (fila de 1 s) ou **25,5 s** (fila de 300 ms); 1 % de perda: 23–38 s | **passa na rede local e com 0,1 %; reprova com fila curta ou 1 % de perda** |
-| Sincronia | p95 ≤ 42 ms após 10 s; nunca > 125 ms por > 1 s | rede local: p95 **25–33 ms**, máximo 53 ms, nunca > 125 ms (nas rodadas de 3 janelas só o par Bruno × Ana foi comparado). 4 janelas, por par e sem filtro (sem quem entrou no meio): 1 % p95 7,6–18,8 ms; 0,1 % p95 **55,5–300,1 ms**, excursões de até 2,4 s por 2,75 s em travamentos curtos | **passa quando há dados**; reprova quando alguém trava < 2 s |
+| Primeiro frame | ≤ 10 s de "Abrir sessão" a todos vendo (1080p 8 Mbps, upload ≥ 20 Mbps) | rede local: Task 15 **2,8 s** (antes da correção do índice 3,8–6,7 s); **Task 16 3,0–5,8 s** (4,7 s no build final: a abertura das conexões extras atrasa uma peça). Rede emulada, 4 janelas, upload 12 Mbps, RTT 40 ms: Task 15 9,1 s (0,1 %) e 23,1 s (1 %); **Task 16 12,1 s (0,1 %) e 9,1 s (1 %)**. 2 janelas, upload 20 Mbps, fila de 300 ms (Task 15): 25,5 s, não re-medido | **passa na rede local**; com perda, dentro das metas da Task 16 (≤ 15 s / ≤ 30 s) |
+| Sincronia | p95 ≤ 42 ms após 10 s; nunca > 125 ms por > 1 s | rede local, **todos** os pares (Task 16): p95 **22,1–27,3 ms**, máx. 38,9 ms, nunca > 125 ms (Task 15: 25–33 ms, só Bruno × Ana). Rede emulada, 4 janelas, todos os pares, sem filtro: **Task 16 1 % 22,8–27,2 ms, 0,1 % 24,5–30,3 ms, nunca > 125 ms**; Task 15 (sem quem entrou no meio) 1 % 7,6–18,8 ms, 0,1 % 55,5–300,1 ms com excursões de até 2,4 s por 2,75 s | **passa** (ponto cego: poltrona congelada não gera amostra) |
 | Pausa | todos no mesmo frame em ≤ 300 ms | mesmo frame em **8/8** pausas; pior poltrona **12–231 ms** depois do instante agendado (`at`); 285–500 ms depois do clique (inclui os 250 ms de `CINEMA_LEAD_MS`); "mesmo frame" medido pelo `currentTime` depois do seek (o script atual usa o último quadro rVFC) | **passa** |
-| Entrar no meio | ≤ 8 s até sincronizado | rede local, 7 entradas: **1,2–3,8 s** em 6; **9,8 s** em 1 (e a sala pausou 7 s para todos) → **corrigido**. Rede emulada: primeiro quadro 1,7 s (0,1 %) e 14,2 s (1 %), sincronia não medível (a sala estava parada esperando outra poltrona) | 6/7 na rede local; correção sem nova medida |
-| Travamentos | zero com 4 pessoas, upload de quem projeta ≥ 1,5× o bitrate | rede local (3 janelas): **zero**. 4 janelas, upload de quem projeta 12 Mbps (1,5×), RTT 40 ms: **1 % de perda: sala parada 343 s de 560**; **0,1 %: 118 s de 300** | **reprova** na rede emulada |
+| Entrar no meio | ≤ 8 s até sincronizado | rede local: Task 15 6 de 7 em 1,2–3,8 s, 1 em 9,85 s (corrigido); **Task 16, 10 entradas em 2 rodadas: 9 em 1,1–3,2 s, 1 em 7,5 s** (o caso "empurra 5 s e depois pula"). Rede emulada (Task 16): 12,9 s (1 %), 11,8 s (0,1 %) | **passa na rede local**; com perda, > 8 s |
+| Travamentos | zero com 4 pessoas, upload de quem projeta ≥ 1,5× o bitrate | rede local: **zero**. 4 janelas, upload de quem projeta 12 Mbps (1,5×), RTT 40 ms: Task 15 **343 s parada em 560** (1 %) e **118 s em 300** (0,1 %); **Task 16: zero esperas nos dois** (3 conexões por par, super-seed também para pedidos urgentes, ritmo e pré-carga adaptativa; ver "Vazão sob perda") | **passa** no lab (uma rodada por perfil; a variação entre rodadas é grande) |
 | Eco | filme vazando pelo microfone atenuado ≥ 30 dB | **não medido** (precisa de caixa de som e de duas casas) | pendente: teste com o dono |
-| RAM | cinema ≤ 1,5 GB por cliente | **354–597 MiB** a mais que a chamada sozinha (pico do app inteiro 1,27–1,53 GiB) | **passa** |
+| RAM | cinema ≤ 1,5 GB por cliente | **354–597 MiB** a mais que a chamada sozinha (pico do app inteiro 1,27–1,53 GiB); Task 16 (3 conexões por par): **368–703 MiB** | **passa** |
 | Instalador | ≤ 40 MB a mais | **+48,6 MiB (+51,0 MB)**: 159,4 MiB contra 110,8 MiB da v0.1.8 | **reprova** a meta original; o dono aceitou o crescimento do instalador, até ~150 MB (R34) |
 
 Também verificado: **E2EE** (ofertas/respostas com tag MLS em todas as conexões da malha: 50 de 50 em 3 rodadas, 0 sem tag),
 **legenda ASS** (estava quebrada no app construído; corrigida), **as duas rotas do som do filme** tocam (nível
-> −60 dBFS), **`canPlay`** certo nos 7 fixtures, **cota do gateway** (pior janela: 130 frames `cinema_*` por 60 s, limite 300).
+> −60 dBFS), **`canPlay`** certo nos 7 fixtures, **cota do gateway** (pior janela: 130 frames `cinema_*` por 60 s, limite 300;
+com 3 conexões por par, Task 16: 119 em quem projeta, 45–60 nos outros; simulado com 8 poltronas: 35 frames de malha
+por cliente em 60 s, 167 com status, relógio e índice). **Troca de áudio com perda** continua reprovando (salto de
+191,5–975,5 ms; ver "Vazão sob perda").
 
 ## Método
 
@@ -288,6 +291,107 @@ teste com o dono, junto do eco.
 
 Pior janela de 60 s por janela: 113–130 frames `cinema_*` em quem projeta, 35–48 nos outros (limite: 300).
 
+## Vazão sob perda (Task 16)
+
+> 2026-11-06. Mesmas condições da Task 15 (4 janelas, E2EE, Davi entra aos ~30 s, upload de quem projeta 12 Mbps =
+> 1,5× o filme, fila de 1 s, RTT +40 ms; 0,1 % e 1 % de perda em cada sentido). Build final da branch (`4cde089`).
+> Resumos finais: `cinema-engine-t16-final-4x-loss0.1.json`, `cinema-engine-t16-final-4x-loss1.json`,
+> `cinema-engine-t16-final-3x-lan.json`. Rodadas intermediárias (versões anteriores do motor, citadas abaixo):
+> `cinema-engine-t16-4x-loss0.1-rtt40-cap12.json` e `…-loss1-…` (`06c4f5a`), `…-loss0.1-…-552fe3d.json`,
+> `cinema-engine-t16-3x-lan-e2ee-late.json` (`552fe3d`).
+
+**O que mudou no motor** (detalhes em `mesh.ts`, `swarm/uploader.ts`, `swarm/scheduler.ts`, `store.ts`):
+1. **3 conexões por par** (`CINEMA_LANES`): uma associação SCTP por conexão. A primeira abre na hora; as outras duas
+   2 s e 4 s depois que ela abre. Cada uma é autenticada como antes (tag MLS sobre a própria fingerprint e o número da
+   conexão). Se uma cai, o par segue nas outras.
+2. **Canal de controle ordenado + canal de dados sem ordem** em cada conexão: pedidos, cancelamentos, `have`/`got` e
+   `none` vão num canal ordenado (sempre o mesmo por par); os pedaços (que já levam o offset) vão sem ordem, divididos
+   entre as conexões (a de menor fila primeiro). Uma perda não segura mais tudo o que vem atrás.
+3. **Ritmo do pré-carregamento**: o que não é crítico sai a 1,5× o bitrate por par e cai pela metade enquanto o RTT de
+   uma conexão passa de 2× o mínimo dela (com folga de 25 ms); o que é crítico nunca espera.
+4. **Pré-carga adaptativa**: abaixo de 1,1× o bitrate (medido só nos segundos em que havia download), a poltrona só
+   diz "pronto" com 30 s à frente depois de começar/pular, e 60 s depois de um travamento seu.
+5. **Super-seed também para pedidos urgentes** (achado no lab): quem projeta só repete uma peça que outro amigo já tem
+   (ou está recebendo) se ela começa a menos de 10 s da posição da sala. Antes, cada amigo puxava a janela crítica
+   inteira (30 s) de quem projeta: **1,8×** as peças, fila do upload a 168–300 ms e 98 s de sala parada em 300.
+6. Pré-carga que vira crítica sem ter recebido nada é pedida de novo como urgente; quem entra no meio não pausa a sala
+   até ficar "pronto" uma vez.
+7. Mensagens que chegam por uma conexão antes de ela ser entregue ao enxame são guardadas e repassadas (antes se
+   perdiam: uma peça pedida duas vezes, primeiro frame 5,8 s na rede local).
+8. Na fila de envio de cada par, o que é urgente sai na ordem do tempo do filme, e um init de um pedaço só passa na
+   frente do que está sendo enviado (um init de áudio esperou ~10 s atrás de 6 MB de vídeo: primeiro frame 21 s).
+
+| | Task 15, 1 % (560 s) | **Task 16, 1 % (560 s)** | Task 15, 0,1 % (300 s) | **Task 16, 0,1 % (300 s)** |
+|---|---|---|---|---|
+| Sala parada depois do primeiro play | 343 s (10 esperas) | **0 s** (nenhuma espera) | 118 s (6 esperas) | **0 s** (nenhuma espera) |
+| Primeiro frame (última poltrona) | 23,1 s | **9,1 s** | 9,1 s | **12,1 s** |
+| Todas "pronto" (pré-carga de 30 s) | — | 37,0 s | — | 32,0 s |
+| Davi entra no meio: 1º quadro / sincronizado | 14,2 s / não medido | **10,2 s / 12,9 s** | 1,7 s / não medido | **5,9 s / 11,8 s** |
+| Sincronia, **todos** os pares, sem filtro: p95 (máx.) | 7,6–18,8 ms (sem Davi; máx. 1,9 s) | **22,8–27,2 ms** (máx. 49,9 ms) | 55,5–300,1 ms (sem Davi; máx. 2,4 s) | **24,5–30,3 ms** (máx. 49,7 ms) |
+| … maior trecho > 125 ms | 250 ms | **nunca** | 2,75 s | **nunca** |
+| Cada amigo recebeu | 235–272 MiB (~44 % do filme) | **565–577 MiB** (o filme inteiro) | 219–245 MiB | 347–353 MiB |
+| Quem projeta enviou ÷ união das peças recebidas | (não medido) | **1,04×** (596,7 MiB) | (não medido) | **1,08×** (379,7 MiB) |
+| Amigos repassaram (cada) | — | 318–415 MiB | — | 196–242 MiB |
+| Fila do upload de quem projeta (o que a voz dele esperaria): p50 / p95 / máx. | — | **20 / 61 / 100 ms** | — | **77 / 249 / 479 ms** (28 % do tempo > 150 ms) |
+| Pausa: mesmo quadro (último rVFC), pior poltrona depois de `at` | — | 3/3, ≤ 133 ms | — | 3/3, ≤ 255 ms |
+| Troca de áudio (troca / seeks / maior salto) | 20,6 s | 455 ms / 1 / **975,5 ms** | 8 597 ms / — / 391,7 ms | 451 ms / 0 / **191,5 ms** |
+| Descrições com tag E2EE | 12/12 | **36/36** (3 conexões × 3 pares × 4) | 12/12 | **36/36** |
+| Pior janela de 60 s de frames `cinema_*` (quem projeta / outros) | 113 / 38–48 | 114 / 45–50 | 113 / 39–48 | 115 / 46–50 |
+| RAM do cinema (pico − base) | 354–597 MiB | 436–646 MiB | — | 390–703 MiB |
+| Perda medida no proxy | 1,07–1,10 % | 1,00 % | 0,10 % | 0,10 % |
+
+Leitura:
+- **1 %:** as três conexões por par acabam com o teto de ~2,5 Mbps por associação: cada amigo recebeu o filme
+  inteiro, a sala não parou nenhuma vez e o primeiro frame caiu de 23,1 para 9,1 s. Quem projeta mandou cada peça
+  ~1× (1,04×) a ~8,5 Mbps dos 12, e a fila do upload ficou baixa (p95 61 ms).
+- **0,1 %:** sem esperas e primeiro frame 12,1 s, mas no limite: aqui o gargalo é o upload de quem projeta (12 Mbps
+  para três amigos; com 0,1 % cada conexão rende mais, e a pré-carga enche o upload), e a fila dele fica alta boa parte
+  do tempo (p50 77 ms, p95 249 ms). Durante o ajuste a mesma configuração deu, com versões anteriores do motor, 98,3 s,
+  0,6 s, 37,3 s, 11,4 s e 0 s de sala parada e 8,4–21,0 s de primeiro frame (tabela de iterações em
+  `task-16-report.md`): a variação entre rodadas é grande; uma rodada por versão não basta para afirmar estabilidade.
+- **Voz de quem projeta:** a chamada LiveKit não passa pelo proxy, então a medida é indireta: o atraso de fila que um
+  pacote de voz teria no upload limitado. Com 1 % fica baixo; com 0,1 % (upload saturado) passa de 150 ms em 28 % do
+  tempo: o ritmo do pré-carregamento corta pela metade quando o RTT sobe, mas o tráfego crítico e as rajadas de
+  pré-carga (cada peça sai inteira na velocidade do enlace) mantêm a fila. **Não protege a voz o bastante** num upload
+  saturado com fila longa; ver recomendações.
+- **Troca de áudio** (re-medida, R35): continua falhando com perda no critério "nenhum salto > 1 frame" (191,5 e
+  975,5 ms), embora a troca leve ~450 ms em vez de 8,6–20,6 s: a faixa nova só existe em quem projeta e as primeiras
+  peças dela chegam depois que o vídeo segue.
+- **Play agendado** com 4 instâncias decodificando 1080p na mesma máquina: erro do primeiro quadro −44 a −66 ms
+  (Task 15: −1 a −59 ms), 1–2 frames, corrigido pelo laço de sincronia em seguida.
+
+### Rede local depois da Task 16 (regressão)
+
+3 janelas, E2EE, 170 s, Carla entra no meio 5 vezes (sai e senta de novo), sem `--netem`. Build final
+(`cinema-engine-t16-final-3x-lan.json`) e a rodada anterior, sem a ordem de envio do item 8
+(`cinema-engine-t16-3x-lan-e2ee-late.json`, `552fe3d`): **11/11 verificações passam nas duas**.
+
+| | Meta | Task 15 | **Task 16 (final)** | Task 16 (`552fe3d`) |
+|---|---|---|---|---|
+| Primeiro frame (Abrir sessão → todos vendo) | ≤ 10 s | 2,8 s | **4,7 s** | 3,0 s |
+| Sincronia p95, **todos** os pares (máx.) | ≤ 42 ms | 25–33 ms (só Bruno × Ana) | **22,1–24,9 ms** (35,8 ms) | 22,1–27,3 ms (38,9 ms) |
+| Nunca > 125 ms por > 1 s | — | sim | **sim** (nunca > 125 ms) | sim |
+| Entrar no meio: 1º quadro / sincronizado | ≤ 8 s | 6 de 7 em 1,2–3,8 s; 1 em 9,85 s | **1º quadro 0,6–1,5 s; sincronizado 1,1–1,8 s em 4 de 5, 7,5 s em 1** | 0,9–2,9 s / 1,3–3,2 s (5 de 5) |
+| Pausa: mesmo quadro (último rVFC), depois de `at` | ≤ 300 ms | 8/8, 12–231 ms | **3/3, 27–65 ms** | 3/3, 29–259 ms |
+| Troca de áudio | 0 seeks, salto ≤ 1 frame | 227–232 ms, salto 3,6–24,2 ms | **349 ms, 0 seeks, salto 3,6 ms** | 241 ms, 0, 3,6 ms |
+| Upload de quem projeta | ≤ 1,5× | 1,1× o filme | **0,8× o filme; 0,86× a união das peças** | 0,7×; 0,83× |
+| Sala parada | zero | zero | **zero** | zero |
+| Descrições com tag E2EE | todas | — | **66/66** | 66/66 |
+| Pior janela de 60 s de frames `cinema_*` (quem projeta / outros) | < 300 | 113–114 / 35–48 | 118 / 53–60 | 119 / 54–58 |
+| RAM do cinema (pico − base) | ≤ 1,5 GB | 354–597 MiB | 368–602 MiB | — |
+
+**Primeiro frame na rede local: 2,8 s (Task 15) → 3,0–5,8 s (Task 16).** Passa a meta (≤ 10 s), mas piorou, e a causa
+é a abertura das conexões extras: nas três rodadas a peça `v:1` (3 MB) estava a caminho quando a segunda conexão
+abriu (~2,4 s depois de sentar) e levou 1,8–2,9 s, enquanto as seguintes levaram 10–250 ms cada. Uma parte foi
+corrigida (`552fe3d`: o que chegava por uma conexão antes de ela ser entregue ao enxame se perdia; 5,8 → 3,0 s); o
+resto (a rodada final deu 4,7 s) não foi isolado. Próximo passo: não dividir uma peça já começada com uma conexão que
+acabou de abrir, ou abrir as conexões extras só depois do primeiro frame.
+
+Uma entrada no meio (a 3ª) levou 7,5 s para sincronizar: primeiro quadro em 0,6 s, mas o erro depois do 1º seek ficou em
+−431 ms; o laço de sincronia empurrou a velocidade por 5 s (−431 → −215 ms) e então fez o seek (5,9 s), sincronizado
+a 7,5 s. É o caso "100–500 ms fora, empurra 5 s e depois pula" do review do `LATE_SEEK_S`, que não tinha aparecido nas 7
+entradas da Task 15: apareceu 1 vez em 10 entradas medidas aqui (dentro da meta de 8 s, por pouco).
+
 ## O que não foi medido, e por quê
 
 - **Eco com caixa de som** e o efeito das duas rotas no cancelamento de eco: precisa de som real numa sala e de outra
@@ -312,11 +416,16 @@ Pior janela de 60 s por janela: 113–130 frames `cinema_*` em quem projeta, 35�
 
 ## Recomendações
 
-1. **Transporte sob gargalo (antes do teste entre casas, se der):** limitar o ritmo do pré-carregamento (por exemplo
-   ~1,2× o bitrate fora da janela crítica) para o upload de quem projeta nunca ficar saturado; e abrir 2–3
-   associações por par quando a vazão medida ficar abaixo de 1,5× o bitrate (o spec já permite uma segunda conexão).
-   Isso ataca as duas reprovações de rede (arranque e 1 % de perda).
+1. ~~**Transporte sob gargalo**~~ feito na Task 16 (3 conexões por par, ritmo do pré-carregamento, pré-carga adaptativa,
+   super-seed para pedidos urgentes). O que sobra:
+   - **voz de quem projeta num upload saturado:** com 0,1 % a fila do upload limitado ficou em p50 77 / p95 249 ms.
+     Próximo passo: um teto para o envio somado de quem projeta (a partir da vazão medida, com folga para a voz) em vez
+     de só cortar o ritmo do pré-carregamento por par; e espaçar os pedaços de uma peça de pré-carga.
+   - **primeiro frame na rede local** 2,8 → 3,0–5,8 s: não dividir uma peça já começada com uma conexão que acabou de
+     abrir, ou abrir as conexões extras só depois do primeiro frame.
+   - **troca de áudio com perda:** buscar as primeiras peças da faixa nova antes de trocar (hoje o vídeo segue sem elas).
+   - **variação entre rodadas:** repetir cada perfil 3× antes do teste entre casas.
 2. **ffmpeg mínimo** para o instalador caber nos +40 MB.
 3. **`LATE_SEEK_S`:** manter 0,5 s.
 4. **Rota do som:** decidir pelo teste de eco com o dono; enquanto isso, WebAudio continua o padrão.
-5. Repetir o lab depois de (1) com o mesmo comando, para comparar.
+5. ~~Repetir o lab depois de (1)~~ feito (seção "Vazão sob perda").
