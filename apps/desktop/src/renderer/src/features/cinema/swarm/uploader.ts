@@ -134,12 +134,18 @@ export class PeerUploader {
     return this.queue.length >= MAX_UPLOAD_QUEUE
   }
 
-  /** Urgent pieces go before queued prefetch; a head already being sent keeps going. */
+  /**
+   * Urgent pieces go before queued prefetch, in time order (init segments first; a tie keeps arrival order); a head
+   * already being sent keeps going, except for a one-chunk urgent piece (an init segment), which passes it: a seat's
+   * audio init waited ~10 s behind 6 MB of its video on a 12 Mbps uplink (Task 16 lab), and no frame shows without it.
+   */
   add(track: CinemaTrackId, n: number, v: number, urgent: boolean): void {
     const u: Upload = { track, n, v, urgent, buf: null, off: 0 }
     const q = this.queue
-    const from = q[0] && (q[0].off > 0 || this.loading) ? 1 : 0
-    const at = urgent ? q.findIndex((x, i) => i >= from && !x.urgent) : -1
+    const start = (x: Upload) => this.deps.meta(x.track, x.n)?.[0] ?? Infinity
+    const tiny = urgent && (this.deps.meta(track, n)?.[2] ?? Infinity) <= CHUNK_BYTES
+    const from = !tiny && q[0] && (q[0].off > 0 || this.loading) ? 1 : 0
+    const at = urgent ? q.findIndex((x, i) => i >= from && (!x.urgent || start(x) > start(u))) : -1
     if (at >= 0) q.splice(at, 0, u)
     else q.push(u)
     this.pump()

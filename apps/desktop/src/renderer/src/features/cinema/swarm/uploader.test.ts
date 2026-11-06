@@ -133,6 +133,32 @@ describe('PeerUploader', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(a.sent.slice(4).map(([t, n]) => [t, n])).toEqual([[1000, 2], [1000, 2]])
   })
+  it('urgent pieces go in time order (init first), not in arrival order; a one-chunk init passes a head being sent', async () => {
+    vi.useFakeTimers()
+    // n → [startS, durS, bytes]: 1 and 2 are 3-chunk video pieces at 0 s and 4 s, 7 an audio piece at 0 s, 9 an init
+    const sizes: Record<number, [number, number, number]> = { 1: [0, 4, 3 * CHUNK_BYTES], 2: [4, 4, 3 * CHUNK_BYTES], 7: [0, 4, 2 * CHUNK_BYTES], 9: [-1, 0, 900] }
+    const metaOf = (_t: string, n: number): CinemaPieceMeta => [...sizes[n]!, '0'.repeat(64)]
+    const up = new PeerUploader({ read: async (_t, n) => new ArrayBuffer(sizes[n]![2]), meta: metaOf, refused: vi.fn(), sent: () => undefined })
+    const a = lane()
+    up.addLane(0, a)
+    a.bufferedAmount = HIGH_WATER + 1 // a slow link: nothing leaves until the test lets it
+    up.add('v', 2, 0, true)
+    up.add('v', 1, 0, true)
+    up.add('a0', 7, 0, true)
+    const step = async () => {
+      a.bufferedAmount = 0
+      a.onbufferedamountlow!(new Event('bufferedamountlow'))
+      await settle()
+    }
+    // one chunk leaves per step
+    a.send = ((orig) => (d: ArrayBuffer) => { orig(d); a.bufferedAmount = HIGH_WATER + 1 })(a.send.bind(a))
+    await step()
+    expect(a.sent.map((s) => s[1])).toEqual([1]) // v:1 (0 s) came after v:2 (4 s) but goes first
+    up.add('a0', 9, 0, true) // the audio init arrives late: one chunk, it passes the head in progress
+    for (let i = 0; i < 8; i++) await step()
+    // the init, the rest of the head, then by start time (a tie keeps arrival order)
+    expect(a.sent.map((s) => s[1])).toEqual([1, 9, 1, 1, 7, 7, 2, 2, 2])
+  })
   it('a removed lane gets nothing more', async () => {
     vi.useFakeTimers()
     const up = uploader()

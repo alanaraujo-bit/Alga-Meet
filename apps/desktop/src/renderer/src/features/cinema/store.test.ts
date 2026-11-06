@@ -115,7 +115,7 @@ const view = (over: Partial<CinemaSessionView> = {}): CinemaSessionView => ({
   sessionId: SID, channelId: CH, hostId: 'ana', film,
   playback: { playing: false, position: 0, at: 0, seq: 0, by: null, reason: 'foyer', waitingFor: [], countdown: false },
   seats: [{ userId: 'ana', status: 'ready', aheadS: 0, direct: true }, { userId: 'me', status: 'preparing', aheadS: 0, direct: true }],
-  options: { controlLock: false, waitForStalled: true }, iceServers: [], createdAt: 0, ...over,
+  options: { controlLock: false, waitForStalled: true }, iceServers: [], createdAt: 0, heat: [], ...over,
 })
 const dispatch = (d: unknown) => handleCinemaDispatch(d as Dispatch)
 const flush = () => new Promise((r) => setTimeout(r, 0))
