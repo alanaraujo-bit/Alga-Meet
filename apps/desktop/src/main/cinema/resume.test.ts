@@ -53,4 +53,13 @@ describe('resume store', () => {
     await s.set('x', 100, 3600)
     expect(await s.get('x')).toBe(100)
   })
+
+  it('concurrent first calls share one load: nothing saved before is lost', async () => {
+    const file = join(dir, 'r4.json')
+    await new ResumeStore(file).set('a', 100, 3600)
+    const s = new ResumeStore(file)
+    const [a] = await Promise.all([s.get('a'), s.set('b', 200, 3600)])
+    expect(a).toBe(100)
+    expect(Object.keys(JSON.parse(readFileSync(file, 'utf8'))).sort()).toEqual(['a', 'b'])
+  })
 })

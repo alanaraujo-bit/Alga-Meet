@@ -18,7 +18,9 @@ import { ResumeStore, resumeKey } from './resume'
  * index) stay in this map, in main. Unknown or closed ids throw, so invoke() rejects and send() is logged and dropped.
  */
 
-interface Entry { path: string; factory: PieceFactory | null; unsubs: (() => void)[]; probing: Promise<unknown> | null; siblings: string[]; resume: { key: string; durationS: number; lastSave: number } | null }
+interface Entry { path: string; factory: PieceFactory | null; unsubs: (() => void)[]; probing: Promise<unknown> | null; siblings: string[]; resume: Resume | null }
+/** Position memory of a probed file: the last position the renderer sent, written at most every SAVE_EVERY_MS (trailing) and on close. */
+interface Resume { key: string; durationS: number; lastSave: number; lastS: number | null; timer: ReturnType<typeof setTimeout> | undefined }
 const files = new Map<string, Entry>()
 
 const SUBTITLE_EXTS = ['srt', 'ass', 'ssa', 'vtt']
@@ -58,6 +60,18 @@ const SAVE_EVERY_MS = 5000
 let store: ResumeStore | null = null
 const resumeStore = (): ResumeStore => (store ??= new ResumeStore(join(app.getPath('userData'), 'cinema-resume.json')))
 const resumeOf = async (e: Entry): Promise<number | null> => (e.resume ? resumeStore().get(e.resume.key) : null)
+/** Writes the last position sent, if any is pending (on the throttle's trailing edge and when the file closes). */
+function flushResume(e: Entry): void {
+  const r = e.resume
+  if (!r) return
+  clearTimeout(r.timer)
+  r.timer = undefined
+  if (r.lastS === null) return
+  const at = r.lastS
+  r.lastS = null
+  r.lastSave = Date.now()
+  resumeStore().set(r.key, at, r.durationS).catch((err) => log.warn('cinema resume save failed', redact(e.path, String(err))))
+}
 
 const MAX_CAPTURE = 4096
 /** Integers, x/y >= 0, size 1..4096, all inside the window's content area. */
@@ -97,6 +111,7 @@ async function closeEntry(id: string): Promise<void> {
   const e = files.get(id)
   if (!e) return
   files.delete(id)
+  flushResume(e)
   for (const u of e.unsubs.splice(0)) u()
   await Promise.all([e.factory?.close(), releaseSiblings(e)])
 }
@@ -132,7 +147,8 @@ async function doProbe(fileId: string, e: Entry) {
   )
   const next = nextPaths.map(register)
   e.siblings.push(...next.map((n) => n.fileId))
-  e.resume = { key: await resumeKey(e.path), durationS: r.film.durationS, lastSave: 0 }
+  flushResume(e) // a re-probe keeps what the previous one had pending
+  e.resume = { key: await resumeKey(e.path), durationS: r.film.durationS, lastSave: 0, lastS: null, timer: undefined }
   return { film: r.film, warnings: r.warnings, next, resumeS: await resumeOf(e) }
 }
 
@@ -151,6 +167,8 @@ export function registerCinemaIpc(): void {
 
   handle(IPC.cinemaProbe, (id) => {
     const e = entry(id)
+    // A probed next episode is in use now: closing the episode it came from must not close it too.
+    for (const p of files.values()) p.siblings = p.siblings.filter((x) => x !== id)
     // One probe at a time per file: concurrent calls share the in-flight one.
     e.probing ??= safe(e.path, () => doProbe(id as string, e)).finally(() => { e.probing = null })
     return e.probing
@@ -181,11 +199,13 @@ export function registerCinemaIpc(): void {
   handle(IPC.cinemaResumeAt, (id) => resumeOf(entry(id)))
   on(IPC.cinemaSaveResume, (id, pos) => {
     const e = entry(id)
+    const r = e.resume
     const at = seconds(pos)
-    const now = Date.now()
-    if (!e.resume || now - e.resume.lastSave < SAVE_EVERY_MS) return
-    e.resume.lastSave = now
-    resumeStore().set(e.resume.key, at, e.resume.durationS).catch((err) => log.warn('cinema resume save failed', redact(e.path, String(err))))
+    if (!r) return
+    r.lastS = at
+    // Throttled with a trailing write: a pause right after a save is still kept within SAVE_EVERY_MS (and on close).
+    if (r.timer) return
+    r.timer = setTimeout(() => flushResume(e), Math.max(0, r.lastSave + SAVE_EVERY_MS - Date.now()))
   })
 
   // Not through handle(): the capture needs the sender's webContents. Same sender check.
@@ -204,7 +224,13 @@ export function registerCinemaIpc(): void {
     const opts = { title: 'Salvar canhoto', defaultPath: `canhoto-alga-${new Date().toISOString().slice(0, 10)}.png`, filters: [{ name: 'PNG', extensions: ['png'] }] }
     const r = await dialog.showSaveDialog(win, opts)
     if (r.canceled || !r.filePath) return false
-    await writeFile(r.filePath, image.toPNG())
+    try {
+      await writeFile(r.filePath, image.toPNG())
+    } catch (err) {
+      // The renderer never learns the chosen path (Electron relays the error text, which names it).
+      log.warn('cinema ticket save failed', err instanceof Error ? (err as NodeJS.ErrnoException).code ?? 'error' : 'error')
+      throw new Error('save failed')
+    }
     return true
   })
 

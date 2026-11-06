@@ -197,6 +197,15 @@ describe('cinema ipc', () => {
     await expect(call(IPC.cinemaProbe, r2.next[0].fileId)).rejects.toThrow('unknown file')
   })
 
+  it('a probed next episode survives closing the one it came from (the host switches to it)', async () => {
+    const { fileId, r } = await probed()
+    const sib = r.next[0].fileId
+    await call(IPC.cinemaProbe, sib).catch(() => undefined) // its path is fake here: the probe itself fails
+    await call(IPC.cinemaClose, fileId)
+    await expect(call(IPC.cinemaResumeAt, sib)).resolves.toBeNull()
+    await call(IPC.cinemaClose, sib)
+  })
+
   it('errors reaching the renderer never carry the local path (both slash styles)', async () => {
     const { fileId } = await probed()
     h.factories[0]!.cbs.error!({ track: 'v', reason: `ffmpeg: ${movie}: Invalid data; ${movie.split('\\').join('/')} and ${dir.toUpperCase()}` })
@@ -227,18 +236,23 @@ describe('cinema ipc', () => {
     }
   })
 
-  it('resume: saved position comes back from probe and resumeAt; throttled; too early/late is null', async () => {
+  it('resume: saved position comes back from probe and resumeAt; throttled with a trailing write, flushed on close', async () => {
     h.duration = 3600
     const { fileId, r } = await probed()
     expect(r.resumeS).toBeNull()
     const send = h.sends.get(IPC.cinemaSaveResume)!
     send(fileId, 1000)
-    send(fileId, 2000) // within 5 s of the previous one: dropped
-    await vi.waitFor(async () => expect(await call(IPC.cinemaResumeAt, fileId)).toBe(1000))
-    expect((await call(IPC.cinemaProbe, fileId)).resumeS).toBe(1000)
+    send(fileId, 2000) // before the write: the last position wins
+    await vi.waitFor(async () => expect(await call(IPC.cinemaResumeAt, fileId)).toBe(2000))
+    send(fileId, 2500) // within 5 s of the last write: pending (a pause right after a save)
+    expect(await call(IPC.cinemaResumeAt, fileId)).toBe(2000)
+    await call(IPC.cinemaClose, fileId) // closing writes what was pending
+    const again = await probed()
+    expect(again.r.resumeS).toBe(2500)
+    expect((await call(IPC.cinemaProbe, again.fileId)).resumeS).toBe(2500)
     expect(() => send(fileId, -1)).toThrow()
     expect(() => send('nope', 100)).toThrow()
-    expect(JSON.stringify(await call(IPC.cinemaProbe, fileId))).not.toContain('alga-cinema-ipc')
+    expect(JSON.stringify(await call(IPC.cinemaProbe, again.fileId))).not.toContain('alga-cinema-ipc')
   })
 
   const sender = { sender: {
@@ -269,5 +283,9 @@ describe('cinema ipc', () => {
     expect(await capture(rect, 'save')).toBe(true)
     expect(readFileSync(out, 'utf8')).toBe('PNGDATA')
     expect(h.saves[0]).toMatch(/canhoto-alga-\d{4}-\d{2}-\d{2}\.png/)
+    // A failed write says so without the chosen path.
+    h.saveTo = join(dir, 'Pasta Secreta', 'no', 'ticket.png')
+    const err = await capture(rect, 'save').catch((e: unknown) => e)
+    expect(String((err as Error).message)).toBe('save failed')
   })
 })

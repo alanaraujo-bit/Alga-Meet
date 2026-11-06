@@ -569,6 +569,8 @@ export function hostEnd(): void {
   for (const off of h.offs) off()
   clearTimeout(h.flushTimer)
   clearTimeout(hostAwayTimer)
+  // where the film stopped ("Continuar de …"): sent before the close, which writes it
+  if (h.sessionId && video && video.currentTime > 0) window.alga.cinema.saveResume(h.fileId, video.currentTime)
   void window.alga.cinema.close(h.fileId).catch(() => undefined)
   useCinema.setState({ host: { fileId: null } })
 }

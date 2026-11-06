@@ -30,22 +30,22 @@ export const resumable = (e: ResumeEntry | undefined): number | null =>
   e && e.positionS >= MIN_S && e.positionS <= e.durationS - TAIL_S ? e.positionS : null
 
 export class ResumeStore {
-  private map: Map<string, ResumeEntry> | null = null
+  /** The load itself is cached (not its result), so concurrent first calls share one read and one map. */
+  private loading: Promise<Map<string, ResumeEntry>> | null = null
   private writing: Promise<void> = Promise.resolve()
   constructor(private readonly file: string) {}
 
-  private async load(): Promise<Map<string, ResumeEntry>> {
-    if (this.map) return this.map
-    this.map = new Map()
-    try {
-      const raw = JSON.parse(await readFile(this.file, 'utf8')) as Record<string, ResumeEntry>
-      for (const [k, v] of Object.entries(raw)) {
-        if (v && Number.isFinite(v.positionS) && Number.isFinite(v.durationS) && Number.isFinite(v.at)) this.map.set(k, v)
-      }
-    } catch {
-      // Missing or corrupt: start empty.
-    }
-    return this.map
+  private load(): Promise<Map<string, ResumeEntry>> {
+    return (this.loading ??= readFile(this.file, 'utf8').then(
+      (text) => {
+        const map = new Map<string, ResumeEntry>()
+        const raw = JSON.parse(text) as Record<string, ResumeEntry>
+        for (const [k, v] of Object.entries(raw)) {
+          if (v && Number.isFinite(v.positionS) && Number.isFinite(v.durationS) && Number.isFinite(v.at)) map.set(k, v)
+        }
+        return map
+      },
+    ).catch(() => new Map<string, ResumeEntry>())) // missing or corrupt: start empty
   }
 
   async get(key: string): Promise<number | null> {

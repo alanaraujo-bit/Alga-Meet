@@ -120,16 +120,20 @@ function Room({ channel, onEngineering }: { channel: Channel; onEngineering: () 
     if (ass.current) setAssOffset(ass.current, mine.offsetS)
   }, [mine.offsetS])
 
-  // The host keeps where the film stopped for "Continuar de …" next time (main throttles to once per 5 s).
+  // The host keeps where the film stopped for "Continuar de …" next time: while playing and on every pause (main
+  // throttles to one write per 5 s with a trailing one, and writes the last position when the file closes).
   const isHost = session.hostId === meId
+  const playingNow = session.playback.playing
   useEffect(() => {
     if (!isHost || !hostFileId) return
-    const id = setInterval(() => {
+    const save = () => {
       const v = vref.current
-      if (v && !v.paused && v.currentTime > 0) window.alga.cinema.saveResume(hostFileId, v.currentTime)
-    }, 5_000)
+      if (v && v.currentTime > 0) window.alga.cinema.saveResume(hostFileId, v.currentTime)
+    }
+    if (!playingNow) return save()
+    const id = setInterval(save, 5_000)
     return () => clearInterval(id)
-  }, [isHost, hostFileId])
+  }, [isHost, hostFileId, playingNow])
 
   useRoomKeys(vref, root)
 
