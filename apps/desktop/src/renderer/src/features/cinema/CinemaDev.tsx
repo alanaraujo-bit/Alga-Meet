@@ -393,8 +393,8 @@ function Timeline({ durationS, cur, buffered, onSeek, disabled }: { durationS: n
 const ms = (v: number | null | undefined, digits = 0) => (v === null || v === undefined ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(digits)} ms`)
 const n1 = (v: number) => (Math.round(v * 10) / 10).toString().replace('.', ',')
 
-/** `S`: the numbers behind the stage (spec §7.4). */
-function StatsPanel({ names }: { names: Record<string, string> }) {
+/** `S`: the numbers behind the stage (spec §7.4). `children`: extra rows (the room's "Modo engenharia"). */
+export function StatsPanel({ names, children }: { names: Record<string, string>; children?: ReactNode }) {
   const stats = useCinema((s) => s.stats)
   const session = useCinema((s) => s.session)
   const route = useCinema((s) => s.prefs.route)
@@ -427,6 +427,7 @@ function StatsPanel({ names }: { names: Record<string, string> }) {
         </select>
         <small> {t.stats.routeNext}</small>
       </label>
+      {children}
     </div>
   )
 }

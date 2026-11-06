@@ -1,0 +1,173 @@
+/* The room (modo sala): values from the approved mockups (docs/design/cinema/mockups/mockups.css, 1440×900 frames). */
+
+/* ── Layer and lights (spec §7.1: dim 1.2 s, half 300 ms, rising 3 s) ───────────────── */
+.room {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-overlay) - 1);
+  overflow: hidden;
+  background: #020203;
+  color: var(--text-primary);
+  font: var(--type-ui);
+  letter-spacing: var(--track-ui);
+  font-feature-settings: var(--font-features);
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 300ms var(--ease-out-quart), visibility 0s linear 300ms;
+}
+/* Going in is the lights going down: the dark layer comes over the call in 1.2 s. */
+.visible {
+  visibility: visible;
+  opacity: 1;
+  transition: opacity 1200ms var(--ease-in-out-cubic), visibility 0s;
+}
+.engineering {
+  background: #000;
+}
+.engineering > :first-child {
+  border-radius: 0;
+}
+.leaveEngineering {
+  position: absolute;
+  right: calc(var(--caption-w) + 12px);
+  top: 6px;
+  z-index: 20;
+}
+.lightHalf,
+.lightOn {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1200ms var(--ease-in-out-cubic);
+}
+/* Half light: the surround rises (~35 %) and a soft wash comes from the top. */
+.lightHalf {
+  background: radial-gradient(ellipse 1100px 420px at 50% -8%, rgba(255, 255, 255, 0.075), transparent 70%), #0c0c0e;
+}
+.lightOn {
+  background: var(--bg-content);
+}
+[data-lights='half'] .lightHalf {
+  opacity: 1;
+  transition-duration: 300ms;
+}
+[data-lights='on'] .lightOn {
+  opacity: 1;
+  transition-duration: 300ms;
+}
+[data-lights='rising'] .lightOn {
+  opacity: 1;
+  transition-duration: 3000ms;
+}
+[data-lights='dim'] .lightHalf,
+[data-lights='dim'] .lightOn {
+  transition-duration: 1200ms;
+}
+
+/* The screen light: the frame, 16×9, blurred into the dark (≤ 12 %). */
+.screenLight {
+  position: absolute;
+  inset: -80px;
+  width: calc(100% + 160px);
+  height: calc(100% + 160px);
+  filter: blur(90px) saturate(1.2);
+  opacity: 0.12;
+  pointer-events: none;
+  transition: opacity 1200ms var(--ease-in-out-cubic);
+}
+[data-lights='on'] .screenLight,
+[data-lights='rising'] .screenLight {
+  opacity: 0;
+}
+
+/* The window can still be dragged by its top band (the native caption buttons stay on top of everything). */
+.drag {
+  position: absolute;
+  left: 0;
+  right: var(--caption-w);
+  top: 0;
+  height: var(--titlebar-h);
+  -webkit-app-region: drag;
+  z-index: 1;
+}
+
+/* ── The film ─────────────────────────────────────────────── */
+/* The frame box leaves 74 px under it (a 2.39 film sits at y 112–714 of 900, as in the mockups). */
+.frame {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 74px;
+  transition: filter 300ms var(--ease-out-quart), opacity 600ms var(--ease-in-out-cubic);
+}
+.video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+[data-screen='paused'] .frame,
+[data-screen='waiting'] .frame {
+  filter: brightness(0.4) saturate(0.7);
+}
+[data-screen='intermission'] .frame {
+  opacity: 0;
+}
+
+/* Subtitles sit in the band under the frame (mockup 06: y 736–770). */
+.subs {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 74px;
+  pointer-events: none;
+}
+.stats {
+  position: absolute;
+  right: 24px;
+  top: 52px;
+  width: min(460px, calc(100% - 48px));
+  z-index: 30;
+  visibility: visible; /* the S panel shows in the foyer too, where the room layer is hidden */
+}
+.stats > div {
+  position: static;
+  width: 100%;
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room,
+  .visible,
+  .lightHalf,
+  .lightOn,
+  .frame,
+  .screenLight {
+    transition: none !important;
+  }
+  .screenLight {
+    display: none;
+  }
+}
+:global(.reduce-motion) .room,
+:global(.reduce-motion) .lightHalf,
+:global(.reduce-motion) .lightOn,
+:global(.reduce-motion) .frame {
+  transition: none !important;
+}
+:global(.reduce-motion) .screenLight {
+  display: none;
+}

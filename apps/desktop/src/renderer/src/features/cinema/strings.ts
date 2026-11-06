@@ -143,4 +143,10 @@ export const t = {
     loadFailed: 'Não deu para carregar esta legenda.',
   },
   trackName: (lang: string | null, title: string | null, i: number) => [title, lang?.toUpperCase()].filter(Boolean).join(' · ') || `Faixa ${i + 1}`,
+  /** The room (Plan 2): screens, lights, controls. */
+  room: {
+    label: (title: string) => `Sala de cinema: ${title}`,
+    engineering: 'Modo engenharia',
+    leaveEngineering: 'Sair do modo engenharia',
+  },
 }

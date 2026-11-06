@@ -15,7 +15,8 @@ import { useLook } from '../billing/store'
 import { personEntries } from '../shell/people'
 import { ActivityLine } from '../activity/Activity'
 import { Eco } from '@/ui/eco/Eco'
-import { CinemaCard, CinemaDev, CinemaNotices, FilmSheet, useCinemaDrop } from '../cinema/CinemaDev'
+import { CinemaCard, CinemaNotices, FilmSheet, useCinemaDrop } from '../cinema/CinemaDev'
+import { CinemaRoom } from '../cinema/room/CinemaRoom'
 import { useCinema } from '../cinema/store'
 import { t as cinemaT } from '../cinema/strings'
 import cs from '../cinema/cinema.module.css'
@@ -62,7 +63,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
   // Full = the others fill it (the server does not count you), and moderators who can move people still get in.
   const mover = useData((st) => !!channel.spaceId && can(spacePermissions(st, channel.spaceId), Permission.MOVE_MEMBERS))
   const full = !!channel.userLimit && !mover && people.filter((p) => p.userId !== meId).length >= channel.userLimit
-  // Sala de Cinema (dev stage): seated → the film takes the stage; a session I'm not in → a card with Sentar.
+  // Sala de Cinema: seated → the room (its own full-window layer, cinema/room); a session I'm not in → a card with Sentar.
   const cinema = useCinema(useShallow((st) => ({ id: st.session?.channelId === channel.id ? st.session.sessionId : null, seated: st.mine.seated })))
   const watching = live && cinema.id !== null && cinema.seated
   const drop = useCinemaDrop(live && cinema.id === null)
@@ -110,9 +111,8 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
             <E2eeChip channelId={channel.id} />
           </div>
         )}
-        {watching ? (
-          <CinemaDev key={cinema.id} channel={channel} />
-        ) : live ? (
+        {watching && <CinemaRoom key={cinema.id} channel={channel} />}
+        {live ? (
           <LiveRoom channel={channel} people={people.map((p) => p.userId)} meId={meId} />
         ) : (
           <PreJoin channel={channel} people={people.map((p) => p.userId)} streaming={people.filter((p) => p.streaming).map((p) => p.userId)} variant={variant} />
