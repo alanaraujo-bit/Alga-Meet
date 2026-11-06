@@ -1,16 +1,13 @@
 import type { CinemaPieceMeta, CinemaTrackId } from '@alga/shared'
 import { Assembler } from './assembler'
 import type { PieceCache } from './cache'
-import { CHUNK_BYTES, bitsOf, decode, encode, setOf, verOf, type WireMsg } from './protocol'
+import { bitsOf, decode, encode, setOf, verOf, type WireMsg } from './protocol'
 import { hostShouldSend, isCritical, isLate, nextRequests, pieceKey, type SwarmView } from './scheduler'
+import { PeerUploader, type ChannelLike } from './uploader'
 
-/** Sending pauses above this many queued bytes and resumes on bufferedamountlow at LOW_WATER (spec §6.4). */
-export const HIGH_WATER = 256 * 1024
-export const LOW_WATER = 128 * 1024
+export { HIGH_WATER, LOW_WATER, type ChannelLike } from './uploader'
 /** Pieces downloading at once (bounds assembly memory). */
 const MAX_INFLIGHT = 12
-/** Requests a peer may queue with us; more are answered `none` (bounds upload memory and abuse). */
-const MAX_UPLOAD_QUEUE = 4
 /** A download times out when its source sent no byte at all for this long (a strike against the source)… */
 const REQ_TIMEOUT_MS = 15_000
 /** …or when the source keeps sending other pieces but nothing of this one for this long (no strike). */
@@ -33,18 +30,7 @@ const DEFAULT_CAP_BYTES = 4 * 1024 ** 3
 /** When space runs short, pieces more than this far behind the playhead go first. */
 const BEHIND_S = 600
 
-/** The part of RTCDataChannel the swarm uses; tests back it with a MessageChannel. */
-export interface ChannelLike {
-  send(data: ArrayBuffer): void
-  readonly bufferedAmount: number
-  bufferedAmountLowThreshold: number
-  onmessage: ((e: MessageEvent) => void) | null
-  onbufferedamountlow: ((e: Event) => void) | null
-  close(): void
-}
-
 type Source = (track: CinemaTrackId, n: number) => Promise<ArrayBuffer | null>
-interface Upload { track: CinemaTrackId; n: number; v: number; urgent: boolean; buf: ArrayBuffer | null; off: number }
 /** `at` = last accepted chunk (request time before); `done` = every byte is in (being verified/stored): later chunks are ignored. */
 interface Flight { peer: string; track: CinemaTrackId; n: number; start: number; at: number; got: number; done: boolean }
 interface Peer {
@@ -60,7 +46,7 @@ interface Peer {
   strikes: number[]; backoffUntil: number
   /** When it last sent us a byte we took. */
   lastByte: number
-  queue: Upload[]; loading: boolean; bytesIn: number; mbps: number
+  up: PeerUploader; bytesIn: number; mbps: number
 }
 
 const setIn = <K, V>(m: Map<K, Set<V>>, k: K): Set<V> => {
@@ -108,11 +94,19 @@ export class Swarm {
     this.removePeer(id)
     const p: Peer = {
       id, ch, has: new Map(), banned: new Set(), refused: new Map(), declined: new Map(), sending: new Map(), strikes: [],
-      backoffUntil: 0, lastByte: 0, queue: [], loading: false, bytesIn: 0, mbps: 0,
+      backoffUntil: 0, lastByte: 0, bytesIn: 0, mbps: 0,
+      up: new PeerUploader(ch, {
+        read: (track, n) => this.get(track, n),
+        meta: (track, n) => this.index.get(track)?.[n],
+        refused: (u, gone) => {
+          this.ctl(p, { t: 'none', track: u.track, n: u.n })
+          if (gone && this.mine.get(u.track)?.delete(u.n)) this.announce(u.track) // evicted (host: the factory dropped it)
+          if (this.opts.isHost) this.unmark(p, u.track, u.n)
+        },
+        sent: (bytes) => { this.up += bytes },
+      }),
     }
     this.peers.set(id, p)
-    ch.bufferedAmountLowThreshold = LOW_WATER
-    ch.onbufferedamountlow = () => this.pump(p)
     ch.onmessage = (e) => {
       const m = e.data instanceof ArrayBuffer ? decode(e.data) : null // text or malformed: dropped
       if (m && this.peers.get(id) === p) this.onMessage(p, m)
@@ -126,7 +120,7 @@ export class Swarm {
     if (!p) return
     this.peers.delete(id)
     p.ch.onmessage = null
-    p.ch.onbufferedamountlow = null
+    p.up.close()
     p.ch.close()
     this.asm.dropPeer(id)
     for (const [k, f] of this.inflight) if (f.peer === id) this.dropFlight(k)
@@ -241,17 +235,16 @@ export class Swarm {
       if (this.inflight.get(k)?.peer === p.id) this.dropFlight(k)
     } else if (m.t === 'req') return this.serve(p, m.track, m.n, m.v, m.urgent)
     else if (m.t === 'cancel') {
-      p.queue = p.queue.filter((u) => u.track !== m.track || u.n !== m.n)
       if (this.opts.isHost) this.unmark(p, m.track, m.n)
-      return this.pump(p)
+      return p.up.cancel(m.track, m.n)
     } else return this.onChunk(p, m)
     this.schedule()
   }
 
   private serve(p: Peer, track: CinemaTrackId, n: number, v: number, urgent: boolean): void {
-    if (p.queue.some((u) => u.track === track && u.n === n)) return
+    if (p.up.queued(track, n)) return
     const meta = this.index.get(track)?.[n]
-    if (!meta || verOf(meta[3]) !== v || !this.mine.get(track)?.has(n) || p.queue.length >= MAX_UPLOAD_QUEUE) return this.ctl(p, { t: 'none', track, n })
+    if (!meta || verOf(meta[3]) !== v || !this.mine.get(track)?.has(n) || p.up.full) return this.ctl(p, { t: 'none', track, n })
     if (this.opts.isHost) {
       // already sent to them (or theirs): no pulling the same piece twice until a cancel, have or reconnect clears it
       if (p.has.get(track)?.has(n)) return this.ctl(p, { t: 'none', track, n })
@@ -268,46 +261,7 @@ export class Swarm {
       setIn(p.has, track).add(n) // count it as theirs from now on
       setIn(p.sending, track).add(n)
     }
-    // urgent pieces go before queued prefetch; a head already being sent keeps going
-    const u: Upload = { track, n, v, urgent, buf: null, off: 0 }
-    const from = p.queue[0] && (p.queue[0].off > 0 || p.loading) ? 1 : 0
-    const at = urgent ? p.queue.findIndex((x, i) => i >= from && !x.urgent) : -1
-    if (at >= 0) p.queue.splice(at, 0, u)
-    else p.queue.push(u)
-    this.pump(p)
-  }
-
-  private pump(p: Peer): void {
-    while (p.queue.length && p.ch.bufferedAmount <= HIGH_WATER && this.peers.get(p.id) === p) {
-      const u = p.queue[0]!
-      if (!u.buf) return this.load(p, u)
-      const total = u.buf.byteLength
-      const data = new Uint8Array(u.buf, u.off, Math.min(CHUNK_BYTES, total - u.off))
-      this.ctl(p, { t: 'chunk', track: u.track, n: u.n, v: u.v, offset: u.off, total, data })
-      this.up += data.byteLength
-      u.off += data.byteLength
-      if (u.off >= total) p.queue.shift()
-    }
-  }
-
-  /** Reads the head upload's bytes (one piece in memory per peer); gone or changed → `none`. */
-  private load(p: Peer, u: Upload): void {
-    if (p.loading) return
-    p.loading = true
-    void this.get(u.track, u.n).then((buf) => {
-      p.loading = false
-      if (p.queue[0] === u) {
-        const meta = this.index.get(u.track)?.[u.n]
-        if (buf && meta && buf.byteLength === meta[2] && verOf(meta[3]) === u.v) u.buf = buf
-        else {
-          p.queue.shift()
-          this.ctl(p, { t: 'none', track: u.track, n: u.n })
-          if (!buf && this.mine.get(u.track)?.delete(u.n)) this.announce(u.track) // evicted (host: the factory dropped it)
-          if (this.opts.isHost) this.unmark(p, u.track, u.n)
-        }
-      }
-      this.pump(p)
-    })
+    p.up.add(track, n, v, urgent)
   }
 
   private onChunk(p: Peer, m: Extract<WireMsg, { t: 'chunk' }>): void {
