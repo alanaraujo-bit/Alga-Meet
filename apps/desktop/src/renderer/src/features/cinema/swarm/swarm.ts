@@ -36,7 +36,8 @@ const RATE_WINDOW = 10
 
 type Source = (track: CinemaTrackId, n: number) => Promise<ArrayBuffer | null>
 /** `at` = last accepted chunk (request time before); `done` = every byte is in (being verified/stored): later chunks are ignored. */
-interface Flight { peer: string; track: CinemaTrackId; n: number; start: number; at: number; got: number; done: boolean }
+/** `urgent`: asked as critical (the uploader serves it first, never paced). */
+interface Flight { peer: string; track: CinemaTrackId; n: number; start: number; at: number; got: number; done: boolean; urgent: boolean }
 interface Lane { ctl: ChannelLike; bulk: ChannelLike }
 interface Peer {
   id: string
@@ -342,10 +343,10 @@ export class Swarm {
       if (p.has.get(track)?.has(n)) return this.ctl(p, { t: 'none', track, n })
       const k = pieceKey(track, n)
       const now = Date.now()
-      // super-seed, unless it is urgent for them, or a repeat once another friend has confirmed the piece: a requester
-      // that could reach that friend asks it instead, so the repeat means it can't
+      // super-seed, urgent or not (hostShouldSend: anyone near the playhead), unless it is a repeat once another friend
+      // has confirmed the piece: a requester that could reach that friend asks it instead, so the repeat means it can't
       const repeat = now - (p.declined.get(k) ?? -Infinity) < REPEAT_MS && this.confirmedElsewhere(p, track, n)
-      if (!urgent && !repeat && !hostShouldSend(this.view(), p.id, track, n)) {
+      if (!repeat && !hostShouldSend(this.view(), p.id, track, n)) {
         p.declined.set(k, now)
         return this.ctl(p, { t: 'none', track, n })
       }
@@ -571,7 +572,7 @@ export class Swarm {
         const p = this.peers.get(r.peer)
         if (!meta || !p) continue
         const now = Date.now()
-        this.inflight.set(pieceKey(r.track, r.n), { peer: r.peer, track: r.track, n: r.n, start: now, at: now, got: 0, done: false })
+        this.inflight.set(pieceKey(r.track, r.n), { peer: r.peer, track: r.track, n: r.n, start: now, at: now, got: 0, done: false, urgent: r.urgent })
         this.ctl(p, { t: 'req', track: r.track, n: r.n, v: verOf(meta[3]), urgent: r.urgent })
       }
     })
@@ -606,6 +607,12 @@ export class Swarm {
       // a critical download that will miss the playhead moves (once) to another holder
       const late = !silent && !stale && !this.moved.has(k) && isCritical(m, this.playheadS, this.criticalS) &&
         isLate(m, f.got, (now - f.start) / 1000, this.playheadS) && this.otherHolder(p, f.track, f.n)
+      // a prefetch with no byte yet that is critical now is asked again as urgent (cancel first, on the ordered control
+      // lane): a paced or queued prefetch would otherwise hold it, and the host's super-seed holds the others back
+      if (!silent && !stale && !late && !f.urgent && f.got === 0 && isCritical(m, this.playheadS, this.criticalS)) {
+        this.cancelFlight(k)
+        continue
+      }
       if (!silent && !stale && !late) continue
       this.cancelFlight(k)
       p.refused.set(k, now)

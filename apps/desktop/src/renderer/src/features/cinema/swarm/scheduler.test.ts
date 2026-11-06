@@ -1,6 +1,6 @@
 import type { CinemaPieceMeta, CinemaTrackId } from '@alga/shared'
 import { describe, expect, it } from 'vitest'
-import { LATE_MIN_AGE_S, MAX_PEER_INFLIGHT, hostShouldSend, isLate, nextRequests, type SwarmView } from './scheduler'
+import { HOST_NEAR_S, LATE_MIN_AGE_S, MAX_PEER_INFLIGHT, hostShouldSend, isLate, nextRequests, type SwarmView } from './scheduler'
 
 const H = 'ab'.repeat(32)
 const meta = (startS: number, durS: number): CinemaPieceMeta => [startS, durS, 1000, H]
@@ -50,16 +50,18 @@ describe('nextRequests', () => {
     expect(MAX_PEER_INFLIGHT).toBe(3)
   })
 
-  it('outside the window never asks the host for what a friend holds; inside it, the fastest even if host', () => {
+  it('beyond HOST_NEAR_S never asks the host for what a friend holds (critical or not); nearer, the fastest even if host', () => {
     const v = view({
       index: new Map([['v', track(0, 10, 20, 30, 40, 50, 60)]]),
-      mine: new Map([['v', new Set([0, 1])]]),
-      peers: [peer('host', 100, all(8), { isHost: true }), peer('p', 1, [2, 3, 4, 5, 6, 7], { inflight: 1 })],
+      mine: new Map([['v', new Set([0])]]),
+      peers: [peer('host', 100, all(8), { isHost: true }), peer('p', 1, [1, 2, 3, 4, 5, 6, 7], { inflight: 1 })],
     })
-    // critical n2, n3 from the host; n4..n7 belong to p, which has room for 2 more; the rest waits (no host fallback)
-    expect(asked(v)).toEqual(['2@host', '3@host', '4@p', '5@p'])
+    // n1 (0 s) is near: the fastest, the host. n2, n3 (critical, but ≥ HOST_NEAR_S ahead) and the prefetch belong to
+    // p, which has room for 2 more; the rest waits (no host fallback while a friend holds it)
+    expect(HOST_NEAR_S).toBe(10)
+    expect(asked(v)).toEqual(['1@host', '2@p', '3@p'])
     const lonely = view({ ...v, peers: [v.peers[0]!, peer('p', 1, [])] })
-    expect(asked(lonely)).toEqual(['2@host', '3@host', '4@host'])
+    expect(asked(lonely)).toEqual(['1@host', '2@host', '3@host']) // no friend holds them: the host, MAX_PEER_INFLIGHT at a time
   })
 
   it('never asks for pieces held, in flight, without a holder, or from a peer banned for them', () => {
@@ -152,11 +154,14 @@ describe('hostShouldSend (super-seed)', () => {
   const index = new Map<CinemaTrackId, CinemaPieceMeta[]>([['v', track(0, 10, 20, 30, 40, 50)]])
   const hv = (playheadS: number) => view({ playheadS, index, peers: [peer('A', 1, [6]), peer('B', 1, [5, 6])] })
 
-  it('refuses a piece a friend already has when it is outside the requester\'s critical window', () => {
+  it('refuses a piece a friend already has when it starts HOST_NEAR_S or more ahead, even inside the critical window', () => {
     expect(hostShouldSend(hv(0), 'A', 'v', 6)).toBe(false)
+    expect(hostShouldSend(hv(30), 'A', 'v', 6)).toBe(false) // n6 = 50 s: critical at 30 s, still 20 s ahead
+    expect(hostShouldSend(hv(40), 'A', 'v', 6)).toBe(false)
   })
-  it('sends it inside the critical window', () => {
-    expect(hostShouldSend(hv(30), 'A', 'v', 6)).toBe(true)
+  it('sends it once it starts less than HOST_NEAR_S ahead, or behind the playhead', () => {
+    expect(hostShouldSend(hv(41), 'A', 'v', 6)).toBe(true)
+    expect(hostShouldSend(hv(80), 'A', 'v', 6)).toBe(true)
   })
   it('sends a piece no other friend has (the requester holding it does not count)', () => {
     expect(hostShouldSend(hv(0), 'A', 'v', 4)).toBe(true)

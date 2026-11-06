@@ -518,9 +518,32 @@ describe('late join (sat into a room already playing)', () => {
     attachVideo(el)
     dispatch({ t: 'CINEMA_STATE', d: view({ playback: playing() }) })
     await vi.advanceTimersByTimeAsync(0)
+    const s = engine.swarms.at(-1)
+    s.aheadS = () => 40 // it gets there in time: ready once
+    await vi.advanceTimersByTimeAsync(600)
+    expect(lastStatus()).toBe('ready')
     players.list.at(-1).stall(true)
     expect(lastStatus()).toBe('preparing')
     await vi.advanceTimersByTimeAsync(CINEMA_READY_TIMEOUT_MS + 1000)
+    expect(lastStatus()).toBe('stalled')
+  })
+
+  it('still loading when CINEMA_READY_TIMEOUT_MS ends: its stalls stay preparing until it has been ready once (measured: a 0.6 s room pause at 11.8 s)', async () => {
+    attachVideo(el)
+    dispatch({ t: 'CINEMA_STATE', d: view({ playback: playing() }) })
+    await vi.advanceTimersByTimeAsync(0)
+    const s = engine.swarms.at(-1)
+    s.aheadS = () => 5
+    s.recvMbps = () => 4 // poor network: ready needs 30 s
+    await vi.advanceTimersByTimeAsync(CINEMA_READY_TIMEOUT_MS + 1000)
+    players.list.at(-1).stall(true)
+    expect(lastStatus()).toBe('preparing')
+    players.list.at(-1).stall(false)
+    s.aheadS = () => 30
+    await vi.advanceTimersByTimeAsync(600)
+    expect(lastStatus()).toBe('ready')
+    s.aheadS = () => 0
+    players.list.at(-1).stall(true)
     expect(lastStatus()).toBe('stalled')
   })
 

@@ -6,6 +6,12 @@ export const CRITICAL_S = 30
 export const MAX_PEER_INFLIGHT = 3
 /** A critical download is judged late only after it has run this long (its rate means little before). */
 export const LATE_MIN_AGE_S = 2
+/**
+ * Within this many seconds of the playhead the host serves anyone (a copy through a friend might come too late);
+ * further ahead, even critical pieces come from a friend that holds them, so the host's uplink carries each piece about
+ * once (super-seed). Measured (Task 16): with the whole 30 s window from the host, it sent 1.8x the pieces and saturated.
+ */
+export const HOST_NEAR_S = 10
 
 export interface SwarmView {
   now: number; playheadS: number; tracks: CinemaTrackId[]
@@ -44,7 +50,8 @@ export function isLate(m: CinemaPieceMeta, gotBytes: number, ageS: number, playh
  *    slot; if every holder is full, the farthest prefetch in flight on the fastest holder is preempted for it.
  * 2. Then pieces ahead of the playhead, rarest first (fewest holders), nearest on a tie, while budgetPieces (minus the
  *    critical media pieces just asked) lasts. Here a friend that holds the piece is always used instead of the host
- *    (super-seed): the host only serves what no friend (out of back-off) has.
+ *    (super-seed): the host only serves what no friend (out of back-off) has. The same goes for critical pieces that
+    start HOST_NEAR_S or more ahead of the playhead.
  * Never asks for what is held or in flight, nor from a peer banned for that piece, nor beyond MAX_PEER_INFLIGHT a peer;
  * maxNew bounds the flights added (a preempting request replaces one).
  */
@@ -68,11 +75,12 @@ export function nextRequests(v: SwarmView, maxNew: number): PieceRequest[] {
   const loadOf = (id: string) => load.get(id) ?? 0
   const out: PieceRequest[] = []
   let fresh = 0
-  const holders = (track: CinemaTrackId, n: number, critical: boolean) => {
+  const holders = (track: CinemaTrackId, n: number, critical: boolean, startS = Infinity) => {
     const k = pieceKey(track, n)
     let hs = v.peers.filter((p) => p.has.get(track)?.has(n) && !p.bannedFor.has(k))
     if (hs.some((p) => p.mbps >= 0)) hs = hs.filter((p) => p.mbps >= 0) // back-off peers only as the last holder, never as overflow
-    if (!critical && hs.some((p) => !p.isHost)) hs = hs.filter((p) => !p.isHost)
+    const far = !critical || startS >= v.playheadS + HOST_NEAR_S
+    if (far && hs.some((p) => !p.isHost)) hs = hs.filter((p) => !p.isHost)
     return hs.sort((a, b) => b.mbps - a.mbps || loadOf(a.id) - loadOf(b.id))
   }
   const preempted = new Set<string>()
@@ -90,7 +98,7 @@ export function nextRequests(v: SwarmView, maxNew: number): PieceRequest[] {
   // critical media pieces are never held back by the budget, but they use it up before any prefetch
   let budget = v.budgetPieces
   for (const [track, n, at] of crit) {
-    const hs = holders(track, n, true)
+    const hs = holders(track, n, true, at)
     const free = fresh < maxNew ? hs.find((p) => loadOf(p.id) < MAX_PEER_INFLIGHT) : undefined
     let req: PieceRequest | undefined
     if (free) {
@@ -122,9 +130,12 @@ export function nextRequests(v: SwarmView, maxNew: number): PieceRequest[] {
   return out
 }
 
-/** Super-seed (host side): send a piece only if no other friend has it, or it is in the room's critical window. */
+/**
+ * Super-seed (host side), for prefetch and critical requests alike: send a piece only if no other friend has it (or is
+ * being sent it), or it is an init/single-file piece, or it starts less than HOST_NEAR_S ahead of the room's playhead.
+ */
 export function hostShouldSend(hostView: SwarmView, peerId: string, track: CinemaTrackId, n: number): boolean {
   const m = hostView.index.get(track)?.[n]
   if (!m) return false
-  return isCritical(m, hostView.playheadS, hostView.criticalS) || !hostView.peers.some((p) => p.id !== peerId && p.has.get(track)?.has(n))
+  return m[1] === 0 || m[0] < hostView.playheadS + HOST_NEAR_S || !hostView.peers.some((p) => p.id !== peerId && p.has.get(track)?.has(n))
 }

@@ -126,10 +126,12 @@ interface Engine {
   /** The call's E2EE failed while I sat: no mesh, the seat stays preparing. */
   e2eeFailed: boolean
   /**
-   * Sat into a room already playing: until then a stall is still the join (spec §6.6 "entrar no meio"), reported as
-   * preparing, so the room does not pause for everyone while I load (measured: a 7 s room pause on a late join).
+   * Sat into a room already playing: until then, and until I have been `ready` once, a stall is still the join (spec
+   * §6.6 "entrar no meio"), reported as preparing, so the room does not pause for everyone while I load (measured: a
+   * 7 s room pause on a late join; then, with the 10 s alone on a lossy network, a 0.6 s one at 11.8 s).
    */
   arrivingUntil: number
+  everReady: boolean
   /** Stalled (not while arriving) and not `ready` since: on a poor network the pre-roll is POOR_RESUME_S. */
   afterStall: boolean
   checked: boolean
@@ -188,7 +190,7 @@ function createEngine(v: CinemaSessionView): void {
   const e: Engine = {
     sessionId: v.sessionId, hostId: v.hostId, isHost, film: v.film, swarm: null, mesh: null, player: null, earlyPieces: [], earlySignals: [],
     offs: [], timer: setInterval(() => tick(e), 500), stalled: false, unsupported: false, e2eeFailed: false,
-    arrivingUntil: v.playback.playing ? Date.now() + CINEMA_READY_TIMEOUT_MS : 0, afterStall: false, checked: false, pendingAudio: null, sentStatus: null,
+    arrivingUntil: v.playback.playing ? Date.now() + CINEMA_READY_TIMEOUT_MS : 0, everReady: false, afterStall: false, checked: false, pendingAudio: null, sentStatus: null,
     sentAt: 0, closed: false,
   }
   eng = e
@@ -288,7 +290,7 @@ function attachPlayer(e: Engine): void {
   e.offs.push(
     player.onStall((stalled) => {
       e.stalled = stalled
-      if (stalled && Date.now() >= e.arrivingUntil) e.afterStall = true
+      if (stalled && !arriving(e)) e.afterStall = true
       pushStatus(e)
     }),
     player.onError(() => {
@@ -361,16 +363,22 @@ export function readyAheadS(o: { isHost: boolean; recvMbps: number | null; bitra
   return Math.max(0, Math.min(need, o.leftS))
 }
 
+/** A late joiner is still joining for CINEMA_READY_TIMEOUT_MS after sitting, and until it has been `ready` once. */
+const arriving = (e: Engine): boolean => e.arrivingUntil > 0 && (Date.now() < e.arrivingUntil || !e.everReady)
+
 function statusNow(e: Engine): Status {
   if (e.unsupported) return 'unsupported'
   if (e.e2eeFailed) return 'preparing'
-  if (e.stalled) return Date.now() < e.arrivingUntil ? 'preparing' : 'stalled'
+  if (e.stalled) return arriving(e) ? 'preparing' : 'stalled'
   const pos = playheadS(e)
   const need = (afterStall: boolean) => readyAheadS({
     isHost: e.isHost, recvMbps: e.swarm?.recvMbps() ?? null, bitrateKbps: e.film.bitrateKbps, afterStall, leftS: e.film.durationS - pos - 0.5,
   })
   const ready = aheadS(e) >= need(e.afterStall)
-  if (ready) e.afterStall = false
+  if (ready) {
+    e.afterStall = false
+    e.everReady = true
+  }
   // a longer pre-roll is fetched as critical (in time order, not paced), else it could wait behind rarest-first prefetch
   e.swarm?.setCriticalS(need(e.afterStall))
   if (ready) return 'ready'

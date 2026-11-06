@@ -350,13 +350,16 @@ describe('Swarm', () => {
     connect(host(f), 'H', a, 'A')
     await sleep(100)
     vi.advanceTimersByTime(3_000) // critical pieces at S are late (no bytes): moved to H
+    await sleep(100)
+    // n3 (20–30 s) is critical but ≥ HOST_NEAR_S ahead: asked from S (a friend holds it) first, moved to H once late
+    vi.advanceTimersByTime(3_000)
     await until(() => [0, 1, 2, 3].every((n) => got.has(n)))
     await sleep(50)
-    expect(s.reqs.some((r) => !r.urgent)).toBe(true) // prefetch goes to the friend first
-    vi.advanceTimersByTime(12_000)
+    expect(s.reqs.some((r) => !r.urgent)).toBe(true) // prefetch goes to the friend first (from t = 3 s on)
+    vi.advanceTimersByTime(9_000) // t = 15 s
     await sleep(100)
     expect(got.has(4)).toBe(false)
-    vi.advanceTimersByTime(4_000)
+    vi.advanceTimersByTime(7_000) // t = 22 s: every prefetch asked of S at t = 3–6 s has been silent ≥ 15 s
     await until(() => got.size === f.bytes.length)
     expect(s.cancels).toEqual(expect.arrayContaining(s.reqs.filter((r) => !r.urgent).map((r) => r.n)))
   })
@@ -397,6 +400,37 @@ describe('Swarm', () => {
     req(true)
     await until(() => r.done.length === 2)
     expect(r.done).toEqual([4, 4])
+  })
+
+  it('super-seed holds for urgent requests too: a piece another friend gets is turned down until it is near the playhead', async () => {
+    const f = await film(6)
+    const h = host(f)
+    const r1 = raw(h, 'R1', f), r2 = raw(h, 'R2', f)
+    const req = (r: Raw, n: number) => r.ch.send(encode({ t: 'req', track: 'v', n, v: ver(f, n), urgent: true }))
+    req(r1, 3) // n3 = 20–30 s: in everyone's critical window, ≥ HOST_NEAR_S ahead of 0
+    await until(() => r1.done.includes(3))
+    req(r2, 3)
+    await until(() => r2.msgs.some((m) => m.t === 'none' && m.n === 3))
+    h.setPlayhead(12) // n3 now starts 8 s ahead: a copy through R1 might come too late
+    req(r2, 3)
+    await until(() => r2.done.includes(3))
+  })
+
+  it('a prefetch with no byte yet that enters the critical window is asked again as urgent (cancel, then req)', async () => {
+    fakeClock()
+    const f = await film(8)
+    const a = friend(f)
+    const s = raw(a, 'S', f, (m, r) => { if (m.urgent) r.serve(m.n, m.v) }) // sits on prefetch (paced or busy)
+    s.ch.send(encode(haveAll(f)))
+    await until(() => s.reqs.some((r) => !r.urgent && r.n === 4)) // n4 = 30–40 s: prefetch at playhead 0
+    a.setPlayhead(5) // n4 is now inside the 30 s window
+    vi.advanceTimersByTime(1_000)
+    await until(() => s.reqs.some((r) => r.urgent && r.n === 4))
+    const log = s.side.log
+    const cancel = log.findIndex((m) => m.t === 'cancel' && m.n === 4)
+    expect(cancel).toBeGreaterThan(-1)
+    expect(log.findIndex((m, i) => i > cancel && m.t === 'req' && m.n === 4 && m.urgent)).toBeGreaterThan(cancel)
+    expect(peerOf(a, 'S').strikes).toEqual([])
   })
 
   it('a peer still sending bytes is not timed out for requests queued behind them', async () => {
