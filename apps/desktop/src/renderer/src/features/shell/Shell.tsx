@@ -25,6 +25,7 @@ import { CallStage } from '../voice/CallStage'
 import { UnsafeCallDialog, VerifySheet } from '../voice/E2ee'
 import { IncomingCall } from '../voice/IncomingCall'
 import { MiniPlayer } from '../voice/MiniPlayer'
+import { CinemaHost } from '../cinema/room/CinemaHost'
 import { VoiceAnnouncer } from '../voice/VoiceAnnouncer'
 import { ScreenPicker } from '../voice/ScreenPicker'
 import { startVoiceSync } from '../voice/voice'
@@ -103,6 +104,7 @@ export function Shell() {
       <UnsafeCallDialog />
       <VoiceAnnouncer />
       <MiniPlayer />
+      <CinemaHost />
       <Suspense fallback={null}>
         {settings && <SettingsOverlay />}
         {spaceSettings && <SpaceSettingsOverlay />}

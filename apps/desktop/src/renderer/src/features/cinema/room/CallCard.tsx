@@ -21,12 +21,14 @@ export function Cover({ url, className }: { url: string | null; className?: stri
   return url ? <img src={url} alt="" draggable={false} className={`${c.coverImg} ${className ?? ''}`} /> : <div className={`${c.placeholder} ${className ?? ''}`} aria-hidden />
 }
 
-export function FilmTitle({ title, className }: { title: string; className?: string }) {
+/** `episode`: "S01E02", shown lighter after the name (the room's top bar, mockup 10). */
+export function FilmTitle({ title, className, episode }: { title: string; className?: string; episode?: string | null }) {
   const { name, year } = splitTitle(title)
   return (
     <span className={className} dir="auto">
       {name}
       {year && <span className={c.year}> ({year})</span>}
+      {episode && <span className={c.year}> · {episode}</span>}
     </span>
   )
 }

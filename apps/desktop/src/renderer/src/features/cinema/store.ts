@@ -19,17 +19,25 @@ import { clearStaleOpfs, createPieceCache } from './swarm/cache'
 import { Swarm } from './swarm/swarm'
 
 type Status = CinemaSeat['status']
+/** A later episode of the same folder, as probe lists it (an id main holds; never a path). */
+export type NextFile = { fileId: string; name: string }
 type Warning = 'dv_profile5' | 'high_bitrate' | 'pgs_ignored' | 'audio_converted' | 'atmos_dropped' | 'tracks_truncated'
 
 export interface CinemaState {
   session: CinemaSessionView | null
-  /** The last session of this call that ended (summary card). */
-  ended: { title: string; reason: CinemaEndReason; summary: CinemaSummary } | null
+  /**
+   * The last session of this call that ended (summary card; the ticket when I was seated). `film`/`createdAt` as the
+   * room last saw them (null when it never did), `at` = when the lights came up (local clock).
+   */
+  ended: {
+    title: string; reason: CinemaEndReason; summary: CinemaSummary; sessionId: string; channelId: string; film: CinemaFilm | null
+    createdAt: number | null; at: number; seated: boolean
+  } | null
   mine: { seated: boolean; status: Status; audioId: number | null; subtitleId: number | null; offsetS: number; unsupported: string | null }
   /** The file I project (fileId only: the path never leaves main). */
   host: { fileId: string | null }
   /** Film sheet between probe and "Abrir sessão" (host). */
-  draft: { fileId: string; name: string; film: CinemaFilm; warnings: Warning[]; decodes: boolean } | null
+  draft: { fileId: string; name: string; film: CinemaFilm; warnings: Warning[]; decodes: boolean; next: NextFile[] } | null
   subtitle: { id: number; format: 'vtt' | 'ass'; text: string; cues: Cue[]; fonts: Uint8Array[] } | null
   /** Which piece cache the swarm got (shown in the stats panel). */
   cache: { kind: 'opfs' | 'memory'; capBytes: number } | null
@@ -168,6 +176,12 @@ interface HostFile {
   /** A new gateway session (READY) may have lost index frames: resend the index when the session is confirmed. */
   resync: boolean
   repairedAt: number
+  /** Later episodes of the folder; the first one is probed in the credits and becomes `prepared`. */
+  next: NextFile[]
+  preparing: boolean
+  prepared: { fileId: string; film: CinemaFilm; next: NextFile[] } | null
+  /** "Cancelar" on the next episode: this film ends with the ticket. */
+  cancelled: boolean
 }
 let hostFile: HostFile | null = null
 
@@ -534,11 +548,11 @@ function repairIndex(h: HostFile): void {
 }
 
 /** The film I project from `fileId` (after probe): its index is kept from the factory's first piece on. */
-export function hostBegin(fileId: string, film: CinemaFilm): void {
+export function hostBegin(fileId: string, film: CinemaFilm, next: NextFile[] = []): void {
   hostEnd()
   const h: HostFile = {
     fileId, film, sessionId: null, index: new Map(), offs: [], seq: -1, pos: 0, pending: new Map(), flushTimer: undefined, flushedAt: 0,
-    resync: false, repairedAt: 0,
+    resync: false, repairedAt: 0, next, preparing: false, prepared: null, cancelled: false,
   }
   hostFile = h
   h.offs.push(
@@ -572,8 +586,67 @@ export function hostEnd(): void {
   // where the film stopped ("Continuar de …"): sent before the close, which writes it
   if (h.sessionId && video && video.currentTime > 0) window.alga.cinema.saveResume(h.fileId, video.currentTime)
   void window.alga.cinema.close(h.fileId).catch(() => undefined)
+  // a next episode probed but not switched to was detached from this file in main: close it too
+  if (h.prepared) void window.alga.cinema.close(h.prepared.fileId).catch(() => undefined)
   useCinema.setState({ host: { fileId: null } })
 }
+
+/** The host's next episode, for the room's driver (room/next.ts). */
+export function hostNextState(): { hasNext: boolean; preparing: boolean; prepared: boolean; cancelled: boolean } {
+  const h = hostFile
+  return { hasNext: !!h?.next.length, preparing: !!h?.preparing, prepared: !!h?.prepared, cancelled: !!h?.cancelled }
+}
+
+/** In the credits: probe the next file in the background, then announce it to the room (cinema_film next). */
+export async function hostPrepareNext(label: (film: CinemaFilm) => string): Promise<void> {
+  const h = hostFile
+  const n = h?.next[0]
+  if (!h || !n || h.preparing || h.prepared || h.cancelled) return
+  h.preparing = true
+  try {
+    const r = await window.alga.cinema.probe(n.fileId)
+    if (hostFile !== h || 'error' in r) return
+    h.prepared = { fileId: n.fileId, film: r.film, next: r.next }
+    if (h.cancelled || !h.sessionId) return
+    send({ op: 'cinema_film', sessionId: h.sessionId, next: { title: label(r.film).slice(0, 120) } })
+  } catch (err) {
+    console.warn('[cinema] next episode', err)
+  } finally {
+    h.preparing = false
+  }
+}
+
+/** "Cancelar": nobody switches; the film ends with the ticket. */
+export function hostCancelNext(): void {
+  const h = hostFile
+  if (!h) return
+  h.cancelled = true
+  if (h.sessionId) send({ op: 'cinema_film', sessionId: h.sessionId, next: null })
+}
+
+/** The 10 s ran out (or "Assistir agora"): the same session, same seats, the next file from its start. */
+export function hostSwitchNext(): void {
+  const h = hostFile
+  const p = h?.prepared
+  const sessionId = h?.sessionId
+  if (!h || !p || !sessionId || h.cancelled) return
+  h.prepared = null // it becomes the projected file: hostEnd must not close it
+  hostBegin(p.fileId, p.film, p.next)
+  const nh = hostFile as HostFile | null
+  if (!nh) return
+  nh.sessionId = sessionId
+  if (!send({ op: 'cinema_switch', sessionId, film: p.film, startS: 0 })) return
+  window.alga.cinema.start(p.fileId, 0, p.film.audio.map((a) => a.id)).catch((err: unknown) => {
+    console.warn('[cinema] start', err)
+    useCinema.setState({ error: t.factoryError })
+  })
+  scheduleFlush(nh)
+}
+
+/** A cinema_switch: another file in the same session (the index, the player and the mesh start over). */
+const otherFilm = (a: CinemaFilm, b: CinemaFilm): boolean =>
+  a.durationS !== b.durationS || a.videoMime !== b.videoMime || a.bitrateKbps !== b.bitrateKbps || a.width !== b.width || a.height !== b.height ||
+  JSON.stringify(a.episode) !== JSON.stringify(b.episode)
 
 /** The room moved (start, seek, pause): the factory makes pieces from there (a seek back needs ensure, R4 note). */
 function hostFollow(v: CinemaSessionView): void {
@@ -594,18 +667,22 @@ function onState(d: DispatchOf<'CINEMA_STATE'>): void {
   const st = useCinema.getState()
   if ('ended' in d) {
     if (st.session?.sessionId !== d.sessionId && hostFile?.sessionId !== d.sessionId) return
-    const title = st.session?.film.title ?? hostFile?.film.title ?? ''
+    const film = st.session?.film ?? hostFile?.film ?? null
+    const ended = {
+      title: film?.title ?? '', reason: d.reason, summary: d.summary, sessionId: d.sessionId, channelId: d.channelId, film,
+      createdAt: st.session?.createdAt ?? null, at: Date.now(), seated: st.mine.seated,
+    }
     closeEngine()
     if (hostFile?.sessionId === d.sessionId) hostEnd()
     stopPing()
-    return useCinema.setState({ session: null, ended: { title, reason: d.reason, summary: d.summary }, mine: freshMine(), busy: false })
+    return useCinema.setState({ session: null, ended, mine: freshMine(), busy: false })
   }
   if (d.channelId !== callChannel()) return
   clearTimeout(helloTimer)
   if (st.session && st.session.sessionId !== d.sessionId) {
     closeEngine()
     if (hostFile?.sessionId === st.session.sessionId) hostEnd()
-  }
+  } else if (eng && eng.sessionId === d.sessionId && otherFilm(eng.film, d.film)) closeEngine() // recreated below
   const me = meId()
   const seated = d.seats.some((x) => x.userId === me)
   useCinema.setState((s) => ({ session: d, ended: null, busy: false, mine: { ...s.mine, seated } }))

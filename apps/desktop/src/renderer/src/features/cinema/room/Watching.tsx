@@ -7,6 +7,7 @@ import { Button } from '@/ui'
 import * as act from '../actions'
 import { t } from '../strings'
 import { Controls } from './Controls'
+import { NextUp } from './Credits'
 import { ReactionLayer } from './ReactionLayer'
 import { SeatRow } from './SeatRow'
 import { SocialTimeline } from './SocialTimeline'
@@ -51,6 +52,8 @@ export function Watching({ session, channel, view, video, root, uiShown, onEngin
     return () => window.removeEventListener('keydown', onKey, true)
   }, [])
   const skipTo = view.screen === 'watching' ? skipIntroTo(session.film.chapters, cur) : null
+  // the credits with a next episode (mockup 10): the card instead of the timeline and the controls
+  const nextUp = view.screen === 'credits' && !!session.next
   return (
     <>
       {center && <div className={s.center}>{center}</div>}
@@ -61,9 +64,10 @@ export function Watching({ session, channel, view, video, root, uiShown, onEngin
         {skipTo !== null && (
           <Button variant="secondary" className={s.skipIntro} onClick={() => act.control('seek', skipTo)}>{t.room.skipIntro}</Button>
         )}
-        <SocialTimeline session={session} cur={cur} />
-        <Controls session={session} video={video} root={root} cur={cur} reactOpen={reactOpen} setReactOpen={setReactOpen} onEngineering={onEngineering} />
+        {!nextUp && <SocialTimeline session={session} cur={cur} />}
+        {!nextUp && <Controls session={session} video={video} root={root} cur={cur} reactOpen={reactOpen} setReactOpen={setReactOpen} onEngineering={onEngineering} />}
       </div>
+      {nextUp && <NextUp session={session} channel={channel} nextUpS={view.nextUpS} />}
       <div className={s.stripWrap}>
         <SeatRow session={session} channel={channel} variant="strip" dim={uiShown ? 0.85 : 0.3} ringFor={view.screen === 'waiting' ? view.who : null} />
       </div>

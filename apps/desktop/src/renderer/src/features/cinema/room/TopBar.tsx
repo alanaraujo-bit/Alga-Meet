@@ -9,6 +9,7 @@ import * as act from '../actions'
 import { t } from '../strings'
 import { FilmTitle } from './CallCard'
 import { videoLabel } from './film'
+import { episodeCode } from './next'
 import { firstName } from './seats'
 import { SyncChip } from './SyncChip'
 import s from './room.module.css'
@@ -22,7 +23,7 @@ export function TopBar({ session, channel, right }: { session: CinemaSessionView
           <Icon icon={ArrowLeft} size={20} />
         </button>
       </Tooltip>
-      <FilmTitle title={session.film.title} className={s.title} />
+      <FilmTitle title={session.film.title} className={s.title} episode={episodeCode(session.film)} />
       <span className={s.chip}>
         <span className={s.accent}><Icon icon={Check} size={12} /></span>
         <b>{t.native}</b> · {videoLabel(session.film)}

@@ -10,11 +10,17 @@ import { displayName } from '@/store/selectors'
 import { Button, toast } from '@/ui'
 import * as act from '../actions'
 import { createAss, destroyAss, setAssOffset } from '../ass'
-import { CinemaDev, CinemaNotices, StatsPanel } from '../CinemaDev'
-import { attachVideo, detachVideo, serverNow, useCinema } from '../store'
+import { CinemaDev, StatsPanel } from '../CinemaDev'
+import { attachVideo, detachVideo, hostNextState, hostPrepareNext, hostSwitchNext, serverNow, useCinema } from '../store'
 import { clock, t } from '../strings'
 import { SubtitleOverlay } from '../SubtitleOverlay'
 import { useFilmAudio } from '../useFilmAudio'
+import { Icon } from '@/ui'
+import { Maximize2 } from '@/ui/icons'
+import { openCall } from '../../voice/voice'
+import { useKeepArt } from './art'
+import { episodeLabel, nextStep } from './next'
+import { CinemaNotices } from './Notices'
 import { reducedMotion } from './prefs'
 import { Countdown } from './Countdown'
 import { Intermission } from './Intermission'
@@ -65,9 +71,10 @@ export function useSeatNames(session: CinemaSessionView, spaceId: string | null)
   return useData(useShallow((st) => Object.fromEntries([session.hostId, ...session.seats.map((x) => x.userId)].map((id) => [id, displayName(st, id, spaceId)]))))
 }
 
-export function CinemaRoom({ channel }: { channel: Channel }) {
+/** `mini`: I left the call's screen while seated — the same <video> keeps playing in a corner (click = back). */
+export function CinemaRoom({ channel, mini = false }: { channel: Channel; mini?: boolean }) {
   const [engineering, setEngineering] = useState(false)
-  if (!engineering) return <Room channel={channel} onEngineering={() => setEngineering(true)} />
+  if (!engineering || mini) return <Room channel={channel} mini={mini} onEngineering={() => setEngineering(true)} />
   // The engineering stage (the old dev stage): the engine's raw controls and numbers, for debugging.
   return createPortal(
     <div className={`${s.room} ${s.visible} ${s.engineering}`} data-lights="dim">
@@ -78,7 +85,7 @@ export function CinemaRoom({ channel }: { channel: Channel }) {
   )
 }
 
-function Room({ channel, onEngineering }: { channel: Channel; onEngineering: () => void }) {
+function Room({ channel, mini, onEngineering }: { channel: Channel; mini: boolean; onEngineering: () => void }) {
   const session = useCinema((st) => st.session) as CinemaSessionView
   const mine = useCinema((st) => st.mine)
   const subtitle = useCinema((st) => st.subtitle)
@@ -92,7 +99,8 @@ function Room({ channel, onEngineering }: { channel: Channel; onEngineering: () 
   const vref = useRef<HTMLVideoElement>(null)
   const now = useServerNow(250)
   const view = useRoomView(session, now)
-  const shown = IN_ROOM.has(view.screen)
+  const inRoom = IN_ROOM.has(view.screen)
+  const shown = inRoom && !mini
   const playingScreen = view.screen === 'watching' || view.screen === 'credits'
   const idle = useIdle(IDLE_MS, shown && playingScreen)
   const uiShown = view.screen !== 'countdown' && !(playingScreen && idle)
@@ -135,7 +143,9 @@ function Room({ channel, onEngineering }: { channel: Channel; onEngineering: () 
     return () => clearInterval(id)
   }, [isHost, hostFileId, playingNow])
 
-  useRoomKeys(vref, root)
+  useRoomKeys(vref, root, !mini)
+  useKeepArt(session)
+  useNextDriver(session, view, isHost)
 
   // "Ana pulou para 1:12:40 · Desfazer": every seek of the room, undone by seeking back to where it was.
   const last = useRef(session.playback)
@@ -154,23 +164,28 @@ function Room({ channel, onEngineering }: { channel: Channel; onEngineering: () 
   return createPortal(
     <div
       ref={root}
-      className={`${s.room} ${shown ? s.visible : ''}`}
+      className={`${s.room} ${shown ? s.visible : ''} ${mini && inRoom ? s.mini : ''}`}
       data-lights={view.lights}
       data-screen={view.screen}
       data-ui={uiShown ? 'on' : 'off'}
       data-cinema-room={shown ? 'shown' : 'hidden'}
-      aria-label={t.room.label(session.film.title)}
-      aria-hidden={!shown || undefined}
+      aria-label={mini ? t.mini.label(session.film.title) : t.room.label(session.film.title)}
+      aria-hidden={!(shown || (mini && inRoom)) || undefined}
       role="region"
     >
       <div className={s.lightHalf} aria-hidden />
       <div className={s.lightOn} aria-hidden />
-      {ambient && <ScreenLight video={vref} />}
+      {ambient && !mini && <ScreenLight video={vref} />}
       <div className={s.drag} aria-hidden />
-      <div className={s.frame} onClick={() => playingScreen && act.control('pause')} onDoubleClick={() => toggleFullscreen(root.current)}>
+      <div className={s.frame} onClick={() => (mini ? openCall(channel.id) : playingScreen && act.control('pause'))} onDoubleClick={() => !mini && toggleFullscreen(root.current)}>
         <video ref={vref} className={s.video} playsInline disablePictureInPicture />
       </div>
-      {subtitle?.format === 'vtt' && (
+      {mini && inRoom && (
+        <button type="button" className={s.miniBack} aria-label={t.mini.back} onClick={() => openCall(channel.id)}>
+          <Icon icon={Maximize2} size={16} />
+        </button>
+      )}
+      {subtitle?.format === 'vtt' && !mini && (
         <div className={s.subs}>
           <SubtitleOverlay cues={subtitle.cues} getTime={() => vref.current?.currentTime ?? 0} size="M" offsetS={mine.offsetS} controlsVisible={uiShown && shown} />
         </div>
@@ -186,19 +201,42 @@ function Room({ channel, onEngineering }: { channel: Channel; onEngineering: () 
           }
         />
       )}
-      {view.screen === 'intermission' && <Intermission session={session} channel={channel} video={vref} who={view.who} />}
-      {statsOpen && (
+      {shown && view.screen === 'intermission' && <Intermission session={session} channel={channel} video={vref} who={view.who} />}
+      {statsOpen && !mini && (
         <div className={s.stats}>
           <StatsPanel names={names}>
             <Button size="sm" variant="secondary" onClick={onEngineering}>{t.room.engineering}</Button>
           </StatsPanel>
         </div>
       )}
-      {shown && <CinemaNotices />}
+      {shown && <CinemaNotices room />}
       <div className={s.sr} aria-live="polite">{announce(view, names)}</div>
     </div>,
     document.body,
   )
+}
+
+/**
+ * The host's client drives the end of each film (room/next.ts): in the credits it prepares and announces the next
+ * file of the folder, switches when the 10 s run out, and with nothing next it ends the session at the very end, so
+ * everyone gets the ticket.
+ */
+function useNextDriver(session: CinemaSessionView, view: RoomView & { position: number }, isHost: boolean): void {
+  const endedFor = useRef<string | null>(null)
+  const film = `${session.sessionId}:${session.film.durationS}`
+  useEffect(() => {
+    if (!isHost) return
+    const step = nextStep({
+      screen: view.screen, nextUpS: view.nextUpS, position: view.position, durationS: session.film.durationS,
+      playing: session.playback.playing, announced: !!session.next, ...hostNextState(),
+    })
+    if (step === 'prepare') void hostPrepareNext(episodeLabel)
+    else if (step === 'switch') hostSwitchNext()
+    else if (step === 'end' && endedFor.current !== film) {
+      endedFor.current = film
+      act.end()
+    }
+  })
 }
 
 /** What the polite live region says when the room changes (spec §7.5). */
@@ -237,8 +275,9 @@ function ScreenLight({ video }: { video: RefObject<HTMLVideoElement | null> }) {
 }
 
 /** Spec §7.4 shortcuts, in the capture phase (the DM chat's "type anywhere" skips defaultPrevented keys). */
-function useRoomKeys(video: RefObject<HTMLVideoElement | null>, root: RefObject<HTMLDivElement | null>): void {
+function useRoomKeys(video: RefObject<HTMLVideoElement | null>, root: RefObject<HTMLDivElement | null>, enabled: boolean): void {
   useEffect(() => {
+    if (!enabled) return
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return
       const el = e.target as HTMLElement | null
@@ -277,7 +316,7 @@ function useRoomKeys(video: RefObject<HTMLVideoElement | null>, root: RefObject<
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [video, root])
+  }, [video, root, enabled])
 }
 
 export function toggleFullscreen(el: HTMLElement | null): void {

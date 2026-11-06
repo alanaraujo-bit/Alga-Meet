@@ -91,6 +91,8 @@ interface Session {
   watchedS: number
   reactions: number
   peaks: Map<number, number>
+  /** Next episode announced by the host (cinema_film next), cleared by the switch. */
+  next: { title: string } | null
 }
 
 export class Cinema {
@@ -220,7 +222,7 @@ export class Cinema {
       playback: { playing: false, position: Math.min(f.startS, f.film.durationS), at: now, seq: 0, by: null, reason: 'foyer', waitingFor: [], countdown: false },
       options: { controlLock: false, waitForStalled: true },
       seats: new Map(), createdAt: now, everSeated: new Set(), pausedAt: now, noWait: new Set(), hostAway: false, awayFromFoyer: false,
-      pieces: new Map(), blocks: new Map(), rate: new Map(), watchedS: 0, reactions: 0, peaks: new Map(),
+      pieces: new Map(), blocks: new Map(), rate: new Map(), watchedS: 0, reactions: 0, peaks: new Map(), next: null,
     }
     this.sessions.set(f.channelId, s)
     metrics.cinemaSessions.inc({ result: 'opened' })
@@ -365,6 +367,7 @@ export class Cinema {
     s.reactions = 0
     s.peaks.clear()
     s.noWait.clear()
+    s.next = null
     this.buffer(s, conn.userId, Math.min(f.startS, film.durationS))
   }
 
@@ -372,7 +375,12 @@ export class Cinema {
     const s = this.byId(conn, f)
     if (!s) return
     if (conn.userId !== s.hostId) return this.error(conn, f.op, 'forbidden', s.id)
-    if (f.title === undefined && !f.addSubtitle) return this.error(conn, f.op, 'invalid', s.id)
+    if (f.title === undefined && !f.addSubtitle && f.next === undefined) return this.error(conn, f.op, 'invalid', s.id)
+    if (f.next !== undefined) {
+      const title = f.next && cleanText(f.next.title)
+      if (f.next && !title) return this.error(conn, f.op, 'invalid', s.id)
+      s.next = title ? { title } : null
+    }
     let film = s.film
     if (f.title !== undefined) {
       // The title is plain text for the clients to render; HTML in it stays text.
@@ -611,7 +619,7 @@ export class Cinema {
         userId: x.userId, status: x.status, aheadS: x.aheadS, direct: forUser === undefined || this.direct(s, forUser, x.userId),
       })),
       iceServers: forUser !== undefined && s.seats.has(forUser) ? this.iceServers(forUser) : [], createdAt: s.createdAt,
-      heat: this.heat(s),
+      heat: this.heat(s), next: s.next,
     }
   }
 

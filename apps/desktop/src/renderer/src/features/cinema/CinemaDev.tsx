@@ -29,27 +29,6 @@ function techChip(f: CinemaFilm): string {
 const trackLabel = (x: { lang: string | null; title: string | null }, i: number) => t.trackName(x.lang, x.title, i)
 
 /** Errors and one-time notices of the cinema, over the stage. */
-export function CinemaNotices() {
-  const { error, notices } = useCinema(useShallow((s) => ({ error: s.error, notices: s.notices })))
-  if (!error && !notices.length) return null
-  return (
-    <div className={styles.notices} role="status" aria-live="polite">
-      {error && (
-        <div className={`${styles.notice} ${styles.noticeError}`}>
-          <span>{error}</span>
-          <button type="button" className={styles.ib} aria-label={t.close} onClick={act.dismissError}><Icon icon={X} size={14} /></button>
-        </div>
-      )}
-      {notices.map((n) => (
-        <div key={n} className={styles.notice}>
-          <span>{n}</span>
-          <button type="button" className={styles.ib} aria-label={t.close} onClick={() => act.dismissNotice(n)}><Icon icon={X} size={14} /></button>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 /** "Ana abriu uma sessão: Duna · 2h46" + Sentar, for whoever in the call is not seated; the summary after it ends. */
 export function CinemaCard({ channel }: { channel: Channel }) {
   const { session, seated, ended } = useCinema(useShallow((s) => ({ session: s.session, seated: s.mine.seated, ended: s.ended })))

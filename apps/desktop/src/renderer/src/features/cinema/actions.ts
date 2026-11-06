@@ -28,9 +28,9 @@ async function prepare(pick: () => Promise<Picked | null>): Promise<void> {
       useCinema.setState({ error: t.probeErrors[r.error] ?? t.probeErrors.unreadable })
       return void c.close(f.fileId).catch(() => undefined)
     }
-    // shortcut: the other episodes (r.next) are not offered yet (Plan 2); their ids close with this file.
+    // r.next: the later episodes of the folder (the room switches to the first at the end of the credits)
     const decodes = typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(r.film.videoMime)
-    useCinema.setState({ draft: { fileId: f.fileId, name: f.name, film: r.film, warnings: r.warnings, decodes } })
+    useCinema.setState({ draft: { fileId: f.fileId, name: f.name, film: r.film, warnings: r.warnings, decodes, next: r.next } })
   } catch (e) {
     console.warn('[cinema] open file', e)
     useCinema.setState({ error: t.probeErrors.unreadable })
@@ -52,7 +52,7 @@ export function openSession(title: string, startS = 0): void {
   const channelId = callChannel()
   if (!d || !channelId) return
   const film = { ...d.film, title: title.trim().slice(0, 120) || d.film.title }
-  hostBegin(d.fileId, film)
+  hostBegin(d.fileId, film, d.next)
   ipNoticeOnce() // the host sits on open
   useCinema.setState({ draft: null, busy: true, error: null })
   if (!send({ op: 'cinema_open', channelId, film, startS: Math.min(Math.max(0, startS), film.durationS) })) {

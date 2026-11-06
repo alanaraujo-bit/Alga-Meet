@@ -15,11 +15,11 @@ import { useLook } from '../billing/store'
 import { personEntries } from '../shell/people'
 import { ActivityLine } from '../activity/Activity'
 import { Eco } from '@/ui/eco/Eco'
-import { CinemaCard, CinemaNotices, useCinemaDrop } from '../cinema/CinemaDev'
+import { CinemaCard, useCinemaDrop } from '../cinema/CinemaDev'
 import { CallCard } from '../cinema/room/CallCard'
-import { CinemaRoom } from '../cinema/room/CinemaRoom'
 import { FilmSheet } from '../cinema/room/FilmSheet'
 import { Foyer } from '../cinema/room/Foyer'
+import { CinemaNotices } from '../cinema/room/Notices'
 import { end as endCinema, seat as seatCinema } from '../cinema/actions'
 import cc from '../cinema/room/call.module.css'
 import { useCinema } from '../cinema/store'
@@ -126,7 +126,6 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
             <E2eeChip channelId={channel.id} />
           </div>
         )}
-        {watching && <CinemaRoom key={cinema.id} channel={channel} />}
         {watching ? (
           <Foyer channel={channel} />
         ) : live && cinema.id !== null && !cinema.seated ? (

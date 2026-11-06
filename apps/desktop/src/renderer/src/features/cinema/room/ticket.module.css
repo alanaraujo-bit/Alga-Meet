@@ -1,0 +1,383 @@
+/* The ticket stub (mockup 11, 1440×900): values from docs/design/cinema/mockups/screens.js s11. */
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-overlay) - 1);
+  overflow: hidden;
+  background: var(--bg-content);
+  color: var(--text-primary);
+  font: var(--type-ui);
+  letter-spacing: var(--track-ui);
+  font-feature-settings: var(--font-features);
+}
+.backdrop {
+  position: absolute;
+  inset: -60px;
+  opacity: 0.32;
+  filter: blur(48px) saturate(1.1);
+}
+.backdropImg {
+  position: absolute;
+  inset: 0;
+}
+.shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 16, 17, 0.5), rgba(15, 16, 17, 0.62) 60%, #0f1011);
+}
+/* The room was dark: the lights come up over 3 s (spec §7.1 "rising"), then the stub shows. */
+.dark {
+  position: absolute;
+  inset: 0;
+  background: #020203;
+  pointer-events: none;
+  animation: rise 3000ms var(--ease-in-out-cubic) forwards;
+}
+@keyframes rise {
+  to {
+    opacity: 0;
+  }
+}
+.drag {
+  position: absolute;
+  left: 0;
+  right: var(--caption-w);
+  top: 0;
+  height: var(--titlebar-h);
+  -webkit-app-region: drag;
+}
+.content {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 400ms var(--ease-out-quart), transform 400ms var(--ease-out-quart);
+}
+.screen[data-risen='true'] .content {
+  opacity: 1;
+  transform: none;
+}
+
+.back {
+  position: absolute;
+  left: 24px;
+  top: 52px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px 0 8px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-weight: 510;
+}
+.back:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+.back:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: 2px;
+}
+.back > span {
+  color: var(--text-secondary);
+}
+
+.center {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: max(48px, calc(50% - 278px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 42px;
+}
+.overline {
+  font: 590 11px/14px var(--font-ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.lights {
+  margin-top: 4px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── The stub: 960×312, perforation at x 760 (two 12 px notches) ───────────────── */
+.fit {
+  position: relative;
+}
+.ticket {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 960px;
+  height: 312px;
+  transform-origin: 0 0;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.7)) drop-shadow(0 24px 40px rgba(0, 0, 0, 0.45));
+}
+.cut {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #161718;
+  --notch: radial-gradient(circle at 760px 0, transparent 12px, #000 12.5px), radial-gradient(circle at 760px 100%, transparent 12px, #000 12.5px);
+  -webkit-mask: var(--notch);
+  -webkit-mask-composite: source-in;
+  mask: var(--notch);
+  mask-composite: intersect;
+}
+.cut::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  pointer-events: none;
+}
+.cover {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 260px;
+  height: 312px;
+}
+.coverFade {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 260px;
+  height: 312px;
+  background: linear-gradient(90deg, transparent 70%, rgba(22, 23, 24, 0.5));
+}
+.stubBg {
+  position: absolute;
+  left: 760px;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: #131415;
+}
+.perf {
+  position: absolute;
+  left: 759px;
+  top: 20px;
+  bottom: 20px;
+  width: 2px;
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0 3px, transparent 3px 9px);
+}
+.main {
+  position: absolute;
+  left: 292px;
+  top: 28px;
+  width: 440px;
+}
+.title {
+  display: block;
+  margin-top: 10px;
+  font: 590 32px/38px var(--font-ui);
+  letter-spacing: -0.022em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.date {
+  margin-top: 6px;
+  color: var(--text-secondary);
+}
+.grid {
+  display: grid;
+  grid-template-columns: 196px 1fr;
+  gap: 24px;
+  margin-top: 22px;
+}
+.label {
+  font: 510 12px/16px var(--font-ui);
+  color: var(--text-tertiary);
+}
+.stack {
+  display: flex;
+  margin-top: 8px;
+}
+.stackFace {
+  display: inline-flex;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2.5px #161718;
+}
+.stackFace + .stackFace {
+  margin-left: -4px;
+}
+.names {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stats {
+  display: flex;
+  gap: 26px;
+  margin-top: 16px;
+}
+.num {
+  font: 590 26px/30px var(--font-ui);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.peak {
+  position: relative;
+  margin-top: 8px;
+  width: 220px;
+  height: 92px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #0b0b0c;
+}
+.peak::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.peakImg {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+}
+.badge {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  font: 510 12px/1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  background: rgba(27, 27, 30, 0.72);
+  backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.peakAt {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.peakAt b {
+  font-weight: 590;
+  color: var(--text-primary);
+}
+.noPeak {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.stub {
+  position: absolute;
+  left: 760px;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 30px 20px 24px;
+}
+.admits {
+  margin-top: 6px;
+  font: 590 56px/60px var(--font-ui);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.rule {
+  width: 48px;
+  height: 1px;
+  margin: 18px 0;
+  background: var(--border-default);
+}
+.channel {
+  font-weight: 510;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.space {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.serial {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 11px/1 var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 36px;
+}
+.hint {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.goesOn {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-secondary);
+}
+.goesOn b {
+  font-weight: 510;
+  color: var(--text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dark {
+    animation: none;
+    opacity: 0;
+  }
+  .content {
+    transition: none;
+    transform: none;
+  }
+}
+:global(.reduce-motion) .dark {
+  animation: none;
+  opacity: 0;
+}
+:global(.reduce-motion) .content {
+  transition: none;
+  transform: none;
+}

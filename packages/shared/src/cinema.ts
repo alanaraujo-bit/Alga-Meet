@@ -69,6 +69,8 @@ export interface CinemaSessionView {
   iceServers: CinemaIceServer[]; createdAt: number
   /** Reactions per 10 s of film (ceil(durationS / 10) slots), same buckets as the summary's peak. */
   heat: number[]
+  /** The next episode the host announced for the end of the credits (absent on older servers). */
+  next?: { title: string } | null
 }
 export interface CinemaSummary { watchedS: number; seats: string[]; reactions: number; peak: { position: number; count: number } | null }
 export type CinemaEndReason = 'host_ended' | 'host_left' | 'moderator' | 'call_empty' | 'channel_gone'
@@ -82,7 +84,7 @@ export type CinemaClientFrame =
   | { op: 'cinema_hello' }
   | { op: 'cinema_open'; channelId: string; film: CinemaFilm; startS: number }
   | { op: 'cinema_pieces'; sessionId: string; track: CinemaTrackId; from: number; items: CinemaPieceMeta[] }
-  | { op: 'cinema_film'; sessionId: string; title?: string; addSubtitle?: CinemaSubtitleTrack }
+  | { op: 'cinema_film'; sessionId: string; title?: string; addSubtitle?: CinemaSubtitleTrack; next?: { title: string } | null }
   | { op: 'cinema_seat'; sessionId: string; seated: boolean }
   | { op: 'cinema_status'; sessionId: string; status: CinemaSeat['status']; aheadS: number }
   | { op: 'cinema_control'; sessionId: string; action: 'start' | 'play' | 'pause' | 'seek' | 'continue_without'; position?: number; target?: string; seq: number }
@@ -139,7 +141,11 @@ export const CinemaClientFrameSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('cinema_open'), channelId: uuid, film: FilmSchema, startS: seconds }),
   /** `from` may be <= the indexed length (regeneration overwrites): the server decides. */
   z.object({ op: z.literal('cinema_pieces'), sessionId: uuid, track: trackId, from: nonNegInt, items: z.array(PieceMetaSchema).max(CINEMA_ITEMS_PER_FRAME) }),
-  z.object({ op: z.literal('cinema_film'), sessionId: uuid, title: z.string().min(1).max(120).optional(), addSubtitle: SubtitleTrackSchema.optional() }),
+  /** `next`: the host announces (or cancels, null) the next episode the room switches to at the end of the credits. */
+  z.object({
+    op: z.literal('cinema_film'), sessionId: uuid, title: z.string().min(1).max(120).optional(), addSubtitle: SubtitleTrackSchema.optional(),
+    next: z.object({ title: z.string().min(1).max(120) }).nullable().optional(),
+  }),
   z.object({ op: z.literal('cinema_seat'), sessionId: uuid, seated: z.boolean() }),
   z.object({ op: z.literal('cinema_status'), sessionId: uuid, status: z.enum(['preparing', 'ready', 'stalled', 'unsupported']), aheadS: seconds }),
   z.object({

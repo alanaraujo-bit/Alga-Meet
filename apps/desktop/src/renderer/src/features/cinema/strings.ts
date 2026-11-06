@@ -74,6 +74,7 @@ export const t = {
   relay: ' · relay',
   factoryError: 'O Alga parou de preparar uma parte do vídeo. Tentando de novo ao pular.',
   playerFailed: 'Seu PC não conseguiu tocar este vídeo.',
+  noHevc: 'Seu PC não decodifica HEVC',
   unsupported: { video_codec: 'Seu PC não decodifica o vídeo deste filme.', audio_codec: 'Seu PC não decodifica esta faixa de áudio.' } as Record<string, string>,
   ipNotice: 'Na sala de cinema seu PC conecta direto com quem está assistindo.',
   e2eeFailed: 'Não foi possível proteger a conexão desta sessão',
@@ -296,5 +297,48 @@ export const t = {
     you: 'Você',
     undo: 'Desfazer',
     time: (cur: string, total: string) => `${cur} de ${total}`,
+  },
+  /** Credits and the next episode (mockup 10). */
+  next: {
+    title: (label: string) => `Próximo: ${label}`,
+    startsIn: 'Começa em',
+    secs: (n: number) => `${n} s`,
+    sameSeats: 'mesmas poltronas',
+    prepared: (name: string) => `${name} já preparou o próximo arquivo da pasta`,
+    preparedMine: 'Você já preparou o próximo arquivo da pasta',
+    watchNow: 'Assistir agora',
+    cancel: 'Cancelar',
+    label: (label: string, n: number) => `Próximo: ${label}, começa em ${n} s`,
+  },
+  /** The ticket stub at the end (mockup 11). */
+  ticket: {
+    back: 'Voltar para a chamada',
+    overline: 'Fim da sessão',
+    lightsAt: (h: string) => `As luzes acenderam às ${h}`,
+    brand: 'Alga Meet · Sala de cinema',
+    row: 'Na fileira',
+    together: 'juntos',
+    reactions: (n: number) => (n === 1 ? 'reação' : 'reações'),
+    peak: 'Momento mais reagido',
+    noPeak: 'Ninguém reagiu desta vez',
+    admits: 'Admite',
+    seats: (n: number) => (n === 1 ? 'poltrona' : 'poltronas'),
+    copy: 'Copiar imagem',
+    save: 'Salvar',
+    hint: 'Cola em qualquer conversa do Alga.',
+    copied: 'Canhoto copiado',
+    saved: 'Canhoto salvo',
+    failed: 'Não deu para fazer a imagem do canhoto.',
+    callGoesOn: 'A chamada continua em',
+    label: (title: string) => `Canhoto da sessão: ${title}`,
+  },
+  /** Presence while seated (spec §6.8): never the film's title. */
+  presence: 'Numa sessão de cinema',
+  /** The report's details (spec §6.8): who projected is the target; title and time, never content. */
+  reportDetails: (title: string, at: string) => `Sala de cinema: ${title}, ${at}`,
+  /** The film in a corner while I am elsewhere in the app. */
+  mini: {
+    label: (title: string) => `Sala de cinema: ${title}. Voltar para a sala`,
+    back: 'Voltar para a sala',
   },
 }

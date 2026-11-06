@@ -1,0 +1,59 @@
+.notices {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--h-call, 56px) + 36px);
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(560px, calc(100% - 32px));
+}
+/* In the room: above the timeline (y 738 of 900). */
+.inRoom {
+  bottom: 196px;
+  z-index: 12;
+}
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 8px;
+  border-radius: 10px;
+  background: var(--bg-overlay);
+  box-shadow: var(--elev-overlay);
+  font: 510 13px/18px var(--font-ui);
+  color: var(--text-primary);
+}
+.error {
+  box-shadow: var(--elev-overlay), inset 0 0 0 1px rgba(235, 87, 87, 0.4);
+}
+.eco {
+  display: inline-flex;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+.text {
+  flex: 1;
+}
+.close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--text-tertiary);
+}
+.close:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+.close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

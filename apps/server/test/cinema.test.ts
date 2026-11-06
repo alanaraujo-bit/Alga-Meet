@@ -685,12 +685,25 @@ describe('cinema', () => {
       expect(await x.ga.waitFor('CINEMA_ERROR', (d) => d.reason === 'invalid')).toMatchObject({ op: 'cinema_switch' })
       x.ga.send({ op: 'cinema_switch', sessionId: st.sessionId, film: { ...film, title: ' <b>Ep 2</b>\u0007' }, startS: 0 })
       expect((await wait(x.gb, (d) => d.film.title === '<b>Ep 2</b>')).film.title).toBe('<b>Ep 2</b>')
+      // The next episode (cinema_film next): host only, cleaned, cancellable; the switch clears it.
+      x.ga.send({ op: 'cinema_film', sessionId: st.sessionId, next: { title: ' S01E03 \u0007' } })
+      expect((await wait(x.gb, (d) => !!d.next)).next).toEqual({ title: 'S01E03' })
+      x.gb.send({ op: 'cinema_film', sessionId: st.sessionId, next: null })
+      expect(await x.gb.waitFor('CINEMA_ERROR', (d) => d.op === 'cinema_film')).toMatchObject({ reason: 'forbidden' })
+      x.ga.send({ op: 'cinema_film', sessionId: st.sessionId, next: { title: '\u0007 ' } })
+      expect(await x.ga.waitFor('CINEMA_ERROR', (d) => d.op === 'cinema_film')).toMatchObject({ reason: 'invalid' })
+      x.ga.send({ op: 'cinema_film', sessionId: st.sessionId, next: null })
+      await wait(x.gb, (d) => d.next === null)
+      x.ga.send({ op: 'cinema_film', sessionId: st.sessionId, next: { title: 'Ep 2' } })
+      await wait(x.gb, (d) => d.next?.title === 'Ep 2')
+      x.ga.send({ op: 'cinema_switch', sessionId: st.sessionId, film: { ...film, title: 'Ep 2b' }, startS: 0 })
+      expect((await wait(x.gb, (d) => d.film.title === 'Ep 2b')).next).toBeNull()
       // A host who left their seat cannot switch (it would overwrite host_away).
       x.ga.send({ op: 'cinema_seat', sessionId: st.sessionId, seated: false })
       await wait(x.gb, (d) => !d.seats.some((e) => e.userId === x.a.user.id))
       x.ga.send({ op: 'cinema_switch', sessionId: st.sessionId, film: { ...film, title: 'Ep 3' }, startS: 0 })
       expect(await x.ga.waitFor('CINEMA_ERROR', (d) => d.reason === 'not_seated')).toMatchObject({ op: 'cinema_switch' })
-      expect(last(x.gb).film.title).toBe('<b>Ep 2</b>')
+      expect(last(x.gb).film.title).toBe('Ep 2b')
     })
 
     it('keeps the seats, wipes pieces and heat, and rebuffers at startS (clamped) with everyone preparing', async () => {
