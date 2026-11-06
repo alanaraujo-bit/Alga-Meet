@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "site",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "-w",
+        "apps/site"
+      ],
+      "port": 3100
+    },
+    {
+      "name": "setup-ui",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "D:/PROJETOS/alga-presence/node_modules/vite/bin/vite.js",
+        "--config",
+        "D:/PROJETOS/alga-presence/apps/desktop/vite.setup.config.ts"
+      ],
+      "port": 5199
+    }
+  ]
+}
