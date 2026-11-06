@@ -264,7 +264,7 @@ export interface AlgaBridge {
     /** A dropped File: the preload resolves its path (webUtils) and sends only that string to main. */
     fromDrop(file: File): Promise<{ fileId: string; name: string }>
     /** `next`: the following episodes of the same folder, each with its own fileId. */
-    probe(fileId: string): Promise<{ film: CinemaFilm; warnings: CinemaWarning[]; next: { fileId: string; name: string }[] } | { error: CinemaProbeError }>
+    probe(fileId: string): Promise<{ film: CinemaFilm; warnings: CinemaWarning[]; next: { fileId: string; name: string }[]; resumeS: number | null } | { error: CinemaProbeError }>
     start(fileId: string, startS: number, audioIds: number[]): Promise<void>
     ensure(fileId: string, track: CinemaTrackId, atS: number): void
     addAudio(fileId: string, audioId: number): void
@@ -278,6 +278,12 @@ export interface AlgaBridge {
     onEvicted(cb: (e: { fileId: string; track: CinemaTrackId; n: number[] }) => void): Unsubscribe
     onError(cb: (e: { fileId: string; track: CinemaTrackId; reason: string }) => void): Unsubscribe
     close(fileId: string): Promise<void>
+    /** Where this film file stopped (position in seconds, kept locally per file), or null when too early/too late to resume. Also returned by probe. */
+    resumeAt(fileId: string): Promise<number | null>
+    /** Remembers the playback position (throttled in main to once per 5 s per file). */
+    saveResume(fileId: string, positionS: number): void
+    /** Captures a rect (CSS px, integers, inside the window) of the sender's page. 'copy' -> clipboard; 'save' -> "Save ticket" dialog (PNG). false when cancelled. */
+    captureCard(rect: { x: number; y: number; width: number; height: number }, action: 'copy' | 'save'): Promise<boolean>
   }
 
   /**

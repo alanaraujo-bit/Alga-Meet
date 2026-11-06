@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,13 +13,23 @@ const h = vi.hoisted(() => ({
   piece: new Uint8Array(0) as Uint8Array | null,
   probeGate: null as Promise<void> | null,
   startError: null as string | null,
+  duration: 10,
+  invokes: new Map<string, (...a: unknown[]) => unknown>(),
+  clip: [] as unknown[],
+  saves: [] as string[],
+  saveTo: null as string | null,
+  win: { w: 1280, h: 720 },
+  captured: [] as unknown[],
 }))
+const fakeImage = { toPNG: () => Buffer.from('PNGDATA') }
 
 vi.mock('electron', () => ({
   app: { isPackaged: false, getPath: () => process.env.TEMP ?? '/tmp', getAppPath: () => process.cwd() },
-  dialog: { showOpenDialog: async () => (h.picks.length ? { canceled: false, filePaths: [h.picks.shift()!] } : { canceled: true, filePaths: [] }) },
-  BrowserWindow: { getAllWindows: () => [] },
-  ipcMain: {},
+  clipboard: { write: async (d: unknown[]) => { h.clip.push(...d) } },
+  ClipboardItem: class { constructor(public items: Record<string, Blob>) {} },
+  dialog: { showSaveDialog: async (...a: unknown[]) => { h.saves.push(JSON.stringify(a.at(-1))); return h.saveTo ? { canceled: false, filePath: h.saveTo } : { canceled: true } }, showOpenDialog: async () => (h.picks.length ? { canceled: false, filePaths: [h.picks.shift()!] } : { canceled: true, filePaths: [] }) },
+  BrowserWindow: { getAllWindows: () => [], fromWebContents: () => ({ getContentSize: () => [h.win.w, h.win.h] }) },
+  ipcMain: { handle: (c: string, fn: (...a: unknown[]) => unknown) => h.invokes.set(c, fn) },
 }))
 vi.mock('../window', () => ({ mainWindow: () => null }))
 vi.mock('../log', () => ({ log: { warn: () => {}, info: () => {} } }))
@@ -27,13 +37,14 @@ vi.mock('../ipc', async () => {
   const real = await vi.importActual<typeof import('../ipc')>('../ipc')
   return {
     ...real,
+    isTrustedSender: () => true,
     handle: (c: string, fn: (...a: unknown[]) => unknown) => h.handlers.set(c, async (...a) => fn(...a)),
     on: (c: string, fn: (...a: unknown[]) => void) => h.sends.set(c, fn),
     emit: (c: string, p: unknown) => h.emitted.push([c, p]),
   }
 })
 vi.mock('./ffmpeg', () => ({ checkFfmpeg: async () => ({ ok: true, version: 'x' }), ffmpegBins: () => ({ ffmpeg: 'f', ffprobe: 'p' }) }))
-vi.mock('./probe', () => ({ probeFile: async () => { await h.probeGate; return { film: { title: 't', durationS: 10, audio: [], subtitles: [] }, warnings: [], videoStreamIndex: 7 } } }))
+vi.mock('./probe', () => ({ probeFile: async () => { await h.probeGate; return { film: { title: 't', durationS: h.duration, audio: [], subtitles: [] }, warnings: [], videoStreamIndex: 7 } } }))
 vi.mock('./names', async () => ({ ...(await vi.importActual<object>('./names')), nextEpisodes: async () => ['C:\\secret\\dir\\S01E02.mkv'] }))
 vi.mock('./pieces', () => ({
   cinemaRoot: () => process.env.TEMP ?? '/tmp',
@@ -74,7 +85,7 @@ const probed = async () => {
   const r = await call(IPC.cinemaProbe, fileId)
   return { fileId, r }
 }
-beforeEach(() => { h.emitted.length = 0; h.factories.length = 0; h.probeGate = null; h.startError = null })
+beforeEach(() => { h.duration = 10; h.saveTo = null; h.saves.length = 0; h.clip.length = 0; h.captured.length = 0; h.emitted.length = 0; h.factories.length = 0; h.probeGate = null; h.startError = null })
 
 describe('cinema ipc', () => {
   it('unknown fileId rejects (invoke) and throws (send)', async () => {
@@ -214,5 +225,49 @@ describe('cinema ipc', () => {
     for (const p of ['\\\\server\\share\\x.mkv', '//server/share/x.mkv', '\\\\?\\C:\\x.mkv', '\\\\.\\pipe\\x.mkv']) {
       await expect(call(IPC.cinemaFromDrop, p)).rejects.toThrow('network and device')
     }
+  })
+
+  it('resume: saved position comes back from probe and resumeAt; throttled; too early/late is null', async () => {
+    h.duration = 3600
+    const { fileId, r } = await probed()
+    expect(r.resumeS).toBeNull()
+    const send = h.sends.get(IPC.cinemaSaveResume)!
+    send(fileId, 1000)
+    send(fileId, 2000) // within 5 s of the previous one: dropped
+    await vi.waitFor(async () => expect(await call(IPC.cinemaResumeAt, fileId)).toBe(1000))
+    expect((await call(IPC.cinemaProbe, fileId)).resumeS).toBe(1000)
+    expect(() => send(fileId, -1)).toThrow()
+    expect(() => send('nope', 100)).toThrow()
+    expect(JSON.stringify(await call(IPC.cinemaProbe, fileId))).not.toContain('alga-cinema-ipc')
+  })
+
+  const sender = { sender: {
+    capturePage: async (rect: unknown) => { h.captured.push(rect); return fakeImage },
+  }, senderFrame: { parent: null, url: 'app://alga/index.html' } }
+  const capture = (rect: unknown, action: unknown) => Promise.resolve(h.invokes.get(IPC.cinemaCaptureCard)!(sender, rect, action)) as Promise<boolean>
+
+  it('captureCard: invalid rect refused, nothing captured', async () => {
+    const bad = [
+      { x: -1, y: 0, width: 10, height: 10 }, { x: 0, y: 0, width: 0, height: 10 }, { x: 0, y: 0, width: 4097, height: 10 },
+      { x: 0.5, y: 0, width: 10, height: 10 }, { x: 1200, y: 0, width: 100, height: 10 }, { x: 0, y: 700, width: 10, height: 100 },
+      { x: 0, y: 0, width: Number.NaN, height: 10 }, null, 'x',
+    ]
+    for (const r of bad) await expect(capture(r, 'copy')).rejects.toThrow()
+    await expect(capture({ x: 0, y: 0, width: 10, height: 10 }, 'print')).rejects.toThrow()
+    expect(h.captured).toEqual([])
+  })
+
+  it('captureCard: copy writes the clipboard; save writes a PNG to the chosen file; cancel -> false', async () => {
+    const rect = { x: 10, y: 20, width: 300, height: 200 }
+    expect(await capture(rect, 'copy')).toBe(true)
+    expect(h.captured).toEqual([rect])
+    expect(h.clip).toHaveLength(1)
+    expect(Object.keys((h.clip[0] as { items: object }).items)).toEqual(['image/png'])
+    expect(await capture(rect, 'save')).toBe(false)
+    const out = join(dir, 'ticket.png')
+    h.saveTo = out
+    expect(await capture(rect, 'save')).toBe(true)
+    expect(readFileSync(out, 'utf8')).toBe('PNGDATA')
+    expect(h.saves[0]).toMatch(/canhoto-alga-\d{4}-\d{2}-\d{2}\.png/)
   })
 })

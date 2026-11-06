@@ -76,6 +76,9 @@ export const IPC = {
   cinemaInit: 'alga:cinema:init', // invoke
   cinemaPiece: 'alga:cinema:piece', // invoke
   cinemaClose: 'alga:cinema:close', // invoke
+  cinemaSaveResume: 'alga:cinema:save-resume', // send
+  cinemaResumeAt: 'alga:cinema:resume-at', // invoke
+  cinemaCaptureCard: 'alga:cinema:capture-card', // invoke
   cinemaPieces: 'alga:cinema:pieces', // event
   cinemaEvicted: 'alga:cinema:evicted', // event
   cinemaError: 'alga:cinema:error', // event

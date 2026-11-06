@@ -137,6 +137,9 @@ const bridge: AlgaBridge = {
     onEvicted: (cb) => subscribe(IPC.cinemaEvicted, cb),
     onError: (cb) => subscribe(IPC.cinemaError, cb),
     close: (fileId) => ipcRenderer.invoke(IPC.cinemaClose, String(fileId)),
+    resumeAt: (fileId) => ipcRenderer.invoke(IPC.cinemaResumeAt, String(fileId)),
+    saveResume: (fileId, positionS) => ipcRenderer.send(IPC.cinemaSaveResume, String(fileId), Number(positionS)),
+    captureCard: (rect, action) => ipcRenderer.invoke(IPC.cinemaCaptureCard, { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, String(action)),
   },
 
   activity: {

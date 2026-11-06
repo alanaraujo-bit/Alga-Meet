@@ -1,23 +1,24 @@
 import { randomBytes } from 'node:crypto'
-import { stat, statfs } from 'node:fs/promises'
-import { basename, dirname, extname, isAbsolute } from 'node:path'
-import { dialog } from 'electron'
+import { stat, statfs, writeFile } from 'node:fs/promises'
+import { basename, dirname, extname, isAbsolute, join } from 'node:path'
+import { BrowserWindow, ClipboardItem, app, clipboard, dialog, ipcMain } from 'electron'
 import type { CinemaTrackId } from '@alga/shared'
 import { IPC } from '../../shared/ipc'
-import { arr, emit, handle, int, on, str } from '../ipc'
+import { arr, emit, handle, int, isTrustedSender, obj, on, str } from '../ipc'
 import { log } from '../log'
 import { mainWindow } from '../window'
 import { checkFfmpeg, ffmpegBins } from './ffmpeg'
 import { VIDEO_EXTS, nextEpisodes } from './names'
 import { PieceFactory, cinemaRoot, sessionDir } from './pieces'
 import { probeFile } from './probe'
+import { ResumeStore, resumeKey } from './resume'
 
 /*
  * Renderer bridge of the cinema engine. The renderer only ever holds opaque fileIds; the local path (and the ffprobe stream
  * index) stay in this map, in main. Unknown or closed ids throw, so invoke() rejects and send() is logged and dropped.
  */
 
-interface Entry { path: string; factory: PieceFactory | null; unsubs: (() => void)[]; probing: Promise<unknown> | null; siblings: string[] }
+interface Entry { path: string; factory: PieceFactory | null; unsubs: (() => void)[]; probing: Promise<unknown> | null; siblings: string[]; resume: { key: string; durationS: number; lastSave: number } | null }
 const files = new Map<string, Entry>()
 
 const SUBTITLE_EXTS = ['srt', 'ass', 'ssa', 'vtt']
@@ -27,7 +28,7 @@ const DISK_SHARE = 0.2
 
 const register = (path: string): { fileId: string; name: string } => {
   const fileId = randomBytes(16).toString('base64url')
-  files.set(fileId, { path, factory: null, unsubs: [], probing: null, siblings: [] })
+  files.set(fileId, { path, factory: null, unsubs: [], probing: null, siblings: [], resume: null })
   return { fileId, name: basename(path) }
 }
 const entry = (v: unknown): Entry => {
@@ -51,6 +52,21 @@ const seconds = (v: unknown): number => {
 }
 /** Exact-length ArrayBuffer of a Node Buffer (its `.buffer` may be a shared pool). */
 const exact = (b: Uint8Array | null): ArrayBuffer | null => (b ? b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer : null)
+
+/** Position memory: opened lazily so `app.getPath` runs after the app is ready. */
+const SAVE_EVERY_MS = 5000
+let store: ResumeStore | null = null
+const resumeStore = (): ResumeStore => (store ??= new ResumeStore(join(app.getPath('userData'), 'cinema-resume.json')))
+const resumeOf = async (e: Entry): Promise<number | null> => (e.resume ? resumeStore().get(e.resume.key) : null)
+
+const MAX_CAPTURE = 4096
+/** Integers, x/y >= 0, size 1..4096, all inside the window's content area. */
+function captureRect(v: unknown, [cw = 0, ch = 0]: number[]): Electron.Rectangle {
+  const o = obj(v)
+  const r = { x: int(o.x, 0, cw), y: int(o.y, 0, ch), width: int(o.width, 1, MAX_CAPTURE), height: int(o.height, 1, MAX_CAPTURE) }
+  if (r.x + r.width > cw || r.y + r.height > ch) throw new RangeError('rect outside the window')
+  return r
+}
 
 const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 /** The path and its folder in both slash styles (case-insensitive) become "<arquivo>": the renderer never learns them. */
@@ -116,7 +132,8 @@ async function doProbe(fileId: string, e: Entry) {
   )
   const next = nextPaths.map(register)
   e.siblings.push(...next.map((n) => n.fileId))
-  return { film: r.film, warnings: r.warnings, next }
+  e.resume = { key: await resumeKey(e.path), durationS: r.film.durationS, lastSave: 0 }
+  return { film: r.film, warnings: r.warnings, next, resumeS: await resumeOf(e) }
 }
 
 export function registerCinemaIpc(): void {
@@ -161,6 +178,36 @@ export function registerCinemaIpc(): void {
 
   handle(IPC.cinemaInit, async (id, t) => exact(await safe(entry(id).path, async () => factory(id).init(track(t)))))
   handle(IPC.cinemaPiece, async (id, t, n) => exact(await safe(entry(id).path, async () => factory(id).piece(track(t), int(n, 0, 1_000_000)))))
+  handle(IPC.cinemaResumeAt, (id) => resumeOf(entry(id)))
+  on(IPC.cinemaSaveResume, (id, pos) => {
+    const e = entry(id)
+    const at = seconds(pos)
+    const now = Date.now()
+    if (!e.resume || now - e.resume.lastSave < SAVE_EVERY_MS) return
+    e.resume.lastSave = now
+    resumeStore().set(e.resume.key, at, e.resume.durationS).catch((err) => log.warn('cinema resume save failed', redact(e.path, String(err))))
+  })
+
+  // Not through handle(): the capture needs the sender's webContents. Same sender check.
+  ipcMain.handle(IPC.cinemaCaptureCard, async (ev, rectIn: unknown, actionIn: unknown) => {
+    if (!isTrustedSender(ev)) throw new Error('forbidden')
+    const action = str(actionIn, 8)
+    if (action !== 'copy' && action !== 'save') throw new TypeError('expected copy or save')
+    const win = BrowserWindow.fromWebContents(ev.sender)
+    if (!win) throw new Error('no window')
+    const image = await ev.sender.capturePage(captureRect(rectIn, win.getContentSize()))
+    if (action === 'copy') {
+      // Electron 45's clipboard is W3C-style: it takes ClipboardItems of Blobs.
+      await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(image.toPNG())], { type: 'image/png' }) })])
+      return true
+    }
+    const opts = { title: 'Salvar canhoto', defaultPath: `canhoto-alga-${new Date().toISOString().slice(0, 10)}.png`, filters: [{ name: 'PNG', extensions: ['png'] }] }
+    const r = await dialog.showSaveDialog(win, opts)
+    if (r.canceled || !r.filePath) return false
+    await writeFile(r.filePath, image.toPNG())
+    return true
+  })
+
   handle(IPC.cinemaClose, async (id) => {
     entry(id)
     await closeEntry(id as string).catch((err) => log.warn('cinema close failed', err))
