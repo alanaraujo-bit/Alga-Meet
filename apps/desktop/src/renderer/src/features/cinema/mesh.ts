@@ -9,6 +9,8 @@ const MAX_QUEUED = 100
 export const LANE_STAGGER_MS = 2_000
 /** Lanes > 0 wait (at most this long) for ICE gathering and send their candidates inside the description: one frame per side. */
 export const GATHER_WAIT_MS = 2_000
+/** Messages held per lane before it is announced (≈ 14 MiB of chunks); beyond that they drop and the piece is re-asked. */
+const MAX_HELD = 64
 
 /** The smaller id makes the offers and creates the data channels; the other side answers. */
 export function isOfferer(selfId: string, peerId: string): boolean {
@@ -118,6 +120,8 @@ interface Lane {
   timer: ReturnType<typeof setTimeout> | null
   /** getStats totals at the last refresh (RTT over the interval). */
   rtt: { responses: number; total: number }
+  /** Messages that came before the lane was announced (the remote saw it open first), replayed in order then. */
+  held: [RTCDataChannel, MessageEvent][]
 }
 
 /** A peer: up to CINEMA_LANES connections. It stays while any lane is opening or open. */
@@ -278,7 +282,7 @@ export class Mesh {
     const pc = new RTCPeerConnection({ iceServers: this.opts.iceServers, iceTransportPolicy: 'all' })
     const lane: Lane = {
       k, pc, retries: 0, early: [], ctl: null, bulk: null, announced: false, active: pair.offerer || k === 0, trickle: k === 0,
-      timer: null, rtt: { responses: 0, total: 0 },
+      timer: null, rtt: { responses: 0, total: 0 }, held: [],
       batcher: new CandidateBatcher((candidates) => this.signal(id, { kind: 'ice', candidates, ...(k ? { lane: k } : {}) })),
     }
     pair.lanes.set(k, lane)
@@ -338,6 +342,8 @@ export class Mesh {
     else if (ch.label === 'cinema' && !lane.bulk) lane.bulk = ch
     else return
     ch.binaryType = 'arraybuffer'
+    // until the lane is announced (and the swarm takes over onmessage), hold what arrives: chunks would be lost
+    ch.onmessage = (e) => { if (lane.held.length < MAX_HELD) lane.held.push([ch, e]) }
     const opened = () => {
       const { ctl, bulk } = lane
       if (lane.announced || !this.isLive(id, lane) || ctl?.readyState !== 'open' || bulk?.readyState !== 'open') return
@@ -345,6 +351,7 @@ export class Mesh {
       lane.timer = null
       lane.announced = true
       for (const cb of this.laneCbs) cb(id, lane.k, ctl, bulk)
+      for (const [c, e] of lane.held.splice(0)) c.onmessage?.(e)
       if (lane.k === 0) this.staggerLanes(id)
     }
     ch.onopen = opened

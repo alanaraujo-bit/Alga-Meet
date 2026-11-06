@@ -329,6 +329,27 @@ describe('Mesh', () => {
     expect(gone).toEqual(['b'])
     expect(laneGone).toEqual([0, 2])
   })
+  it('messages that arrive before the lane is announced (the other channel still opening) are replayed, in order', () => {
+    const { mesh } = mk()
+    const got: string[] = []
+    mesh.onLane((_id, _k, ctl, bulk) => {
+      ctl.onmessage = (e) => got.push(`ctl:${e.data}`)
+      bulk.onmessage = (e) => got.push(`bulk:${e.data}`)
+    })
+    mesh.sync([seat('b')])
+    const pc = FakePC.all[0]!
+    type Ch = FakeCh & { onmessage: ((e: { data: string }) => void) | null }
+    const ctl = pc.chs.get('cinema-ctl') as Ch
+    const bulk = pc.chs.get('cinema') as Ch
+    bulk.readyState = 'open'
+    bulk.onopen?.()
+    bulk.onmessage?.({ data: 'c1' }) // the remote saw the lane open first and is already sending chunks
+    bulk.onmessage?.({ data: 'c2' })
+    expect(got).toEqual([])
+    ctl.readyState = 'open'
+    ctl.onopen?.()
+    expect(got).toEqual(['bulk:c1', 'bulk:c2'])
+  })
   it('answerer: idle lanes (no offer yet) do not keep a peer whose lane 0 failed', () => {
     vi.useFakeTimers()
     const gone: string[] = []
