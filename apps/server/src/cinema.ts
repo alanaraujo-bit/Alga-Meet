@@ -158,6 +158,8 @@ export class Cinema {
         return this.react(conn, frame)
       case 'cinema_end':
         return this.endBy(conn, frame)
+      case 'cinema_switch':
+        return this.switchFilm(conn, frame)
     }
   }
 
@@ -343,6 +345,23 @@ export class Cinema {
     for (const userId of s.seats.keys()) {
       if (userId !== conn.userId) this.toSeat(s, userId, 'CINEMA_PIECES', { sessionId: s.id, track: f.track, from: f.from, items: f.items })
     }
+  }
+
+  /** Next episode in the same session: same seats, fresh index/reactions/heat, rebuffering at startS with everyone preparing (like `start`). */
+  private switchFilm(conn: Conn, f: Extract<CinemaClientFrame, { op: 'cinema_switch' }>): void {
+    const s = this.byId(conn, f)
+    if (!s) return
+    if (conn.userId !== s.hostId) return this.error(conn, f.op, 'forbidden', s.id)
+    const film = cleanFilm(f.film)
+    if (!film) return this.error(conn, f.op, 'invalid', s.id)
+    // Bank the old episode's played time against the old duration, then stop the clock so buffer() does not bank it twice.
+    this.bank(s, Date.now())
+    s.playback = { ...s.playback, playing: false }
+    s.film = film
+    s.pieces.clear()
+    s.reactions = 0
+    s.peaks.clear()
+    this.buffer(s, conn.userId, Math.min(f.startS, film.durationS))
   }
 
   private film(conn: Conn, f: Extract<CinemaClientFrame, { op: 'cinema_film' }>): void {
@@ -588,7 +607,15 @@ export class Cinema {
         userId: x.userId, status: x.status, aheadS: x.aheadS, direct: forUser === undefined || this.direct(s, forUser, x.userId),
       })),
       iceServers: forUser !== undefined && s.seats.has(forUser) ? this.iceServers(forUser) : [], createdAt: s.createdAt,
+      heat: this.heat(s),
     }
+  }
+
+  /** Reactions per PEAK_BUCKET_S slot; a reaction exactly at the end of the film counts in the last slot. */
+  private heat(s: Session): number[] {
+    const heat = Array<number>(Math.ceil(s.film.durationS / PEAK_BUCKET_S)).fill(0)
+    for (const [bucket, n] of s.peaks) if (heat.length) heat[Math.min(bucket, heat.length - 1)]! += n
+    return heat
   }
 
   private broadcast(s: Session): void {

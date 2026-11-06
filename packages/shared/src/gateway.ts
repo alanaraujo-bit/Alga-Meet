@@ -71,7 +71,8 @@ export type ClientFrame =
   /**
    * Cinema (cinema.ts): `cinema_time`, `cinema_hello`, `cinema_open` (host), `cinema_pieces` (host), `cinema_film`
    * (host: rename / add subtitle), `cinema_seat`, `cinema_status`, `cinema_control`, `cinema_options` (host),
-   * `cinema_signal`, `cinema_react`, `cinema_end` (host or moderator). The server answers with CINEMA_* dispatches only.
+   * `cinema_signal`, `cinema_react`, `cinema_end` (host or moderator), `cinema_switch` (host: next episode in the same
+   * session, keeps the seats, resets pieces/reactions/heat and rebuffers at `startS`). The server answers with CINEMA_* dispatches only.
    */
   | CinemaClientFrame
 

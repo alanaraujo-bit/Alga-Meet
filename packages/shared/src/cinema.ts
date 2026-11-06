@@ -65,6 +65,8 @@ export interface CinemaSessionView {
   playback: CinemaPlayback; seats: CinemaSeat[]
   options: { controlLock: boolean; waitForStalled: boolean }
   iceServers: CinemaIceServer[]; createdAt: number
+  /** Reactions per 10 s of film (ceil(durationS / 10) slots), same buckets as the summary's peak. */
+  heat: number[]
 }
 export interface CinemaSummary { watchedS: number; seats: string[]; reactions: number; peak: { position: number; count: number } | null }
 export type CinemaEndReason = 'host_ended' | 'host_left' | 'moderator' | 'call_empty' | 'channel_gone'
@@ -86,6 +88,7 @@ export type CinemaClientFrame =
   | { op: 'cinema_signal'; sessionId: string; to: string; signal: CinemaSignal }
   | { op: 'cinema_react'; sessionId: string; emoji: CinemaReaction }
   | { op: 'cinema_end'; sessionId: string }
+  | { op: 'cinema_switch'; sessionId: string; film: CinemaFilm; startS: number }
 
 // ---- gateway schema --------------------------------------------------------------------------------------------------
 
@@ -146,6 +149,8 @@ export const CinemaClientFrameSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('cinema_signal'), sessionId: uuid, to: uuid, signal: SignalSchema }),
   z.object({ op: z.literal('cinema_react'), sessionId: uuid, emoji: z.enum(CINEMA_REACTIONS) }),
   z.object({ op: z.literal('cinema_end'), sessionId: uuid }),
+  /** Host only: next episode in the same session (same seats); clears the piece index, reactions and heat. */
+  z.object({ op: z.literal('cinema_switch'), sessionId: uuid, film: FilmSchema, startS: seconds }),
 ])
 
 /** Where the shared timeline is at `serverNow` (server clock, ms): frozen until `at`, then advancing 1 s per second. */

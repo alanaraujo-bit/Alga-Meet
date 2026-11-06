@@ -206,6 +206,7 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
         case 'cinema_signal':
         case 'cinema_react':
         case 'cinema_end':
+        case 'cinema_switch':
           await ctx.cinema.handle(conn, frame)
           break
       }

@@ -38,6 +38,7 @@ const ok = {
   cinema_signal: { op: 'cinema_signal', sessionId: id, to: id, signal: { kind: 'ice', candidates: ['c'] } },
   cinema_react: { op: 'cinema_react', sessionId: id, emoji: CINEMA_REACTIONS[0] },
   cinema_end: { op: 'cinema_end', sessionId: id },
+  cinema_switch: { op: 'cinema_switch', sessionId: id, film, startS: 12 },
 }
 const parse = (v: unknown) => CinemaClientFrameSchema.safeParse(v).success
 const bad = (o: object, patch: object) => ({ ...o, ...patch })
@@ -52,6 +53,9 @@ describe('CinemaClientFrameSchema', () => {
   })
   it('rejects negative or non-finite positions', () => {
     expect(parse(bad(ok.cinema_open, { startS: -1 }))).toBe(false)
+    expect(parse(bad(ok.cinema_switch, { startS: -1 }))).toBe(false)
+    expect(parse(bad(ok.cinema_switch, { startS: Infinity }))).toBe(false)
+    expect(parse(bad(ok.cinema_switch, { film: { ...film, title: '' } }))).toBe(false)
     expect(parse(bad(ok.cinema_control, { position: Number.NaN }))).toBe(false)
     expect(parse(bad(ok.cinema_control, { position: Infinity }))).toBe(false)
     expect(parse(bad(ok.cinema_time, { c: Infinity }))).toBe(false)

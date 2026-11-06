@@ -670,6 +670,63 @@ describe('cinema', () => {
     expect(s.app.ctx.cinema.sessionOf(x.voice.id)).toBeUndefined()
   })
 
+  describe('switch', () => {
+    it('only the host, only an existing session, and the title is cleaned like in open', async () => {
+      const x = await setup()
+      const st = await open(x)
+      await seat(x.gb, st.sessionId, x.b.user.id)
+      x.gb.send({ op: 'cinema_switch', sessionId: st.sessionId, film, startS: 0 })
+      expect(await x.gb.waitFor('CINEMA_ERROR')).toMatchObject({ op: 'cinema_switch', reason: 'forbidden' })
+      x.ga.send({ op: 'cinema_switch', sessionId: '0198b3f0-0000-7000-8000-000000000000', film, startS: 0 })
+      expect(await x.ga.waitFor('CINEMA_ERROR')).toMatchObject({ op: 'cinema_switch', reason: 'not_found' })
+      x.ga.send({ op: 'cinema_switch', sessionId: st.sessionId, film: { ...film, title: '\u0007 ' }, startS: 0 })
+      expect(await x.ga.waitFor('CINEMA_ERROR', (d) => d.reason === 'invalid')).toMatchObject({ op: 'cinema_switch' })
+      x.ga.send({ op: 'cinema_switch', sessionId: st.sessionId, film: { ...film, title: ' <b>Ep 2</b>\u0007' }, startS: 0 })
+      expect((await wait(x.gb, (d) => d.film.title === '<b>Ep 2</b>')).film.title).toBe('<b>Ep 2</b>')
+    })
+
+    it('keeps the seats, wipes pieces and heat, and rebuffers at startS (clamped) with everyone preparing', async () => {
+      const x = await setup()
+      const { id, p } = await playing(x)
+      await seat(x.gc, id, x.c.user.id)
+      x.ga.send({ op: 'cinema_pieces', sessionId: id, track: 'v', from: 0, items: [piece(0), piece(1)] })
+      await x.gb.waitFor('CINEMA_PIECES')
+      expect(p.heat).toEqual(Array(60).fill(0)) // one slot per 10 s of film
+      // Reactions land in the bucket of their position (frozen at 0 s here, then at 25 s after a seek).
+      x.gb.send({ op: 'cinema_react', sessionId: id, emoji: '😂' })
+      await x.ga.waitFor('CINEMA_REACTION')
+      x.ga.send({ op: 'cinema_hello' })
+      const h0 = await wait(x.ga, (d) => d.heat[0] === 1)
+      control(x.ga, id, 'seek', h0.playback.seq, { position: 25 })
+      await wait(x.ga, (d) => d.playback.position === 25)
+      x.gb.send({ op: 'cinema_react', sessionId: id, emoji: '😂' })
+      await x.ga.waitFor('CINEMA_REACTION', () => x.ga.events.filter((e) => e.t === 'CINEMA_REACTION').length === 2)
+      x.ga.send({ op: 'cinema_hello' })
+      expect((await wait(x.ga, (d) => d.heat[2] === 1)).heat.slice(0, 3)).toEqual([1, 0, 1])
+      const seqBefore = last(x.ga).playback.seq
+      const next = { ...film, title: 'Ep 2', durationS: 100 }
+      x.ga.send({ op: 'cinema_switch', sessionId: id, film: next, startS: 5000 })
+      const sw = await wait(x.gb, (d) => d.film.title === 'Ep 2')
+      expect(sw.playback).toMatchObject({ playing: false, position: 100, reason: 'buffering', seq: seqBefore + 1, waitingFor: [], countdown: false, by: x.a.user.id })
+      expect(sw.seats.map((e) => [e.userId, e.status]).sort()).toEqual([x.a.user.id, x.b.user.id, x.c.user.id].map((u) => [u, 'preparing']).sort())
+      expect(sw.heat).toEqual(Array(10).fill(0))
+      await wait(x.gc, (d) => d.film.title === 'Ep 2') // everyone in the call gets it
+
+      // The index is gone: a seat joining afterwards is replayed nothing; the host's new index starts at 0.
+      const before = pieceFrames(x.gc).length
+      x.gc.send({ op: 'cinema_seat', sessionId: id, seated: false })
+      await wait(x.gb, (d) => !d.seats.some((e) => e.userId === x.c.user.id))
+      await seat(x.gc, id, x.c.user.id)
+      expect(pieceFrames(x.gc).length).toBe(before)
+      x.ga.send({ op: 'cinema_pieces', sessionId: id, track: 'v', from: 0, items: [piece(0)] }) // from 0 is valid again
+      await x.gb.waitFor('CINEMA_PIECES', (d) => d.items.length === 1 && d.from === 0 && pieceFrames(x.gb).length === 2)
+
+      // Ready gating works as for start.
+      for (const g of [x.ga, x.gb, x.gc]) status(g, id, 'ready')
+      expect((await wait(x.gb, (d) => d.playback.playing && d.film.title === 'Ep 2')).playback.position).toBe(100)
+    })
+  })
+
   describe('summary', () => {
     afterEach(() => { vi.useRealTimers() })
 
