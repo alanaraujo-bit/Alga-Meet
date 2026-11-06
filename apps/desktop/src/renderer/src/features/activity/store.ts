@@ -3,22 +3,27 @@ import { useMemo, useSyncExternalStore } from 'react'
 import { create } from 'zustand'
 import { useData } from '@/store/data'
 import { onDispatch, useSession } from '@/store/session'
-import { readableTint, vividAverage } from './logic'
+import { useCinema } from '../cinema/store'
+import { cinemaActivity, readableTint, vividAverage } from './logic'
 
 type LocalActivity = NonNullable<Awaited<ReturnType<Window['alga']['activity']['current']>>>
 
 interface MyActivity {
+  /** Seated in a cinema session since (epoch ms): that is the activity meanwhile, whatever else is detected. */
+  cinema: number | null
   /** What this PC detects and would share (null = nothing, sharing off, or the app is hidden). */
   detected: LocalActivity | null
   /** "Pausar por 1 h": nothing is sent until this epoch ms (memory only; a restart ends the pause). */
   pausedUntil: number
 }
 
-export const useMyActivity = create<MyActivity>()(() => ({ detected: null, pausedUntil: 0 }))
+export const useMyActivity = create<MyActivity>()(() => ({ detected: null, pausedUntil: 0, cinema: null }))
 
 /** What actually goes out: detection minus the pause. */
 export function sharedActivity(st: MyActivity = useMyActivity.getState(), now = Date.now()): Activity | null {
-  if (!st.detected || st.pausedUntil > now) return null
+  if (st.pausedUntil > now) return null
+  if (st.cinema !== null) return cinemaActivity(st.cinema)
+  if (!st.detected) return null
   const { key: _key, ...wire } = st.detected
   return wire
 }
@@ -56,6 +61,11 @@ export function startActivitySync(): () => void {
   const offPref = useData.subscribe((st, prev) => {
     if (st.me?.statusPreference !== prev.me?.statusPreference) send()
   })
+  const offCinema = useCinema.subscribe((st, prev) => {
+    if (st.mine.seated === prev.mine.seated) return
+    useMyActivity.setState({ cinema: st.mine.seated ? Date.now() : null })
+    send()
+  })
   const offReady = onDispatch((d) => {
     if (d.t === 'READY') {
       lastSent = null
@@ -64,6 +74,7 @@ export function startActivitySync(): () => void {
   })
   return () => {
     offChange()
+    offCinema()
     offReady()
     offPref()
   }
@@ -75,8 +86,9 @@ export function useActivity(userId: string | undefined): Activity | undefined {
   const theirs = useData((st) => (userId ? st.activities[userId] : undefined))
   // Select stable references only (a fresh object per render would loop): the pause timer clears pausedUntil.
   const detected = useMyActivity((st) => (isMe ? st.detected : null))
+  const cinema = useMyActivity((st) => (isMe ? st.cinema : null))
   const paused = useMyActivity((st) => st.pausedUntil > 0)
-  const mine = useMemo(() => (detected && !paused ? sharedActivity({ detected, pausedUntil: 0 }) : null), [detected, paused])
+  const mine = useMemo(() => (paused ? null : sharedActivity({ detected, pausedUntil: 0, cinema })), [detected, cinema, paused])
   return isMe ? (mine ?? undefined) : theirs
 }
 

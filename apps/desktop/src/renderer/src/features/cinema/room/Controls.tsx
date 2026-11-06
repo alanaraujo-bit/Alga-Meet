@@ -56,7 +56,8 @@ export function Controls({ session, video, root, cur, reactOpen, setReactOpen, o
     { label: t.room.screenLight, checked: prefs.ambient, onSelect: () => act.setPrefs({ ambient: !prefs.ambient }) },
     { label: t.room.ducking, checked: prefs.ducking, onSelect: () => act.setPrefs({ ducking: !prefs.ducking }) },
     { kind: 'separator' },
-    ...(host ? [{ label: t.room.report, icon: Flag, onSelect: () => openReport({ kind: 'user', user: host }) }] : []),
+    // who projected is the target; the details name the session and the moment, never its content (spec §6.8)
+    ...(host ? [{ label: t.room.report, icon: Flag, onSelect: () => openReport({ kind: 'user', user: host }, t.reportDetails(f.title, clock(cur))) }] : []),
     { label: t.room.engineering, icon: Wrench, onSelect: onEngineering },
   ]
 

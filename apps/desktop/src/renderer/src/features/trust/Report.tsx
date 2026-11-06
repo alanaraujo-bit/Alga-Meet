@@ -18,8 +18,9 @@ import s from './trust.module.css'
  */
 export type ReportTarget = { kind: 'message'; message: Message } | { kind: 'user'; user: PublicUser } | { kind: 'space'; spaceId: string }
 
-const useReport = create<{ target: ReportTarget | null; open: boolean; n: number }>()(() => ({ target: null, open: false, n: 0 }))
-export const openReport = (target: ReportTarget) => useReport.setState((x) => ({ target, open: true, n: x.n + 1 }))
+const useReport = create<{ target: ReportTarget | null; details: string; open: boolean; n: number }>()(() => ({ target: null, details: '', open: false, n: 0 }))
+/** `details`: context the caller fills in for the reporter (editable), e.g. the cinema's "Sala de cinema: <título>, <minutagem>". */
+export const openReport = (target: ReportTarget, details = '') => useReport.setState((x) => ({ target, details, open: true, n: x.n + 1 }))
 // The target stays while the dialog plays its exit.
 const close = () => useReport.setState({ open: false })
 
@@ -50,16 +51,17 @@ export function ReportHost() {
   const target = useReport((x) => x.target)
   const open = useReport((x) => x.open)
   const n = useReport((x) => x.n)
-  return target ? <ReportFlow key={n} target={target} open={open} /> : null
+  const details = useReport((x) => x.details)
+  return target ? <ReportFlow key={n} target={target} open={open} initialDetails={details} /> : null
 }
 
 const LIFE: ReportReason[] = ['self_harm', 'violence']
 
-function ReportFlow({ target, open }: { target: ReportTarget; open: boolean }) {
+function ReportFlow({ target, open, initialDetails }: { target: ReportTarget; open: boolean; initialDetails: string }) {
   const [step, setStep] = useState<'reason' | 'details' | 'done'>('reason')
   const [reason, setReason] = useState<ReportReason | null>(null)
   const [more, setMore] = useState(false)
-  const [details, setDetails] = useState('')
+  const [details, setDetails] = useState(initialDetails)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [duplicate, setDuplicate] = useState(false)

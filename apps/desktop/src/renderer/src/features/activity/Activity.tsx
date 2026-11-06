@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { AppWindow, Code, FilmStrip, GameController, MusicNotes, PaintBrush, type Glyph } from '@/ui/icons'
 import { Icon, Tooltip } from '@/ui'
-import { formatElapsed, PHRASE, sentence, spokenElapsed, steamArt } from './logic'
+import { formatElapsed, PHRASE, phraseOf, sentence, spokenElapsed, steamArt } from './logic'
 import { loadTint, tintOf, useActivity, useNow } from './store'
 import s from './activity.module.css'
 
@@ -128,12 +128,12 @@ export function ActivityPanel({ activity: a, children, still, compact }: { activ
 export function ActivityLine({ userId, fallback = null }: { userId: string; fallback?: ReactNode }) {
   const a = useActivity(userId)
   if (!a) return <>{fallback}</>
-  const p = PHRASE[a.kind]
+  const p = phraseOf(a.kind, a.name)
   return (
     <span className={s.line} title={sentence(a.kind, a.name)}>
       <ActivityIcon activity={a} size={14} />
       <span className={s.lineText}>
-        {p.verb} {p.prep && `${p.prep} `}
+        {p.verb && `${p.verb} `}{p.prep && `${p.prep} `}
         <strong>{a.name}</strong>
       </span>
     </span>

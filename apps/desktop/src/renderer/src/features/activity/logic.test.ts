@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { formatElapsed, readableTint, sentence, spokenElapsed, vividAverage } from './logic'
+import { ActivitySchema } from '@alga/shared'
+import { cinemaActivity, formatElapsed, readableTint, sentence, spokenElapsed, vividAverage } from './logic'
 
 describe('activity logic', () => {
   it('formats the live timer like a stopwatch', () => {
@@ -32,5 +33,13 @@ describe('activity logic', () => {
   it('makes any hue readable on the dark surface', () => {
     expect(readableTint([230, 40, 50])).toBe('hsl(357 72% 70%)')
     expect(readableTint([20, 120, 220])).toMatch(/^hsl\(210 72% 70%\)$/)
+  })
+
+  it('the cinema presence: its own sentence, a valid activity, never the film title', () => {
+    const a = cinemaActivity(1_700_000_000_000)
+    expect(a).toEqual({ kind: 'video', name: 'Numa sessão de cinema', startedAt: 1_700_000_000_000 })
+    expect(ActivitySchema.safeParse(a).success).toBe(true)
+    expect(sentence(a.kind, a.name)).toBe('Numa sessão de cinema')
+    expect(sentence('video', 'YouTube')).toBe('Assistindo no YouTube')
   })
 })

@@ -1,4 +1,5 @@
-import type { ActivityKind } from '@alga/shared'
+import type { Activity, ActivityKind } from '@alga/shared'
+import { t as cinemaT } from '../cinema/strings'
 
 /** "1:23:45" past an hour, "4:07" before: the live timer (tabular figures keep it still). */
 export function formatElapsed(ms: number): string {
@@ -29,8 +30,15 @@ export const PHRASE: Record<ActivityKind, { verb: string; prep: string }> = {
   app: { verb: 'Usando', prep: '' },
 }
 
+/** While seated in the cinema (spec §6.8): "Numa sessão de cinema", never the film's title (it wins over a detected app). */
+export const cinemaActivity = (startedAt: number): Activity => ({ kind: 'video', name: cinemaT.presence, startedAt })
+
+/** The cinema's line is a sentence of its own (no verb); every other activity reads "verb prep name". */
+export const phraseOf = (kind: ActivityKind, name: string): { verb: string; prep: string } =>
+  kind === 'video' && name === cinemaT.presence ? { verb: '', prep: '' } : PHRASE[kind]
+
 export function sentence(kind: ActivityKind, name: string): string {
-  const p = PHRASE[kind]
+  const p = phraseOf(kind, name)
   return [p.verb, p.prep, name].filter(Boolean).join(' ')
 }
 
