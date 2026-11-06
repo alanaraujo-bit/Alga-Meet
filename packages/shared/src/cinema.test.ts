@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CINEMA_ITEMS_PER_FRAME, CINEMA_MAX_FRAME_BYTES, CINEMA_REACTIONS, CinemaClientFrameSchema, positionAt, type CinemaPlayback } from './cinema.js'
+import { CINEMA_ITEMS_PER_FRAME, CINEMA_LANES, CINEMA_MAX_FRAME_BYTES, CINEMA_REACTIONS, CinemaClientFrameSchema, positionAt, type CinemaPlayback } from './cinema.js'
 import { uuidv7 } from './ids.js'
 
 const pb = (o: Partial<CinemaPlayback> = {}): CinemaPlayback => ({
@@ -82,6 +82,14 @@ describe('CinemaClientFrameSchema', () => {
     expect(parse(bad(ok.cinema_signal, { signal: { kind: 'ice', candidates: Array(21).fill('c') } }))).toBe(false)
     expect(parse(bad(ok.cinema_signal, { signal: { kind: 'offer', sdp: 'x'.repeat(12_000) } }))).toBe(true)
     expect(parse(bad(ok.cinema_signal, { signal: { kind: 'offer', sdp: 'x'.repeat(12_001) } }))).toBe(false)
+  })
+  it('keeps the lane of a signal (0..CINEMA_LANES-1) and refuses others', () => {
+    const lane = (signal: object) => CinemaClientFrameSchema.safeParse(bad(ok.cinema_signal, { signal }))
+    const r = lane({ kind: 'ice', candidates: ['c'], lane: 2 })
+    expect(r.success && r.data.op === 'cinema_signal' && r.data.signal.lane).toBe(2)
+    expect(lane({ kind: 'answer', sdp: 'x', lane: CINEMA_LANES - 1 }).success).toBe(true)
+    expect(lane({ kind: 'offer', sdp: 'x', lane: CINEMA_LANES }).success).toBe(false)
+    expect(lane({ kind: 'ice', candidates: [], lane: 1.5 }).success).toBe(false)
   })
   it('requires uuids and integer seq', () => {
     expect(parse(bad(ok.cinema_seat, { sessionId: 'nope' }))).toBe(false)

@@ -32,6 +32,8 @@ export const CINEMA_REACTIONS = ['😂', '😱', '😍', '😭', '🔥', '👏']
 export const CINEMA_REACTION_RATE = { perSecond: 1, burst: 5 } as const
 /** Lifetime of the TURN credentials handed out with a session. */
 export const CINEMA_TURN_TTL_S = 21_600
+/** RTCPeerConnections per pair of seats: one SCTP association each, since loss and a bloated queue cap each one's rate (§6.4). */
+export const CINEMA_LANES = 3
 
 const MAX_PIECE_BYTES = 64 * 1024 * 1024
 const MAX_SDP_CHARS = 12_000
@@ -67,9 +69,10 @@ export interface CinemaSessionView {
 export interface CinemaSummary { watchedS: number; seats: string[]; reactions: number; peak: { position: number; count: number } | null }
 export type CinemaEndReason = 'host_ended' | 'host_left' | 'moderator' | 'call_empty' | 'channel_gone'
 export type CinemaErrorReason = 'disabled' | 'not_in_call' | 'forbidden' | 'exists' | 'full' | 'not_found' | 'locked' | 'stale' | 'not_seated' | 'invalid'
+/** `lane`: which of the pair's CINEMA_LANES connections the signal is for (absent = 0). */
 export type CinemaSignal =
-  | { kind: 'offer' | 'answer'; sdp: string; tag?: string; epoch?: number }
-  | { kind: 'ice'; candidates: string[] }
+  | { kind: 'offer' | 'answer'; sdp: string; tag?: string; epoch?: number; lane?: number }
+  | { kind: 'ice'; candidates: string[]; lane?: number }
 export type CinemaClientFrame =
   | { op: 'cinema_time'; c: number }
   | { op: 'cinema_hello' }
@@ -117,9 +120,10 @@ const PieceMetaSchema = z.tuple([
   z.number().int().min(1).max(MAX_PIECE_BYTES),
   z.string().regex(/^[0-9a-f]{64}$/, 'sha256 hex'),
 ])
+const lane = z.number().int().min(0).max(CINEMA_LANES - 1).optional()
 const SignalSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.enum(['offer', 'answer']), sdp: z.string().max(MAX_SDP_CHARS), tag: text(64).optional(), epoch: nonNegInt.optional() }),
-  z.object({ kind: z.literal('ice'), candidates: z.array(text(512)).max(MAX_ICE_CANDIDATES) }),
+  z.object({ kind: z.enum(['offer', 'answer']), sdp: z.string().max(MAX_SDP_CHARS), tag: text(64).optional(), epoch: nonNegInt.optional(), lane }),
+  z.object({ kind: z.literal('ice'), candidates: z.array(text(512)).max(MAX_ICE_CANDIDATES), lane }),
 ])
 
 export const CinemaClientFrameSchema = z.discriminatedUnion('op', [

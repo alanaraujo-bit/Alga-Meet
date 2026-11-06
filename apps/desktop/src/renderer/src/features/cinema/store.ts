@@ -207,7 +207,7 @@ async function openSwarm(e: Engine, v: CinemaSessionView): Promise<void> {
   // The host serves from its factory: the file must be the one of this session (kept across a media drop).
   const fileId = e.isHost && hostFile?.sessionId === v.sessionId ? hostFile.fileId : undefined
   const swarm = new Swarm({
-    sessionId: v.sessionId, isHost: e.isHost, cache: c.cache, hostId: v.hostId, capBytes: c.capBytes,
+    sessionId: v.sessionId, isHost: e.isHost, cache: c.cache, hostId: v.hostId, capBytes: c.capBytes, bitrateKbps: v.film.bitrateKbps,
     ...(fileId ? { source: (track: CinemaTrackId, n: number) => window.alga.cinema.piece(fileId, track, n) } : {}),
   })
   e.swarm = swarm
@@ -254,8 +254,10 @@ function createMesh(e: Engine, v: CinemaSessionView, e2ee: boolean): void {
   })
   e.mesh = mesh
   e.offs.push(
-    mesh.onChannel((peer, ch) => swarm.addPeer(peer, ch)),
+    mesh.onLane((peer, lane, ctl, bulk) => swarm.addLane(peer, lane, ctl, bulk)),
+    mesh.onLaneGone((peer, lane) => swarm.removeLane(peer, lane)),
     mesh.onPeerGone((peer) => swarm.removePeer(peer)),
+    mesh.onRtt((peer, lane, ms) => swarm.setRtt(peer, lane, ms)),
   )
   // seats first: the mesh only takes signals from peers it wants
   mesh.sync(useCinema.getState().session?.seats ?? v.seats)

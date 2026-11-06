@@ -116,6 +116,7 @@ export const t = {
     fromHost: 'de quem projeta',
     fromPeers: 'de amigos',
     peers: 'pares',
+    lanes: 'conexões',
     relay: 'Relay',
     none: 'nenhum',
     cache: 'Cache',

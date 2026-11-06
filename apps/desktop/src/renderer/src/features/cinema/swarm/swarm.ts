@@ -29,12 +29,19 @@ const TICK_MS = 1_000
 const DEFAULT_CAP_BYTES = 4 * 1024 ** 3
 /** When space runs short, pieces more than this far behind the playhead go first. */
 const BEHIND_S = 600
+/** Prefetch toward each peer is paced at this × the film's bitrate (halved while its RTT says a queue is building). */
+export const PREFETCH_PACE = 1.5
 
 type Source = (track: CinemaTrackId, n: number) => Promise<ArrayBuffer | null>
 /** `at` = last accepted chunk (request time before); `done` = every byte is in (being verified/stored): later chunks are ignored. */
 interface Flight { peer: string; track: CinemaTrackId; n: number; start: number; at: number; got: number; done: boolean }
+interface Lane { ctl: ChannelLike; bulk: ChannelLike }
 interface Peer {
-  id: string; ch: ChannelLike; has: Map<CinemaTrackId, Set<number>>
+  id: string
+  lanes: Map<number, Lane>
+  /** The lane whose ordered channel carries our control messages: kept until it closes (no reordering across lanes). */
+  ctlLane: number
+  has: Map<CinemaTrackId, Set<number>>
   /** Sent bytes with a wrong hash for this piece version: never asked again for it. */
   banned: Set<string>
   /** Answered `none` (key → when): skipped for REFUSED_MS, until it announces the piece, or until a peer leaves. */
@@ -85,17 +92,84 @@ export class Swarm {
   /** Stores run one at a time so eviction and the byte count stay in step. */
   private storing: Promise<unknown> = Promise.resolve()
 
-  constructor(private readonly opts: { sessionId: string; isHost: boolean; cache: PieceCache; source?: Source; hostId?: string; capBytes?: number }) {
+  /** `bitrateKbps`: the film's, for prefetch pacing (absent: prefetch is not paced). */
+  constructor(private readonly opts: {
+    sessionId: string; isHost: boolean; cache: PieceCache; source?: Source; hostId?: string; capBytes?: number; bitrateKbps?: number
+  }) {
     this.cap = opts.capBytes ?? DEFAULT_CAP_BYTES
     this.timer = setInterval(() => this.tick(), TICK_MS)
   }
 
+  /** A peer over a single channel for everything (control and chunks): replaces any previous one. */
   addPeer(id: string, ch: ChannelLike): void {
     this.removePeer(id)
+    this.addLane(id, 0, ch, ch)
+  }
+
+  /**
+   * One lane of a peer (mesh.ts): `ctl` is ordered and carries every control message; chunks go out striped over the
+   * lanes' `bulk` channels (unordered: chunks are addressed by offset). The first lane makes the peer.
+   */
+  addLane(id: string, k: number, ctl: ChannelLike, bulk: ChannelLike): void {
+    let p = this.peers.get(id)
+    const fresh = !p
+    if (!p) this.peers.set(id, (p = this.newPeer(id, k)))
+    const peer = p
+    const old = peer.lanes.get(k)
+    if (old) this.closeLane(peer, k, old)
+    const lane = { ctl, bulk }
+    peer.lanes.set(k, lane)
+    const onmessage = (e: MessageEvent) => {
+      const m = e.data instanceof ArrayBuffer ? decode(e.data) : null // text or malformed: dropped
+      if (m && this.peers.get(id) === peer && peer.lanes.get(k) === lane) this.onMessage(peer, m)
+    }
+    ctl.onmessage = onmessage
+    bulk.onmessage = onmessage
+    peer.up.addLane(k, bulk)
+    if (!fresh) return
+    this.sendHaves(peer)
+    this.schedule()
+  }
+
+  /**
+   * A lane closed. Its last chunks are lost, so whatever was coming from that peer is asked again (cancel first, on the
+   * ordered control lane) and both sides re-announce what they hold (control messages on a closed control lane are lost
+   * too). The peer goes with its last lane.
+   */
+  removeLane(id: string, k: number): void {
+    const p = this.peers.get(id)
+    const lane = p?.lanes.get(k)
+    if (!p || !lane) return
+    if (p.lanes.size === 1) return this.removePeer(id)
+    this.closeLane(p, k, lane)
+    if (p.ctlLane === k) p.ctlLane = Math.min(...p.lanes.keys())
+    for (const [key, f] of this.inflight) if (f.peer === id && !f.done) this.cancelFlight(key)
+    this.sendHaves(p)
+    this.schedule()
+  }
+
+  removePeer(id: string): void {
+    const p = this.peers.get(id)
+    if (!p) return
+    this.peers.delete(id)
+    p.up.close()
+    for (const [k, lane] of p.lanes) this.closeLane(p, k, lane)
+    this.asm.dropPeer(id)
+    for (const [k, f] of this.inflight) if (f.peer === id) this.dropFlight(k)
+    for (const q of this.peers.values()) q.refused.clear() // whoever turned us down (super-seed) may serve now
+    this.schedule()
+  }
+
+  /** A lane's round-trip time (mesh getStats): drives that peer's prefetch pacing. */
+  setRtt(id: string, k: number, ms: number): void {
+    this.peers.get(id)?.up.pacer.rtt(k, ms)
+  }
+
+  private newPeer(id: string, k: number): Peer {
     const p: Peer = {
-      id, ch, has: new Map(), banned: new Set(), refused: new Map(), declined: new Map(), sending: new Map(), strikes: [],
-      backoffUntil: 0, lastByte: 0, bytesIn: 0, mbps: 0,
-      up: new PeerUploader(ch, {
+      id, lanes: new Map(), ctlLane: k, has: new Map(), banned: new Set(), refused: new Map(), declined: new Map(), sending: new Map(),
+      strikes: [], backoffUntil: 0, lastByte: 0, bytesIn: 0, mbps: 0,
+      up: new PeerUploader({
         read: (track, n) => this.get(track, n),
         meta: (track, n) => this.index.get(track)?.[n],
         refused: (u, gone) => {
@@ -104,28 +178,22 @@ export class Swarm {
           if (this.opts.isHost) this.unmark(p, u.track, u.n)
         },
         sent: (bytes) => { this.up += bytes },
-      }),
+      }, PREFETCH_PACE * ((this.opts.bitrateKbps ?? 0) * 1000) / 8),
     }
-    this.peers.set(id, p)
-    ch.onmessage = (e) => {
-      const m = e.data instanceof ArrayBuffer ? decode(e.data) : null // text or malformed: dropped
-      if (m && this.peers.get(id) === p) this.onMessage(p, m)
-    }
-    for (const [track, set] of this.mine) if (set.size) this.ctl(p, { t: 'have', track, bits: bitsOf(set) })
-    this.schedule()
+    return p
   }
 
-  removePeer(id: string): void {
-    const p = this.peers.get(id)
-    if (!p) return
-    this.peers.delete(id)
-    p.ch.onmessage = null
-    p.up.close()
-    p.ch.close()
-    this.asm.dropPeer(id)
-    for (const [k, f] of this.inflight) if (f.peer === id) this.dropFlight(k)
-    for (const q of this.peers.values()) q.refused.clear() // whoever turned us down (super-seed) may serve now
-    this.schedule()
+  private closeLane(p: Peer, k: number, lane: Lane): void {
+    p.lanes.delete(k)
+    p.up.removeLane(k)
+    for (const ch of new Set([lane.ctl, lane.bulk])) {
+      ch.onmessage = null
+      ch.close()
+    }
+  }
+
+  private sendHaves(p: Peer): void {
+    for (const [track, set] of this.mine) if (set.size) this.ctl(p, { t: 'have', track, bits: bitsOf(set) })
   }
 
   /** Index entries from `from` on (may overwrite: a changed entry is a new version and drops the old bytes, R4). */
@@ -186,12 +254,14 @@ export class Swarm {
     return end - this.playheadS
   }
 
-  stats(): { fromHostPct: number; fromPeersPct: number; downMbps: number; upMbps: number; peers: number } {
+  stats(): { fromHostPct: number; fromPeersPct: number; downMbps: number; upMbps: number; peers: number; lanes: number } {
     const total = this.fromHost + this.fromPeers
+    let lanes = 0
+    for (const p of this.peers.values()) lanes += p.lanes.size
     return {
       fromHostPct: total ? (100 * this.fromHost) / total : 0,
       fromPeersPct: total ? (100 * this.fromPeers) / total : 0,
-      downMbps: this.downMbps, upMbps: this.upMbps, peers: this.peers.size,
+      downMbps: this.downMbps, upMbps: this.upMbps, peers: this.peers.size, lanes,
     }
   }
 
@@ -417,11 +487,12 @@ export class Swarm {
     }
   }
 
+  /** Control messages: always on the peer's control lane (ordered), never striped. */
   private ctl(p: Peer, m: WireMsg): void {
     try {
-      p.ch.send(encode(m))
+      p.lanes.get(p.ctlLane)?.ctl.send(encode(m))
     } catch {
-      // channel closing: the mesh removes the peer
+      // channel closing: the mesh removes the lane
     }
   }
 

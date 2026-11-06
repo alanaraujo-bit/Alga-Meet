@@ -556,3 +556,101 @@ describe('Swarm', () => {
     expect(cache.bytes()).toBe(0)
   })
 })
+
+/** `k` lanes between a and b, each with its own control and bulk link (as mesh.ts hands them over). */
+function lanes(a: Swarm, aId: string, b: Swarm, bId: string, k = 3) {
+  return Array.from({ length: k }, (_, i) => {
+    const [ac, bc] = link()
+    const [ab, bb] = link()
+    a.addLane(bId, i, ac, ab)
+    b.addLane(aId, i, bc, bb)
+    return { a: { ctl: ac, bulk: ab }, b: { ctl: bc, bulk: bb } }
+  })
+}
+const kinds = (log: WireMsg[]) => [...new Set(log.map((m) => m.t))].sort()
+
+describe('Swarm lanes', () => {
+  it('chunks are striped over every lane; control messages only travel on the control lane', async () => {
+    const f = await film(12, 700_000)
+    const h = host(f), a = friend(f)
+    const got = count(a)
+    const ls = lanes(h, 'H', a, 'A')
+    await until(() => got.size === f.bytes.length)
+    for (let n = 0; n < f.bytes.length; n++) expect(sameBytes(await a.get('v', n), f.bytes[n]!)).toBe(true)
+    // host → friend: every bulk lane carried chunks, and nothing else; control (have/got) only on lane 0's
+    for (const l of ls) {
+      expect(l.a.bulk.payload).toBeGreaterThan(0.15 * f.total)
+      expect(kinds(l.a.bulk.log)).toEqual(['chunk'])
+      expect(l.a.bulk.peak).toBeLessThanOrEqual(HIGH_WATER + 224 * 1024)
+    }
+    expect(kinds(ls[0]!.a.ctl.log)).not.toContain('chunk')
+    // friend → host: requests on lane 0's control channel only
+    expect(ls[0]!.b.ctl.log.filter((m) => m.t === 'req').length).toBe(f.bytes.length)
+    for (const l of ls.slice(1)) expect([...l.b.ctl.log, ...l.a.ctl.log]).toEqual([])
+    for (const l of ls) expect(l.b.bulk.log).toEqual([])
+    expect(a.stats()).toMatchObject({ peers: 1, lanes: 3 })
+  })
+
+  it('chunks arriving out of order, over different lanes, make the piece (and it is verified)', async () => {
+    const f = await film(4, 1_000_000)
+    const a = friend(f)
+    const got = count(a)
+    const [c0, s0] = link(), [b0, t0] = link(), [b1, t1] = link()
+    a.addLane('P', 0, s0, t0)
+    a.addLane('P', 1, link()[1], t1)
+    const reqs: number[] = []
+    c0.onmessage = (e) => { const m = decode(e.data as ArrayBuffer); if (m?.t === 'req') reqs.push(m.n) }
+    c0.send(encode(haveAll(f)))
+    await until(() => reqs.includes(1))
+    const b = f.bytes[1]!
+    const offs = Array.from({ length: Math.ceil(b.length / CHUNK_BYTES) }, (_, i) => i * CHUNK_BYTES).reverse()
+    offs.forEach((off, i) => (i % 2 ? b1 : b0).send(encode({ t: 'chunk', track: 'v', n: 1, v: ver(f, 1), offset: off, total: b.length, data: b.subarray(off, off + CHUNK_BYTES) })))
+    await until(() => got.has(1))
+    expect(sameBytes(await a.get('v', 1), b)).toBe(true)
+  })
+
+  it('a lane that closes: what was in flight is asked again (cancel before req, on the control lane); the peer stays', async () => {
+    const f = await film(10, 700_000)
+    const h = host(f), a = friend(f)
+    const got = count(a)
+    const ls = lanes(h, 'H', a, 'A', 2)
+    ls[1]!.a.bulk.hold = true // the host's chunks on lane 1 never arrive
+    await until(() => got.size >= 1 && ls[1]!.a.bulk.log.length > 0)
+    await sleep(50)
+    expect(got.size).toBeLessThan(f.bytes.length)
+    h.removeLane('A', 1)
+    a.removeLane('H', 1)
+    await until(() => got.size === f.bytes.length)
+    for (let n = 0; n < f.bytes.length; n++) expect(sameBytes(await a.get('v', n), f.bytes[n]!)).toBe(true)
+    const sent = ls[0]!.b.ctl.log // what the friend sent on its control lane
+    const cancelled = sent.flatMap((m, i) => (m.t === 'cancel' ? [[m.n, i] as const] : []))
+    expect(cancelled.length).toBeGreaterThan(0)
+    for (const [n, i] of cancelled) expect(sent.findIndex((m, j) => j > i && m.t === 'req' && m.n === n), `re-req of ${n}`).toBeGreaterThan(i)
+    expect(a.stats()).toMatchObject({ peers: 1, lanes: 1 })
+    expect(peerOf(a, 'H').strikes).toEqual([]) // a lost lane is not the peer's fault
+  })
+
+  it('the control lane moves to the lowest lane left when its own closes, and both sides re-announce there', async () => {
+    const f = await film(4)
+    const h = host(f), a = friend(f)
+    const got = count(a)
+    const ls = lanes(h, 'H', a, 'A', 3)
+    await until(() => got.size === f.bytes.length)
+    h.removeLane('A', 0)
+    a.removeLane('H', 0)
+    await sleep(20)
+    expect(ls[1]!.a.ctl.log.filter((m) => m.t === 'have').length).toBeGreaterThan(0)
+    expect(ls[1]!.b.ctl.log.filter((m) => m.t === 'have').length).toBeGreaterThan(0)
+    expect(ls[2]!.b.ctl.log).toEqual([])
+  })
+
+  it('the last lane closing removes the peer', async () => {
+    const f = await film(2)
+    const h = host(f), a = friend(f)
+    lanes(h, 'H', a, 'A', 2)
+    a.removeLane('H', 0)
+    expect(a.stats()).toMatchObject({ peers: 1, lanes: 1 })
+    a.removeLane('H', 1)
+    expect(a.stats()).toMatchObject({ peers: 0, lanes: 0 })
+  })
+})

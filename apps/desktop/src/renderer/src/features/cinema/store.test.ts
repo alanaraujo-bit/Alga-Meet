@@ -47,8 +47,10 @@ vi.mock('./mesh', () => ({
     calls: string[] = []
     sync = vi.fn(() => this.calls.push('sync'))
     onSignal = vi.fn(async () => void this.calls.push('signal'))
-    onChannel = () => () => undefined
+    onLane = () => () => undefined
+    onLaneGone = () => () => undefined
     onPeerGone = () => () => undefined
+    onRtt = () => () => undefined
     relayed = () => []
     close = vi.fn()
     constructor(readonly opts: unknown) {

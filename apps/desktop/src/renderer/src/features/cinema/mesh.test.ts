@@ -1,6 +1,6 @@
 import type { CinemaClientFrame, CinemaSeat } from '@alga/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CandidateBatcher, Mesh, SignalBuffer, fingerprintOf, isOfferer, tagInput } from './mesh'
+import { CandidateBatcher, GATHER_WAIT_MS, LANE_STAGGER_MS, Mesh, SignalBuffer, fingerprintOf, isOfferer, tagInput } from './mesh'
 
 const SDP = ['v=0', 'o=- 4611731400430051336 2 IN IP4 127.0.0.1', 's=-', 't=0 0',
   'a=group:BUNDLE 0', 'm=application 9 UDP/DTLS/SCTP webrtc-datachannel', 'c=IN IP4 0.0.0.0',
@@ -67,6 +67,10 @@ describe('tagInput', () => {
     expect(tagInput('s', 'a', 'b', 'AB:CD')).toBe('s|a|b|AB:CD')
     expect(tagInput('s', 'b', 'a', 'AB:CD')).not.toBe(tagInput('s', 'a', 'b', 'AB:CD'))
   })
+  it('binds lanes > 0 (lane 0 keeps the original input)', () => {
+    expect(tagInput('s', 'a', 'b', 'AB:CD', 0)).toBe('s|a|b|AB:CD')
+    expect(tagInput('s', 'a', 'b', 'AB:CD', 2)).toBe('s|a|b|AB:CD|2')
+  })
 })
 
 describe('SignalBuffer', () => {
@@ -95,20 +99,33 @@ describe('SignalBuffer', () => {
 
 // Minimal RTCPeerConnection stand-in: enough to drive the Mesh signalling and timers.
 const SDPFP = 'v=0\r\nm=application 9 x\r\na=fingerprint:sha-256 AB:CD\r\n'
+type FakeCh = { label: string; ordered: boolean; readyState: string; close(): void; onopen: (() => void) | null; onclose: (() => void) | null; binaryType: string }
+const fakeCh = (label: string, ordered = true): FakeCh => ({ label, ordered, readyState: 'connecting', close() {}, onopen: null, onclose: null, binaryType: '' })
 class FakePC {
   static all: FakePC[] = []
   localDescription: { sdp: string } | null = null
   remoteDescription: { sdp: string } | null = null
   signalingState = 'stable'
   connectionState = 'new'
+  iceGatheringState = 'complete'
   restarts = 0
   closed = false
   log: string[] = []
   onnegotiationneeded: (() => void) | null = null
+  onicecandidate: ((e: { candidate: { candidate: string } | null }) => void) | null = null
+  ondatachannel: ((e: { channel: FakeCh }) => void) | null = null
   constructor() { FakePC.all.push(this) }
-  ch = { readyState: 'connecting', close() {}, onopen: null, onclose: null, binaryType: '' }
+  chs = new Map<string, FakeCh>()
   onconnectionstatechange: (() => void) | null = null
-  createDataChannel() { return this.ch }
+  createDataChannel(label: string, o: { ordered?: boolean } = {}) {
+    const ch = fakeCh(label, o.ordered !== false)
+    this.chs.set(label, ch)
+    return ch
+  }
+  /** Both channels open (offerer side), as the browser fires it. */
+  openAll() {
+    for (const ch of this.chs.values()) { ch.readyState = 'open'; ch.onopen?.() }
+  }
   async setLocalDescription() { this.localDescription = { sdp: SDPFP }; this.signalingState = 'have-local-offer' }
   async setRemoteDescription(d: { sdp: string }) { await Promise.resolve(); this.remoteDescription = d; this.signalingState = 'stable'; this.log.push('remote') }
   async addIceCandidate(c: { candidate: string }) { this.log.push('ice:' + c.candidate) }
@@ -198,10 +215,13 @@ describe('Mesh', () => {
     const { mesh } = mk({ selfId: 'b' })
     mesh.onPeerGone((id) => gone.push(id))
     mesh.sync([seat('a')])
+    const made = FakePC.all.length
     mesh.sync([])
     expect(gone).toEqual(['a'])
     await mesh.onSignal('a', { kind: 'offer', sdp: SDPFP })
-    expect(FakePC.all).toHaveLength(1)
+    await mesh.onSignal('a', { kind: 'offer', sdp: SDPFP, lane: 2 })
+    expect(FakePC.all).toHaveLength(made)
+    expect(FakePC.all.every((pc) => pc.closed && !pc.remoteDescription)).toBe(true)
     mesh.sync([seat('a')])
     mesh.close()
     expect(gone).toEqual(['a'])
@@ -213,7 +233,7 @@ describe('Mesh', () => {
     mesh.onPeerGone((id) => gone.push(id))
     mesh.sync([seat('b')])
     const pc = FakePC.all[0]!
-    pc.ch.readyState = 'open'
+    pc.openAll()
     pc.connectionState = 'failed'
     pc.onconnectionstatechange!()
     expect(pc.restarts).toBe(1)
@@ -223,5 +243,201 @@ describe('Mesh', () => {
     expect(pc.restarts).toBe(1)
     expect(gone).toEqual([])
     expect(pc.closed).toBe(false)
+  })
+  it('lane 0: an ordered control channel and an unordered (reliable) bulk channel', () => {
+    const { mesh } = mk()
+    mesh.sync([seat('b')])
+    expect([...FakePC.all[0]!.chs.values()].map((c) => [c.label, c.ordered])).toEqual([['cinema-ctl', true], ['cinema', false]])
+  })
+  it('offerer: lanes 1 and 2 open LANE_STAGGER_MS apart once lane 0 is up; each lane is announced with its channels', () => {
+    vi.useFakeTimers()
+    const lanes: [string, number, string, string][] = []
+    const { mesh } = mk()
+    mesh.onLane((id, k, ctl, bulk) => lanes.push([id, k, ctl.label, bulk.label]))
+    mesh.sync([seat('b')])
+    vi.advanceTimersByTime(10_000)
+    expect(FakePC.all).toHaveLength(1) // nothing before lane 0 is up
+    FakePC.all[0]!.openAll()
+    expect(lanes).toEqual([['b', 0, 'cinema-ctl', 'cinema']])
+    vi.advanceTimersByTime(LANE_STAGGER_MS - 1)
+    expect(FakePC.all).toHaveLength(1)
+    vi.advanceTimersByTime(1)
+    expect(FakePC.all).toHaveLength(2)
+    vi.advanceTimersByTime(LANE_STAGGER_MS)
+    expect(FakePC.all).toHaveLength(3)
+    FakePC.all[2]!.openAll()
+    expect(lanes.map((l) => l[1])).toEqual([0, 2])
+    const late: number[] = []
+    mesh.onLane((_id, k) => late.push(k)) // replays the open lanes
+    expect(late).toEqual([0, 2])
+  })
+  it('lanes > 0 carry their lane, wait for ICE gathering and send the early candidates inside the description', async () => {
+    vi.useFakeTimers()
+    const { mesh, sent } = mk()
+    mesh.sync([seat('b')])
+    FakePC.all[0]!.openAll()
+    vi.advanceTimersByTime(LANE_STAGGER_MS)
+    const pc = FakePC.all[1]!
+    pc.iceGatheringState = 'gathering'
+    pc.onnegotiationneeded!()
+    await vi.advanceTimersByTimeAsync(0)
+    pc.onicecandidate!({ candidate: { candidate: 'c1' } }) // goes in the description, not trickled
+    await vi.advanceTimersByTimeAsync(GATHER_WAIT_MS - 1)
+    expect(sent).toEqual([])
+    await vi.advanceTimersByTimeAsync(1)
+    expect(sent.map(sig)).toEqual([expect.objectContaining({ kind: 'offer', lane: 1 })])
+    pc.onicecandidate!({ candidate: { candidate: 'c2' } }) // after it: trickled, with the lane
+    await vi.advanceTimersByTimeAsync(200)
+    expect(sent.map(sig).slice(1)).toEqual([{ kind: 'ice', candidates: ['c2'], lane: 1 }])
+  })
+  it('E2EE: every lane is tagged over its own fingerprint and lane; a tag made for another lane drops the pair', async () => {
+    const gone: string[] = []
+    const { mesh, sent } = mk({ selfId: 'b', e2ee: { epoch: () => 4 }, cinemaTag: async (_c, _e, m) => `T(${m})` })
+    mesh.onPeerGone((id) => gone.push(id))
+    mesh.sync([seat('a')])
+    const tag = (lane: number) => `T(${tagInput('s', 'a', 'b', 'sha-256 AB:CD', lane)})`
+    await mesh.onSignal('a', { kind: 'offer', sdp: SDPFP, tag: tag(1), epoch: 4, lane: 1 })
+    expect(sig(sent[0]!)).toMatchObject({ kind: 'answer', lane: 1, epoch: 4, tag: `T(${tagInput('s', 'b', 'a', 'sha-256 AB:CD', 1)})` })
+    expect(gone).toEqual([])
+    await mesh.onSignal('a', { kind: 'offer', sdp: SDPFP, tag: tag(1), epoch: 4, lane: 2 }) // lane 1's tag replayed on lane 2
+    expect(gone).toEqual(['a'])
+    expect(FakePC.all.every((pc) => pc.closed)).toBe(true)
+  })
+  it('a failed lane goes alone (onLaneGone); the peer goes with its last open lane', () => {
+    vi.useFakeTimers()
+    const laneGone: number[] = []
+    const gone: string[] = []
+    const { mesh } = mk()
+    mesh.onLaneGone((_id, k) => laneGone.push(k))
+    mesh.onPeerGone((id) => gone.push(id))
+    mesh.sync([seat('b')])
+    FakePC.all[0]!.openAll()
+    vi.advanceTimersByTime(2 * LANE_STAGGER_MS)
+    FakePC.all[1]!.openAll()
+    FakePC.all[2]!.openAll()
+    FakePC.all[0]!.chs.get('cinema')!.onclose!() // lane 0's bulk channel closed
+    expect(laneGone).toEqual([0])
+    expect(FakePC.all[0]!.closed).toBe(true)
+    const pc2 = FakePC.all[2]!
+    pc2.connectionState = 'failed'
+    pc2.onconnectionstatechange!() // then two ICE restarts time out
+    vi.advanceTimersByTime(40_000)
+    expect(laneGone).toEqual([0, 2])
+    expect(gone).toEqual([])
+    FakePC.all[1]!.connectionState = 'closed'
+    FakePC.all[1]!.onconnectionstatechange!()
+    expect(gone).toEqual(['b'])
+    expect(laneGone).toEqual([0, 2])
+  })
+  it('answerer: idle lanes (no offer yet) do not keep a peer whose lane 0 failed', () => {
+    vi.useFakeTimers()
+    const gone: string[] = []
+    const { mesh } = mk({ selfId: 'b' })
+    mesh.onPeerGone((id) => gone.push(id))
+    mesh.sync([seat('a')])
+    expect(FakePC.all).toHaveLength(3)
+    vi.advanceTimersByTime(60_000)
+    expect(gone).toEqual(['a'])
+    expect(FakePC.all.every((pc) => pc.closed)).toBe(true)
+  })
+})
+
+/**
+ * Signalling load at 8 seats (gateway quota: CINEMA_FRAME_LIMIT = 300 cinema_* frames per 60 s per socket; target < 200).
+ * Eight real Mesh instances over a simulated relay; every RTCPeerConnection gathers 4 candidates 120 ms apart (two ICE
+ * frames on lane 0) and connects 50 ms after the answer.
+ */
+describe('Mesh signalling at 8 seats', () => {
+  afterEach(() => vi.useRealTimers())
+  class SimPC {
+    static all: SimPC[] = []
+    static seq = 0
+    id = ++SimPC.seq
+    peer: SimPC | null = null
+    localDescription: { type: string; sdp: string } | null = null
+    remoteDescription: { type: string; sdp: string } | null = null
+    signalingState = 'stable'
+    connectionState = 'new'
+    iceGatheringState = 'new'
+    chs: FakeCh[] = []
+    onnegotiationneeded: (() => void) | null = null
+    onicecandidate: ((e: { candidate: { candidate: string } | null }) => void) | null = null
+    onicegatheringstatechange: (() => void) | null = null
+    onconnectionstatechange: (() => void) | null = null
+    ondatachannel: ((e: { channel: FakeCh }) => void) | null = null
+    constructor() { SimPC.all.push(this) }
+    createDataChannel(label: string, o: { ordered?: boolean } = {}) {
+      if (!this.chs.length) setTimeout(() => this.onnegotiationneeded?.(), 0)
+      const ch = fakeCh(label, o.ordered !== false)
+      this.chs.push(ch)
+      return ch
+    }
+    async setLocalDescription() {
+      const type = this.remoteDescription ? 'answer' : 'offer'
+      this.localDescription = { type, sdp: `${SDPFP}a=x-pc:${this.id}\r\n` }
+      this.signalingState = type === 'offer' ? 'have-local-offer' : 'stable'
+      this.iceGatheringState = 'gathering'
+      for (let i = 1; i <= 4; i++) {
+        setTimeout(() => {
+          this.localDescription!.sdp += `a=candidate:${i}\r\n`
+          this.onicecandidate?.({ candidate: { candidate: `c${i}` } })
+          if (i < 4) return
+          this.iceGatheringState = 'complete'
+          this.onicegatheringstatechange?.()
+        }, 120 * i)
+      }
+    }
+    async setRemoteDescription(d: { type: string; sdp: string }) {
+      this.remoteDescription = d
+      this.peer = SimPC.all.find((p) => p.id === Number(/a=x-pc:(\d+)/.exec(d.sdp)![1]))!
+      if (d.type !== 'answer') return
+      this.signalingState = 'stable'
+      setTimeout(() => { this.up(); this.peer!.up() }, 50)
+    }
+    up() {
+      if (this.connectionState === 'connected') return
+      this.connectionState = 'connected'
+      this.onconnectionstatechange?.()
+      if (this.chs.length) for (const ch of this.chs) { ch.readyState = 'open'; ch.onopen?.() }
+      else for (const ch of this.peer!.chs) this.ondatachannel?.({ channel: { ...fakeCh(ch.label, ch.ordered), readyState: 'open' } })
+    }
+    async addIceCandidate() {}
+    async getStats() { return new Map() }
+    restartIce() {}
+    close() { this.connectionState = 'closed' }
+  }
+
+  it('every pair gets its 3 lanes; each client sends < 50 mesh frames in any 60 s (< 200 with status, clock and index)', async () => {
+    vi.useFakeTimers()
+    ;(globalThis as any).RTCPeerConnection = SimPC
+    const ids = Array.from({ length: 8 }, (_, i) => `u${i}`)
+    const meshes = new Map<string, Mesh>()
+    const frames = new Map<string, number[]>(ids.map((id) => [id, []]))
+    const lanes = new Map<string, number>(ids.map((id) => [id, 0]))
+    for (const id of ids) {
+      const mesh = new Mesh({
+        sessionId: 's', channelId: 'ch', selfId: id, iceServers: [], e2ee: null,
+        send: (f) => {
+          frames.get(id)!.push(Date.now())
+          const { to, signal } = f as Extract<CinemaClientFrame, { op: 'cinema_signal' }>
+          setTimeout(() => void meshes.get(to)!.onSignal(id, signal), 20) // the server's relay
+          return true
+        },
+      })
+      mesh.onLane(() => lanes.set(id, lanes.get(id)! + 1))
+      meshes.set(id, mesh)
+    }
+    for (const m of meshes.values()) m.sync(ids.map(seat))
+    for (let t = 0; t < 120_000; t += 100) await vi.advanceTimersByTimeAsync(100)
+    for (const id of ids) expect(lanes.get(id), id).toBe(7 * 3)
+    const worst60 = (ts: number[]) => Math.max(...ts.map((t) => ts.filter((x) => x >= t && x < t + 60_000).length))
+    const mesh60 = Math.max(...ids.map((id) => worst60(frames.get(id)!)))
+    // per 60 s besides the mesh: a status every CINEMA_STATUS_INTERVAL_MS (30), clock pings (≤ 8 + 4) and, for the host,
+    // the index at INDEX_FRAMES_PER_FLUSH per 2 s (90; viewers send none)
+    const others = 30 + 12 + 90
+    console.info(`[signalling] 8 seats × 3 lanes: worst client ${mesh60} mesh frames in 60 s, ${mesh60 + others} with the rest`)
+    expect(mesh60).toBeLessThan(50)
+    expect(mesh60 + others).toBeLessThan(200)
+    for (const m of meshes.values()) m.close()
   })
 })

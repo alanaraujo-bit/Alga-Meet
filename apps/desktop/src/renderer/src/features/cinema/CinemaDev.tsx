@@ -408,7 +408,7 @@ function StatsPanel({ names }: { names: Record<string, string> }) {
     [t.stats.drift, `${ms(stats?.driftMs)} · p95 ${pl ? `${Math.round(pl.syncErrP95Ms)} ms` : '—'} · ${t.stats.dropped} ${pl?.droppedFrames ?? '—'}`],
     [t.stats.buffer, pl ? `${n1(pl.bufferedAheadS)} s` : '—'],
     [t.stats.clock, `offset ${ms(stats?.clock.offsetMs, 1)} · RTT ${stats?.clock.rttMs ?? '—'} ms`],
-    [t.stats.pieces, sw ? `${t.stats.fromHost} ${Math.round(sw.fromHostPct)}% · ${t.stats.fromPeers} ${Math.round(sw.fromPeersPct)}% · ↓ ${n1(sw.downMbps)} ↑ ${n1(sw.upMbps)} Mbps · ${sw.peers} ${t.stats.peers}` : '—'],
+    [t.stats.pieces, sw ? `${t.stats.fromHost} ${Math.round(sw.fromHostPct)}% · ${t.stats.fromPeers} ${Math.round(sw.fromPeersPct)}% · ↓ ${n1(sw.downMbps)} ↑ ${n1(sw.upMbps)} Mbps · ${sw.peers} ${t.stats.peers} (${sw.lanes} ${t.stats.lanes})` : '—'],
     [t.stats.relay, stats?.relayed.length ? stats.relayed.map((id) => names[id] ?? id).join(', ') : t.stats.none],
     [t.stats.cache, stats?.cache ? `${stats.cache.kind.toUpperCase()} · ${n1(stats.cache.capGB)} GB` : '—'],
     [t.stats.audio, stats?.audioTrack ?? '—'],
