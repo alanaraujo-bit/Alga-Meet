@@ -6,6 +6,7 @@ import {
   type CinemaSignal, type CinemaSummary, type CinemaTrackId, type Dispatch, type DispatchOf,
 } from '@alga/shared'
 import { create } from 'zustand'
+import type { CinemaSeries } from '../../../../shared/bridge'
 import { useMedia } from '@/media/store'
 import { useData } from '@/store/data'
 import { onDispatch, useSession } from '@/store/session'
@@ -40,7 +41,9 @@ export interface CinemaState {
   /** The file I project (fileId only: the path never leaves main). */
   host: { fileId: string | null }
   /** Film sheet between probe and "Abrir sessão" (host). */
-  draft: { fileId: string; name: string; film: CinemaFilm; warnings: Warning[]; decodes: boolean; next: NextFile[] } | null
+  draft: { fileId: string; name: string; film: CinemaFilm; warnings: Warning[]; decodes: boolean; next: NextFile[]; series: CinemaSeries | null } | null
+  /** The episode the sheet is switching to (its probe is running). */
+  choosing: string | null
   subtitle: { id: number; format: 'vtt' | 'ass'; text: string; cues: Cue[]; fonts: Uint8Array[] } | null
   /** Which piece cache the swarm got (shown in the stats panel). */
   cache: { kind: 'opfs' | 'memory'; capBytes: number } | null
@@ -95,7 +98,7 @@ const initialPrefs = (): CinemaState['prefs'] => {
 }
 const freshMine = (): CinemaState['mine'] => ({ seated: false, status: 'preparing', audioId: null, subtitleId: null, offsetS: 0, unsupported: null })
 const initial = (): CinemaState => ({
-  enabled: false, session: null, ended: null, mine: freshMine(), host: { fileId: null }, draft: null, subtitle: null, cache: null, audio: null,
+  enabled: false, session: null, ended: null, mine: freshMine(), host: { fileId: null }, draft: null, choosing: null, subtitle: null, cache: null, audio: null,
   prefs: initialPrefs(), stats: null, statsOpen: false, notices: [], error: null, busy: false,
 })
 
@@ -635,6 +638,7 @@ export function hostSwitchNext(): void {
   const sessionId = h?.sessionId
   if (!h || !p || !sessionId || h.cancelled) return
   h.prepared = null // it becomes the projected file: hostEnd must not close it
+  window.alga.cinema.saveResume(h.fileId, h.film.durationS) // this episode is over: main marks it watched
   hostBegin(p.fileId, p.film, p.next)
   const nh = hostFile as HostFile | null
   if (!nh) return

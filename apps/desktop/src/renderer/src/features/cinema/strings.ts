@@ -200,6 +200,25 @@ export const t = {
     resume: (at: string) => `Continuar de ${at}`,
     fromStart: 'Do começo',
   },
+  /** The show's episodes on the film sheet, when the file is part of a series. */
+  series: {
+    label: 'Episódios',
+    seasons: 'Temporadas',
+    count: (eps: number, seasons: number, watched: number) =>
+      [`${eps} episódios`, ...(seasons > 1 ? [`${seasons} temporadas`] : []), ...(watched ? [`${watched} ${watched === 1 ? 'assistido' : 'assistidos'}`] : [])].join(' · '),
+    season: (n: number) => (n === 0 ? 'Especiais' : `T${n}`),
+    seasonName: (n: number) => (n === 0 ? 'Especiais' : `Temporada ${n}`),
+    episode: (n: number) => `Episódio ${n}`,
+    selected: 'Vai passar este',
+    upNext: 'Em seguida',
+    watched: 'Assistido',
+    continueTitle: 'Continuar a série',
+    continueBody: (code: string, title: string) => (title ? `${code} · ${title}` : code),
+    autoplay: (n: number) =>
+      n === 0 ? 'É o último episódio: a sessão termina com ele.'
+      : n === 1 ? 'Depois deste, o próximo começa sozinho nos créditos.'
+      : `Depois deste, os próximos ${n} começam sozinhos nos créditos.`,
+  },
   /** Seats (foyer, strip, intermission). */
   seats: {
     ready: 'Pronto',

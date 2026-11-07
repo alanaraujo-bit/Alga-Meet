@@ -103,7 +103,7 @@ vi.stubGlobal('window', { alga: { cinema: bridge, e2ee: { cinemaTag: async () =>
 
 const { handleCinemaDispatch, onMediaChange, useCinema, resetCinema, attachVideo, detachVideo, readyAheadS, extraPiece, startCinema } = await import('./store')
 const { useMedia } = await import('@/media/store')
-const { openFromFile, openSession } = await import('./actions')
+const { cancelDraft, chooseEpisode, openFromFile, openSession } = await import('./actions')
 const { t } = await import('./strings')
 
 const film = {
@@ -233,6 +233,25 @@ describe('host', () => {
     expect(useCinema.getState().error).toBe(t.ffmpegBlocked)
     expect(bridge.probe).not.toHaveBeenCalled()
     expect(bridge.close).toHaveBeenCalledWith('f1')
+  })
+
+  it('another episode on the sheet becomes the draft (its own queue); the old file closes; a failed probe keeps the draft', async () => {
+    const ep = (fileId: string, episode: number) => ({ fileId, name: `S01E0${episode}.mkv`, season: 1, episode, title: '', watched: false })
+    const series = { show: 'Show', episodes: [ep('f1', 1), ep('e2', 2), ep('e3', 3)] }
+    bridge.probe.mockResolvedValueOnce({ film, warnings: [], next: [{ fileId: 'e2', name: 'S01E02.mkv' }, { fileId: 'e3', name: 'S01E03.mkv' }], series })
+    await openFromFile()
+    bridge.close.mockClear()
+    bridge.probe.mockResolvedValueOnce({ error: 'unreadable' })
+    await chooseEpisode('e2')
+    expect(useCinema.getState().draft?.fileId).toBe('f1')
+    expect(bridge.close).toHaveBeenCalledWith('e2')
+    bridge.close.mockClear()
+    bridge.probe.mockResolvedValueOnce({ film, warnings: [], next: [{ fileId: 'n4', name: 'S01E04.mkv' }], series: { ...series, episodes: [ep('m1', 1), ep('e3', 3)] } })
+    await chooseEpisode('e3')
+    expect(useCinema.getState().draft).toMatchObject({ fileId: 'e3', name: 'S01E03.mkv', next: [{ fileId: 'n4' }] })
+    expect(useCinema.getState().choosing).toBeNull()
+    expect(bridge.close).toHaveBeenCalledWith('f1')
+    cancelDraft()
   })
 
   it('pick → probe → sheet → open; the factory starts with the session; its index goes out merged, throttled, ≤ CINEMA_ITEMS_PER_FRAME per frame', async () => {

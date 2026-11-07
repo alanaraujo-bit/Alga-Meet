@@ -263,8 +263,11 @@ export interface AlgaBridge {
     pick(): Promise<{ fileId: string; name: string } | null>
     /** A dropped File: the preload resolves its path (webUtils) and sends only that string to main. */
     fromDrop(file: File): Promise<{ fileId: string; name: string }>
-    /** `next`: the following episodes of the same folder, each with its own fileId. */
-    probe(fileId: string): Promise<{ film: CinemaFilm; warnings: CinemaWarning[]; next: { fileId: string; name: string }[]; resumeS: number | null } | { error: CinemaProbeError }>
+    /**
+     * `next`: the following episodes of the show (season folders included), each with its own fileId. `series`: every
+     * episode of the show for the sheet (the probed file keeps its own id), or null for a film.
+     */
+    probe(fileId: string): Promise<{ film: CinemaFilm; warnings: CinemaWarning[]; next: { fileId: string; name: string }[]; series: CinemaSeries | null; resumeS: number | null } | { error: CinemaProbeError }>
     start(fileId: string, startS: number, audioIds: number[]): Promise<void>
     ensure(fileId: string, track: CinemaTrackId, atS: number): void
     addAudio(fileId: string, audioId: number): void
@@ -323,3 +326,7 @@ declare global {
     alga: AlgaBridge
   }
 }
+
+/** One episode of the show on the film sheet: an opaque id, never a path. `title`: from the file name ('Piloto'), or ''. */
+export interface CinemaEpisode { fileId: string; name: string; season: number; episode: number; title: string; watched: boolean }
+export interface CinemaSeries { show: string; episodes: CinemaEpisode[] }

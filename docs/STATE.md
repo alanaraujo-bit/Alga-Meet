@@ -1,6 +1,7 @@
 # Alga Meet — Estado do projeto
 
 ## 2026-11-05 noite (2) — Sala de Cinema — motor (Plano 1) (branch `feat/sala-de-cinema`, NÃO mesclada)
+- **Séries no Cinema (desktop 0.1.11, 2026-11-07):** abrir um episódio monta a série (pastas de temporada, `S01E02`/`1x02`/`E02`/`Ep 02`/`01 - Título` em `Temporada N`); a ficha mostra a lista por temporada, ✓ nos assistidos (`cinema-series.json`, por hash, sem caminho) e "Continuar a série"; o próximo episódio nos créditos atravessa temporadas. `main/cinema/names.ts` `seriesOf`, `room/SeriesPanel.tsx`.
 - **Sala de Cinema (desktop 0.1.9, 2026-11-06):** assistir filme baixado junto na call, P2P, mesmo frame (p95 22–25 ms em rede local; 0 % parado com 1 % de perda), visual dos mockups aprovados. Servidor com `CINEMA=true` e relay coturn no home-server (`CINEMA_TURN_*`). Detalhes: `docs/benchmarks/cinema-engine.md`, specs/plans `2026-11-05-sala-de-cinema-*`.
 - **O que é:** o motor da Sala de Cinema (spec `docs/superpowers/specs/2026-11-05-sala-de-cinema-design.md`): ffmpeg
   LGPL no main (sonda, peças fMP4 sem recompressão de vídeo, áudio convertido quando precisa), enxame P2P próprio

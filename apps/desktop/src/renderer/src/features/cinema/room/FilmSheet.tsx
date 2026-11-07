@@ -10,6 +10,7 @@ import * as act from '../actions'
 import { useCinema } from '../store'
 import { clock, length, t } from '../strings'
 import { audioRoute, audioRow, codecName, defaultAudio, subtitleRow, videoLabel } from './film'
+import { SeriesPanel } from './SeriesPanel'
 import c from './call.module.css'
 
 /** The host sends ~1.5× the film when the seats swap pieces among themselves (spec §6.4). */
@@ -18,6 +19,7 @@ const HOST_SHARE = 1.5
 export function FilmSheet({ channel }: { channel: Channel }) {
   const draft = useCinema((s) => s.draft)
   const busy = useCinema((s) => s.busy)
+  const choosing = useCinema((s) => s.choosing)
   const inCall = useData((st) => voiceMembers(st, channel.id).length)
   const [title, setTitle] = useState('')
   const [resumeS, setResumeS] = useState<number | null>(null)
@@ -35,7 +37,7 @@ export function FilmSheet({ channel }: { channel: Channel }) {
   const a = f && defaultAudio(f)
   const converted = f?.audio.find((x) => x.out !== 'copy')
   const mbps = f ? f.bitrateKbps / 1000 : 0
-  const ok = !!title.trim()
+  const ok = !!title.trim() && !choosing
   return (
     <Modal
       open={!!draft}
@@ -60,10 +62,16 @@ export function FilmSheet({ channel }: { channel: Channel }) {
       {f && draft && (
         <div className={c.sheet}>
           <div>
-            <div className={c.sheetCover}>
-              <div className={c.placeholder} aria-hidden />
-            </div>
-            <p className={c.small}>{t.filmSheet.cover}</p>
+            {draft.series && draft.series.episodes.length > 1 ? (
+              <SeriesPanel series={draft.series} selectedId={draft.fileId} choosing={choosing} upNext={draft.next.length} />
+            ) : (
+              <>
+                <div className={c.sheetCover}>
+                  <div className={c.placeholder} aria-hidden />
+                </div>
+                <p className={c.small}>{t.filmSheet.cover}</p>
+              </>
+            )}
             <div className={c.fileBlock}>
               <div className={c.fileName}>{draft.name}</div>
               <div className={c.small}>{[length(f.durationS), ...(f.chapters.length ? [t.film.chapters(f.chapters.length)] : [])].join(' · ')}</div>

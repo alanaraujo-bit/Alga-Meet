@@ -20,6 +20,8 @@ const h = vi.hoisted(() => ({
   saveTo: null as string | null,
   win: { w: 1280, h: 720 },
   captured: [] as unknown[],
+  // the watched list lives in TEMP across runs: a fresh show folder per run
+  run: Math.random().toString(36).slice(2),
 }))
 const fakeImage = { toPNG: () => Buffer.from('PNGDATA') }
 
@@ -45,7 +47,17 @@ vi.mock('../ipc', async () => {
 })
 vi.mock('./ffmpeg', () => ({ checkFfmpeg: async () => ({ ok: true, version: 'x' }), ffmpegBins: () => ({ ffmpeg: 'f', ffprobe: 'p' }) }))
 vi.mock('./probe', () => ({ probeFile: async () => { await h.probeGate; return { film: { title: 't', durationS: h.duration, audio: [], subtitles: [] }, warnings: [], videoStreamIndex: 7 } } }))
-vi.mock('./names', async () => ({ ...(await vi.importActual<object>('./names')), nextEpisodes: async () => ['C:\\secret\\dir\\S01E02.mkv'] }))
+vi.mock('./names', async () => ({
+  ...(await vi.importActual<object>('./names')),
+  seriesOf: async (p: string) => ({
+    show: 'Show', root: `C:\\secret\\dir-${h.run}`, current: 1, fromFolder: false,
+    episodes: [
+      { path: 'C:\\secret\\dir\\S00E09.mkv', name: 'S00E09.mkv', season: 0, episode: 9, title: '' },
+      { path: p, name: 'S01E01.mkv', season: 1, episode: 1, title: '' },
+      { path: 'C:\\secret\\dir\\S01E02.mkv', name: 'S01E02.mkv', season: 1, episode: 2, title: 'Dois' },
+    ],
+  }),
+}))
 vi.mock('./pieces', () => ({
   cinemaRoot: () => process.env.TEMP ?? '/tmp',
   sessionDir: () => 'x',
@@ -105,8 +117,12 @@ describe('cinema ipc', () => {
   })
 
   it('probe returns next as fresh ids + names only (no paths, no stream index)', async () => {
-    const { r } = await probed()
+    const { fileId, r } = await probed()
     expect(r.next).toEqual([{ fileId: expect.any(String), name: 'S01E02.mkv' }])
+    expect(r.series.show).toBe('Show')
+    expect(r.series.episodes.map((x: { fileId: string; title: string; watched: boolean }) => [x.fileId === fileId, x.title, x.watched])).toEqual([[false, '', false], [true, '', false], [false, 'Dois', false]])
+    expect(r.series.episodes[2].fileId).toBe(r.next[0].fileId)
+    expect(r.film.episode).toEqual({ season: 1, episode: 1 })
     expect(JSON.stringify(r)).not.toContain('secret')
     expect(r.videoStreamIndex).toBeUndefined()
   })
@@ -253,6 +269,16 @@ describe('cinema ipc', () => {
     expect(() => send(fileId, -1)).toThrow()
     expect(() => send('nope', 100)).toThrow()
     expect(JSON.stringify(await call(IPC.cinemaProbe, again.fileId))).not.toContain('alga-cinema-ipc')
+  })
+
+  it('playing an episode to its end marks it watched for the next listing (once, not before the end)', async () => {
+    h.duration = 3600
+    const { fileId } = await probed()
+    const send = h.sends.get(IPC.cinemaSaveResume)!
+    send(fileId, 3000)
+    expect((await call(IPC.cinemaProbe, (await probed()).fileId)).series.episodes[1].watched).toBe(false)
+    send(fileId, 3500)
+    await vi.waitFor(async () => expect((await call(IPC.cinemaProbe, (await probed()).fileId)).series.episodes.map((x: { watched: boolean }) => x.watched)).toEqual([false, true, false]))
   })
 
   const sender = { sender: {

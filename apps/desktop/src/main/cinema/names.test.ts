@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { cleanTitle, nextEpisodes, parseEpisode } from './names'
+import { cleanTitle, nextEpisodes, parseEpisode, seasonDir, seriesOf } from './names'
 
 describe('cleanTitle', () => {
   it.each([
@@ -80,5 +80,64 @@ describe('nextEpisodes', () => {
     expect(await nextEpisodes(dir, 'Movie.2020.mkv')).toEqual([])
     expect(await nextEpisodes(dir, 'Show.S01E01.mkv')).toEqual([])
     expect(await nextEpisodes(join(root, 'missing'), 'Show.S01E01.mkv')).toEqual([])
+  })
+  it('crosses season folders next to the current one', async () => {
+    const show = join(root, 'Tales of the Walking Dead')
+    for (const [d, files] of [['Temporada 1', ['01 - Evie Joe.mkv', '02 - Dee.mkv']], ['Temporada 2', ['Ep 01.mkv']], ['Extras', ['01 - Making of.mkv']]] as const) {
+      mkdirSync(join(show, d), { recursive: true })
+      mk(join(show, d), ...files)
+    }
+    expect(await nextEpisodes(join(show, 'Temporada 1'), '02 - Dee.mkv')).toEqual([join(show, 'Temporada 2', 'Ep 01.mkv')])
+  })
+})
+
+describe('seasonDir', () => {
+  it.each([
+    ['Temporada 1', 1], ['Season 02', 2], ['S3', 3], ['T04', 4], ['2ª Temporada', 2], ['Season 1 (2022)', 1], ['Show S01', 1],
+  ])('%s -> %i', (name, season) => expect(seasonDir(name)?.season).toBe(season))
+  it.each(['Extras', 'Series', 'Matrix 2', '1080p', 'Downloads'])('%s -> null', (name) => expect(seasonDir(name)).toBeNull())
+})
+
+describe('seriesOf', () => {
+  const root = mkdtempSync(join(tmpdir(), 'alga-series-test-'))
+  afterAll(() => rmSync(root, { recursive: true, force: true }))
+  const mk = (dir: string, ...names: string[]) => {
+    mkdirSync(dir, { recursive: true })
+    names.forEach((n) => writeFileSync(join(dir, n), ''))
+  }
+
+  it('season folders with bare numbers: show from the folder, titles from the names, every season', async () => {
+    const show = join(root, 'Tales of the Walking Dead')
+    mk(join(show, 'Temporada 1'), '02 - Dee.mkv', '01 - Evie Joe.1080p.mkv', 'notes.txt')
+    mk(join(show, 'Temporada 2'), 'E01.mkv')
+    mk(join(show, 'Extras'), '01 - Making of.mkv')
+    const s = await seriesOf(join(show, 'Temporada 1', '02 - Dee.mkv'))
+    expect(s?.show).toBe('Tales of the Walking Dead')
+    expect(s?.fromFolder).toBe(true)
+    expect(s?.current).toBe(1)
+    expect(s?.episodes.map((e) => [e.season, e.episode, e.title])).toEqual([[1, 1, 'Evie Joe'], [1, 2, 'Dee'], [2, 1, '']])
+  })
+  it('a file next to season folders sees them; S01E02 names keep their own season', async () => {
+    const show = join(root, 'Show')
+    mk(show, 'Show.S01E01.Pilot.720p.mkv')
+    mk(join(show, 'Season 2'), 'Show.S02E01.mkv', 'Show.S02E02.mkv')
+    const s = await seriesOf(join(show, 'Show.S01E01.Pilot.720p.mkv'))
+    expect(s?.show).toBe('Show')
+    expect(s?.fromFolder).toBe(false)
+    expect(s?.episodes.map((e) => `${e.season}x${e.episode}:${e.title}`)).toEqual(['1x1:Pilot', '2x1:', '2x2:'])
+  })
+  it('season folders of two shows side by side do not mix', async () => {
+    const lib = join(root, 'lib')
+    mk(join(lib, 'Alpha S01'), 'E01.mkv', 'E02.mkv')
+    mk(join(lib, 'Beta S01'), 'E01.mkv', 'E02.mkv', 'E03.mkv')
+    const s = await seriesOf(join(lib, 'Alpha S01', 'E01.mkv'))
+    expect(s?.episodes.map((e) => e.path)).toEqual([join(lib, 'Alpha S01', 'E01.mkv'), join(lib, 'Alpha S01', 'E02.mkv')])
+  })
+  it('a film, a lone episode, or a bare number outside a season folder is no series', async () => {
+    const d = join(root, 'loose')
+    mk(d, 'Movie.2020.mkv', '01 - Something.mkv', '02 - Other.mkv', 'Lone.S01E01.mkv')
+    expect(await seriesOf(join(d, 'Movie.2020.mkv'))).toBeNull()
+    expect(await seriesOf(join(d, '01 - Something.mkv'))).toBeNull()
+    expect(await seriesOf(join(d, 'Lone.S01E01.mkv'))).toBeNull()
   })
 })

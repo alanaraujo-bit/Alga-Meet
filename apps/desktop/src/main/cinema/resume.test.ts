@@ -3,7 +3,28 @@ import { mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { ResumeStore, resumeKey } from './resume'
+import { ResumeStore, WatchedStore, resumeKey, seriesKey, watchedAt } from './resume'
+
+describe('WatchedStore', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'alga-watched-test-'))
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+  it('marks once, survives a reload, keys shows apart', async () => {
+    const file = join(dir, 'w.json')
+    const s = new WatchedStore(file)
+    const a = seriesKey('C:\\Series\\Show', 'Show')
+    await s.mark(a, '1:1')
+    await s.mark(a, '1:1')
+    await s.mark(a, '1:2')
+    expect([...(await new WatchedStore(file).get(a))]).toEqual(['1:1', '1:2'])
+    expect((await s.get(seriesKey('C:\\Series\\Other', 'Show'))).size).toBe(0)
+    expect(readFileSync(file, 'utf8')).not.toContain('Series')
+  })
+  it('watched from the last 120 s, or the last 10% of a short episode', () => {
+    expect(watchedAt(3600)).toBe(3480)
+    expect(watchedAt(600)).toBe(540)
+  })
+})
 
 const dir = mkdtempSync(join(tmpdir(), 'alga-resume-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))

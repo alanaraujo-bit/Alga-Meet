@@ -8,17 +8,19 @@ import { arr, emit, handle, int, isTrustedSender, obj, on, str } from '../ipc'
 import { log } from '../log'
 import { mainWindow } from '../window'
 import { checkFfmpeg, ffmpegBins } from './ffmpeg'
-import { VIDEO_EXTS, nextEpisodes } from './names'
+import { VIDEO_EXTS, seriesOf, type Series } from './names'
 import { PieceFactory, cinemaRoot, sessionDir } from './pieces'
 import { probeFile } from './probe'
-import { ResumeStore, resumeKey } from './resume'
+import { ResumeStore, WatchedStore, episodeCode, resumeKey, seriesKey, watchedAt } from './resume'
 
 /*
  * Renderer bridge of the cinema engine. The renderer only ever holds opaque fileIds; the local path (and the ffprobe stream
  * index) stay in this map, in main. Unknown or closed ids throw, so invoke() rejects and send() is logged and dropped.
  */
 
-interface Entry { path: string; factory: PieceFactory | null; unsubs: (() => void)[]; probing: Promise<unknown> | null; siblings: string[]; resume: Resume | null }
+interface Entry { path: string; factory: PieceFactory | null; unsubs: (() => void)[]; probing: Promise<unknown> | null; siblings: string[]; resume: Resume | null; episode: EpisodeMark | null }
+/** The show and episode a probed file is, to mark it watched once the host plays it to the end. */
+interface EpisodeMark { key: string; code: string; marked: boolean }
 /** Position memory of a probed file: the last position the renderer sent, written at most every SAVE_EVERY_MS (trailing) and on close. */
 interface Resume { key: string; durationS: number; lastSave: number; lastS: number | null; timer: ReturnType<typeof setTimeout> | undefined }
 const files = new Map<string, Entry>()
@@ -30,7 +32,7 @@ const DISK_SHARE = 0.2
 
 const register = (path: string): { fileId: string; name: string } => {
   const fileId = randomBytes(16).toString('base64url')
-  files.set(fileId, { path, factory: null, unsubs: [], probing: null, siblings: [], resume: null })
+  files.set(fileId, { path, factory: null, unsubs: [], probing: null, siblings: [], resume: null, episode: null })
   return { fileId, name: basename(path) }
 }
 const entry = (v: unknown): Entry => {
@@ -60,6 +62,8 @@ const SAVE_EVERY_MS = 5000
 let store: ResumeStore | null = null
 const resumeStore = (): ResumeStore => (store ??= new ResumeStore(join(app.getPath('userData'), 'cinema-resume.json')))
 const resumeOf = async (e: Entry): Promise<number | null> => (e.resume ? resumeStore().get(e.resume.key) : null)
+let watched: WatchedStore | null = null
+const watchedStore = (): WatchedStore => (watched ??= new WatchedStore(join(app.getPath('userData'), 'cinema-series.json')))
 /** Writes the last position sent, if any is pending (on the throttle's trailing edge and when the file closes). */
 function flushResume(e: Entry): void {
   const r = e.resume
@@ -135,7 +139,8 @@ async function doProbe(fileId: string, e: Entry) {
   await Promise.all([e.factory?.close(), releaseSiblings(e)])
   e.factory = null
   const bytes = await budget(e.path)
-  const nextPaths = await nextEpisodes(dirname(e.path), e.path).catch(() => [])
+  const series = await seriesOf(e.path).catch(() => null)
+  const seen = series ? await watchedStore().get(seriesKey(series.root, series.show)) : new Set<string>()
   // Closed while probing: nothing is created, so no orphan ffmpeg.
   if (files.get(fileId) !== e) throw new Error('closed')
   const f = new PieceFactory({ path: e.path, film: r.film, dir: sessionDir(), budgetBytes: bytes, bins: ffmpegBins(), videoStreamIndex: r.videoStreamIndex })
@@ -145,11 +150,30 @@ async function doProbe(fileId: string, e: Entry) {
     f.onEvicted((ev) => emit(IPC.cinemaEvicted, { fileId, ...ev })),
     f.onError((ev) => emit(IPC.cinemaError, { fileId, track: ev.track, reason: redact(e.path, ev.reason) })),
   )
-  const next = nextPaths.map(register)
-  e.siblings.push(...next.map((n) => n.fileId))
+  // Every episode of the show gets an id (siblings: they go with this file); the later ones are the room's queue.
+  const list = series ? listEpisodes(fileId, series, seen) : null
+  const at = series?.episodes[series.current] ?? null
+  e.siblings.push(...(list?.episodes.filter((x) => x.fileId !== fileId).map((x) => x.fileId) ?? []))
+  const code = at && episodeCode(at.season, at.episode)
+  e.episode = series && code ? { key: seriesKey(series.root, series.show), code, marked: seen.has(code) } : null
+  const after = (x: { season: number; episode: number }) => !!at && (x.season > at.season || (x.season === at.season && x.episode > at.episode))
+  const next = (list?.episodes ?? []).filter(after).map(({ fileId: id, name }) => ({ fileId: id, name }))
+  // The episode number from the folder layout, and the show's name when the file name has none, go to the room too.
+  const film = series && at ? { ...r.film, episode: { season: at.season, episode: at.episode }, title: series.fromFolder ? series.show : r.film.title } : r.film
   flushResume(e) // a re-probe keeps what the previous one had pending
   e.resume = { key: await resumeKey(e.path), durationS: r.film.durationS, lastSave: 0, lastS: null, timer: undefined }
-  return { film: r.film, warnings: r.warnings, next, resumeS: await resumeOf(e) }
+  return { film, warnings: r.warnings, next, series: list, resumeS: await resumeOf(e) }
+}
+
+/** The whole show for the sheet: fresh ids (the probed file keeps its own), names and numbers only, never a path. */
+function listEpisodes(fileId: string, s: Series, seen: Set<string>) {
+  return {
+    show: s.show,
+    episodes: s.episodes.map((x, i) => ({
+      fileId: i === s.current ? fileId : register(x.path).fileId,
+      name: x.name, season: x.season, episode: x.episode, title: x.title, watched: seen.has(episodeCode(x.season, x.episode)),
+    })),
+  }
 }
 
 export function registerCinemaIpc(): void {
@@ -203,6 +227,11 @@ export function registerCinemaIpc(): void {
     const at = seconds(pos)
     if (!r) return
     r.lastS = at
+    const ep = e.episode
+    if (ep && !ep.marked && at >= watchedAt(r.durationS)) {
+      ep.marked = true
+      watchedStore().mark(ep.key, ep.code).catch((err) => log.warn('cinema watched save failed', String(err)))
+    }
     // Throttled with a trailing write: a pause right after a save is still kept within SAVE_EVERY_MS (and on close).
     if (r.timer) return
     r.timer = setTimeout(() => flushResume(e), Math.max(0, r.lastSave + SAVE_EVERY_MS - Date.now()))

@@ -30,7 +30,7 @@ async function prepare(pick: () => Promise<Picked | null>): Promise<void> {
     }
     // r.next: the later episodes of the folder (the room switches to the first at the end of the credits)
     const decodes = typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(r.film.videoMime)
-    useCinema.setState({ draft: { fileId: f.fileId, name: f.name, film: r.film, warnings: r.warnings, decodes, next: r.next } })
+    useCinema.setState({ draft: { fileId: f.fileId, name: f.name, film: r.film, warnings: r.warnings, decodes, next: r.next, series: r.series ?? null } })
   } catch (e) {
     console.warn('[cinema] open file', e)
     useCinema.setState({ error: t.probeErrors.unreadable })
@@ -58,6 +58,35 @@ export function openSession(title: string, startS = 0): void {
   if (!send({ op: 'cinema_open', channelId, film, startS: Math.min(Math.max(0, startS), film.durationS) })) {
     hostEnd()
     useCinema.setState({ busy: false })
+  }
+}
+
+/**
+ * Another episode on the sheet: probe it, and it becomes the draft (same show list, fresh ids). The old draft file closes
+ * after, which releases its ids; the chosen one was detached from it by its own probe.
+ */
+export async function chooseEpisode(fileId: string): Promise<void> {
+  const c = window.alga.cinema
+  const d = useCinema.getState().draft
+  const ep = d?.series?.episodes.find((e) => e.fileId === fileId)
+  if (!d || !ep || d.fileId === fileId || useCinema.getState().choosing) return
+  useCinema.setState({ choosing: fileId, error: null })
+  try {
+    const r = await c.probe(fileId)
+    if (useCinema.getState().draft !== d) return void c.close(fileId).catch(() => undefined) // the sheet closed meanwhile
+    if ('error' in r) {
+      useCinema.setState({ error: t.probeErrors[r.error] ?? t.probeErrors.unreadable })
+      return void c.close(fileId).catch(() => undefined)
+    }
+    const decodes = typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(r.film.videoMime)
+    useCinema.setState({ draft: { fileId, name: ep.name, film: r.film, warnings: r.warnings, decodes, next: r.next, series: r.series ?? null } })
+    void c.close(d.fileId).catch(() => undefined)
+  } catch (e) {
+    console.warn('[cinema] choose episode', e)
+    useCinema.setState({ error: t.probeErrors.unreadable })
+    void c.close(fileId).catch(() => undefined)
+  } finally {
+    useCinema.setState({ choosing: null })
   }
 }
 
