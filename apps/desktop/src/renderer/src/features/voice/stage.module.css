@@ -148,6 +148,15 @@
   display: grid;
   place-items: center;
 }
+/* A seat's face opens their profile card. */
+.face[role='button'] {
+  border-radius: 50%;
+  cursor: pointer;
+}
+.face[role='button']:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 /* Their hue as the floor under the face: 6 % at rest, a touch more while they talk. */
 .face::before {
   content: '';

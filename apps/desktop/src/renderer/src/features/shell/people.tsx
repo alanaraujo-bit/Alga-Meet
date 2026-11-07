@@ -102,7 +102,8 @@ export function personEntries(user: PublicUser, opts: { spaceId?: string | null;
  * Bottom of someone's profile card: where they are in voice (one click joins), then Mensagem first and the other
  * reaches as icons; the rest (relationship, copy, report) lives in ⋯ so the card never reads as hostile.
  */
-export function ProfileFooter({ user, spaceId, onDone }: { user: PublicUser; spaceId?: string | null; onDone: () => void }) {
+/** `actionsOnly`: just the buttons (the full profile shows where they are talking in its own tab). */
+export function ProfileFooter({ user, spaceId, onDone, actionsOnly }: { user: PublicUser; spaceId?: string | null; onDone: () => void; actionsOnly?: boolean }) {
   const me = useData((st) => st.me?.id)
   const rel = useData((st) => st.relationships[user.id]?.type)
   const vs = useData((st) => st.voiceStates[user.id])
@@ -129,7 +130,7 @@ export function ProfileFooter({ user, spaceId, onDone }: { user: PublicUser; spa
     : null
   return (
     <>
-      {room && (
+      {room && !actionsOnly && (
         <div className={s.profileVoice}>
           <VoiceDot />
           <span className={s.profileVoiceText}>{room.spaceId ? t.people.inRoom(roomName) : t.people.inCall}</span>

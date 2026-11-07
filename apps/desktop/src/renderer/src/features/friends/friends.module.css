@@ -64,6 +64,31 @@
 .row:focus-within {
   background: var(--state-hover);
 }
+/* Avatar + name: the way into their full profile. */
+.whoButton {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.whoButton:focus-visible {
+  outline: none;
+  border-radius: var(--r-md);
+  box-shadow: var(--focus-ring);
+}
+.whoButton:hover .name {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--text-tertiary);
+}
 .who {
   display: flex;
   flex-direction: column;

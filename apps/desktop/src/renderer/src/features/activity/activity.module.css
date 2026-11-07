@@ -375,6 +375,12 @@
   display: flex;
   pointer-events: none;
 }
+/* The full profile's hero card: beside the 96 px avatar, clear of the action buttons on the right. */
+:global([data-hero]) .bubbleSlot {
+  top: 12px;
+  left: 132px;
+  right: 240px;
+}
 .bubbleMotion {
   max-width: 100%;
   transform-origin: 0% 100%;

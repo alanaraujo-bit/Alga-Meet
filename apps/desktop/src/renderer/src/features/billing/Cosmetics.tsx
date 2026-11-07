@@ -87,9 +87,12 @@ export function ProfileCard({
   children,
   motion = 'play',
   pose,
+  hero,
 }: {
   user: ProfileUser
   look: Look
+  /** The full profile: a wider banner, a 96 px avatar and a larger name. */
+  hero?: boolean
   /** Overrides the display name (space nickname). */
   name?: string
   presence?: PresenceStatus
@@ -100,12 +103,12 @@ export function ProfileCard({
 }) {
   const hueBanner = user.accentColor ?? `oklch(0.45 0.05 ${hueFor(user.id)})`
   return (
-    <div className={s.card} data-theme={look.theme} style={{ ['--banner' as string]: hueBanner }}>
+    <div className={s.card} data-theme={look.theme} data-hero={hero || undefined} style={{ ['--banner' as string]: hueBanner }}>
       <div className={s.banner} />
       <ProfileEffect id={look.effect} seed={user.id} motion={motion} pose={pose} />
       <div className={s.avatarSlot}>
         <span className={s.avatarRing}>
-          <DecoratedAvatar user={user} size={80} presence={presence} decoration={look.decoration} decorative motion={motion} />
+          <DecoratedAvatar user={user} size={hero ? 96 : 80} presence={presence} decoration={look.decoration} decorative motion={motion} />
         </span>
       </div>
       <div className={s.body}>

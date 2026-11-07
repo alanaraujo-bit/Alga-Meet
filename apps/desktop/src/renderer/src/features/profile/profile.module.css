@@ -15,8 +15,10 @@
 }
 .panel {
   position: relative;
-  width: min(880px, 100%);
-  height: min(620px, 100%);
+  display: flex;
+  flex-direction: column;
+  width: min(680px, 100%);
+  max-height: min(700px, 100%);
   overflow: hidden;
   border-radius: var(--r-xl);
   background: var(--bg-modal);
@@ -25,41 +27,50 @@
 }
 .close {
   position: absolute;
-  top: var(--s-3);
-  right: var(--s-3);
+  top: var(--s-2);
+  right: var(--s-2);
   z-index: 5;
+  border-radius: var(--r-md);
+  background: rgba(10, 10, 14, 0.32);
+  backdrop-filter: blur(8px);
+  color: rgba(255, 255, 255, 0.86);
 }
-
-.layout {
-  display: grid;
-  grid-template-columns: 340px 1fr;
-  height: 100%;
-}
-
-.side {
-  display: flex;
-  flex-direction: column;
+.scroller {
+  flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  border-right: 1px solid var(--border-subtle);
-  background: var(--bg-content);
-}
-.cardWrap {
-  border-radius: var(--r-xl) 0 0 0;
-}
-.sideBody {
-  display: grid;
-  gap: var(--s-4);
-  padding: 0 var(--s-4) var(--s-5);
 }
 
+/* Their actions, on the name's row, right-aligned under the banner. */
+.heroActions {
+  position: absolute;
+  top: 14px;
+  right: 24px;
+  display: flex;
+}
+.heroActions > * {
+  margin-top: 0;
+}
+
+/* The facts: one hairline row of label over value, no boxes, no icons. */
 .facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) 0;
+  margin: var(--s-4) 0 0;
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--border-subtle);
+}
+.fact {
   display: grid;
-  gap: var(--s-3);
-  margin: 0;
+  gap: 1px;
+  padding: 0 var(--s-5);
+  border-left: 1px solid var(--border-subtle);
+}
+.fact:first-child {
+  padding-left: 0;
+  border-left: 0;
 }
 .fact dt {
-  margin-bottom: 2px;
   color: var(--text-tertiary);
   font: var(--type-badge);
   letter-spacing: 0.04em;
@@ -67,10 +78,15 @@
 }
 .fact dd {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font: var(--type-ui);
+  font-variant-numeric: tabular-nums;
 }
 
+.noteWrap {
+  padding: var(--s-2) var(--s-6) var(--s-5);
+  border-top: 1px solid var(--border-subtle);
+}
 .note {
   display: grid;
   gap: var(--s-1);
@@ -110,20 +126,22 @@
   box-shadow: inset 0 0 0 1px var(--border-strong);
 }
 
-.main {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-}
 .tabs {
-  padding: var(--s-5) var(--s-12) 0 var(--s-6);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: var(--s-3) var(--s-6) 0;
   border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-modal);
+}
+/* Clips while the height glides; the inner box is what gets measured (and anchors popLayout's exiting tab). */
+.autoHeight {
+  overflow: hidden;
 }
 .content {
-  flex: 1;
-  min-height: 0;
-  padding: var(--s-5) var(--s-6) var(--s-6);
+  position: relative;
+  min-height: 200px;
+  padding: var(--s-4) var(--s-6) var(--s-5);
 }
 
 .sections {
@@ -299,8 +317,8 @@
   background: rgba(0, 0, 0, 0.45);
   color: rgba(255, 255, 255, 0.9);
   font: var(--type-badge);
-  opacity: 0;
-  transform: translateY(-2px);
+  /* always there (people never found a hover-only hint), louder on hover */
+  opacity: 0.8;
   transition:
     opacity var(--dur-base) var(--ease-out-quad),
     transform var(--dur-base) var(--ease-out-quad);
@@ -309,18 +327,10 @@
 .opener:hover .openerHint,
 .opener:focus-visible .openerHint {
   opacity: 1;
-  transform: none;
+  background: rgba(0, 0, 0, 0.62);
 }
 .opener:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
-@media (max-width: 760px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-  .side {
-    display: none;
-  }
-}

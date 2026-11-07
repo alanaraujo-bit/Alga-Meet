@@ -154,6 +154,38 @@
   overflow-wrap: anywhere;
 }
 
+/* The full profile (hero): the same card, quieter and wider. 96 px avatar + 4 px ring centered on the 120 px edge. */
+.card[data-hero] {
+  --banner-h: 120px;
+  border-radius: 0;
+  background: var(--bg-modal);
+}
+/* No theme: their color, deep and muted, lit softly from the top left. */
+.card[data-hero]:not([data-theme]) .banner {
+  background:
+    radial-gradient(90% 160% at 0% 0%, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(in oklab 180deg, color-mix(in oklab, var(--banner) 46%, #111116), color-mix(in oklab, var(--banner) 30%, #111116));
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+.card[data-hero] .avatarRing {
+  background: var(--bg-modal);
+}
+.card[data-hero] .avatarSlot {
+  top: 68px;
+  left: 20px;
+}
+.card[data-hero] .body {
+  gap: 2px;
+  padding: 60px 24px 18px;
+}
+.card[data-hero] .name {
+  font: var(--type-title);
+}
+.card[data-hero] .bio {
+  max-width: 60ch;
+  margin-top: var(--s-2);
+}
+
 /* ── Shop thumbnails ── */
 .thumbCard {
   display: block;

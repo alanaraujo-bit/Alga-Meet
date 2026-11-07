@@ -13,6 +13,8 @@ import { AuraGlyph, DecoratedAvatar, ReactionLayer, StreamFrame } from '../billi
 import { useEncodingGate, useTileCount } from '../billing/engine'
 import { useLook } from '../billing/store'
 import { personEntries } from '../shell/people'
+import { openProfile } from '../profile/store'
+import { UserPopover } from '../shell/MemberList'
 import { ActivityLine } from '../activity/Activity'
 import { Eco } from '@/ui/eco/Eco'
 import { CinemaCard, useCinemaDrop } from '../cinema/CinemaDev'
@@ -495,6 +497,7 @@ function Seat({ userId, channel, size }: { userId: string; channel: Channel; siz
   const p = usePerson(userId, channel)
   const hue = usePersonHue(p.user)
   const [menu, setMenu] = useState<HTMLElement | null>(null)
+  const [card, setCard] = useState<HTMLElement | null>(null)
   const look = useLook(userId)
   // Auras fall back to the default ring with more than 9 faces, or while your own encode needs the CPU/GPU.
   useTileCount(true)
@@ -511,9 +514,28 @@ function Seat({ userId, channel, size }: { userId: string; channel: Channel; siz
       data-seat={small ? undefined : ''}
       data-hue={hue}
       data-speak-host
-      onContextMenu={p.isMe ? undefined : contextMenuHandler(() => personEntries(p.user!, { spaceId: channel.spaceId }), p.name)}
+      onContextMenu={p.isMe ? undefined : contextMenuHandler(() => personEntries(p.user!, { spaceId: channel.spaceId, profile: () => openProfile(p.user!.id, channel.spaceId) }), p.name)}
     >
-      <div className={s.face} data-face style={{ width: size, height: size }}>
+      <div
+        className={s.face}
+        data-face
+        style={{ width: size, height: size }}
+        role="button"
+        tabIndex={0}
+        aria-label={t.stage.profile(p.name)}
+        aria-haspopup="dialog"
+        aria-expanded={!!card}
+        onClick={(e) => {
+          // the ⋯ volume button lives inside the face
+          if ((e.target as HTMLElement).closest('button')) return
+          setCard(card ? null : e.currentTarget)
+        }}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+          e.preventDefault()
+          setCard(card ? null : e.currentTarget)
+        }}
+      >
         {/* Cosmetics stay discreet on the stage: a still decoration, and the voice aura in place of the default ring. */}
         <DecoratedAvatar user={p.user} size={size as AvatarSize} glow decorative decoration={small ? undefined : look.decoration} aura={look.aura} />
         {p.flag && (
@@ -543,6 +565,7 @@ function Seat({ userId, channel, size }: { userId: string; channel: Channel; siz
       <Popover anchor={menu} onClose={() => setMenu(null)} side="bottom" align="end" label={t.stage.personVolume(p.name)} width={240}>
         <PersonVolume userId={userId} name={p.name} />
       </Popover>
+      <UserPopover userId={userId} spaceId={channel.spaceId} anchor={card} onClose={() => setCard(null)} />
     </div>
   )
 }
@@ -586,7 +609,7 @@ function LiveCard({ userId, channel, width, isMe }: { userId: string; channel: C
       data-seat=""
       data-hue={hue}
       data-speak-host
-      onContextMenu={isMe ? undefined : contextMenuHandler(() => personEntries(p.user!, { spaceId: channel.spaceId }), p.name)}
+      onContextMenu={isMe ? undefined : contextMenuHandler(() => personEntries(p.user!, { spaceId: channel.spaceId, profile: () => openProfile(p.user!.id, channel.spaceId) }), p.name)}
     >
       {isMe ? (
         <SelfLive />

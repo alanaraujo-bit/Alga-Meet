@@ -1,6 +1,6 @@
 import { Permission, type Channel } from '@alga/shared'
 import { Bell, BellOff, CheckCheck, ChevronDown, Hash, HeadphoneOff, LogOut, MicOff, Plus, Search, ShieldOff, Users, Volume2 } from '@/ui/icons'
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useMedia } from '@/media'
 import { useShallow } from 'zustand/react/shallow'
 import { isUnread, useData } from '@/store/data'
@@ -19,6 +19,9 @@ import { UserPanel } from './UserPanel'
 import { ActivityBadge } from '../activity/Activity'
 import { mute, unmute, useMuted } from '../app/notifyPrefs'
 import type { MenuEntry } from '@/ui'
+import { openProfile } from '../profile/store'
+import { UserPopover } from './MemberList'
+import { personEntries } from './people'
 
 /** One toggle for a channel or a DM: silenced until you turn it back on. */
 const muteEntry = (channelId: string, muted: boolean, dm: boolean): MenuEntry =>
@@ -275,10 +278,26 @@ function VoiceUser({ userId, channelId, spaceId, muted, deaf, server, live }: { 
   const user = useData((st) => st.users[userId])
   const name = useData((st) => (spaceId && st.members[spaceId]?.[userId]?.nickname) || st.users[userId]?.displayName || '…')
   const glow = useRef<HTMLSpanElement>(null)
+  const [card, setCard] = useState<HTMLElement | null>(null)
   useSpeakingGlow(glow, useLevelGetter(userId, channelId))
   if (!user) return null
+  const toggle = (el: HTMLElement) => setCard(card ? null : el)
   return (
-    <li className={s.voiceUser}>
+    <li
+      className={s.voiceUser}
+      role="button"
+      tabIndex={0}
+      aria-haspopup="dialog"
+      aria-expanded={!!card}
+      data-open={card ? '' : undefined}
+      onClick={(e) => toggle(e.currentTarget)}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        e.preventDefault()
+        toggle(e.currentTarget)
+      }}
+      onContextMenu={contextMenuHandler(() => personEntries(user, { spaceId, profile: () => openProfile(userId, spaceId) }), name)}
+    >
       <Avatar user={user} size={20} glowRef={glow} decorative />
       <span className={s.rowName}>{name}</span>
       {live && <span className={s.live}>{t.space.live}</span>}
@@ -304,6 +323,7 @@ function VoiceUser({ userId, channelId, spaceId, muted, deaf, server, live }: { 
           </Tooltip>
         ) : null}
       </span>
+      <UserPopover userId={userId} spaceId={spaceId} anchor={card} onClose={() => setCard(null)} />
     </li>
   )
 }

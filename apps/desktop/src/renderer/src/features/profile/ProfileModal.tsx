@@ -1,8 +1,7 @@
 import type { ProfileExtras, PublicUser, RecentActivity } from '@alga/shared'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { create } from 'zustand'
 import { api } from '@/lib/api'
 import { useMedia } from '@/media'
 import { useData } from '@/store/data'
@@ -17,6 +16,7 @@ import { ProfileCard } from '../billing/Cosmetics'
 import { useLook } from '../billing/store'
 import { ProfileFooter } from '../shell/people'
 import { joinVoice, openCall } from '../voice/voice'
+import { closeProfile, openProfile, useProfileModal } from './store'
 import s from './profile.module.css'
 
 const t = {
@@ -31,8 +31,11 @@ const t = {
   nothingHint: 'Quando jogar ou usar um app que compartilha, aparece aqui.',
   noFriends: 'Nenhum amigo em comum',
   noSpaces: 'Nenhum espaço em comum',
-  memberSince: 'Membro desde',
+  memberSince: 'No Alga desde',
   friendsSince: 'Amigos desde',
+  inCommon: 'Em comum',
+  friendsN: (n: number) => (n === 1 ? '1 amigo' : `${n} amigos`),
+  spacesN: (n: number) => (n === 1 ? '1 espaço' : `${n} espaços`),
   note: 'Nota',
   noteHint: 'só você vê',
   notePlaceholder: 'Clique para adicionar uma nota',
@@ -40,12 +43,8 @@ const t = {
   you: 'Você',
 }
 
-/** Who the full profile is open for (null = closed). Mounted once (ProfileModalHost). */
-export const useProfileModal = create<{ userId: string | null; spaceId: string | null }>()(() => ({ userId: null, spaceId: null }))
-export const openProfile = (userId: string, spaceId: string | null = null) => useProfileModal.setState({ userId, spaceId })
-const closeProfile = () => useProfileModal.setState({ userId: null })
 
-const longDate = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace(' de ', ' ')
 function ago(ms: number): string {
   const min = Math.round((Date.now() - ms) / 60_000)
   if (min < 60) return min <= 1 ? 'agora há pouco' : `há ${min} min`
@@ -122,78 +121,114 @@ function Profile({ user }: { user: PublicUser }) {
   const mutualSpaces = useMutualSpaces(user.id)
   const [tab, setTab] = useState<'activity' | 'friends' | 'spaces'>('activity')
   const self = user.id === me
+  // which way the content slides: toward the tab you picked
+  const prevTab = useRef(tab)
+  const dir = TAB_ORDER.indexOf(tab) >= TAB_ORDER.indexOf(prevTab.current) ? 1 : -1
+  useEffect(() => {
+    prevTab.current = tab
+  }, [tab])
 
   useEffect(() => {
     let live = true
     setExtras(null)
+    setTab('activity')
     api<ProfileExtras>('GET', `/users/${user.id}/profile`).then((x) => live && setExtras(x), () => undefined)
     return () => {
       live = false
     }
   }, [user.id])
 
-  return (
-    <div className={s.layout}>
-      <div className={s.side}>
-        <div className={s.cardWrap}>
-          <ProfileCard user={user} look={look} name={name} presence={presence === 'offline' ? undefined : presence}>
-            <StatusBubble userId={user.id} />
-          </ProfileCard>
-        </div>
-        <div className={s.sideBody}>
-          <ProfileFooter user={user} spaceId={spaceId} onDone={closeProfile} />
-          <dl className={s.facts}>
-            {extras && (
-              <motion.div className={s.fact} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <dt>{t.memberSince}</dt>
-                <dd>{longDate(extras.memberSince)}</dd>
-              </motion.div>
-            )}
-            {rel?.type === 'friend' && (
-              <div className={s.fact}>
-                <dt>{t.friendsSince}</dt>
-                <dd>{longDate(rel.since)}</dd>
-              </div>
-            )}
-          </dl>
-          {!self && me && <Note me={me} them={user.id} />}
-        </div>
-      </div>
+  const mutual = [
+    extras?.mutualFriends.length ? t.friendsN(extras.mutualFriends.length) : '',
+    !self && mutualSpaces.length ? t.spacesN(mutualSpaces.length) : '',
+  ].filter(Boolean)
 
-      <div className={s.main}>
-        <div className={s.tabs}>
-          <Tabs
-            label={t.label(name)}
-            value={tab}
-            onChange={setTab}
-            items={[
-              { value: 'activity', label: t.tabs.activity },
-              ...(self
-                ? []
-                : [
-                    { value: 'friends' as const, label: `${t.tabs.friends}${extras ? ` · ${extras.mutualFriends.length}` : ''}` },
-                    { value: 'spaces' as const, label: `${t.tabs.spaces} · ${mutualSpaces.length}` },
-                  ]),
-            ]}
-          />
+  return (
+    <ScrollArea className={s.scroller}>
+      <ProfileCard hero user={user} look={look} name={name} presence={presence === 'offline' ? undefined : presence}>
+        <StatusBubble userId={user.id} />
+        <div className={s.heroActions}>
+          <ProfileFooter user={user} spaceId={spaceId} onDone={closeProfile} actionsOnly />
         </div>
-        <ScrollArea className={s.content}>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={tab}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2, ease: [0.165, 0.84, 0.44, 1] }}
-            >
-              {tab === 'activity' && <ActivityTab user={user} extras={extras} />}
-              {tab === 'friends' && <FriendsTab list={extras?.mutualFriends ?? []} />}
-              {tab === 'spaces' && <SpacesTab ids={mutualSpaces} />}
-            </motion.div>
-          </AnimatePresence>
-        </ScrollArea>
+        <dl className={s.facts}>
+          <div className={s.fact}>
+            <dt>{t.memberSince}</dt>
+            <dd>{extras ? shortDate(extras.memberSince) : '—'}</dd>
+          </div>
+          {rel?.type === 'friend' && (
+            <div className={s.fact}>
+              <dt>{t.friendsSince}</dt>
+              <dd>{shortDate(rel.since)}</dd>
+            </div>
+          )}
+          {mutual.length > 0 && (
+            <div className={s.fact}>
+              <dt>{t.inCommon}</dt>
+              <dd>{mutual.join(' · ')}</dd>
+            </div>
+          )}
+        </dl>
+      </ProfileCard>
+
+      <div className={s.tabs}>
+        <Tabs
+          label={t.label(name)}
+          value={tab}
+          onChange={setTab}
+          items={[
+            { value: 'activity', label: t.tabs.activity },
+            ...(self
+              ? []
+              : [
+                  { value: 'friends' as const, label: t.tabs.friends },
+                  { value: 'spaces' as const, label: t.tabs.spaces },
+                ]),
+          ]}
+        />
       </div>
-    </div>
+      <AutoHeight className={s.content}>
+        <AnimatePresence mode="popLayout" initial={false} custom={dir}>
+          <motion.div key={tab} custom={dir} variants={slide} initial="enter" animate="center" exit="exit">
+            {tab === 'activity' && <ActivityTab user={user} extras={extras} />}
+            {tab === 'friends' && <FriendsTab list={extras?.mutualFriends ?? []} />}
+            {tab === 'spaces' && <SpacesTab ids={mutualSpaces} />}
+          </motion.div>
+        </AnimatePresence>
+      </AutoHeight>
+      {!self && me && (
+        <div className={s.noteWrap}>
+          <Note me={me} them={user.id} />
+        </div>
+      )}
+    </ScrollArea>
+  )
+}
+
+const TAB_ORDER = ['activity', 'friends', 'spaces'] as const
+const EASE = [0.32, 0.72, 0, 1] as const
+const slide = {
+  enter: (d: number) => ({ opacity: 0, x: 18 * d, filter: 'blur(2px)' }),
+  center: { opacity: 1, x: 0, filter: 'blur(0px)', transition: { duration: 0.32, ease: EASE } },
+  exit: (d: number) => ({ opacity: 0, x: -14 * d, filter: 'blur(2px)', transition: { duration: 0.16, ease: [0.4, 0, 1, 1] as const } }),
+}
+
+/** Glides to its content's height instead of jumping (tabs of different lengths, data that arrives later). */
+function AutoHeight({ className, children }: { className?: string; children: ReactNode }) {
+  const inner = useRef<HTMLDivElement>(null)
+  const [h, setH] = useState<number | 'auto'>('auto')
+  useLayoutEffect(() => {
+    const el = inner.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setH(el.offsetHeight))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return (
+    <motion.div className={s.autoHeight} initial={false} animate={{ height: h }} transition={{ duration: 0.38, ease: EASE }}>
+      <div ref={inner} className={className}>
+        {children}
+      </div>
+    </motion.div>
   )
 }
 

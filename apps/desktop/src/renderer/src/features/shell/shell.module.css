@@ -360,6 +360,17 @@
   color: var(--text-tertiary);
   font: var(--type-ui);
 }
+.voiceUser {
+  cursor: pointer;
+}
+.voiceUser[data-open] {
+  background: var(--state-hover);
+  color: var(--text-secondary);
+}
+.voiceUser:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 .voiceUser:hover {
   background: var(--state-hover);
   color: var(--text-secondary);

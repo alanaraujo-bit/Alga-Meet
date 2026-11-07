@@ -66,6 +66,7 @@ export const t = {
     hw: 'por hardware',
     sw: 'por software',
     personVolume: (name: string) => `Volume de ${name}`,
+    profile: (name: string) => `Perfil de ${name}`,
     muteFor: 'Silenciar para mim',
     unmuteFor: 'Voltar a ouvir',
     serverMuted: 'Silenciado pela moderação',

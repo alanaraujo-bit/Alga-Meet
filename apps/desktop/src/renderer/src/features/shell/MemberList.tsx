@@ -114,6 +114,15 @@ function MemberRow({ row, spaceId }: { row: Row; spaceId: string }) {
   )
 }
 
+/** PersonPopover from just an id (voice rows, call seats): resolves the user, their nickname here and presence. */
+export function UserPopover({ userId, spaceId, anchor, onClose, side = 'right' }: { userId: string; spaceId: string | null; anchor: HTMLElement | null; onClose: () => void; side?: 'left' | 'right' }) {
+  const user = useData((st) => st.users[userId])
+  const name = useData((st) => (spaceId && st.members[spaceId]?.[userId]?.nickname) || st.users[userId]?.displayName || '')
+  const presence = useData((st) => presenceOf(st, userId))
+  if (!user || !anchor) return null
+  return <PersonPopover user={user} spaceId={spaceId} name={name} presence={presence === 'offline' ? undefined : presence} anchor={anchor} onClose={onClose} side={side} />
+}
+
 /** Someone's profile card with the ways to reach them (member list, chat author). */
 export function PersonPopover({
   user,

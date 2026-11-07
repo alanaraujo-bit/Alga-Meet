@@ -1,5 +1,5 @@
 import type { Relationship } from '@alga/shared'
-import { Ban, Check, Copy, MessageCircle, MoreHorizontal, Search, UserMinus, UserPlus, Users, X, type Glyph } from '@/ui/icons'
+import { Ban, Check, Copy, MessageCircle, MoreHorizontal, Search, UserMinus, UserPlus, UserRound, Users, X, type Glyph } from '@/ui/icons'
 import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { ApiRequestError } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
@@ -18,6 +18,7 @@ import { toastError } from '../auth/VerifyEmail'
 import s from './friends.module.css'
 import { PersonLine } from '../activity/Status'
 import { ActiveNow } from '../activity/ActiveNow'
+import { openProfile } from '../profile/store'
 
 export function FriendsView() {
   const tab = useUi((st) => st.friendsTab)
@@ -131,6 +132,11 @@ async function message(userId: string) {
 function friendMenu(rel: Relationship): MenuEntry[] {
   const u = rel.user
   const copy: MenuEntry = { label: t.actions.copyUsername, icon: Copy, onSelect: () => void copyText(u.username) }
+  const profile: MenuEntry = { label: t.actions.viewProfile, icon: UserRound, onSelect: () => openProfile(u.id) }
+  return [profile, ...entries(rel, u, copy)]
+}
+
+function entries(rel: Relationship, u: Relationship['user'], copy: MenuEntry): MenuEntry[] {
   switch (rel.type) {
     case 'friend':
       return [
@@ -182,14 +188,22 @@ function FriendRow({ rel }: { rel: Relationship }) {
         if (e.key === 'Enter' && rel.type === 'friend' && e.target === e.currentTarget) void message(u.id)
       }}
     >
-      <Avatar user={u} size={32} presence={rel.type === 'friend' ? presence : undefined} decorative />
-      <div className={s.who}>
-        <span className={s.name}>
-          {u.displayName}
-          <span className={s.username}>@{u.username}</span>
+      <button
+        type="button"
+        className={s.whoButton}
+        aria-label={t.actions.profile(u.displayName)}
+        onClick={() => openProfile(u.id)}
+        onDoubleClick={(e) => e.stopPropagation()}
+      >
+        <Avatar user={u} size={32} presence={rel.type === 'friend' ? presence : undefined} decorative />
+        <span className={s.who}>
+          <span className={s.name}>
+            {u.displayName}
+            <span className={s.username}>@{u.username}</span>
+          </span>
+          <span className={`${s.sub} ${rel.type === 'incoming' ? s.subAccent : ''}`}>{rel.type === 'friend' ? <PersonLine userId={u.id} fallback={sub} /> : sub}</span>
         </span>
-        <span className={`${s.sub} ${rel.type === 'incoming' ? s.subAccent : ''}`}>{rel.type === 'friend' ? <PersonLine userId={u.id} fallback={sub} /> : sub}</span>
-      </div>
+      </button>
       {/* Actions show on hover/focus; a request waiting on you keeps them visible. Accept ≠ decline in weight. */}
       <div className={`${s.actions} ${rel.type === 'incoming' ? s.actionsPinned : ''}`}>
         {rel.type === 'incoming' && (

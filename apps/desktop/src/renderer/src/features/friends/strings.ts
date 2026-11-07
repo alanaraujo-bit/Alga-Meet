@@ -21,6 +21,8 @@ export const t = {
     block: 'Bloquear',
     unblock: 'Desbloquear',
     copyUsername: 'Copiar nome de usuário',
+    viewProfile: 'Ver perfil',
+    profile: (n: string) => `Ver perfil de ${n}`,
   },
   done: {
     accepted: (n: string) => `Agora você e ${n} são amigos.`,
