@@ -1,37 +1,35 @@
 import { COSMETIC_SLOTS, type BillingMe } from '@alga/shared'
+import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { PRODUCTS } from '../src/billing/catalog.js'
+import { entitlements, users } from '../src/db/schema.js'
 import { api, register, startServer, type TestServer } from './helpers.js'
 
-describe('founder account (ALGA_OWNER_EMAILS)', () => {
+// The founder grant (ALGA_OWNER_EMAILS) was removed: nobody gets Plus or cosmetics without paying.
+describe('no free grants', () => {
   let s: TestServer
   beforeAll(async () => {
-    s = await startServer({ ALGA_OWNER_EMAILS: ' Dono_owner@Example.com , unverified_owner@example.com' })
+    // A leftover variable on the host must be ignored, not crash the boot.
+    s = await startServer({ ALGA_OWNER_EMAILS: 'dono_owner@example.com' })
   })
   afterAll(() => s.close())
 
-  it('holds Plus and every cosmetic for good; other accounts and an unverified owner e-mail do not', async () => {
+  it('revokes grant rows left by the old founder rule on the first sweep after a start', async () => {
     const owner = await register(s.app, 'dono_owner')
-    const unverified = await register(s.app, 'unverified_owner', { verified: false })
-    const other = await register(s.app)
+    const cosmetic = PRODUCTS.find((p) => p.kind === 'cosmetic' && p.cosmeticType)!
+    const { db } = s.app.ctx
+    await db.insert(entitlements).values([
+      { userId: owner.user.id, sku: 'plan:plus', kind: 'plan', source: 'grant', sourceId: owner.user.id, expiresAt: null },
+      { userId: owner.user.id, sku: cosmetic.id, kind: 'cosmetic', source: 'grant', sourceId: owner.user.id, expiresAt: null },
+    ])
+    await db.update(users).set({ plan: 'plus' }).where(eq(users.id, owner.user.id))
+
     await s.app.ctx.billing.sweep()
 
-    const cosmetics = PRODUCTS.filter((p) => p.kind === 'cosmetic')
-    const mine = (await api<BillingMe>(s.app, 'GET', '/billing/me', { token: owner.token })).body
-    expect(mine.plan.id).toBe('plus')
-    expect(mine.items.filter((i) => i.kind === 'cosmetic' && i.source === 'grant' && i.expiresAt === null)).toHaveLength(cosmetics.length)
-    expect(mine.items.find((i) => i.sku === 'plan:plus')).toMatchObject({ source: 'grant', expiresAt: null })
-
-    const item = cosmetics.find((p) => p.cosmeticType)!
-    const body = { [COSMETIC_SLOTS[item.cosmeticType!]]: item.id }
-    expect((await api(s.app, 'PUT', '/users/@me/cosmetics', { token: owner.token, body })).status).toBe(200)
-    for (const u of [unverified, other]) {
-      expect((await api<BillingMe>(s.app, 'GET', '/billing/me', { token: u.token })).body.plan.id).toBe('free')
-      expect((await api(s.app, 'PUT', '/users/@me/cosmetics', { token: u.token, body })).status).toBe(403)
-    }
-
-    // A second pass changes nothing (no churn every minute).
-    await s.app.ctx.billing.sweep()
-    expect((await api<BillingMe>(s.app, 'GET', '/billing/me', { token: owner.token })).body.items).toHaveLength(mine.items.length)
+    const me = (await api<BillingMe>(s.app, 'GET', '/billing/me', { token: owner.token })).body
+    expect(me.plan.id).toBe('free')
+    expect(me.items).toHaveLength(0)
+    const body = { [COSMETIC_SLOTS[cosmetic.cosmeticType!]]: cosmetic.id }
+    expect((await api(s.app, 'PUT', '/users/@me/cosmetics', { token: owner.token, body })).status).toBe(403)
   })
 })

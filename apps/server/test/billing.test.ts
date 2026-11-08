@@ -256,10 +256,13 @@ describe('entitlements lifecycle', () => {
     await sandboxHook(s.app, orderEvent(order.reference, 'refunded'))
     expect(await skus()).toEqual([])
     expect((await billingMe(u.token)).orders[0]!.status).toBe('refunded')
-    // A declined payment cancels the pending order.
+    // A refused card does not end the checkout: another attempt (another payment id) still pays it.
     const other = (await checkout(u.token, 'deco_ha_constelacao')).body
-    await sandboxHook(s.app, orderEvent(other.reference, 'failed'))
-    expect((await billingMe(u.token)).orders.find((o) => o.id === other.reference)!.status).toBe('canceled')
+    await sandboxHook(s.app, orderEvent(other.reference, 'failed', { providerPaymentId: 'p_refused' }))
+    expect((await billingMe(u.token)).orders.find((o) => o.id === other.reference)!.status).toBe('pending')
+    await sandboxHook(s.app, orderEvent(other.reference, 'paid', { providerPaymentId: 'p_ok', amountCents: other.amountCents }))
+    expect((await billingMe(u.token)).orders.find((o) => o.id === other.reference)!.status).toBe('paid')
+    expect(await skus()).toEqual(['deco_ha_constelacao'])
   })
 })
 

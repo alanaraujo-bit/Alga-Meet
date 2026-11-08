@@ -64,9 +64,29 @@ export interface CheckoutInput {
   pixOnly?: boolean
 }
 
+/** An in-app payment of a pending checkout (POST /billing/pay). */
+export type PayInput = Omit<CheckoutInput, 'pixOnly'> & {
+  /** The pending preapproval made by createCheckout (subscriptions): replaced by the authorized one. */
+  providerSubscriptionId?: string | null
+} & ({ method: 'pix' } | { method: 'card'; token: string; paymentMethodId: string; issuerId?: string; document: string; deviceId?: string })
+
+export interface PayResult {
+  status: 'approved' | 'pending' | 'rejected'
+  /** Provider reason code of a rejection (e.g. cc_rejected_insufficient_amount). */
+  reason?: string
+  pix?: { qrCode: string; qrCodeBase64: string; expiresAt: string | null }
+  /**
+   * The state the provider just answered with (read with our own token, as a webhook re-fetch would): applied now so
+   * the item arrives without waiting for the notification.
+   */
+  update?: BillingUpdate
+}
+
 export interface PaymentProvider {
   readonly id: BillingProviderId
   readonly sandbox: boolean
+  /** In-app payments (card token / Pix QR). Absent = the hosted page is the only way to pay. */
+  pay?(input: PayInput): Promise<PayResult>
   /** Hosted payment page. `providerSubscriptionId` when the provider creates the subscription up front. */
   createCheckout(input: CheckoutInput): Promise<{ url: string; providerSubscriptionId?: string }>
   /**

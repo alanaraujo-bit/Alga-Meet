@@ -77,12 +77,12 @@ const EnvSchema = z
     EMAIL_LINK_URL: z.url().default('algameet://auth'),
     /** none = payments off (checkout 503). Default: sandbox in development/test, none in production. sandbox is refused in production. */
     BILLING_PROVIDER: z.enum(['none', 'sandbox', 'mercadopago', 'stripe']).optional(),
-    /** The founder's accounts (comma-separated e-mails, verified only): Plus and every cosmetic, for good. Set in the host, never in git. */
-    ALGA_OWNER_EMAILS: z.string().default(''),
     MP_ACCESS_TOKEN: z.string().min(1).optional(),
     /** "Assinatura secreta" of the webhook (Suas integrações > Webhooks): HMAC key of `x-signature`. */
     MP_WEBHOOK_SECRET: z.string().min(1).optional(),
     MP_API_URL: z.url().default('https://api.mercadopago.com'),
+    /** Public key (APP_USR-… / TEST-…, public by design): turns on the in-app checkout (card fields + Pix QR). */
+    MP_PUBLIC_KEY: z.string().regex(/^(APP_USR|TEST)-[0-9a-f-]{20,80}$/i).optional(),
     /** sk_test_… on staging, sk_live_… in production (Stripe Dashboard > Developers > API keys). */
     STRIPE_SECRET_KEY: z.string().min(1).optional(),
     /** whsec_… of the webhook endpoint (docs/infra/stripe.md): HMAC key of `Stripe-Signature`. */
@@ -205,11 +205,9 @@ export interface BillingConfig {
   sandboxSecret: string
   /** CASA_CINEMA: list the Cinema perk (dev/staging only for now). */
   casaCinema: boolean
-  /** ALGA_OWNER_EMAILS, lowercased (Billing.recompute grants these accounts everything). */
-  ownerEmails: string[]
   /** mercadopago only. */
   returnUrl: string
-  mercadopago?: { accessToken: string; webhookSecret: string; apiUrl: string }
+  mercadopago?: { accessToken: string; webhookSecret: string; apiUrl: string; publicKey?: string }
   /** stripe only. */
   stripe?: { secretKey: string; webhookSecret: string; apiUrl: string }
 }
@@ -275,10 +273,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       provider: e.BILLING_PROVIDER ?? (e.NODE_ENV === 'production' ? 'none' : 'sandbox'),
       sandboxSecret: randomBytes(32).toString('hex'),
       casaCinema: e.CASA_CINEMA,
-      ownerEmails: e.ALGA_OWNER_EMAILS.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
       returnUrl: e.BILLING_RETURN_URL ?? 'https://algameet.com.br/billing/return',
       ...(e.BILLING_PROVIDER === 'mercadopago'
-        ? { mercadopago: { accessToken: e.MP_ACCESS_TOKEN!, webhookSecret: e.MP_WEBHOOK_SECRET!, apiUrl: e.MP_API_URL.replace(/\/+$/, '') } }
+        ? { mercadopago: { accessToken: e.MP_ACCESS_TOKEN!, webhookSecret: e.MP_WEBHOOK_SECRET!, apiUrl: e.MP_API_URL.replace(/\/+$/, ''), ...(e.MP_PUBLIC_KEY ? { publicKey: e.MP_PUBLIC_KEY } : {}) } }
         : {}),
       ...(e.BILLING_PROVIDER === 'stripe'
         ? { stripe: { secretKey: e.STRIPE_SECRET_KEY!, webhookSecret: e.STRIPE_WEBHOOK_SECRET!, apiUrl: e.STRIPE_API_URL.replace(/\/+$/, '') } }

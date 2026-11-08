@@ -170,11 +170,11 @@ export function Waiting() {
       <Spinner size={16} />
       <div className={s.waitingText}>
         <span className={st.rowLabel}>{t.waiting.title}</span>
-        <span className={st.rowHint}>{t.waiting.body}</span>
+        <span className={st.rowHint}>{w?.inApp ? t.pay.waitingInApp : t.waiting.body}</span>
         {w?.pixOnly && <span className={st.rowHint}>{t.gift.pixOnly}</span>}
         <span className={s.waitingActions}>
-          <Button size="sm" icon={ExternalLink} onClick={reopenCheckout}>
-            {t.waiting.reopen}
+          <Button size="sm" variant={w?.inApp ? 'primary' : 'secondary'} icon={w?.inApp ? undefined : ExternalLink} onClick={reopenCheckout}>
+            {w?.inApp ? t.pay.resume : t.waiting.reopen}
           </Button>
           <Button size="sm" variant="ghost" onClick={stopWaiting}>
             {t.waiting.stop}

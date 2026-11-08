@@ -1,0 +1,192 @@
+/* In-app checkout (Pay.tsx): one column, the price up top, one primary action. */
+
+.price {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.hint {
+  margin: 0;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-align: center;
+}
+
+/* ── Card ── */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.frameWrap {
+  position: relative;
+  transition: height var(--dur-base) var(--ease-out-quart);
+}
+.frame {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color-scheme: dark;
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out-quad);
+}
+.frame[data-ready] {
+  opacity: 1;
+}
+.frameLoading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.error {
+  margin: 0;
+  min-height: 0;
+  color: var(--danger);
+  font: var(--type-meta);
+  text-align: center;
+}
+.error:empty {
+  display: none;
+}
+.secure {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--s-1_5, 6px);
+  margin: 0;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  text-align: center;
+  text-wrap: balance;
+}
+.secure > svg {
+  margin-top: 2px;
+}
+
+/* ── Pix ── */
+.pixLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-10) 0;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+}
+.pix {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+}
+.qr {
+  padding: var(--s-3);
+  border-radius: var(--r-lg);
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--border-default), 0 12px 32px -12px var(--accent-glow);
+}
+.qr img {
+  display: block;
+  width: 184px;
+  height: 184px;
+  image-rendering: pixelated;
+}
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-meta);
+}
+.pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  box-shadow: 0 0 0 0 var(--accent-glow);
+  animation: pulse 1.6s var(--ease-out-quad) infinite;
+}
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--accent-glow);
+  }
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+.alt {
+  all: unset;
+  align-self: center;
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  cursor: pointer;
+  border-radius: var(--r-xs);
+  transition: color var(--dur-fast) var(--ease-out-quad);
+}
+.alt:hover {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.alt:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Success ── */
+.done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-8) 0 var(--s-6);
+  text-align: center;
+}
+.doneIcon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: var(--s-2);
+  border-radius: var(--r-full);
+  background: var(--success-tint);
+  color: var(--success);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--success) 25%, transparent), 0 0 40px -6px color-mix(in srgb, var(--success) 45%, transparent);
+}
+.doneGlyph {
+  width: 32px;
+  height: 32px;
+}
+.doneTitle {
+  color: var(--text-primary);
+  font: var(--type-title);
+}
+.doneLine {
+  color: var(--text-secondary);
+  font: var(--type-ui);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse {
+    animation: none;
+  }
+  .frameWrap,
+  .frame {
+    transition: none;
+  }
+}

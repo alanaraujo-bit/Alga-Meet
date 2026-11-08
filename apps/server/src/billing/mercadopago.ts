@@ -11,7 +11,8 @@
 import type { BillingProviderId } from '@alga/shared'
 import {
   WebhookRejected, hmacHex, header, safeEqualHex,
-  type BillingUpdate, type CheckoutInput, type PaymentProvider, type SubscriptionUpdate, type VerifiedEvent, type WebhookRequest,
+  type BillingUpdate, type CheckoutInput, type PaymentProvider, type PayInput, type PayResult, type SubscriptionUpdate, type VerifiedEvent,
+  type WebhookRequest,
 } from './provider.js'
 
 export interface MercadoPagoOptions {
@@ -31,6 +32,20 @@ const REF_RE = /^([so])_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 export function parseReference(ref: unknown): { kind: 'subscription' | 'order'; id: string } | null {
   const m = typeof ref === 'string' ? REF_RE.exec(ref) : null
   return m ? { kind: m[1] === 's' ? 'subscription' : 'order', id: m[2]!.toLowerCase() } : null
+}
+
+async function readJson(res: Response): Promise<Json> {
+  try {
+    return (await res.json()) as Json
+  } catch {
+    return {}
+  }
+}
+
+/** The reason code of a refused card (payment status_detail, or the first `cause` of an API error); never payer data. */
+function rejection(body: Json): string {
+  const code = body.status_detail ?? body.cause?.[0]?.code ?? body.error ?? body.message
+  return typeof code === 'string' || typeof code === 'number' ? String(code).slice(0, 80) : 'unknown'
 }
 
 const cents = (amount: unknown) => (typeof amount === 'number' && Number.isFinite(amount) ? Math.round(amount * 100) : undefined)
@@ -68,7 +83,16 @@ export class MercadoPagoProvider implements PaymentProvider {
   constructor(private readonly opts: MercadoPagoOptions, private readonly fetchImpl: typeof fetch = (...a) => fetch(...a)) {}
 
   private async call(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown, idempotencyKey?: string, extra: Record<string, string> = {}): Promise<Json> {
-    const res = await this.fetchImpl(`${this.opts.apiUrl}${path}`, {
+    const res = await this.send(method, path, body, idempotencyKey, extra)
+    // The panel's "test notification" and other merchants' ids are not found: nothing to apply (200, no retries).
+    if (res.status === 404 && method === 'GET') return {}
+    // The response body can carry payer data: never put it in the error (it ends up in logs).
+    if (!res.ok) throw new Error(`mercadopago ${method} ${path.replace(/\/[^/]+$/, '/:id')}: HTTP ${res.status}`)
+    return (await res.json()) as Json
+  }
+
+  private send(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown, idempotencyKey?: string, extra: Record<string, string> = {}): Promise<Response> {
+    return this.fetchImpl(`${this.opts.apiUrl}${path}`, {
       method,
       headers: {
         authorization: `Bearer ${this.opts.accessToken}`,
@@ -77,13 +101,84 @@ export class MercadoPagoProvider implements PaymentProvider {
         ...extra,
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(15_000),
     })
-    // The panel's "test notification" and other merchants' ids are not found: nothing to apply (200, no retries).
-    if (res.status === 404 && method === 'GET') return {}
-    // The response body can carry payer data: never put it in the error (it ends up in logs).
-    if (!res.ok) throw new Error(`mercadopago ${method} ${path.replace(/\/[^/]+$/, '/:id')}: HTTP ${res.status}`)
-    return (await res.json()) as Json
+  }
+
+  /**
+   * Checkout Transparente: a card token (from MP's secure fields, never the card itself) or Pix.
+   * - card, one-time: POST /v1/payments with binary_mode (approved or rejected now, no "in review").
+   * - card, subscription: POST /preapproval {card_token_id, status: authorized}; the pending preapproval made for the
+   *   hosted page is cancelled (it never charged: nothing was ever attached to it).
+   * - pix, one-time: POST /v1/payments {payment_method_id: pix}; the same order always gets the same QR (idempotency
+   *   key), valid until shortly before the order itself expires (24 h).
+   */
+  async pay(input: PayInput): Promise<PayResult> {
+    const amount = input.amountCents / 100
+    const headers: Record<string, string> = input.method === 'card' && input.deviceId ? { 'x-meli-session-id': input.deviceId } : {}
+    if (input.kind === 'subscription') {
+      if (input.method !== 'card') throw new Error('mercadopago: subscriptions are card-only')
+      const res = await this.send('POST', '/preapproval', {
+        reason: input.product.name,
+        external_reference: `s_${input.reference}`,
+        payer_email: input.payerEmail,
+        card_token_id: input.token,
+        auto_recurring: {
+          frequency: input.product.interval === 'year' ? 12 : 1,
+          frequency_type: 'months',
+          transaction_amount: amount,
+          currency_id: input.currency,
+        },
+        back_url: this.opts.returnUrl,
+        status: 'authorized',
+      }, `card_${input.token}`, headers)
+      const pa = await readJson(res)
+      if (!res.ok || pa.status !== 'authorized') return { status: 'rejected', reason: rejection(pa) }
+      if (input.providerSubscriptionId && input.providerSubscriptionId !== String(pa.id)) {
+        await this.call('PUT', `/preapproval/${encodeURIComponent(input.providerSubscriptionId)}`, { status: 'cancelled' }).catch(() => {})
+      }
+      const update = this.preapprovalUpdate(pa)
+      return { status: 'approved', ...(update ? { update } : {}) }
+    }
+    const description = input.title ?? input.product.name
+    const common = {
+      transaction_amount: amount,
+      description,
+      external_reference: `o_${input.reference}`,
+      notification_url: this.opts.notificationUrl,
+      additional_info: { items: [{ id: input.product.id, title: description, quantity: 1, unit_price: amount, category_id: 'virtual_goods' }] },
+    }
+    const res = input.method === 'pix'
+      ? await this.send('POST', '/v1/payments', {
+        ...common,
+        payment_method_id: 'pix',
+        payer: { email: input.payerEmail },
+        date_of_expiration: new Date(Date.now() + 23 * 3600_000).toISOString(),
+      }, `pix_o_${input.reference}`)
+      : await this.send('POST', '/v1/payments', {
+        ...common,
+        token: input.token,
+        payment_method_id: input.paymentMethodId,
+        ...(input.issuerId ? { issuer_id: Number(input.issuerId) } : {}),
+        installments: 1,
+        binary_mode: true,
+        statement_descriptor: 'ALGAMEET',
+        payer: { email: input.payerEmail, identification: { type: input.document.length === 14 ? 'CNPJ' : 'CPF', number: input.document } },
+      }, `card_${input.token}`, headers)
+    const p = await readJson(res)
+    if (!res.ok) return { status: 'rejected', reason: rejection(p) }
+    const status = mapPaymentStatus(p.status)
+    const update: BillingUpdate = {
+      kind: 'order', reference: input.reference, providerPaymentId: String(p.id), status,
+      amountCents: cents(p.transaction_amount), currency: p.currency_id === 'USD' ? 'USD' : 'BRL', occurredAt: dateOf(p.date_last_updated, p.date_created),
+    }
+    if (status === 'paid') return { status: 'approved', update }
+    if (status === 'failed' || status === 'refunded') return { status: 'rejected', reason: String(p.status_detail ?? p.status ?? '') }
+    const tx = p.point_of_interaction?.transaction_data
+    if (input.method === 'pix' && typeof tx?.qr_code === 'string' && typeof tx?.qr_code_base64 === 'string') {
+      return { status: 'pending', pix: { qrCode: tx.qr_code, qrCodeBase64: tx.qr_code_base64, expiresAt: typeof p.date_of_expiration === 'string' ? p.date_of_expiration : null } }
+    }
+    return { status: 'pending' }
   }
 
   async createCheckout(input: CheckoutInput): Promise<{ url: string; providerSubscriptionId?: string }> {

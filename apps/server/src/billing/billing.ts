@@ -12,9 +12,9 @@ import {
   REMOVED_USER_ID, SPACE_TONES, uuidv7,
   type BillingCatalog, type BillingMe, type CheckoutResponse, type CosmeticSlot, type Entitlement, type Entitlements,
   type EquippedCosmetics, type Gift, type GiftBody, type Order, type PlanId, type PlanSummary, type PlusPassBody,
-  type PlusStatus, type Product, type PutCosmeticsBody, type Quote, type Subscription,
+  type PayBody, type PayResponse, type PlusStatus, type Product, type PutCosmeticsBody, type Quote, type Subscription,
 } from '@alga/shared'
-import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, notInArray, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import { isBlockedBetween, profileAudience, spaceMemberIds } from '../access.js'
 import type { Config } from '../config.js'
@@ -182,8 +182,6 @@ export class Billing {
   private timer: NodeJS.Timeout | undefined
   private sweeping: Promise<number> | undefined
   private lastSweepAt: Date | undefined
-  /** Founder accounts resolved from ALGA_OWNER_EMAILS by each sweep (verified e-mails only). */
-  private owners = new Set<string>()
   readonly tryOns: TryOns
 
   constructor(
@@ -196,6 +194,11 @@ export class Billing {
     readonly provider: PaymentProvider | null = createProvider(config),
   ) {
     this.tryOns = new TryOns(db, hub, voice)
+  }
+
+  /** The provider's public key for the in-app card fields; null = in-app checkout off (hosted page only). */
+  get cardFrameKey(): string | null {
+    return this.provider?.pay ? this.config.billing.mercadopago?.publicKey ?? null : null
   }
 
   get sandbox(): SandboxProvider | null {
@@ -230,7 +233,7 @@ export class Billing {
   catalog(now = Date.now()): BillingCatalog {
     return {
       version: CATALOG_VERSION,
-      provider: this.provider ? { id: this.provider.id, sandbox: this.provider.sandbox } : null,
+      provider: this.provider ? { id: this.provider.id, sandbox: this.provider.sandbox, ...(this.cardFrameKey ? { inApp: true } : {}) } : null,
       plans: (Object.keys(PLANS) as PlanId[]).map((id) => this.plan(id)),
       products: PRODUCTS.map((p) => ({ ...p, available: isAvailable(p, now) })),
       collections: collectionsView(now),
@@ -418,6 +421,64 @@ export class Billing {
       url: page.url, reference: id, kind: 'order', provider: provider.id, sandbox: provider.sandbox, amountCents,
       ...(giftId ? { giftId } : {}), ...(extra.pixOnly ? { pixOnly: true } : {}),
     }
+  }
+
+  /**
+   * POST /billing/pay: pays the user's own pending checkout inside the app (card token or Pix). What the provider
+   * answers is applied at once (it was read with our token, like a webhook re-fetch); the webhook still follows.
+   */
+  async pay(user: UserRow, body: PayBody): Promise<PayResponse> {
+    const provider = this.provider
+    if (!provider?.pay || !this.cardFrameKey) throw new HttpError('internal', 'Pagamento no app indisponível no momento.', undefined, 503)
+    const now = new Date()
+    const [sub] = await this.db.select().from(subscriptions)
+      .where(and(eq(subscriptions.id, body.reference), eq(subscriptions.userId, user.id), eq(subscriptions.provider, provider.id)))
+    const [order] = sub ? [] : await this.db.select().from(orders)
+      .where(and(eq(orders.id, body.reference), eq(orders.userId, user.id), eq(orders.provider, provider.id)))
+    const row = sub ?? order
+    if (!row) throw notFound('Pagamento não encontrado.')
+    if (row.status === 'active' || row.status === 'paid') return { status: 'approved' }
+    if (row.status !== 'pending') throw conflict('Este pagamento expirou. Comece de novo.')
+    const product = productById(row.productId)
+    if (!product) throw notFound('Produto não encontrado.')
+    if (sub && body.method !== 'card') throw invalid({ method: 'A assinatura mensal é só no cartão.' })
+    if (order && body.method === 'card') {
+      const [gift] = await this.db.select({ id: gifts.id }).from(gifts).where(eq(gifts.orderId, order.id))
+      if (gift) {
+        const [spent] = await this.db.select({ cents: sql<number>`coalesce(sum(${orders.amountCents}), 0)::int` }).from(gifts)
+          .innerJoin(orders, eq(orders.id, gifts.orderId))
+          .where(and(eq(gifts.senderId, user.id), inArray(orders.status, ['pending', 'paid']), gt(orders.createdAt, new Date(now.getTime() - DAY_MS))))
+        if ((spent?.cents ?? 0) > GIFT_CARD_LIMIT_CENTS) throw forbidden('Hoje, presentes acima do limite são só no Pix.')
+      }
+    }
+    let result: Awaited<ReturnType<NonNullable<PaymentProvider['pay']>>>
+    try {
+      result = await provider.pay({
+        kind: sub ? 'subscription' : 'order', reference: row.id, product, amountCents: row.amountCents, currency: 'BRL', payerEmail: user.email,
+        ...(sub ? { providerSubscriptionId: sub.providerSubscriptionId } : {}),
+        ...(body.method === 'pix' ? { method: 'pix' as const } : {
+          method: 'card' as const, token: body.token, paymentMethodId: body.paymentMethodId, document: body.document,
+          ...(body.issuerId ? { issuerId: body.issuerId } : {}), ...(body.deviceId ? { deviceId: body.deviceId } : {}),
+        }),
+      })
+    } catch (err) {
+      this.log.error({ err: safeErr(err), provider: provider.id, method: body.method }, 'billing: in-app payment failed')
+      throw new HttpError('internal', 'Não foi possível falar com o Mercado Pago. Tente de novo.', undefined, 502)
+    }
+    if (result.update) {
+      if (result.update.kind === 'subscription' && result.update.providerSubscriptionId) {
+        // The authorized preapproval replaces the pending one made for the hosted page (applySubscription matches ids).
+        await this.db.update(subscriptions).set({ providerSubscriptionId: result.update.providerSubscriptionId }).where(eq(subscriptions.id, row.id))
+      }
+      const u = result.update
+      const key = `pay:${u.kind === 'order' ? u.providerPaymentId : u.providerSubscriptionId}:${u.status}`
+      await this.apply({ id: key, type: 'in_app', updates: [u] }, sha256(key), now)
+    }
+    if (result.status === 'rejected') {
+      this.log.info({ provider: provider.id, method: body.method, reason: result.reason }, 'billing: in-app payment rejected')
+      return { status: 'rejected', message: rejectionMessage(result.reason) }
+    }
+    return { status: result.status, ...(result.pix ? { pix: result.pix } : {}) }
   }
 
   // ---- gifts and Plus passes ----------------------------------------------------------------------------------------
@@ -830,6 +891,11 @@ export class Billing {
       this.log.warn({ provider, reference: u.reference }, 'billing: update for an unknown subscription')
       return
     }
+    if (u.providerSubscriptionId && s.providerSubscriptionId && u.providerSubscriptionId !== s.providerSubscriptionId) {
+      // The pending preapproval of the hosted page, replaced by the one paid in the app (Billing.pay).
+      this.log.info({ provider, reference: u.reference }, 'billing: update for a replaced preapproval ignored')
+      return
+    }
     if (s.providerUpdatedAt && u.occurredAt < s.providerUpdatedAt) {
       this.log.info({ provider, reference: u.reference }, 'billing: stale subscription update ignored')
       return
@@ -891,9 +957,10 @@ export class Billing {
       this.log.warn({ provider, reference: u.reference }, 'billing: update for an unknown order')
       return
     }
-    if (u.providerPaymentId && o.providerPaymentId && u.providerPaymentId !== o.providerPaymentId) {
-      // The same checkout paid twice: the extra payment needs a manual refund.
-      this.log.error({ provider, reference: u.reference }, 'billing: second payment for one order, refund it manually')
+    const settled = o.status === 'paid' || o.status === 'refunded'
+    if (u.providerPaymentId && o.providerPaymentId && u.providerPaymentId !== o.providerPaymentId && settled) {
+      // The same checkout paid twice: the extra payment needs a manual refund. (A refused earlier attempt is not it.)
+      if (u.status === 'paid') this.log.error({ provider, reference: u.reference }, 'billing: second payment for one order, refund it manually')
       return
     }
     if (o.providerUpdatedAt && u.occurredAt < o.providerUpdatedAt) {
@@ -911,7 +978,7 @@ export class Billing {
         status = 'paid'
         break
       case 'failed':
-        if (o.status === 'pending') status = 'canceled'
+        // A refused card or an expired Pix QR: the buyer can still pay this checkout another way until it expires (24 h).
         break
       case 'refunded':
         status = 'refunded'
@@ -970,7 +1037,7 @@ export class Billing {
   private async recompute(tx: Tx, userId: string, now: Date): Promise<Change | null> {
     // Payment rows of purged accounts move to the "removed user" (src/privacy.ts): they never grant anything again.
     if (userId === REMOVED_USER_ID) return null
-    const [u] = await tx.select({ plan: users.plan, cosmetics: users.cosmetics, plusSince: users.plusSince, createdAt: users.createdAt }).from(users)
+    const [u] = await tx.select({ plan: users.plan, cosmetics: users.cosmetics, plusSince: users.plusSince }).from(users)
       .where(eq(users.id, userId)).for('update')
     if (!u) return null
     const subs = (await tx.select().from(subscriptions).where(eq(subscriptions.userId, userId))).filter((s) => this.counts(s.provider))
@@ -983,14 +1050,9 @@ export class Billing {
       .where(and(eq(gifts.recipientId, userId), eq(gifts.status, 'accepted'), eq(orders.status, 'paid')))
 
     const desired = new Map<string, Desired>()
-    const owner = this.owners.has(userId)
-    const plan: PlanId = owner ? 'plus' : (cover?.best.planId as PlanId | undefined) ?? 'free'
-    if (owner) {
-      // The founder's account: Plus and every cosmetic in the catalog, for good, whatever was or wasn't paid.
-      const forever = { source: 'grant' as const, sourceId: userId, expiresAt: null }
-      desired.set('plan:plus', { kind: 'plan', ...forever })
-      for (const p of PRODUCTS) if (p.kind === 'cosmetic') desired.set(p.id, { kind: 'cosmetic', ...forever })
-    } else if (cover) {
+    // No free grants for anyone (founder included): everything comes from a payment or an accepted gift.
+    const plan: PlanId = (cover?.best.planId as PlanId | undefined) ?? 'free'
+    if (cover) {
       const until = { source: 'subscription' as const, sourceId: cover.best.id, expiresAt: new Date(cover.until) }
       desired.set(`plan:${plan}`, { kind: 'plan', ...until })
       for (const p of includedIn(plan, now.getTime())) desired.set(p.id, { kind: 'cosmetic', ...until })
@@ -1001,8 +1063,7 @@ export class Billing {
       for (const sku of o.items) desired.set(sku, { kind: 'cosmetic', source: 'order', sourceId: o.id, expiresAt: null })
     }
     // Badge base: while a paid Plus (not a pass) is active, now − summed Plus time; stable as time passes.
-    const plusSince = owner ? u.createdAt
-      : cover && plan === 'plus' && cover.best.kind !== 'pass' ? new Date(now.getTime() - tenureMs(subs, now.getTime())) : null
+    const plusSince = cover && plan === 'plus' && cover.best.kind !== 'pass' ? new Date(now.getTime() - tenureMs(subs, now.getTime())) : null
 
     const current = await tx.select().from(entitlements).where(eq(entitlements.userId, userId))
     const same = current.length === desired.size && current.every((c) => {
@@ -1136,13 +1197,6 @@ export class Billing {
     // Safety net: anything whose derived expiry passed gets rebuilt even if no status changed.
     const lapsed = await this.db.selectDistinct({ userId: entitlements.userId }).from(entitlements).where(lte(entitlements.expiresAt, now))
     const ids = new Set([...ended, ...lapsed].map((r) => r.userId))
-    // The founder's accounts: an owner who just verified (or a newly configured e-mail) gets everything on this pass.
-    const emails = this.config.billing.ownerEmails
-    const owners = emails.length ? await this.db.select({ id: users.id }).from(users)
-      .where(and(inArray(sql`lower(${users.email})`, emails), isNotNull(users.emailVerifiedAt))) : []
-    if (owners.length !== this.owners.size) this.log.info({ owners: owners.length, configured: emails.length }, 'billing: founder accounts')
-    this.owners = new Set(owners.map((o) => o.id))
-    for (const id of this.owners) ids.add(id)
     // First sweep after a start (the catalog may have changed: retired items, a new wardrobe item) or a wardrobe
     // item arriving now: rebuild every user who holds something.
     const wardrobe = PRODUCTS.some((p) => p.includedFrom && (!prev || (new Date(p.includedFrom) > prev && new Date(p.includedFrom) <= now)))
@@ -1215,5 +1269,22 @@ export class Billing {
   /** Wishlist helper (wishlist.ts): cosmetics owned for good. */
   owned(userId: string): Promise<Set<string>> {
     return this.ownedSkus(userId)
+  }
+}
+
+/** A refused card, in words the buyer can act on (MP status_detail codes). */
+export function rejectionMessage(reason: string | undefined): string {
+  switch (reason) {
+    case 'cc_rejected_insufficient_amount': return 'Saldo ou limite insuficiente. Tente outro cartão ou o Pix.'
+    case 'cc_rejected_bad_filled_card_number': return 'Confira o número do cartão.'
+    case 'cc_rejected_bad_filled_date': return 'Confira a validade do cartão.'
+    case 'cc_rejected_bad_filled_security_code': return 'Confira o código de segurança.'
+    case 'cc_rejected_bad_filled_other': return 'Confira os dados do cartão.'
+    case 'cc_rejected_call_for_authorize': return 'Seu banco pediu para autorizar esta compra. Fale com ele e tente de novo.'
+    case 'cc_rejected_card_disabled': return 'Este cartão está bloqueado. Ative com seu banco ou use outro.'
+    case 'cc_rejected_duplicated_payment': return 'Este pagamento já foi feito agora há pouco.'
+    case 'cc_rejected_high_risk': case 'cc_rejected_blacklist': return 'O pagamento foi recusado por segurança. Tente o Pix ou outro cartão.'
+    case 'cc_rejected_max_attempts': return 'Muitas tentativas com este cartão. Tente outro ou o Pix.'
+    default: return 'O cartão foi recusado. Tente outro cartão ou o Pix.'
   }
 }

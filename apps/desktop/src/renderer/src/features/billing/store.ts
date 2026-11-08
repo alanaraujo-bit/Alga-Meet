@@ -1,6 +1,6 @@
 import type {
-  AnnualItemBody, BillingCatalog, BillingMe, CheckoutResponse, Gift, GiftBody, Me, Order, PatchSpaceUpgradeBody, PatchWishlistBody,
-  PlusPassBody, Product, PublicUser, PutCosmeticsBody, Quote, SpaceContributionBody, SpaceUpgrade, Subscription, TryOn, TryOnBody, Wishlist,
+  AnnualItemBody, BillingCatalog, BillingMe, CheckoutResponse, Gift, GiftBody, Me, Order, PatchSpaceUpgradeBody, PatchWishlistBody, PayBody,
+  PayResponse, PlusPassBody, Product, PublicUser, PutCosmeticsBody, Quote, SpaceContributionBody, SpaceUpgrade, Subscription, TryOn, TryOnBody, Wishlist,
 } from '@alga/shared'
 import { useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
@@ -28,6 +28,8 @@ interface Waiting {
   spaceId?: string
   amountCents?: number
   pixOnly?: boolean
+  /** Paid in the app's own checkout (PayDialog) instead of the provider page. */
+  inApp?: boolean
 }
 
 /** Where the store opens: a tab, an item, or a gift to start. */
@@ -39,6 +41,8 @@ interface BillingState {
   loadError: string | null
   /** A checkout open in the browser. Only the provider confirms it (webhook → events); the app never assumes it. */
   waiting: Waiting | null
+  /** The in-app checkout dialog over the waiting checkout. */
+  payOpen: boolean
   /** The provider declined/abandoned the last checkout (seen on refresh). */
   declined: string | null
   /**
@@ -61,7 +65,7 @@ interface BillingState {
 }
 
 export const useBilling = create<BillingState>()(() => ({
-  catalog: null, me: null, loadError: null, waiting: null, declined: null, arrived: null, wishlist: null, tryOn: null, revealing: null,
+  catalog: null, me: null, loadError: null, waiting: null, payOpen: false, declined: null, arrived: null, wishlist: null, tryOn: null, revealing: null,
   giftDialog: null, passDialog: false, casaDialog: null, tab: 'collection', focus: null,
 }))
 
@@ -93,8 +97,28 @@ function settleWaiting(me: BillingMe) {
 }
 
 async function checkout(w: Omit<Waiting, 'url' | 'reference' | 'kind'>, res: CheckoutResponse) {
-  useBilling.setState({ waiting: { ...w, url: res.url, reference: res.reference, kind: res.kind, giftId: res.giftId ?? w.giftId, amountCents: res.amountCents, pixOnly: res.pixOnly }, declined: null, arrived: null })
-  await window.alga.app.openExternal(res.url)
+  const inApp = !!useBilling.getState().catalog?.provider?.inApp
+  useBilling.setState({
+    waiting: { ...w, url: res.url, reference: res.reference, kind: res.kind, giftId: res.giftId ?? w.giftId, amountCents: res.amountCents, pixOnly: res.pixOnly, inApp },
+    payOpen: inApp, declined: null, arrived: null,
+  })
+  if (!inApp) await window.alga.app.openExternal(res.url)
+}
+
+/** In-app payment of the waiting checkout. Approved: the server already applied it, so the refresh settles it now. */
+export async function pay(body: PayBody): Promise<PayResponse> {
+  const res = await api<PayResponse>('POST', '/billing/pay', body)
+  if (res.status === 'approved') await loadBilling()
+  return res
+}
+
+export const closePay = () => useBilling.setState({ payOpen: false })
+/** The provider's own page, for whoever prefers it (MP balance, saved cards). */
+export const payOnProviderPage = () => {
+  const w = useBilling.getState().waiting
+  if (!w) return
+  useBilling.setState({ payOpen: false })
+  void window.alga.app.openExternal(w.url)
 }
 
 /** Creates the pending checkout on the server and opens the provider page in the browser. Grants nothing. */
@@ -116,10 +140,11 @@ export async function startContribution(spaceId: string, product: Product, showO
 
 export const reopenCheckout = () => {
   const w = useBilling.getState().waiting
-  if (w) void window.alga.app.openExternal(w.url)
+  if (w?.inApp) useBilling.setState({ payOpen: true })
+  else if (w) void window.alga.app.openExternal(w.url)
 }
 /** Stop waiting here; the pending checkout simply expires on the server after 24 h. */
-export const stopWaiting = () => useBilling.setState({ waiting: null })
+export const stopWaiting = () => useBilling.setState({ waiting: null, payOpen: false })
 
 export const quote = (productId: string, recipientId?: string) =>
   api<Quote>('GET', `/billing/quote?productId=${encodeURIComponent(productId)}${recipientId ? `&recipientId=${encodeURIComponent(recipientId)}` : ''}`)
@@ -278,7 +303,7 @@ export function startBilling(): () => void {
   })
   const onFocus = () => useBilling.getState().waiting && void loadBilling()
   window.addEventListener('focus', onFocus)
-  const offSession = useSession.subscribe((s) => s.phase === 'signed_out' && useBilling.setState({ me: null, waiting: null, declined: null, arrived: null, wishlist: null, tryOn: null, revealing: null }))
+  const offSession = useSession.subscribe((s) => s.phase === 'signed_out' && useBilling.setState({ me: null, waiting: null, payOpen: false, declined: null, arrived: null, wishlist: null, tryOn: null, revealing: null }))
   // The private slots: the accent recolors the UI, the icon goes to the window (when the main process has the IPC).
   const sync = (me: Me | null) => {
     applyAccent(me?.cosmetics?.appAccent)

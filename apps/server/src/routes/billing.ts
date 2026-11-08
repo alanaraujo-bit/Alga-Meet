@@ -1,18 +1,19 @@
 import {
-  AnnualItemBody, CheckoutBody, GiftBody, PatchSpaceUpgradeBody, PatchWishlistBody, PlusPassBody, SpaceContributionBody, TryOnBody,
-  type BillingCatalog, type BillingMe, type CheckoutResponse, type Gift, type Order, type Quote, type SpaceUpgrade, type Subscription,
+  AnnualItemBody, CheckoutBody, GiftBody, PatchSpaceUpgradeBody, PatchWishlistBody, PayBody, PlusPassBody, SpaceContributionBody, TryOnBody,
+  type BillingCatalog, type BillingMe, type CheckoutResponse, type Gift, type Order, type PayResponse, type Quote, type SpaceUpgrade, type Subscription,
   type TryOn, type Wishlist,
 } from '@alga/shared'
 import type { FastifyInstance } from 'fastify'
 import type { Ctx } from '../app.js'
 import { requireSpace } from '../access.js'
 import { requireVerifiedEmail } from '../auth.js'
+import { cardFrameHtml } from '../billing/card-frame.js'
 import { patchSpaceUpgrade, spaceUpgradeView } from '../billing/casa.js'
 import { WebhookRejected } from '../billing/provider.js'
 import { addToWishlist, friendWishlist, removeFromWishlist, setWishlistVisible, wishlistOf } from '../billing/wishlist.js'
 import type { Config } from '../config.js'
 import type { UserRow } from '../db/schema.js'
-import { HttpError, forbidden, idParam, parse } from '../errors.js'
+import { HttpError, forbidden, idParam, notFound, parse } from '../errors.js'
 import { ageBracketOf } from '../legal.js'
 import { metrics } from '../metrics.js'
 import { perMinute } from './users.js'
@@ -62,6 +63,28 @@ export async function billingPublicRoutes(app: FastifyInstance, { billing }: Ctx
     })
   })
 
+  // BILLING_RETURN_URL in production: where Mercado Pago sends the buyer back. Static on purpose: the query string
+  // (collection_status, …) is client-controlled, so state only ever comes from the webhook (ENTITLEMENTS_UPDATE).
+  app.get('/billing/return', { config: perMinute(30) }, async (_req, reply) =>
+    reply.type('text/html; charset=utf-8').header('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'").send(
+      '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>Alga Meet</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0e0f13;color:#e6e7ea;' +
+      'font:16px/1.5 system-ui,sans-serif;padding:16px;box-sizing:border-box}main{max-width:420px;text-align:center}' +
+      'a{display:inline-block;margin-top:16px;padding:10px 18px;border-radius:8px;background:#5e6ad2;color:#fff;text-decoration:none}' +
+      'p{color:#a3a6ae}</style><main><h1>Pagamento enviado</h1>' +
+      '<p>Assim que o Mercado Pago confirmar, o Alga Meet libera tudo sozinho. Pix e cartão costumam levar segundos.</p>' +
+      '<p>Pode fechar esta aba.</p><a href="algameet://billing">Voltar ao Alga Meet</a></main></html>',
+    ))
+
+  // The in-app checkout's card form (src/billing/card-frame.ts), framed by the desktop modal. Static per key + accent.
+  app.get<{ Querystring: { accent?: string } }>('/billing/card-frame', { config: perMinute(60) }, async (req, reply) => {
+    const key = billing.cardFrameKey
+    if (!key) throw notFound('Pagamento no app indisponível.')
+    const accent = /^[0-9a-f]{6}$/i.test(String(req.query.accent ?? '')) ? String(req.query.accent) : '8b8ef7'
+    return reply.type('text/html; charset=utf-8').header('cache-control', 'no-store').header('referrer-policy', 'strict-origin')
+      .send(cardFrameHtml(key, accent))
+  })
+
   if (!billing.sandbox) return
   app.get<{ Params: { reference: string }; Querystring: { sig?: string; outcome?: string } }>(
     '/billing/sandbox/checkout/:reference', { config: perMinute(30) }, async (req, reply) => {
@@ -89,6 +112,12 @@ export function billingRoutes(app: FastifyInstance, { billing, config, db }: Ctx
     const res = await billing.checkout(req.auth.user, productId)
     reply.code(201)
     return res
+  })
+
+  // In-app payment of a pending checkout: card token or Pix QR. Card retries count, so per hour and generous.
+  app.post('/billing/pay', { config: perHour(30) }, async (req): Promise<PayResponse> => {
+    requireAdultBuyer(req.auth.user, config)
+    return billing.pay(req.auth.user, parse(PayBody, req.body))
   })
 
   // Every real change is a provider API call (idempotent repeats are not): a cancel/resume loop must not drain the quota.

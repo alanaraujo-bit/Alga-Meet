@@ -169,6 +169,11 @@ export interface BillingProviderInfo {
   id: BillingProviderId
   /** true = test provider: nothing is charged. Never true in production (the server refuses to start). */
   sandbox: boolean
+  /**
+   * The app can pay inside its own checkout (POST /billing/pay): card fields from GET /billing/card-frame and Pix
+   * QR codes. Absent = only the provider page (CheckoutResponse.url).
+   */
+  inApp?: boolean
 }
 
 export interface BillingCatalog {
@@ -250,7 +255,7 @@ export interface Entitlement {
   /** `plan:<planId>` or a cosmetic product id. */
   sku: string
   kind: 'plan' | 'cosmetic'
-  /** grant = the founder's account (server ALGA_OWNER_EMAILS): everything, for good. */
+  /** grant = retired (the founder rule was removed); old rows are revoked by the server's first sweep. */
   source: 'subscription' | 'order' | 'grant'
   /** null = owned for good (bought); otherwise usable until then. */
   expiresAt: string | null
@@ -292,6 +297,34 @@ export interface CheckoutResponse {
   giftId?: string
   /** The provider page offers Pix only (cards are past today's gift limit, GIFT_CARD_LIMIT_CENTS). */
   pixOnly?: boolean
+}
+
+/**
+ * POST /billing/pay: pays a pending checkout (CheckoutResponse.reference) inside the app. The card fields live in the
+ * provider's own iframes (GET /billing/card-frame): only a single-use card token ever reaches us.
+ */
+export const PayBody = z.discriminatedUnion('method', [
+  z.object({ method: z.literal('pix'), reference: z.uuid() }),
+  z.object({
+    method: z.literal('card'),
+    reference: z.uuid(),
+    token: z.string().trim().min(8).max(128).regex(/^[A-Za-z0-9_-]+$/),
+    paymentMethodId: z.string().trim().min(2).max(32).regex(/^[a-z0-9_]+$/),
+    issuerId: z.string().trim().max(32).regex(/^\d*$/).optional(),
+    /** CPF (11 digits) or CNPJ (14), digits only. */
+    document: z.string().regex(/^(\d{11}|\d{14})$/),
+    /** The provider's device fingerprint (fraud screening), when the card frame produced one. */
+    deviceId: z.string().trim().max(128).regex(/^[A-Za-z0-9:_.-]*$/).optional(),
+  }),
+])
+export type PayBody = z.infer<typeof PayBody>
+
+export interface PayResponse {
+  /** approved = paid now (the item arrives as ENTITLEMENTS_UPDATE); pending = waiting for the Pix; rejected = try again. */
+  status: 'approved' | 'pending' | 'rejected'
+  /** Why it was rejected, in plain Portuguese for the buyer. */
+  message?: string
+  pix?: { qrCode: string; qrCodeBase64: string; expiresAt: string | null }
 }
 
 /** GET /billing/quote?productId=&recipientId=: what a checkout (or a gift to recipientId) would charge now. */
