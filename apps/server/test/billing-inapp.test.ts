@@ -80,8 +80,9 @@ describe('in-app checkout (Mercado Pago)', () => {
       payload: JSON.stringify({ id: ++seq, type, data: { id: dataId } }),
     })
   }
+  // A real MP device id is long (armor. + ~225 chars).
   const card = (reference: string, token: string) =>
-    ({ method: 'card', reference, token, paymentMethodId: 'master', document: '52998224725', deviceId: 'dev-1' })
+    ({ method: 'card', reference, token, paymentMethodId: 'master', document: '52998224725', deviceId: `armor.${'a1b2c3d4e5'.repeat(23)}` })
 
   it('announces itself and serves the card frame with the public key', async () => {
     const cat = await api<BillingCatalog>(m.app, 'GET', '/billing/catalog')
@@ -159,6 +160,9 @@ describe('in-app checkout (Mercado Pago)', () => {
     expect((await api(m.app, 'POST', '/billing/pay', { token: owner.token, body: { ...card(co.reference, 'tok-xyz-123'), document: '123' } })).status).toBe(400)
     expect((await api(m.app, 'POST', '/billing/pay', { token: owner.token, body: { ...card(co.reference, 'tok"><x'), document: '52998224725' } })).status).toBe(400)
     expect(calls.length).toBe(before)
+    // An odd device id is dropped, never a refusal.
+    const odd = await api<PayResponse>(m.app, 'POST', '/billing/pay', { token: owner.token, body: { ...card(co.reference, 'good-card-tok-9'), deviceId: 'x'.repeat(2000) } })
+    expect(odd.body.status).toBe('approved')
   })
 
   it('is off without a public key (hosted page only)', async () => {

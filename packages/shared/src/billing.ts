@@ -313,8 +313,11 @@ export const PayBody = z.discriminatedUnion('method', [
     issuerId: z.string().trim().max(32).regex(/^\d*$/).optional(),
     /** CPF (11 digits) or CNPJ (14), digits only. */
     document: z.string().regex(/^(\d{11}|\d{14})$/),
-    /** The provider's device fingerprint (fraud screening), when the card frame produced one. */
-    deviceId: z.string().trim().max(128).regex(/^[A-Za-z0-9:_.-]*$/).optional(),
+    /**
+     * The provider's device fingerprint (fraud screening; MP's is `armor.` + ~225 chars). Optional and never a reason
+     * to refuse a payment: anything odd is dropped.
+     */
+    deviceId: z.string().trim().max(512).regex(/^[A-Za-z0-9:_.-]+$/).optional().catch(undefined),
   }),
 ])
 export type PayBody = z.infer<typeof PayBody>
