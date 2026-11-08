@@ -7,7 +7,7 @@ import type { FastifyInstance } from 'fastify'
 import type { Ctx } from '../app.js'
 import { requireSpace } from '../access.js'
 import { requireVerifiedEmail } from '../auth.js'
-import { cardFrameHtml } from '../billing/card-frame.js'
+import { cardFrameHtml, interWoff2 } from '../billing/card-frame.js'
 import { patchSpaceUpgrade, spaceUpgradeView } from '../billing/casa.js'
 import { WebhookRejected } from '../billing/provider.js'
 import { addToWishlist, friendWishlist, removeFromWishlist, setWishlistVisible, wishlistOf } from '../billing/wishlist.js'
@@ -83,6 +83,10 @@ export async function billingPublicRoutes(app: FastifyInstance, { billing }: Ctx
     const accent = /^[0-9a-f]{6}$/i.test(String(req.query.accent ?? '')) ? String(req.query.accent) : '8b8ef7'
     return reply.type('text/html; charset=utf-8').header('cache-control', 'no-store').header('referrer-policy', 'strict-origin')
       .send(cardFrameHtml(key, accent))
+  })
+  app.get('/billing/card-frame/inter.woff2', { config: perMinute(60) }, async (_req, reply) => {
+    if (!interWoff2) throw notFound()
+    return reply.type('font/woff2').header('cache-control', 'public, max-age=31536000, immutable').send(interWoff2)
   })
 
   if (!billing.sandbox) return

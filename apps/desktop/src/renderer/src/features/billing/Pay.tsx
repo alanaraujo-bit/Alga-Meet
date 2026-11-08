@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { errorText } from '@/lib/errors'
 import { copyText } from '@/lib/clipboard'
-import { Button, Icon, Modal, SegmentedControl, Spinner } from '@/ui'
+import { Button, Icon, Modal, SegmentedControl, Spinner, TextField } from '@/ui'
 import { Check, CircleCheck, Copy, Lock } from '@/ui/icons'
 import { money } from './look'
 import { closePay, loadBilling, pay, payOnProviderPage, useBilling } from './store'
@@ -88,13 +88,33 @@ function Form({ reference, sub, pixOnly, cta }: { reference: string; sub: boolea
   )
 }
 
+/** CPF mask while typing: 000.000.000-00. */
+const maskCpf = (v: string) => {
+  const d = v.replace(/\D/g, '').slice(0, 11)
+  return d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+}
+
+export function cpfValid(v: string): boolean {
+  const d = v.replace(/\D/g, '')
+  if (!/^\d{11}$/.test(d) || /^(\d)\1{10}$/.test(d)) return false
+  for (let t = 9; t < 11; t++) {
+    let sum = 0
+    for (let i = 0; i < t; i++) sum += Number(d[i]) * (t + 1 - i)
+    if (((sum * 10) % 11) % 10 !== Number(d[t])) return false
+  }
+  return true
+}
+
 function Card({ reference, cta }: { reference: string; cta: string }) {
   const frame = useRef<HTMLIFrameElement>(null)
   const [src] = useState(() => `${window.alga.config.apiUrl}/api/v1/billing/card-frame?accent=${accentHex()}`)
   const [ready, setReady] = useState(false)
-  const [height, setHeight] = useState(268)
+  const [height, setHeight] = useState(128)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [name, setName] = useState('')
+  const [cpf, setCpf] = useState('')
+  const [fieldErr, setFieldErr] = useState<{ name?: string; cpf?: string }>({})
   const timer = useRef(0)
 
   useEffect(() => {
@@ -104,14 +124,14 @@ function Card({ reference, cta }: { reference: string; cta: string }) {
       const m = e.data as FrameMsg
       if (!m || m.source !== 'alga-card') return
       if (m.type === 'ready') setReady(true)
-      else if (m.type === 'height') setHeight(Math.min(Math.max(m.value, 120), 520))
+      else if (m.type === 'height') setHeight(Math.min(Math.max(m.value + 6, 96), 320))
       else if (m.type === 'error') {
         setReady(true)
         setError(t.pay.frameError)
       } else if (m.type === 'invalid') {
         window.clearTimeout(timer.current)
         setBusy(false)
-        setError(m.message ?? null)
+        setError(m.message || null)
       } else if (m.type === 'token') {
         window.clearTimeout(timer.current)
         try {
@@ -134,11 +154,20 @@ function Card({ reference, cta }: { reference: string; cta: string }) {
     }
   }, [reference])
 
-  const submit = () => {
+  const submit = (e?: React.FormEvent) => {
+    e?.preventDefault()
     if (busy || !ready) return
-    setBusy(true)
+    const holder = name.trim().replace(/\s+/g, ' ')
+    const errs = {
+      ...(holder.split(' ').length < 2 ? { name: t.pay.nameError } : {}),
+      ...(!cpfValid(cpf) ? { cpf: t.pay.cpfError } : {}),
+    }
+    setFieldErr(errs)
     setError(null)
-    frame.current?.contentWindow?.postMessage({ target: 'alga-card', type: 'submit' }, apiOrigin())
+    // The card fields validate themselves inside the frame on submit, so they run even when ours are wrong.
+    if (Object.keys(errs).length) return
+    setBusy(true)
+    frame.current?.contentWindow?.postMessage({ target: 'alga-card', type: 'submit', cardholderName: holder, document: cpf.replace(/\D/g, '') }, apiOrigin())
     timer.current = window.setTimeout(() => {
       setBusy(false)
       setError(t.pay.timeout)
@@ -146,7 +175,7 @@ function Card({ reference, cta }: { reference: string; cta: string }) {
   }
 
   return (
-    <div className={s.card}>
+    <form className={s.card} onSubmit={submit} noValidate>
       <div className={s.frameWrap} style={{ height }}>
         {!ready && (
           <div className={s.frameLoading}>
@@ -161,19 +190,44 @@ function Card({ reference, cta }: { reference: string; cta: string }) {
           className={s.frame}
           data-ready={ready || undefined}
           style={{ height }}
-          sandbox="allow-scripts allow-same-origin allow-forms"
+          sandbox="allow-scripts allow-same-origin"
           referrerPolicy="strict-origin"
         />
       </div>
+      <TextField
+        label={t.pay.name}
+        placeholder={t.pay.namePlaceholder}
+        autoComplete="cc-name"
+        spellCheck={false}
+        maxLength={60}
+        value={name}
+        error={fieldErr.name}
+        onChange={(e) => {
+          setName(e.target.value)
+          if (fieldErr.name) setFieldErr((f) => ({ ...f, name: undefined }))
+        }}
+      />
+      <TextField
+        label={t.pay.cpf}
+        placeholder="000.000.000-00"
+        inputMode="numeric"
+        autoComplete="off"
+        value={cpf}
+        error={fieldErr.cpf}
+        onChange={(e) => {
+          setCpf(maskCpf(e.target.value))
+          if (fieldErr.cpf) setFieldErr((f) => ({ ...f, cpf: undefined }))
+        }}
+      />
       <p className={s.error} role="alert" aria-live="assertive">{error}</p>
-      <Button variant="primary" size="lg" full loading={busy} disabled={!ready} onClick={submit}>
+      <Button type="submit" variant="primary" size="lg" full loading={busy} disabled={!ready}>
         {busy ? t.pay.processing : cta}
       </Button>
       <p className={s.secure}>
         <Icon icon={Lock} size={12} />
         {t.pay.secure}
       </p>
-    </div>
+    </form>
   )
 }
 

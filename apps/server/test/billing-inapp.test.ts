@@ -91,6 +91,10 @@ describe('in-app checkout (Mercado Pago)', () => {
     expect(frame.headers['content-type']).toContain('text/html')
     expect(frame.body).toContain(PUBLIC_KEY)
     expect(frame.body).toContain('--accent:#6163d0')
+    const font = await m.app.inject({ method: 'GET', url: '/api/v1/billing/card-frame/inter.woff2' })
+    expect(font.statusCode).toBe(200)
+    expect(font.headers['content-type']).toBe('font/woff2')
+    expect(font.rawPayload.subarray(0, 4).toString()).toBe('wOF2')
     // A hostile accent never reaches the page.
     expect((await m.app.inject({ method: 'GET', url: '/api/v1/billing/card-frame?accent=%22%3E%3Cscript%3E' })).body).toContain('--accent:#8b8ef7')
   })
