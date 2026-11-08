@@ -50,8 +50,8 @@ export const COLLECTIONS: (Omit<Collection, 'waves'> & { waves: { wave: number; 
   {
     id: 'hora_azul', name: 'Hora Azul',
     description: 'Coleção 01: o quarto de hora depois do pôr do sol, quando o céu fica índigo e as janelas acendem.',
-    // Wave 2 (auras, sounds, reactions, frames) 6–8 weeks after the paid launch: the owner sets the date.
-    waves: [{ wave: 1, opensAt: '2026-11-01T00:00:00-03:00' }, { wave: 2, opensAt: null }],
+    // Wave 2 (auras, sounds, reactions, frames) opened early by the owner on 2026-11-08 (bundles go on sale with it).
+    waves: [{ wave: 1, opensAt: '2026-11-01T00:00:00-03:00' }, { wave: 2, opensAt: '2026-11-08T00:00:00-03:00' }],
   },
 ]
 

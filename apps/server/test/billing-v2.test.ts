@@ -79,10 +79,13 @@ const asTeen = async (u: User) => {
   await s.app.ctx.db.update(users).set({ birthDate: new Date(Date.UTC(y - 17, m - 1, d)).toISOString().slice(0, 10) }).where(eq(users.id, u.user.id))
 }
 
-const withWave2 = async (fn: () => Promise<void>) => {
-  COLLECTIONS[0]!.waves[1]!.opensAt = '2026-01-01T00:00:00Z'
-  try { await fn() } finally { COLLECTIONS[0]!.waves[1]!.opensAt = null }
+/** Runs fn with wave 2's opening date set to `at` (null = not scheduled), then puts the catalog's own date back. */
+const withWave2At = async (at: string | null, fn: () => Promise<void>) => {
+  const real = COLLECTIONS[0]!.waves[1]!.opensAt
+  COLLECTIONS[0]!.waves[1]!.opensAt = at
+  try { await fn() } finally { COLLECTIONS[0]!.waves[1]!.opensAt = real }
 }
+const withWave2 = (fn: () => Promise<void>) => withWave2At('2026-01-01T00:00:00Z', fn)
 
 async function spaceWith(owner: User, ...members: User[]) {
   const space = (await call<SpaceSnapshot>('POST', '/spaces', owner, { name: 'Galera' })).body
@@ -92,7 +95,13 @@ async function spaceWith(owner: User, ...members: User[]) {
 }
 
 describe('catalog v2', () => {
-  it('Hora Azul: 28 items in waves 1/2, 25 sold for R$ 240,50, bundles, Plus wardrobe, Casa; v1 retired', async () => {
+  it('wave 2 is open in the real catalog (owner, 2026-11-08): bundles are on sale', async () => {
+    expect(COLLECTIONS[0]!.waves[1]!.opensAt).toBe('2026-11-08T00:00:00-03:00')
+    const cat = (await call<BillingCatalog>('GET', '/billing/catalog', null)).body
+    expect(cat.products.filter((p) => p.kind === 'bundle').every((p) => p.available)).toBe(true)
+  })
+
+  it('Hora Azul: 28 items in waves 1/2, 25 sold for R$ 240,50, bundles, Plus wardrobe, Casa; v1 retired', () => withWave2At(null, async () => {
     const cat = (await call<BillingCatalog>('GET', '/billing/catalog', null)).body
     expect(cat.version).toBe(2)
     const ha = cat.products.filter((p) => p.collectionId === 'hora_azul' && p.kind === 'cosmetic')
@@ -132,7 +141,7 @@ describe('catalog v2', () => {
     expect((await checkout(u, 'bundle_ha_vidro')).status).toBe(409) // has wave-2 items
     expect((await checkout(u, 'deco_coral')).status).toBe(404) // retired
     expect((await checkout(u, 'casa_7d')).status).toBe(404) // only through a space
-  })
+  }))
 
   it('a v1 item someone owns stays theirs and equippable (grandfathered)', async () => {
     const u = await register(s.app)
@@ -434,7 +443,7 @@ describe('Plus v2', () => {
     const y = await subscribed('plus_yearly', new Date(Date.now() + 365 * DAY))
     expect((await billingMe(y)).plus!.annualItem).toEqual({ available: true, claimedProductId: null })
     expect((await claim(y, 'effect_ha_hora_azul')).status).toBe(400) // R$ 16,90
-    expect((await claim(y, 'aura_ha_respiro')).status).toBe(400) // wave 2 not open
+    await withWave2At(null, async () => expect((await claim(y, 'aura_ha_respiro')).status).toBe(400)) // wave 2 not open
     const order = await claim(y, 'deco_ha_halo_vidro')
     expect(order.body).toMatchObject({ amountCents: 0, status: 'paid', items: ['deco_ha_halo_vidro'], refundableUntil: null })
     expect((await claim(y, 'deco_ha_orbita')).status).toBe(409)
