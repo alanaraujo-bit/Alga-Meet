@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto'
 import type { BillingCatalog, BillingMe, CheckoutResponse, Me, PayResponse } from '@alga/shared'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { rejectionMessage } from '../src/billing/billing.js'
 import { api, register, startServer, type TestServer } from './helpers.js'
 
 // In-app checkout (POST /billing/pay) against a simulated Mercado Pago API.
@@ -163,6 +164,13 @@ describe('in-app checkout (Mercado Pago)', () => {
     // An odd device id is dropped, never a refusal.
     const odd = await api<PayResponse>(m.app, 'POST', '/billing/pay', { token: owner.token, body: { ...card(co.reference, 'good-card-tok-9'), deviceId: 'x'.repeat(2000) } })
     expect(odd.body.status).toBe('approved')
+  })
+
+  it('explains refusals in words the buyer can act on', () => {
+    // What MP answered on a real subscription attempt (2026-11-08): the pre-authorization of the card failed.
+    expect(rejectionMessage('CC_VAL_433 Credit card validation has failed')).toContain('validar este cartão')
+    expect(rejectionMessage('cc_rejected_insufficient_amount')).toContain('limite')
+    expect(rejectionMessage(undefined)).toContain('recusado')
   })
 
   it('is off without a public key (hosted page only)', async () => {

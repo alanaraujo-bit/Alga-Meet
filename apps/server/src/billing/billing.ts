@@ -1274,6 +1274,8 @@ export class Billing {
 
 /** A refused card, in words the buyer can act on (MP status_detail codes). */
 export function rejectionMessage(reason: string | undefined): string {
+  // Subscriptions: MP pre-authorizes the card before accepting the preapproval; CC_VAL_* = that check failed.
+  if (reason?.startsWith('CC_VAL_')) return 'O Mercado Pago não conseguiu validar este cartão para a assinatura. Confira os dados ou use outro cartão.'
   switch (reason) {
     case 'cc_rejected_insufficient_amount': return 'Saldo ou limite insuficiente. Tente outro cartão ou o Pix.'
     case 'cc_rejected_bad_filled_card_number': return 'Confira o número do cartão.'
