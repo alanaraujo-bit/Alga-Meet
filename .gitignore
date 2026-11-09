@@ -39,3 +39,6 @@ docs/private/
 # Sala de Cinema: generated fixtures and the pinned LGPL ffmpeg (fetched at build time)
 apps/desktop/test-fixtures/cinema/
 apps/desktop/build/ffmpeg/
+
+# Brainstorm mockups (superpowers visual companion): local only.
+.superpowers/
