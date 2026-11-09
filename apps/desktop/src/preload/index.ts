@@ -162,6 +162,9 @@ const bridge: AlgaBridge = {
     openExternal: (url) => ipcRenderer.invoke(IPC.appOpenExternal, String(url)),
     openLogs: () => ipcRenderer.invoke(IPC.appOpenLogs),
     takeSetupEco: () => ipcRenderer.invoke(IPC.appTakeSetupEco),
+    recentLog: (previous) => ipcRenderer.invoke(IPC.appRecentLog, previous),
+    captureWindow: () => ipcRenderer.invoke(IPC.appCaptureWindow),
+    takeCrash: () => ipcRenderer.invoke(IPC.appTakeCrash),
     quit: () => ipcRenderer.send(IPC.appQuit),
   },
 }

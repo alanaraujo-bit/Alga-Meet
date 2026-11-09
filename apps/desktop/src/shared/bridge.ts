@@ -319,6 +319,12 @@ export interface AlgaBridge {
     openLogs(): Promise<void>
     /** The Eco dressed in the setup window during the install (unvalidated; null when none). Read once. */
     takeSetupEco(): Promise<unknown>
+    /** End of main.log for a bug report (at most 200 lines / 48 KB). `previous`: the session before this one (after a crash). */
+    recentLog(previous: boolean): Promise<string>
+    /** PNG of the app window as it is now, or null when it could not be captured. */
+    captureWindow(): Promise<Uint8Array | null>
+    /** How the previous session ended badly, read once (null when it did not, or the note is stale or malformed). */
+    takeCrash(): Promise<{ kind: 'renderer' | 'unresponsive'; at: number; version: string } | null>
     quit(): void
   }
 }

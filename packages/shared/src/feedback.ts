@@ -16,8 +16,11 @@ export const FEEDBACK_LOG_MAX_BYTES = 48 * 1024
 export const FEEDBACK_SCREENSHOT_MAX_BYTES = 8 * 1024 * 1024
 export const FEEDBACK_PER_HOUR = 10
 
-/** How the previous session ended when the feedback comes from the "Travei da última vez" offer. */
-export const FEEDBACK_CRASH_KINDS = ['renderer', 'main', 'unresponsive'] as const
+/**
+ * How the previous session ended when the feedback comes from the "Travei da última vez" offer: the interface process
+ * died, or the window stopped answering and never came back.
+ */
+export const FEEDBACK_CRASH_KINDS = ['renderer', 'unresponsive'] as const
 export type FeedbackCrashKind = (typeof FEEDBACK_CRASH_KINDS)[number]
 
 /** Where the person was. Closed on purpose (`.strict()`): never a name or an id of a space, channel or person. */

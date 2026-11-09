@@ -8,6 +8,7 @@ import { IPC } from '../shared/ipc'
 import { registerActivityIpc, startActivity, stopActivity } from './activity'
 import { initCapture } from './capture'
 import { receiveDeepLink, registerDeepLinkIpc, trackDeepLinkPage } from './deep-links'
+import { registerFeedbackIpc } from './feedback'
 import { registerHotkeyIpc, stopHotkeys } from './hotkeys'
 import { bool, handle, isTrustedSender, on, str } from './ipc'
 import { initLog, log, logDir } from './log'
@@ -109,6 +110,7 @@ function registerAppIpc(): void {
   registerE2eeIpc()
   registerCinemaIpc()
   registerActivityIpc()
+  registerFeedbackIpc()
 }
 
 if (!app.requestSingleInstanceLock()) app.quit()

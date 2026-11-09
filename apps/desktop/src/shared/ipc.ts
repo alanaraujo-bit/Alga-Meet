@@ -53,6 +53,9 @@ export const IPC = {
   appOpenExternal: 'alga:app:open-external', // invoke
   appOpenLogs: 'alga:app:open-logs', // invoke
   appTakeSetupEco: 'alga:app:take-setup-eco', // invoke
+  appRecentLog: 'alga:app:recent-log', // invoke
+  appCaptureWindow: 'alga:app:capture-window', // invoke
+  appTakeCrash: 'alga:app:take-crash', // invoke
   appQuit: 'alga:app:quit', // send
 
   e2eeStatus: 'alga:e2ee:status', // invoke
