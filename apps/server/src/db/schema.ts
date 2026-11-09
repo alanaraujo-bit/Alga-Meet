@@ -1,4 +1,4 @@
-import { ACCOUNT_ACTION_REASONS, REPORT_REASONS, type EcoSpec, type EquippedCosmetics, type ReleaseContent } from '@alga/shared'
+import { ACCOUNT_ACTION_REASONS, FEEDBACK_KINDS, REPORT_REASONS, type EcoSpec, type EquippedCosmetics, type FeedbackContext, type ReleaseContent } from '@alga/shared'
 import { sql } from 'drizzle-orm'
 import {
   type AnyPgColumn, boolean, date, foreignKey, index, integer, jsonb, pgTable, primaryKey, real, text, timestamp, uniqueIndex, uuid,
@@ -830,6 +830,26 @@ export const uninstallFeedback = pgTable('uninstall_feedback', {
   appVersion: text('app_version'),
   createdAt: ts('created_at').notNull().defaultNow(),
 })
+
+/**
+ * App feedback ("Conta pro Eco", packages/shared/src/feedback.ts): what a person told the team from the desktop app.
+ * Private to the sender and the team; read by a future admin panel. Goes away with the account.
+ */
+export const feedback = pgTable('feedback', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kind: text('kind', { enum: FEEDBACK_KINDS }).notNull(),
+  text: text('text').notNull(),
+  /** algaClientHeader of the request: "<app version>; <os>", null when the header was absent or invalid. */
+  client: text('client'),
+  context: jsonb('context').$type<FeedbackContext>().notNull(),
+  /** End of the app's main.log, only for bug/crash and only when the person left it on. */
+  log: text('log'),
+  /** Screenshot object (feedback/<userId>/<id>.webp), null when none. The delete trigger queues it (0019). */
+  storageKey: text('storage_key'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [index('feedback_user_created_idx').on(t.userId, t.createdAt)])
+export type FeedbackRow = typeof feedback.$inferSelect
 
 // ---- Novidades (release notes; packages/shared/src/releases.ts) -----------------------------------------------------
 

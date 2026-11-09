@@ -16,7 +16,7 @@ import type { Ctx } from './app.js'
 import { revokeAllSessions, sha256Hex } from './auth.js'
 import {
   accessLogs, accountActions, activityDays, activityEmails, activitySettings, appeals, attachments, channelRecipients, channels,
-  consentRecords, dataExports, releaseReactions, deletedAccounts, eventRsvps, events, memberRoles, messages, orders, reactions, relationships, uninstallFeedback,
+  consentRecords, dataExports, releaseReactions, deletedAccounts, feedback, eventRsvps, events, memberRoles, messages, orders, reactions, relationships, uninstallFeedback,
   reports, roles, sessions, spaceMembers, spaces, subscriptions, users, voiceNotifyPrefs, voiceSessions, voiceWeekly, weeklyRecaps,
   type DataExportRow, type UserRow,
 } from './db/schema.js'
@@ -346,6 +346,9 @@ export class Privacy {
       },
       releaseFeedback: (await db.select().from(releaseReactions).where(eq(releaseReactions.userId, userId)))
         .map((r) => ({ version: r.version, itemId: r.itemId, value: r.value, updatedAt: r.updatedAt.toISOString() })),
+      // What the person told the team from the app; the screenshot is indicated, not bundled.
+      feedback: (await db.select().from(feedback).where(eq(feedback.userId, userId)).orderBy(asc(feedback.createdAt)))
+        .map((f) => ({ kind: f.kind, text: f.text, context: f.context, log: f.log, client: f.client, hasScreenshot: f.storageKey !== null, createdAt: f.createdAt.toISOString() })),
       retention: await this.collectRetention(userId),
     }
   }
