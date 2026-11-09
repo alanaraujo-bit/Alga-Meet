@@ -7,6 +7,8 @@
   `admin`) para escrever, traduzir, pré-visualizar e publicar. Como publicar: `docs/releases.md`.
 - **Servidor:** tabelas `release_notes`/`release_reactions` (migrações 0017–0018; 0018 grava o histórico 0.1.3–0.1.14 e
   a 0.1.15 já publicada), rotas `/releases*` e `/admin/releases*`.
+- **No ar (2026-11-09):** API no Railway (migrações 0017–0018 aplicadas, `/releases` respondendo) e release
+  https://github.com/alanaraujo-bit/Alga-Meet/releases/tag/v0.1.15 (build de `7c699d2`, não assinado).
 - **Desktop 0.1.15:** `features/whatsnew/`; `updates.status()` no bridge; a versão vem do `downloading`.
 - **Testes:** shared 51, servidor 314 (+ releases em PostgreSQL real), desktop 789, typecheck de tudo, e2e no app real
   21/21 (`apps/desktop/scripts/whatsnew-e2e.mjs`, capturas em `docs/screenshots/whatsnew/`).
