@@ -1,4 +1,4 @@
-import { CornerDownLeft, Hash, Headphones, HeadphoneOff, Mic, MicOff, MonitorOff, MonitorUp, Phone, PhoneOff, Search, Settings2, Volume2 } from '@/ui/icons'
+import { Megaphone, CornerDownLeft, Hash, Headphones, HeadphoneOff, Mic, MicOff, MonitorOff, MonitorUp, Phone, PhoneOff, Search, Settings2, Volume2 } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -14,6 +14,8 @@ import { EASE_IN, EASE_OUT_QUART } from '@/ui/motion'
 import { toastError } from '../auth/VerifyEmail'
 import { loadBindings } from '../settings/hotkeys'
 import { openSettings } from '../settings/store'
+import { openFeedback } from '../feedback/store'
+import { t as feedbackT } from '../feedback/strings'
 import { inVoice, joinVoice, leaveVoice, openCall, useVoice } from '../voice/voice'
 import s from './switcher.module.css'
 
@@ -107,6 +109,7 @@ function collectActions(d: DataState): Item[] {
   }
   items.push(action('settings', t.act.settings, <Icon icon={Settings2} size={16} />, () => openSettings('account'), { kbd: 'Ctrl ,', keywords: 'preferências configurar opções' }))
   items.push(action('voice-settings', t.act.voiceSettings, <Icon icon={Settings2} size={16} />, () => openSettings('voice'), { keywords: 'microfone dispositivos fone câmera' }))
+  items.push(action('feedback', feedbackT.entry.action, <Icon icon={Megaphone} size={16} />, () => openFeedback(), { keywords: feedbackT.entry.keywords }))
   return items
 }
 

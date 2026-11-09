@@ -1,0 +1,521 @@
+/*
+ * "Conta pro Eco" (docs/feedback.md): a small, non-modal card over the user panel. More alive than the rest of the app
+ * on purpose (the owner asked for it), inside two rules: only transform/opacity/color move, and everything stops
+ * under reduced motion (base.css zeroes the durations; the states stay visible).
+ */
+
+/* The kind's color, registered so the light, the focus ring and the dots cross-fade when the kind changes. */
+@property --fb-tone {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #8b8ef7;
+}
+
+.card {
+  position: fixed;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  width: 400px;
+  max-width: calc(100vw - 16px);
+  min-height: 428px;
+  max-height: calc(100vh - var(--titlebar-h) - 84px);
+  border-radius: var(--r-xl);
+  background: var(--bg-modal);
+  box-shadow: var(--elev-modal);
+  overflow: hidden;
+  transform-origin: 24px 100%;
+  transition: --fb-tone 450ms var(--ease-out-quad);
+}
+.card[data-dropping] {
+  box-shadow: var(--elev-modal), inset 0 0 0 2px var(--fb-tone);
+}
+
+/* One wide, soft pool of light in the kind's color, behind the Eco (same idea as the room light of the call stage). */
+.light {
+  position: absolute;
+  left: 50%;
+  top: -70px;
+  width: 420px;
+  height: 280px;
+  margin-left: -210px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--fb-tone) 24%, transparent), color-mix(in srgb, var(--fb-tone) 8%, transparent) 55%, transparent);
+  pointer-events: none;
+  animation: lightIn 500ms var(--ease-out-quad) 120ms both, breathe 5.2s ease-in-out 620ms infinite;
+}
+@keyframes lightIn {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes breathe {
+  50% {
+    opacity: 0.72;
+    transform: scale(1.06);
+  }
+}
+
+.top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: 40px;
+  padding: 0 var(--s-2);
+  flex-shrink: 0;
+}
+.topTitle {
+  margin: 0;
+  font: var(--type-ui-lg);
+  letter-spacing: var(--track-ui-lg);
+  color: var(--text-primary);
+}
+.grow {
+  flex: 1;
+}
+
+/* The Eco: in on a small hop a beat after the card; on "sent" it steps to the middle and grows. */
+.eco {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  height: 86px;
+  margin-top: -20px;
+  flex-shrink: 0;
+  pointer-events: none;
+  transition: transform 520ms cubic-bezier(0.3, 1.5, 0.5, 1);
+  animation: ecoIn 320ms cubic-bezier(0.3, 1.5, 0.5, 1) 80ms backwards;
+}
+@keyframes ecoIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.86);
+  }
+}
+.card[data-pane='sent'] .eco {
+  transform: translateY(34px) scale(1.25);
+}
+/* The Eco's outline and antennae are attributes in its drawing: let them cross-fade with the kind too. */
+.eco :global([data-part='body']),
+.eco :global([data-part='edge']) {
+  transition: stroke 450ms var(--ease-out-quad);
+}
+.eco :global([data-part='ant']) {
+  transition: fill 450ms var(--ease-out-quad), transform 260ms cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+.pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0 var(--s-5) var(--s-4);
+  overflow-y: auto;
+  animation: paneIn 220ms var(--ease-out-quart) both;
+}
+@keyframes paneIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.ask {
+  margin: var(--s-2) 0 var(--s-3);
+  font: var(--type-title-sm);
+  font-variation-settings: var(--opsz-display);
+  letter-spacing: var(--track-title);
+  color: var(--text-primary);
+  text-align: center;
+  animation: askIn 220ms var(--ease-out-quart) both;
+}
+@keyframes askIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.kinds {
+  display: flex;
+  justify-content: center;
+  gap: var(--s-1_5);
+  margin-bottom: var(--s-3);
+}
+.kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 var(--s-3);
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-ui);
+  transition: color var(--dur-base) var(--ease-out-quad), background-color var(--dur-base) var(--ease-out-quad),
+    box-shadow var(--dur-base) var(--ease-out-quad), transform var(--dur-base) var(--ease-out-quart);
+}
+.kind:hover {
+  color: var(--text-primary);
+}
+.kind:active {
+  transform: scale(0.96);
+}
+.kind[aria-checked='true'] {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--k) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k) 60%, transparent);
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--k);
+  flex-shrink: 0;
+}
+
+.field {
+  position: relative;
+  display: flex;
+}
+.text {
+  width: 100%;
+  height: 84px;
+  padding: 10px var(--s-3);
+  border: 0;
+  border-radius: var(--r-md);
+  outline: none;
+  resize: none;
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  color: var(--text-primary);
+  font: var(--type-ui-lg);
+  font-weight: var(--w-regular);
+  letter-spacing: var(--track-ui-lg);
+  transition: box-shadow var(--dur-base) var(--ease-out-quad);
+}
+.text::placeholder {
+  color: var(--text-tertiary);
+}
+.text:focus,
+.text:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fb-tone) 75%, transparent), 0 0 0 3px color-mix(in srgb, var(--fb-tone) 16%, transparent);
+}
+.shake {
+  animation: shake 300ms var(--ease-out-quad);
+}
+@keyframes shake {
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+.count {
+  position: absolute;
+  right: var(--s-2);
+  bottom: var(--s-1_5);
+  font: var(--type-meta);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+}
+.countOut {
+  color: var(--danger);
+}
+
+.shot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: 28px;
+  margin-top: var(--s-2);
+  margin-left: calc(var(--s-2) * -1);
+}
+.shot:has(.thumb) {
+  margin-left: 0;
+}
+.thumb {
+  position: relative;
+  width: 104px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--border-strong);
+  animation: land 420ms cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+.thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.thumbX {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  border-radius: var(--r-sm);
+  background: rgba(11, 11, 12, 0.72);
+}
+@keyframes land {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(1.12) rotate(-3deg);
+  }
+}
+.note {
+  margin: 0;
+  font: var(--type-meta);
+  color: var(--text-tertiary);
+}
+.error {
+  margin: var(--s-2) 0 0;
+  font: var(--type-meta);
+  color: var(--danger);
+}
+
+.goes {
+  margin-top: var(--s-3);
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--border-subtle);
+  font: var(--type-meta);
+  color: var(--text-tertiary);
+}
+.goesLine {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-1_5);
+}
+.goesWhat {
+  flex: 1;
+  min-width: 0;
+}
+.goesWhat b {
+  color: var(--text-secondary);
+  font-weight: var(--w-medium);
+}
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: var(--type-meta);
+  color: var(--text-tertiary);
+  border-radius: var(--r-xs);
+  transition: color var(--dur-fast) var(--ease-out-quad);
+}
+.link:hover {
+  color: var(--text-primary);
+}
+.goesLine .link {
+  color: var(--accent);
+}
+.goesLine .link:hover {
+  color: var(--accent-hover);
+}
+.detail {
+  display: grid;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  animation: paneIn 180ms var(--ease-out-quart) both;
+}
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--s-3);
+  margin: 0;
+}
+.facts dd {
+  margin: 0;
+  color: var(--text-secondary);
+  text-align: right;
+}
+.logRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--border-subtle);
+}
+.logRow > span {
+  display: grid;
+}
+.logTitle {
+  color: var(--text-secondary);
+}
+.log {
+  max-height: 112px;
+  margin: 0;
+  padding: var(--s-2);
+  overflow: auto;
+  border-radius: var(--r-sm);
+  background: var(--bg-app);
+  color: var(--text-tertiary);
+  font: 11px/16px var(--font-mono);
+  white-space: pre;
+  user-select: text;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-top: auto;
+  padding-top: var(--s-3);
+}
+
+/* Sent: the Eco stepped to the middle (see .eco), so the words start below it. */
+.sent {
+  align-items: center;
+  padding-top: 64px;
+  text-align: center;
+  animation-delay: 180ms;
+}
+.sentTitle {
+  margin: 0 0 var(--s-1);
+  font: var(--type-title-sm);
+  font-variation-settings: var(--opsz-display);
+  letter-spacing: var(--track-title);
+  color: var(--text-primary);
+}
+.sentBody {
+  margin: 0 0 var(--s-4);
+  font: var(--type-ui);
+  color: var(--text-tertiary);
+}
+.sentFoot {
+  display: flex;
+  gap: var(--s-2);
+  margin-top: auto;
+  padding-top: var(--s-4);
+}
+/* Six fronds of the logo fan out from the Eco and fade: around it, never part of its drawing. */
+.leaves {
+  position: absolute;
+  left: 50%;
+  top: 112px;
+  pointer-events: none;
+}
+.leaf {
+  position: absolute;
+  width: 10px;
+  height: 16px;
+  margin: -8px 0 0 -5px;
+  border-radius: 0 100% 0 100%;
+  background: var(--fb-tone);
+  opacity: 0;
+  animation: burst 900ms var(--ease-out-quart) 160ms both;
+}
+@keyframes burst {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--r)) translateY(-20px) scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--r)) translateY(-130px) scale(1.1);
+  }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1_5);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--s-2) 10px;
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  text-align: left;
+}
+.rowText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--type-ui);
+  letter-spacing: var(--track-ui);
+  color: var(--text-primary);
+}
+.rowMeta {
+  font: var(--type-meta);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.tag {
+  padding: 2px var(--s-2);
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  font: var(--type-badge);
+  white-space: nowrap;
+}
+.center {
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  text-align: center;
+}
+
+.dropHint {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 16, 17, 0.86);
+  color: var(--text-primary);
+  font: var(--type-ui-lg);
+  pointer-events: none;
+}
+
+/* "Travei da última vez…": the only time the feedback offers itself. Same corner, smaller, no focus steal. */
+.offer {
+  position: fixed;
+  z-index: var(--z-popover);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 340px;
+  max-width: calc(100vw - 16px);
+  padding: var(--s-3) var(--s-3) var(--s-3) var(--s-2);
+  border-radius: var(--r-lg);
+  background: var(--bg-overlay);
+  box-shadow: var(--elev-overlay);
+  transform-origin: 24px 100%;
+}
+.offerBody {
+  display: grid;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.offerText {
+  margin: 0;
+  font: var(--type-ui);
+  letter-spacing: var(--track-ui);
+  color: var(--text-primary);
+}
+.offerActions {
+  display: flex;
+  gap: var(--s-2);
+}

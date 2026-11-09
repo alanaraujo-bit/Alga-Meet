@@ -1,5 +1,5 @@
 import type { StatusPreference } from '@alga/shared'
-import { Check, Copy, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Settings, Smile } from '@/ui/icons'
+import { Check, Copy, Headphones, HeadphoneOff, LogOut, Megaphone, Mic, MicOff, Settings, Smile } from '@/ui/icons'
 import { useRef, useState } from 'react'
 import { media, useMedia } from '@/media'
 import { setStatus } from '@/store/actions'
@@ -8,6 +8,8 @@ import { presenceOf } from '@/store/selectors'
 import { useSession } from '@/store/session'
 import { Divider, Icon, IconButton, Popover, PresenceGlyph, toast } from '@/ui'
 import { openSettings } from '../settings/store'
+import { openFeedback } from '../feedback/store'
+import { t as feedbackT } from '../feedback/strings'
 import { DecoratedAvatar, ProfileCard } from '../billing/Cosmetics'
 import { useLook } from '../billing/store'
 import { VoicePanel } from '../voice/VoicePanel'
@@ -23,7 +25,7 @@ import s from './shell.module.css'
 
 export function UserPanel() {
   return (
-    <div className={s.dock}>
+    <div className={s.dock} data-user-dock>
       <VoicePanel />
       <UserRow />
       <StatusEditorHost />
@@ -144,6 +146,19 @@ function UserRow() {
               <Icon icon={Copy} size={14} />
             </span>
             {t.userPanel.copyUsername}
+          </button>
+          <button
+            type="button"
+            className={s.statusItem}
+            onClick={() => {
+              setAnchor(null)
+              openFeedback()
+            }}
+          >
+            <span className={s.statusDot} style={{ marginTop: 2 }}>
+              <Icon icon={Megaphone} size={14} />
+            </span>
+            {feedbackT.entry.action}
           </button>
           <button
             type="button"

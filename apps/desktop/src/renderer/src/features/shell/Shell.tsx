@@ -31,6 +31,8 @@ import { ScreenPicker } from '../voice/ScreenPicker'
 import { startVoiceSync } from '../voice/voice'
 import { Center as WhatsNewCenter } from '../whatsnew/Center'
 import { startWhatsNew } from '../whatsnew/store'
+import { FeedbackHost } from '../feedback/Host'
+import { resetFeedback } from '../feedback/store'
 import { Welcome } from '../whatsnew/Welcome'
 import { MemberList } from './MemberList'
 import { Sidebar } from './Sidebar'
@@ -69,6 +71,8 @@ export function Shell() {
   useDeletionCanceledNotice()
   // Signing out closes the panel, so the next account never starts with it open.
   useEffect(() => closeStaff, [])
+  // Signing out leaves nothing of this account's feedback in memory (the draft on disk is per account).
+  useEffect(() => resetFeedback, [])
   const staffPanel = useLatch(useStaff((st) => st.open))
   const idle = useIdle()
   const settingsOpen = useSettings((st) => st.section !== null)
@@ -116,6 +120,7 @@ export function Shell() {
       </Suspense>
       <WhatsNewCenter />
       <Welcome />
+      <FeedbackHost />
       <VerifyEmailDialog />
       <BillingHost />
       <ReportHost />

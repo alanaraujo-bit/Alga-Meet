@@ -66,8 +66,9 @@ export function currentMoment(): Moment {
   return {
     inCall: conn === 'connecting' || conn === 'connected' || conn === 'reconnecting',
     gaming: useMyActivity.getState().detected?.kind === 'game',
-    // Any dialog (settings, checkout, a confirmation, the staff panel), an open menu or the switcher.
-    overlay: !!document.querySelector('[role="dialog"][aria-modal="true"], [role="menu"]') || useUi.getState().switcherOpen || useUi.getState().modal !== null,
+    // Any dialog (settings, checkout, a confirmation, the staff panel), an open menu, the switcher, or the
+    // feedback card (not modal, but someone is writing in it).
+    overlay: !!document.querySelector('[role="dialog"][aria-modal="true"], [role="menu"], [data-feedback]') || useUi.getState().switcherOpen || useUi.getState().modal !== null,
     attentive: document.visibilityState === 'visible' && document.hasFocus(),
   }
 }

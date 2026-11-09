@@ -166,4 +166,6 @@ export {
   TrendUp,
   ArrowCircleUp,
   ClockCounterClockwise as History,
+  Megaphone,
+  Camera,
 } from '@phosphor-icons/react'

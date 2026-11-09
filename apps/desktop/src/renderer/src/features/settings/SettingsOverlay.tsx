@@ -20,6 +20,8 @@ import { PlanSection, StreamPlanGroup } from '../billing/Plan'
 import { ShopSection } from '../billing/Shop'
 import { PrivacySection } from '../trust/Privacy'
 import { ActivitySettings } from '../activity/ActivitySettings'
+import { openFeedback } from '../feedback/store'
+import { t as feedbackT } from '../feedback/strings'
 import { openCenter } from '../whatsnew/store'
 import { EcoEditor } from './EcoEditor'
 import { Group, Row, SettingsFrame } from './Frame'
@@ -738,6 +740,16 @@ function Advanced() {
           }}
         >
           {t.advanced.openWhatsNew}
+        </Button>
+      </Row>
+      <Row label={feedbackT.entry.row} hint={feedbackT.entry.rowHint}>
+        <Button
+          onClick={() => {
+            closeSettings()
+            openFeedback()
+          }}
+        >
+          {feedbackT.entry.action}
         </Button>
       </Row>
       <Row label={t.advanced.logs} hint={t.advanced.logsHint}>
