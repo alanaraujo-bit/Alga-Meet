@@ -168,8 +168,7 @@ ana.token = (await ok(null, 'POST', '/auth/login', { login: ana.username, passwo
 const space = await ok(ana.token, 'POST', '/spaces', { name: 'Turma da Ana' })
 const voice = space.channels.find((c) => c.type === 'voice')
 
-// The seeded 0.1.15 draft goes live (what the team does at release); 0.1.16 exists for the update notice only.
-await ok(admin.token, 'POST', `/admin/releases/${VERSION}/publish`)
+// 0.1.15 ships published by the migration; 0.1.16 exists for the update notice only.
 const upcoming = {
   items: [
     { id: 'cinema-4k', category: 'new', highlight: true, media: null },

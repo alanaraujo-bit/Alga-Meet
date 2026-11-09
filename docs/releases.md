@@ -67,5 +67,5 @@ Contrato e validação: `packages/shared/src/releases.ts` (`ReleaseContent`). Ed
 ## Deploy
 
 A migração `0017_release_notes` cria as tabelas e a `0018_release_history` grava o histórico 0.1.3–0.1.14 (publicado,
-reescrito a partir dos GitHub Releases, com capturas reais do app) e a nota da 0.1.15 como **rascunho**. Suba a API
+reescrito a partir dos GitHub Releases, com capturas reais do app) e a nota da 0.1.15 já publicada. Suba a API
 antes de distribuir o desktop 0.1.15; um app novo contra uma API antiga só não mostra novidades (o 404 é silencioso).

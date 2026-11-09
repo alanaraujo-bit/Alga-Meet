@@ -32,11 +32,11 @@ const note = (title = 'Tudo novo'): Content => ({
 })
 
 describe('history seeded by the migration', () => {
-  it('every seeded note is valid content, published up to 0.1.14 and a draft for 0.1.15', async () => {
+  it('every seeded note is valid content and published, up to 0.1.15', async () => {
     const rows = await s.app.ctx.db.select().from(releaseNotes)
     expect(rows.length).toBeGreaterThanOrEqual(13)
     for (const r of rows) expect(ReleaseContent.safeParse(r.content).success, r.version).toBe(true)
-    expect(rows.find((r) => r.version === '0.1.15')?.status).toBe('draft')
+    expect(rows.find((r) => r.version === '0.1.15')?.status).toBe('published')
     expect(rows.filter((r) => r.status === 'published').every((r) => r.publishedAt)).toBe(true)
   })
 
@@ -45,8 +45,8 @@ describe('history seeded by the migration', () => {
     expect(res.status).toBe(200)
     expect(res.body.map((n) => n.version)).toEqual(['0.1.10', '0.1.9', '0.1.8', '0.1.7', '0.1.6', '0.1.5', '0.1.4', '0.1.3'])
     const all = await api<ReleaseNote[]>(s.app, 'GET', '/releases?upTo=0.1.15', { token: alice.token })
-    expect(all.body[0]!.version).toBe('0.1.14') // 0.1.15 is still a draft
-    expect((await api(s.app, 'GET', '/releases/0.1.15', { token: alice.token })).status).toBe(404)
+    expect(all.body[0]!.version).toBe('0.1.15')
+    expect((await api(s.app, 'GET', '/releases/0.1.15', { token: alice.token })).status).toBe(200)
     expect((await api(s.app, 'GET', '/releases?upTo=latest', { token: alice.token })).status).toBe(400)
     expect((await api(s.app, 'GET', '/releases?upTo=0.1.10')).status).toBe(401)
   })
@@ -59,6 +59,8 @@ describe('the studio (admin)', () => {
     const list = await api<AdminReleaseNote[]>(s.app, 'GET', '/admin/releases', { token: admin })
     expect(list.status).toBe(200)
     expect(list.body[0]!.version).toBe('0.1.15')
+    // A draft for a later version, for the visibility checks below.
+    expect((await api(s.app, 'POST', '/admin/releases', { token: admin, body: { version: '0.1.16', content: note('Rascunho') } })).status).toBe(201)
     // The status is written in onResponse, after the reply: wait for it.
     let logged = false
     for (let i = 0; i < 50 && !logged; i++) {
@@ -76,7 +78,7 @@ describe('the studio (admin)', () => {
     expect((await api(s.app, 'POST', '/admin/releases', { token: admin, body: { version: '9.0.1', content: { ...note(), items: [] } } })).status).toBe(400)
 
     // A draft is invisible, even to someone already on that version.
-    expect((await api<ReleaseNote[]>(s.app, 'GET', '/releases?upTo=9.0.0', { token: alice.token })).body[0]!.version).toBe('0.1.14')
+    expect((await api<ReleaseNote[]>(s.app, 'GET', '/releases?upTo=9.0.0', { token: alice.token })).body[0]!.version).toBe('0.1.15')
 
     const edited = await api<AdminReleaseNote>(s.app, 'PUT', '/admin/releases/9.0.0', { token: admin, body: { content: note('Palco novo'), revision: 1 } })
     expect(edited.body).toMatchObject({ revision: 2 })
@@ -126,7 +128,7 @@ describe('reactions', () => {
   it('refuses unknown items, drafts, odd values', async () => {
     const put = (path: string, value: unknown) => api(s.app, 'PUT', path, { token: alice.token, body: { value } })
     expect((await put('/releases/9.0.0/reactions/nada', 1)).status).toBe(404)
-    expect((await put('/releases/0.1.15/reactions/novidades', 1)).status).toBe(404) // draft
+    expect((await put('/releases/0.1.16/reactions/palco', 1)).status).toBe(404) // draft
     expect((await put('/releases/9.0.0/reactions/palco', 2)).status).toBe(400)
     expect((await put('/releases/x/reactions/palco', 1)).status).toBe(400)
   })

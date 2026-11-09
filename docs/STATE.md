@@ -1,14 +1,13 @@
 # Alga Meet — Estado do projeto
 
-## 2026-11-08 noite — Novidades (patch notes e "O que há de novo") — no `main`, NÃO publicado
+## 2026-11-08 noite — Novidades (patch notes e "O que há de novo") — desktop 0.1.15
 - **O que é:** boas-vindas depois de atualizar ("O Alga Meet ficou ainda melhor", com o Eco), Central de Novidades
   permanente (ícone de brilho na barra da esquerda; Configurações › Avançado), pílula "Atualização pronta" na barra de
   título (sem reiniciar no meio de chamada), 👍/👎 por item com totais para a equipe, e o estúdio da equipe (staff
   `admin`) para escrever, traduzir, pré-visualizar e publicar. Como publicar: `docs/releases.md`.
 - **Servidor:** tabelas `release_notes`/`release_reactions` (migrações 0017–0018; 0018 grava o histórico 0.1.3–0.1.14 e
-  a 0.1.15 como rascunho), rotas `/releases*` e `/admin/releases*`. **Falta subir no staging** antes do desktop 0.1.15.
-- **Desktop:** `features/whatsnew/`; `updates.status()` no bridge; a versão vem do `downloading`. Ainda na 0.1.14
-  (não versionado nem empacotado).
+  a 0.1.15 já publicada), rotas `/releases*` e `/admin/releases*`.
+- **Desktop 0.1.15:** `features/whatsnew/`; `updates.status()` no bridge; a versão vem do `downloading`.
 - **Testes:** shared 51, servidor 314 (+ releases em PostgreSQL real), desktop 789, typecheck de tudo, e2e no app real
   21/21 (`apps/desktop/scripts/whatsnew-e2e.mjs`, capturas em `docs/screenshots/whatsnew/`).
 
