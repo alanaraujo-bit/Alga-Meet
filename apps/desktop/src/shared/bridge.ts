@@ -58,7 +58,7 @@ export type UpdateStatus =
   | { state: 'idle' }
   | { state: 'checking' }
   | { state: 'available'; version: string }
-  | { state: 'downloading'; percent: number }
+  | { state: 'downloading'; percent: number; version: string | null }
   | { state: 'ready'; version: string }
   | { state: 'none' }
   | { state: 'error'; message: string }
@@ -211,6 +211,8 @@ export interface AlgaBridge {
 
   updates: {
     check(): Promise<UpdateStatus>
+    /** The current status, without starting a check. */
+    status(): Promise<UpdateStatus>
     onStatus(cb: (s: UpdateStatus) => void): Unsubscribe
     /** Quit and install a downloaded update. */
     install(): void

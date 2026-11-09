@@ -1,4 +1,4 @@
-import { ACCOUNT_ACTION_REASONS, REPORT_REASONS, type EcoSpec, type EquippedCosmetics } from '@alga/shared'
+import { ACCOUNT_ACTION_REASONS, REPORT_REASONS, type EcoSpec, type EquippedCosmetics, type ReleaseContent } from '@alga/shared'
 import { sql } from 'drizzle-orm'
 import {
   type AnyPgColumn, boolean, date, foreignKey, index, integer, jsonb, pgTable, primaryKey, real, text, timestamp, uniqueIndex, uuid,
@@ -830,3 +830,29 @@ export const uninstallFeedback = pgTable('uninstall_feedback', {
   appVersion: text('app_version'),
   createdAt: ts('created_at').notNull().defaultNow(),
 })
+
+// ---- Novidades (release notes; packages/shared/src/releases.ts) -----------------------------------------------------
+
+/** One note per app version. Only `published` ones reach people, and the client never shows a version above its own. */
+export const releaseNotes = pgTable('release_notes', {
+  version: text('version').primaryKey(),
+  status: text('status', { enum: ['draft', 'published'] }).notNull().default('draft'),
+  content: jsonb('content').$type<ReleaseContent>().notNull(),
+  revision: integer('revision').notNull().default(1),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+  /** Staff account of the last save (null after that account is deleted). */
+  updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  /** First publication; kept when unpublished and published again. */
+  publishedAt: ts('published_at'),
+})
+export type ReleaseNoteRow = typeof releaseNotes.$inferSelect
+
+/** 👍/👎 per person per item: the primary key is what makes a second vote an edit, never a duplicate. */
+export const releaseReactions = pgTable('release_reactions', {
+  version: text('version').notNull().references(() => releaseNotes.version, { onDelete: 'cascade', onUpdate: 'cascade' }),
+  itemId: text('item_id').notNull(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  value: integer('value').notNull(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.version, t.itemId, t.userId] }), index('release_reactions_user_idx').on(t.userId)])

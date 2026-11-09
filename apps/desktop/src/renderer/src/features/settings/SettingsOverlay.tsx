@@ -20,6 +20,7 @@ import { PlanSection, StreamPlanGroup } from '../billing/Plan'
 import { ShopSection } from '../billing/Shop'
 import { PrivacySection } from '../trust/Privacy'
 import { ActivitySettings } from '../activity/ActivitySettings'
+import { openCenter } from '../whatsnew/store'
 import { EcoEditor } from './EcoEditor'
 import { Group, Row, SettingsFrame } from './Frame'
 import { HOTKEY_ACTIONS, loadBindings, saveBindings, type SavedBinding } from './hotkeys'
@@ -728,6 +729,16 @@ function Advanced() {
             {t.advanced.check}
           </Button>
         )}
+      </Row>
+      <Row label={t.advanced.whatsNew} hint={t.advanced.whatsNewHint}>
+        <Button
+          onClick={() => {
+            closeSettings()
+            openCenter()
+          }}
+        >
+          {t.advanced.openWhatsNew}
+        </Button>
       </Row>
       <Row label={t.advanced.logs} hint={t.advanced.logsHint}>
         <Button icon={Monitor} disabled={!window.alga?.app} onClick={() => void window.alga.app.openLogs()}>

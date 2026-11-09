@@ -13,6 +13,8 @@ let status: UpdateStatus = app.isPackaged
   ? { state: 'idle' }
   : { state: 'disabled', reason: 'Atualizações automáticas só funcionam na versão instalada.' }
 let updater: typeof import('electron-updater').autoUpdater | null = null
+/** The version being downloaded (download-progress events do not carry it). */
+let incoming: string | null = null
 
 function set(s: UpdateStatus): void {
   status = s
@@ -42,6 +44,7 @@ export async function checkForUpdates(): Promise<UpdateStatus> {
 
 export function initUpdater(): void {
   handle(IPC.updatesCheck, () => checkForUpdates())
+  handle(IPC.updatesGet, () => status)
   on(IPC.updatesInstall, () => {
     if (!updater || status.state !== 'ready') return
     log.info('installing update', status.version)
@@ -68,9 +71,12 @@ export function initUpdater(): void {
   updater.allowDowngrade = false
   updater.disableWebInstaller = true // we ship the full NSIS installer, never the web installer
   updater.on('checking-for-update', () => set({ state: 'checking' }))
-  updater.on('update-available', (i) => set({ state: 'available', version: i.version }))
+  updater.on('update-available', (i) => {
+    incoming = i.version
+    set({ state: 'available', version: i.version })
+  })
   updater.on('update-not-available', () => set({ state: 'none' }))
-  updater.on('download-progress', (p) => set({ state: 'downloading', percent: Math.round(p.percent) }))
+  updater.on('download-progress', (p) => set({ state: 'downloading', percent: Math.round(p.percent), version: incoming }))
   updater.on('update-downloaded', (i) => set({ state: 'ready', version: i.version }))
   updater.on('error', (err) => {
     log.warn('updater error:', firstLine(err))

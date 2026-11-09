@@ -1,0 +1,132 @@
+{
+  "at": "2026-11-09T00:35:55.436Z",
+  "version": "0.1.15",
+  "results": [
+    {
+      "name": "Conta nova: nenhuma boas-vindas no primeiro dia, e nada marcado como novo",
+      "pass": true,
+      "ms": 9050,
+      "detail": null
+    },
+    {
+      "name": "Quem pulou versões (estava na 0.1.11) vê as quatro mais novas juntas, em destaques",
+      "pass": true,
+      "ms": 6913,
+      "detail": "5 destaques; ↓↓ → \"Campos que parecem do app\""
+    },
+    {
+      "name": "A mídia real carrega só quando aparece (perfil da 0.1.12)",
+      "pass": true,
+      "ms": 1146,
+      "detail": null
+    },
+    {
+      "name": "\"Entendi\" marca como visto e não volta depois de reiniciar",
+      "pass": true,
+      "ms": 13531,
+      "detail": null
+    },
+    {
+      "name": "\"Lembrar depois\" adia (um dia) e o ponto de novidade fica na barra",
+      "pass": true,
+      "ms": 19335,
+      "detail": null
+    },
+    {
+      "name": "Nunca por cima de outra janela: espera as Configurações fecharem",
+      "pass": true,
+      "ms": 18452,
+      "detail": null
+    },
+    {
+      "name": "Com a janela sem foco (jogo em tela cheia, outro app) não aparece; volta quando a pessoa volta",
+      "pass": true,
+      "ms": 15723,
+      "detail": null
+    },
+    {
+      "name": "Durante uma chamada: nada de boas-vindas; aviso de atualização não reinicia no meio",
+      "pass": true,
+      "ms": 20928,
+      "detail": null
+    },
+    {
+      "name": "Aviso de atualização: progresso discreto e, pronta, o que vem nela",
+      "pass": true,
+      "ms": 1021,
+      "detail": null
+    },
+    {
+      "name": "Central: histórico até a versão instalada (nunca a 0.1.16), mais nova primeiro",
+      "pass": true,
+      "ms": 717,
+      "detail": "0.1.15 0.1.14 0.1.13 0.1.12 0.1.11 0.1.10 0.1.9 0.1.8 0.1.7 0.1.6 0.1.5 0.1.4 0.1.3"
+    },
+    {
+      "name": "Gostei/não gostei: um voto por pessoa, dá para trocar e desfazer; a equipe vê só o total",
+      "pass": true,
+      "ms": 495,
+      "detail": null
+    },
+    {
+      "name": "Navegação por teclado entre versões e mídia real na 0.1.12",
+      "pass": true,
+      "ms": 623,
+      "detail": null
+    },
+    {
+      "name": "Mídia fora do ar não deixa buraco",
+      "pass": true,
+      "ms": 4600,
+      "detail": null
+    },
+    {
+      "name": "Vídeo: toca mudo só na tela; com movimento reduzido, quadro parado e botão de play",
+      "pass": true,
+      "ms": 9381,
+      "detail": "raw.githubusercontent (octet-stream) toca"
+    },
+    {
+      "name": "Servidor de novidades fora: a central abre com a cópia guardada",
+      "pass": true,
+      "ms": 4318,
+      "detail": "13 versões do cache"
+    },
+    {
+      "name": "Sem cópia e sem servidor: diz \"Sem conexão\" e se recupera sozinho",
+      "pass": true,
+      "ms": 30654,
+      "detail": null
+    },
+    {
+      "name": "Tela estreita: central e boas-vindas continuam legíveis",
+      "pass": true,
+      "ms": 1083,
+      "detail": null
+    },
+    {
+      "name": "Estúdio (só admin): editar, salvar com Ctrl+S e a central mostra a correção",
+      "pass": true,
+      "ms": 1138,
+      "detail": null
+    },
+    {
+      "name": "Estúdio: pré-visualizar as boas-vindas de um rascunho sem marcar nada como visto",
+      "pass": true,
+      "ms": 848,
+      "detail": null
+    },
+    {
+      "name": "Estúdio: nova nota nasce rascunho (invisível) e publicar a deixa visível",
+      "pass": true,
+      "ms": 955,
+      "detail": null
+    },
+    {
+      "name": "Pessoas sem papel de admin não abrem o estúdio nem a API",
+      "pass": true,
+      "ms": 12,
+      "detail": null
+    }
+  ]
+}

@@ -29,6 +29,9 @@ import { CinemaHost } from '../cinema/room/CinemaHost'
 import { VoiceAnnouncer } from '../voice/VoiceAnnouncer'
 import { ScreenPicker } from '../voice/ScreenPicker'
 import { startVoiceSync } from '../voice/voice'
+import { Center as WhatsNewCenter } from '../whatsnew/Center'
+import { startWhatsNew } from '../whatsnew/store'
+import { Welcome } from '../whatsnew/Welcome'
 import { MemberList } from './MemberList'
 import { Sidebar } from './Sidebar'
 import { SpaceRail } from './SpaceRail'
@@ -61,6 +64,7 @@ export function Shell() {
   useEffect(() => startVoiceSync(), [])
   useEffect(() => startNotifications(), [])
   useEffect(() => startBilling(), [])
+  useEffect(() => startWhatsNew(), [])
   useInviteLink()
   useDeletionCanceledNotice()
   // Signing out closes the panel, so the next account never starts with it open.
@@ -110,6 +114,8 @@ export function Shell() {
         {spaceSettings && <SpaceSettingsOverlay />}
         {staffPanel && <StaffPanel />}
       </Suspense>
+      <WhatsNewCenter />
+      <Welcome />
       <VerifyEmailDialog />
       <BillingHost />
       <ReportHost />

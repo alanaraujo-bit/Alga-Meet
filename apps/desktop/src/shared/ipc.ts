@@ -37,6 +37,7 @@ export const IPC = {
   powerResume: 'alga:power:resume', // event
 
   updatesCheck: 'alga:updates:check', // invoke
+  updatesGet: 'alga:updates:get', // invoke
   updatesStatus: 'alga:updates:status', // event
   updatesInstall: 'alga:updates:install', // send
 

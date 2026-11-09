@@ -32,6 +32,7 @@ import { filePublicRoutes, fileRoutes } from './routes/files.js'
 import { messageRoutes } from './routes/messages.js'
 import { moderationRoutes } from './routes/moderation.js'
 import { privacyPublicRoutes, privacyRoutes } from './routes/privacy.js'
+import { releaseAdminRoutes, releaseRoutes } from './routes/releases.js'
 import { reportPublicRoutes, reportRoutes } from './routes/reports.js'
 import { roleRoutes } from './routes/roles.js'
 import { invitePublicRoutes, spaceRoutes } from './routes/spaces.js'
@@ -209,7 +210,11 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       eventRoutes(authed, ctx)
       activityRoutes(authed, ctx)
       profileRoutes(authed, ctx)
-      await authed.register(async (admin) => adminRoutes(admin, ctx))
+      releaseRoutes(authed, ctx)
+      await authed.register(async (admin) => {
+        adminRoutes(admin, ctx)
+        releaseAdminRoutes(admin, ctx)
+      })
     })
   }, { prefix: '/api/v1' })
 

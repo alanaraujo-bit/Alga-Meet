@@ -159,4 +159,11 @@ export {
   WifiSlash as WifiOff,
   Wrench,
   X,
+  Sparkle,
+  Gift,
+  ThumbsUp,
+  ThumbsDown,
+  TrendUp,
+  ArrowCircleUp,
+  ClockCounterClockwise as History,
 } from '@phosphor-icons/react'

@@ -16,7 +16,7 @@ import type { Ctx } from './app.js'
 import { revokeAllSessions, sha256Hex } from './auth.js'
 import {
   accessLogs, accountActions, activityDays, activityEmails, activitySettings, appeals, attachments, channelRecipients, channels,
-  consentRecords, dataExports, deletedAccounts, eventRsvps, events, memberRoles, messages, orders, reactions, relationships, uninstallFeedback,
+  consentRecords, dataExports, releaseReactions, deletedAccounts, eventRsvps, events, memberRoles, messages, orders, reactions, relationships, uninstallFeedback,
   reports, roles, sessions, spaceMembers, spaces, subscriptions, users, voiceNotifyPrefs, voiceSessions, voiceWeekly, weeklyRecaps,
   type DataExportRow, type UserRow,
 } from './db/schema.js'
@@ -344,6 +344,8 @@ export class Privacy {
         reportsMade: myReports.map((r) => ({ targetType: r.targetType, targetId: r.targetId, reason: r.reason, status: r.status, createdAt: r.createdAt.toISOString() })),
         falseReports: u.falseReports,
       },
+      releaseFeedback: (await db.select().from(releaseReactions).where(eq(releaseReactions.userId, userId)))
+        .map((r) => ({ version: r.version, itemId: r.itemId, value: r.value, updatedAt: r.updatedAt.toISOString() })),
       retention: await this.collectRetention(userId),
     }
   }

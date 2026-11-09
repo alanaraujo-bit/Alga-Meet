@@ -6,6 +6,7 @@ import { useUi } from '@/store/ui'
 import { useSettings } from '../settings/store'
 import { useSpaceSettings } from '../spaceSettings/store'
 import { useVoice } from '../voice/voice'
+import { UpdatePill } from '../whatsnew/UpdatePill'
 import { ConnectionChip } from './ConnectionBanner'
 import { LogoMark } from './Logo'
 import { t } from './strings'
@@ -32,6 +33,7 @@ export function TitleBar({ search }: { search?: boolean }) {
         </span>
         {t.appName}
         {profile && profile !== 'default' && <span className={s.profile}>{profile}</span>}
+        <UpdatePill />
         {live && (
           <span className={s.liveChip} role="status">
             <span className={s.liveDot} />

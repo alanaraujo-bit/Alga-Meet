@@ -1,5 +1,17 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-08 noite — Novidades (patch notes e "O que há de novo") — no `main`, NÃO publicado
+- **O que é:** boas-vindas depois de atualizar ("O Alga Meet ficou ainda melhor", com o Eco), Central de Novidades
+  permanente (ícone de brilho na barra da esquerda; Configurações › Avançado), pílula "Atualização pronta" na barra de
+  título (sem reiniciar no meio de chamada), 👍/👎 por item com totais para a equipe, e o estúdio da equipe (staff
+  `admin`) para escrever, traduzir, pré-visualizar e publicar. Como publicar: `docs/releases.md`.
+- **Servidor:** tabelas `release_notes`/`release_reactions` (migrações 0017–0018; 0018 grava o histórico 0.1.3–0.1.14 e
+  a 0.1.15 como rascunho), rotas `/releases*` e `/admin/releases*`. **Falta subir no staging** antes do desktop 0.1.15.
+- **Desktop:** `features/whatsnew/`; `updates.status()` no bridge; a versão vem do `downloading`. Ainda na 0.1.14
+  (não versionado nem empacotado).
+- **Testes:** shared 51, servidor 314 (+ releases em PostgreSQL real), desktop 789, typecheck de tudo, e2e no app real
+  21/21 (`apps/desktop/scripts/whatsnew-e2e.mjs`, capturas em `docs/screenshots/whatsnew/`).
+
 ## 2026-11-05 noite (2) — Sala de Cinema — motor (Plano 1) (branch `feat/sala-de-cinema`, NÃO mesclada)
 - **Checkout no app (desktop 0.1.13–0.1.14, 2026-11-08):** campos do cartão com cara do app (nome e CPF nativos, frame transparente com Inter) na 0.1.14; pagar Plus/itens/presentes/Casa sem sair do app: cartão (campos seguros do Mercado Pago num iframe isolado, `GET /billing/card-frame`) e Pix (QR + copia e cola); `POST /billing/pay`; liberação grátis do dono removida. Ver `docs/infra/staging.md` §Pagamentos.
 - **Séries no Cinema (desktop 0.1.11, 2026-11-07):** abrir um episódio monta a série (pastas de temporada, `S01E02`/`1x02`/`E02`/`Ep 02`/`01 - Título` em `Temporada N`); a ficha mostra a lista por temporada, ✓ nos assistidos (`cinema-series.json`, por hash, sem caminho) e "Continuar a série"; o próximo episódio nos créditos atravessa temporadas. `main/cinema/names.ts` `seriesOf`, `room/SeriesPanel.tsx`.

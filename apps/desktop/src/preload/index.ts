@@ -98,6 +98,7 @@ const bridge: AlgaBridge = {
 
   updates: {
     check: () => ipcRenderer.invoke(IPC.updatesCheck),
+    status: () => ipcRenderer.invoke(IPC.updatesGet),
     onStatus: (cb) => subscribe(IPC.updatesStatus, cb),
     install: () => ipcRenderer.send(IPC.updatesInstall),
   },

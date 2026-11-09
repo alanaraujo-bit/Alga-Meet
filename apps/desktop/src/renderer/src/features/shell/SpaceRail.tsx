@@ -1,4 +1,4 @@
-import { MessageCircle, Plus, ShieldCheck } from '@/ui/icons'
+import { MessageCircle, Plus, ShieldCheck, Sparkle } from '@/ui/icons'
 import { useMemo } from 'react'
 import { useMedia } from '@/media'
 import { useData } from '@/store/data'
@@ -13,6 +13,9 @@ import { spaceMenu } from '../spaces/spaceMenu'
 import { openStaff } from '../staff/store'
 import { t as tstaff } from '../staff/strings'
 import { t } from '../app/strings'
+import { unviewed } from '../whatsnew/logic'
+import { openCenter, useWhatsNew } from '../whatsnew/store'
+import { t as tnew } from '../whatsnew/strings'
 import s from './shell.module.css'
 
 export function SpaceRail() {
@@ -25,6 +28,8 @@ export function SpaceRail() {
   const home = useMemo(() => homeBadge({ channels, readStates, relationships }, (id) => isMutedIn(prefs, id)), [channels, readStates, relationships, prefs])
   const dmCall = useData((st) => Object.values(st.voiceStates).some((v) => v.spaceId === null))
   const staff = useData((st) => !!st.me?.staffRole)
+  const fresh = useWhatsNew((st) => (st.notes && st.seen ? unviewed(st.notes, st.seen).length > 0 : false))
+  const centerOpen = useWhatsNew((st) => st.center !== null)
 
   return (
     <nav className={s.rail} aria-label="Espaços">
@@ -70,6 +75,20 @@ export function SpaceRail() {
               <Icon icon={Plus} size={20} />
             </button>
           </MenuButton>
+        </div>
+        <div className={s.railItem}>
+          <Tooltip content={tnew.rail} side="right">
+            <button
+              type="button"
+              className={`${s.spaceBtn} ${s.addBtn}`}
+              aria-label={fresh ? tnew.railNew : tnew.rail}
+              aria-pressed={centerOpen}
+              onClick={() => openCenter()}
+            >
+              <Icon icon={Sparkle} size={20} filled={centerOpen} />
+              {fresh && <span className={s.railUnread} aria-hidden />}
+            </button>
+          </Tooltip>
         </div>
         {staff && (
           <div className={s.railItem}>

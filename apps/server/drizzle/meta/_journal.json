@@ -120,6 +120,20 @@
       "when": 1793891270269,
       "tag": "0016_uninstall_feedback",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794182584549,
+      "tag": "0017_release_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794182654646,
+      "tag": "0018_release_history",
+      "breakpoints": true
     }
   ]
 }

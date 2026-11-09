@@ -216,5 +216,8 @@ export const t = {
     logsHint: 'Abre a pasta de registros. Útil para relatar um problema.',
     openLogs: 'Abrir pasta',
     profile: 'Perfil de execução',
+    whatsNew: 'Novidades',
+    whatsNewHint: 'O que mudou em cada versão do Alga Meet.',
+    openWhatsNew: 'Ver novidades',
   },
 } as const
