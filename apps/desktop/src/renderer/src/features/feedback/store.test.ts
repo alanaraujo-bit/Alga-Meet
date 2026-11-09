@@ -1,5 +1,5 @@
 import type { FeedbackItem } from '@alga/shared'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const upload = vi.fn()
 const api = vi.fn()
@@ -235,5 +235,99 @@ describe('answering the offer after a crash', () => {
     expect(JSON.parse(sentForm().get('context') as string).crash).toBe('renderer')
     expect(sentForm().get('log')).toBe('old session\n')
     expect(useFeedback.getState().crash).toBeNull()
+  })
+})
+
+describe('the offer after a crash', () => {
+  const crash = { kind: 'unresponsive', at: 1, version: '0.1.15' } as const
+  const TICK = 2500
+  let stop: () => void = () => {}
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => {
+    stop()
+    vi.useRealTimers()
+  })
+  const start = async () => {
+    stop = f.startFeedback()
+    await vi.advanceTimersByTimeAsync(0)
+  }
+
+  it('appears after two quiet checks in a row, once', async () => {
+    bridge.takeCrash.mockResolvedValueOnce(crash)
+    await start()
+    await vi.advanceTimersByTimeAsync(TICK)
+    expect(useFeedback.getState().offer).toBeNull()
+    await vi.advanceTimersByTimeAsync(TICK)
+    expect(useFeedback.getState().offer).toEqual(crash)
+    f.answerOffer(false)
+    await vi.advanceTimersByTimeAsync(TICK * 4)
+    expect(useFeedback.getState().offer).toBeNull()
+  })
+
+  it('waits for the call to end and for the welcome to close', async () => {
+    bridge.takeCrash.mockResolvedValueOnce(crash)
+    moment.inCall = true
+    await start()
+    await vi.advanceTimersByTimeAsync(TICK * 4)
+    expect(useFeedback.getState().offer).toBeNull()
+    moment.inCall = false
+    whatsNew.welcome = {}
+    await vi.advanceTimersByTimeAsync(TICK * 4)
+    expect(useFeedback.getState().offer).toBeNull()
+    whatsNew.welcome = null
+    await vi.advanceTimersByTimeAsync(TICK * 2)
+    expect(useFeedback.getState().offer).toEqual(crash)
+    f.answerOffer(false)
+  })
+
+  it('a moment that stops being quiet starts the count again', async () => {
+    bridge.takeCrash.mockResolvedValueOnce(crash)
+    await start()
+    await vi.advanceTimersByTimeAsync(TICK)
+    moment.inCall = true
+    await vi.advanceTimersByTimeAsync(TICK)
+    moment.inCall = false
+    await vi.advanceTimersByTimeAsync(TICK)
+    expect(useFeedback.getState().offer).toBeNull()
+    await vi.advanceTimersByTimeAsync(TICK)
+    expect(useFeedback.getState().offer).toEqual(crash)
+    f.answerOffer(false)
+  })
+
+  it('does not interrupt someone already writing feedback', async () => {
+    bridge.takeCrash.mockResolvedValueOnce(crash)
+    await start()
+    f.openFeedback()
+    await vi.advanceTimersByTimeAsync(TICK * 4)
+    expect(useFeedback.getState().offer).toBeNull()
+    f.closeFeedback()
+    await vi.advanceTimersByTimeAsync(TICK * 2)
+    expect(useFeedback.getState().offer).toEqual(crash)
+    f.answerOffer(false)
+  })
+
+  it('survives a sign-out before it was shown, and signing out clears the card', async () => {
+    bridge.takeCrash.mockResolvedValueOnce(crash)
+    await start()
+    f.openFeedback()
+    f.setText('da Ana')
+    stop()
+    expect(useFeedback.getState()).toMatchObject({ open: false, text: '', offer: null })
+    signIn('u2')
+    await start() // takeCrash answers null now: main already handed the marker over
+    await vi.advanceTimersByTimeAsync(TICK * 2)
+    expect(useFeedback.getState().offer).toEqual(crash)
+    f.answerOffer(false)
+  })
+
+  it('nothing happens without a crash or without the bridge', async () => {
+    await start()
+    await vi.advanceTimersByTimeAsync(TICK * 4)
+    expect(useFeedback.getState().offer).toBeNull()
+    stop()
+    bridge.takeCrash.mockRejectedValueOnce(new Error('forbidden'))
+    await start()
+    await vi.advanceTimersByTimeAsync(TICK * 4)
+    expect(useFeedback.getState().offer).toBeNull()
   })
 })

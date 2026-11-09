@@ -1,6 +1,6 @@
 import { FEEDBACK_KINDS, FEEDBACK_SCREENSHOT_MAX_BYTES, FEEDBACK_TEXT_MAX, kindTakesLog, type FeedbackItem } from '@alga/shared'
 import { motion } from 'motion/react'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent, type KeyboardEvent } from 'react'
 import { useData } from '@/store/data'
 import { Button, IconButton, Spinner, Switch } from '@/ui'
 import { Eco } from '@/ui/eco/Eco'
@@ -8,6 +8,7 @@ import { BRAND_ECO, type EcoState } from '@/ui/eco/ecoRules'
 import { ArrowLeft, Camera, X } from '@/ui/icons'
 import { EASE_IN, EASE_OUT_QUART } from '@/ui/motion'
 import { shortDate, useReduced } from '../whatsnew/parts'
+import { useAnchor } from './anchor'
 import { KIND_ECO, KIND_TONE, canSend, firstName, sendsLog } from './logic'
 import {
   captureShot, closeFeedback, currentContext, openFeedback, send, setKind, setLogOn, setShot, setText, showForm, showMine, useFeedback,
@@ -17,28 +18,6 @@ import s from './feedback.module.css'
 
 const SHOT_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(' ')
-
-/** Where the card sits: on top of the user panel (which grows with the voice panel during a call). */
-function useAnchor(): CSSProperties {
-  const [at, setAt] = useState<CSSProperties>({ left: 72, bottom: 68 })
-  useLayoutEffect(() => {
-    const dock = document.querySelector<HTMLElement>('[data-user-dock]')
-    if (!dock) return
-    const place = () => {
-      const r = dock.getBoundingClientRect()
-      setAt({ left: Math.round(r.left), bottom: Math.round(window.innerHeight - r.top + 8) })
-    }
-    place()
-    const ro = new ResizeObserver(place)
-    ro.observe(dock)
-    window.addEventListener('resize', place)
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', place)
-    }
-  }, [])
-  return at
-}
 
 /**
  * The Eco reacts for a moment (a kind picked, typing, a screenshot arriving, an empty send) and otherwise shows what

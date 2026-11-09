@@ -7,8 +7,8 @@ import { useMedia } from '@/media'
 import { useData } from '@/store/data'
 import { useUi } from '@/store/ui'
 import { useCinema } from '../cinema/store'
-import { currentMoment } from '../whatsnew/store'
-import { canSend, contextOf, draftKey, readDraft, sendsLog, type Crash } from './logic'
+import { currentMoment, useWhatsNew } from '../whatsnew/store'
+import { canSend, contextOf, draftKey, readDraft, sendsLog, shouldOfferCrash, type Crash } from './logic'
 
 interface FeedbackState {
   open: boolean
@@ -193,4 +193,32 @@ export function answerOffer(tell: boolean): void {
 export function resetFeedback(): void {
   dropShot()
   useFeedback.setState(initial)
+}
+
+/** The crash the previous session left, until it is offered. Outlives a sign-out: it is about the app, not the account. */
+let pending: Crash | null = null
+
+/**
+ * Asks main once per sign-in how the previous session ended (main hands the note over a single time) and, if it ended
+ * badly, offers the card in a quiet moment: checked every few seconds, quiet twice in a row, never over the Novidades
+ * welcome or someone already writing. Returns the stop function (sign-out), which also empties the card.
+ */
+export function startFeedback(): () => void {
+  void window.alga?.app.takeCrash().then((c) => {
+    if (c) pending = c
+  }).catch(() => {})
+  let calm = 0
+  const tick = setInterval(() => {
+    const st = useFeedback.getState()
+    if (!pending || st.offer || st.open) return
+    calm = shouldOfferCrash(pending, currentMoment(), useWhatsNew.getState().welcome !== null) ? calm + 1 : 0
+    if (calm < 2) return
+    calm = 0
+    useFeedback.setState({ offer: pending })
+    pending = null
+  }, 2500)
+  return () => {
+    clearInterval(tick)
+    resetFeedback()
+  }
 }
