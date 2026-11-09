@@ -44,12 +44,12 @@ export async function billingPublicRoutes(app: FastifyInstance, { billing }: Ctx
       const provider = ['sandbox', 'mercadopago', 'stripe'].includes(req.params.provider) ? req.params.provider : 'other'
       let outcome = 'error'
       try {
-        const { duplicate } = await billing.handleWebhook(req.params.provider, {
+        const { duplicate, ignored } = await billing.handleWebhook(req.params.provider, {
           rawBody: typeof req.body === 'string' ? req.body : '',
           headers: req.headers,
           query: req.query as Record<string, unknown>,
         })
-        outcome = duplicate ? 'duplicate' : 'applied'
+        outcome = ignored ? 'ignored' : duplicate ? 'duplicate' : 'applied'
       } catch (err) {
         if (err instanceof HttpError && err.statusCode === 404) outcome = 'unknown_provider'
         if (!(err instanceof WebhookRejected)) throw err

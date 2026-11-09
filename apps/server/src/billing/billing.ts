@@ -842,8 +842,9 @@ export class Billing {
   // ---- provider events ----------------------------------------------------------------------------------------------
 
   /** POST /billing/webhooks/:provider. Throws WebhookRejected (→ 401) for unauthentic requests. */
-  async handleWebhook(providerId: string, req: WebhookRequest): Promise<{ duplicate: boolean }> {
+  async handleWebhook(providerId: string, req: WebhookRequest): Promise<{ duplicate: boolean; ignored?: boolean }> {
     if (!this.provider || this.provider.id !== providerId) throw notFound()
+    if (this.provider.ignorable?.(req)) return { duplicate: false, ignored: true }
     const event = await this.provider.parseWebhook(req)
     return this.apply(event, sha256(req.rawBody))
   }

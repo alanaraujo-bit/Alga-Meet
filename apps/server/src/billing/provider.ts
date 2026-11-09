@@ -98,6 +98,11 @@ export interface PaymentProvider {
   resumeSubscription(providerSubscriptionId: string | null): Promise<void>
   /** Asks for a full refund; the result arrives as a webhook (order → refunded, subscription → revoked). */
   refund(providerPaymentId: string): Promise<void>
+  /**
+   * A notification that carries nothing to verify and nothing we act on (Mercado Pago's legacy IPN feed): answered
+   * 200 so the provider stops retrying, without a database write. Checked before parseWebhook.
+   */
+  ignorable?(req: WebhookRequest): boolean
   /** Verifies the signature and returns the normalized updates. Throws WebhookRejected when not authentic. */
   parseWebhook(req: WebhookRequest): Promise<VerifiedEvent>
 }

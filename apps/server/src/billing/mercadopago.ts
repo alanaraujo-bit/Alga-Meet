@@ -237,6 +237,14 @@ export class MercadoPagoProvider implements PaymentProvider {
       { 'x-render-in-process-refunds': 'true' })
   }
 
+  /**
+   * MP also posts the legacy IPN format to notification_url (`?topic=payment&id=…`, never signed) next to the signed
+   * webhook (`?data.id=…&type=…`). The signed one carries the same change, so the IPN copy is acknowledged and dropped.
+   */
+  ignorable(req: WebhookRequest): boolean {
+    return !header(req.headers, 'x-signature') && req.query['data.id'] === undefined && typeof req.query.topic === 'string'
+  }
+
   /** x-signature check (see file header). Requires a signed data.id: that id is what gets re-fetched. */
   verifySignature(req: WebhookRequest): { dataId: string; ts: string } {
     const parts = Object.fromEntries((header(req.headers, 'x-signature') ?? '').split(',').map((kv) => kv.trim().split('=', 2) as [string, string]))

@@ -166,6 +166,19 @@ describe('in-app checkout (Mercado Pago)', () => {
     expect(odd.body.status).toBe('approved')
   })
 
+  it('acknowledges the unsigned legacy IPN copy without acting on it; anything else unsigned is still refused', async () => {
+    const before = calls.length
+    const post = (query: string, headers: Record<string, string> = {}) => m.app.inject({
+      method: 'POST', url: `/api/v1/billing/webhooks/mercadopago?${query}`, headers: { 'content-type': 'application/json', ...headers }, payload: '{}',
+    })
+    expect((await post('topic=payment&id=123456')).statusCode).toBe(200)
+    expect((await post('topic=merchant_order&id=99')).statusCode).toBe(200)
+    expect(calls.length).toBe(before)
+    expect((await post('type=payment')).statusCode).toBe(401)
+    expect((await post('data.id=123&type=payment')).statusCode).toBe(401)
+    expect((await post('topic=payment&id=1', { 'x-signature': 'ts=1,v1=00' })).statusCode).toBe(401)
+  })
+
   it('explains refusals in words the buyer can act on', () => {
     // What MP answered on a real subscription attempt (2026-11-08): the pre-authorization of the card failed.
     expect(rejectionMessage('CC_VAL_433 Credit card validation has failed')).toContain('validar este cartão')
