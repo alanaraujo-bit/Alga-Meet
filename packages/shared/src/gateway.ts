@@ -71,7 +71,7 @@ export type ClientFrame =
   /**
    * Cinema (cinema.ts): `cinema_time`, `cinema_hello`, `cinema_open` (host), `cinema_pieces` (host), `cinema_film`
    * (host: rename / add subtitle), `cinema_seat`, `cinema_status`, `cinema_control`, `cinema_options` (host),
-   * `cinema_signal`, `cinema_react`, `cinema_end` (host or moderator), `cinema_switch` (host: next episode in the same
+   * `cinema_signal`, `cinema_react`, `cinema_chat` (live chat), `cinema_end` (host or moderator), `cinema_switch` (host: next episode in the same
    * session, keeps the seats, resets pieces/reactions/heat and rebuffers at `startS`). The server answers with CINEMA_* dispatches only.
    */
   | CinemaClientFrame
@@ -223,6 +223,8 @@ export type Dispatch =
   /** Only to `to` of the matching `cinema_signal`; `from` is the sender's user id. */
   | { t: 'CINEMA_SIGNAL'; d: { sessionId: string; from: string; signal: CinemaSignal } }
   | { t: 'CINEMA_REACTION'; d: { sessionId: string; userId: string; emoji: CinemaReaction; position: number; at: number } }
+  /** Live chat of the room, to every seat except those who blocked the author or were blocked by them. Not stored. */
+  | { t: 'CINEMA_CHAT'; d: { sessionId: string; id: string; userId: string; text: string; at: number } }
   /** Only to the socket that sent `cinema_time`: `c` echoes its clock, `s` is the server clock (ms). */
   | { t: 'CINEMA_PONG'; d: { c: number; s: number } }
   /** Only to the socket whose cinema_* frame was refused. */

@@ -8,7 +8,7 @@
 import { createHmac } from 'node:crypto'
 import {
   CINEMA_COUNTDOWN_AFTER_PAUSE_MS, CINEMA_COUNTDOWN_MS, CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME, CINEMA_LEAD_MS, CINEMA_MAX_DURATION_S, CINEMA_MAX_SEATS,
-  CINEMA_READY_TIMEOUT_MS, CINEMA_REACTION_RATE, CINEMA_STATUS_INTERVAL_MS, CINEMA_TURN_TTL_S, Permission, hasPermission, positionAt, uuidv7,
+  CINEMA_CHAT_RATE, CINEMA_READY_TIMEOUT_MS, CINEMA_REACTION_RATE, cinemaChatText, CINEMA_STATUS_INTERVAL_MS, CINEMA_TURN_TTL_S, Permission, hasPermission, positionAt, uuidv7,
   type CinemaClientFrame, type CinemaEndReason, type CinemaErrorReason, type CinemaFilm, type CinemaIceServer, type CinemaPieceMeta,
   type CinemaPlayback, type CinemaSeat, type CinemaSessionView, type CinemaTrackId, type DispatchOf, type DispatchType,
 } from '@alga/shared'
@@ -92,6 +92,8 @@ interface Session {
   blocks: Map<string, Set<string>>
   /** Reaction token buckets. */
   rate: Map<string, { tokens: number; at: number }>
+  /** Chat token buckets (CINEMA_CHAT_RATE). */
+  chatRate: Map<string, { tokens: number; at: number }>
   /** Summary counters. */
   watchedS: number
   reactions: number
@@ -164,6 +166,8 @@ export class Cinema {
         return this.signal(conn, frame)
       case 'cinema_react':
         return this.react(conn, frame)
+      case 'cinema_chat':
+        return this.chat(conn, frame)
       case 'cinema_end':
         return this.endBy(conn, frame)
       case 'cinema_switch':
@@ -228,7 +232,7 @@ export class Cinema {
       playback: { playing: false, position: Math.min(f.startS, f.film.durationS), at: now, seq: 0, by: null, reason: 'foyer', waitingFor: [], countdown: false },
       options: { controlLock: false, waitForStalled: true },
       seats: new Map(), createdAt: now, everSeated: new Set(), pausedAt: now, noWait: new Set(), hostAway: false, awayFromFoyer: false, lastBroadcastAt: now,
-      pieces: new Map(), blocks: new Map(), rate: new Map(), watchedS: 0, reactions: 0, peaks: new Map(), next: null,
+      pieces: new Map(), blocks: new Map(), rate: new Map(), chatRate: new Map(), watchedS: 0, reactions: 0, peaks: new Map(), next: null,
     }
     this.sessions.set(f.channelId, s)
     metrics.cinemaSessions.inc({ result: 'opened' })
@@ -441,6 +445,30 @@ export class Cinema {
     s.reactions++
     s.peaks.set(bucket, (s.peaks.get(bucket) ?? 0) + 1)
     for (const userId of s.seats.keys()) this.toSeat(s, userId, 'CINEMA_REACTION', { sessionId: s.id, userId: uid, emoji: f.emoji, position, at: now })
+  }
+
+  /**
+   * Live chat (one line, CINEMA_CHAT_MAX): relayed to the seats, never stored nor logged. Who blocked the author, or was
+   * blocked by them, does not get it (and the author does not see them either way). Over the rate: dropped in silence.
+   */
+  private async chat(conn: Conn, f: Extract<CinemaClientFrame, { op: 'cinema_chat' }>): Promise<void> {
+    const s = this.byId(conn, f)
+    if (!s) return
+    const uid = conn.userId
+    if (!s.seats.has(uid)) return this.error(conn, f.op, 'not_seated', s.id)
+    const text = cinemaChatText(f.text)
+    if (!text) return
+    const now = Date.now()
+    const { perSecond, burst } = CINEMA_CHAT_RATE
+    const b = s.chatRate.get(uid)
+    const tokens = Math.min(burst, (b?.tokens ?? burst) + (b ? ((now - b.at) / 1000) * perSecond : 0))
+    if (tokens < 1) return void s.chatRate.set(uid, { tokens, at: now })
+    s.chatRate.set(uid, { tokens: tokens - 1, at: now })
+    const blocked = await blockedWith(this.db, uid)
+    // The session may have ended or the author stood up while the blocks were read.
+    if (this.sessions.get(s.channelId) !== s || !s.seats.has(uid)) return
+    const d = { sessionId: s.id, id: uuidv7(now), userId: uid, text, at: now }
+    for (const userId of s.seats.keys()) if (!blocked.has(userId)) this.toSeat(s, userId, 'CINEMA_CHAT', d)
   }
 
   /** The host ends it; in a space, so may whoever can mute or move members. */

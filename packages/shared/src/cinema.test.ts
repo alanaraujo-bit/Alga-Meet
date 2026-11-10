@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CINEMA_ITEMS_PER_FRAME, CINEMA_LANES, CINEMA_MAX_FRAME_BYTES, CINEMA_REACTIONS, CinemaClientFrameSchema, positionAt, type CinemaPlayback } from './cinema.js'
+import { CINEMA_CHAT_MAX, CINEMA_ITEMS_PER_FRAME, cinemaChatText, CINEMA_LANES, CINEMA_MAX_FRAME_BYTES, CINEMA_REACTIONS, CinemaClientFrameSchema, positionAt, type CinemaPlayback } from './cinema.js'
 import { uuidv7 } from './ids.js'
 
 const pb = (o: Partial<CinemaPlayback> = {}): CinemaPlayback => ({
@@ -37,6 +37,7 @@ const ok = {
   cinema_options: { op: 'cinema_options', sessionId: id, controlLock: true },
   cinema_signal: { op: 'cinema_signal', sessionId: id, to: id, signal: { kind: 'ice', candidates: ['c'] } },
   cinema_react: { op: 'cinema_react', sessionId: id, emoji: CINEMA_REACTIONS[0] },
+  cinema_chat: { op: 'cinema_chat', sessionId: id, text: 'que cena!' },
   cinema_end: { op: 'cinema_end', sessionId: id },
   cinema_switch: { op: 'cinema_switch', sessionId: id, film, startS: 12 },
 }
@@ -89,6 +90,11 @@ describe('CinemaClientFrameSchema', () => {
     for (const t of ['a-1', 'x', 'a', 'v1', '']) expect(parse(bad(ok.cinema_pieces, { track: t }))).toBe(false)
   })
   it('rejects emoji outside the list', () => expect(parse(bad(ok.cinema_react, { emoji: '💩' }))).toBe(false))
+  it('limits chat text to CINEMA_CHAT_MAX characters and refuses it empty', () => {
+    expect(parse(bad(ok.cinema_chat, { text: 'x'.repeat(CINEMA_CHAT_MAX) }))).toBe(true)
+    expect(parse(bad(ok.cinema_chat, { text: 'x'.repeat(CINEMA_CHAT_MAX + 1) }))).toBe(false)
+    expect(parse(bad(ok.cinema_chat, { text: '' }))).toBe(false)
+  })
   it('limits signals', () => {
     expect(parse(bad(ok.cinema_signal, { signal: { kind: 'ice', candidates: Array(21).fill('c') } }))).toBe(false)
     expect(parse(bad(ok.cinema_signal, { signal: { kind: 'offer', sdp: 'x'.repeat(12_000) } }))).toBe(true)
@@ -106,5 +112,18 @@ describe('CinemaClientFrameSchema', () => {
     expect(parse(bad(ok.cinema_seat, { sessionId: 'nope' }))).toBe(false)
     expect(parse(bad(ok.cinema_control, { seq: -1 }))).toBe(false)
     expect(parse(bad(ok.cinema_control, { seq: 1.5 }))).toBe(false)
+  })
+})
+
+describe('cinemaChatText', () => {
+  it('one clean line: no line breaks, tabs or control characters, spaces collapsed, ends trimmed', () => {
+    expect(cinemaChatText('  que\n\ncena\t  incrível \u0007 ')).toBe('que cena incrível')
+    expect(cinemaChatText('​ \n ')).toBe('')
+  })
+  it('keeps emoji and accents whole, and cuts at CINEMA_CHAT_MAX characters without splitting an emoji', () => {
+    expect(cinemaChatText('kkkk 😂😂 ação')).toBe('kkkk 😂😂 ação')
+    const long = cinemaChatText('😂'.repeat(CINEMA_CHAT_MAX))
+    expect([...long].every((c) => c === '😂')).toBe(true)
+    expect(long.length).toBeLessThanOrEqual(CINEMA_CHAT_MAX)
   })
 })

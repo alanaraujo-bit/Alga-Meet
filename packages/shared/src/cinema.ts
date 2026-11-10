@@ -32,6 +32,10 @@ export const CINEMA_MAX_FRAME_BYTES = 16 * 1024
 export const CINEMA_ITEMS_PER_FRAME = 120
 export const CINEMA_REACTIONS = ['😂', '😱', '😍', '😭', '🔥', '👏'] as const
 export const CINEMA_REACTION_RATE = { perSecond: 1, burst: 5 } as const
+/** Live chat of the room: one short line per message, relayed to the seats and never stored. */
+export const CINEMA_CHAT_MAX = 200
+/** A quick back-and-forth is fine (4 in a row), a flood is not: then one every 2 s. Over it, messages are dropped. */
+export const CINEMA_CHAT_RATE = { perSecond: 0.5, burst: 4 } as const
 /** Lifetime of the TURN credentials handed out with a session. */
 export const CINEMA_TURN_TTL_S = 21_600
 /** RTCPeerConnections per pair of seats: one SCTP association each, since loss and a bloated queue cap each one's rate (§6.4). */
@@ -42,6 +46,21 @@ const MAX_SDP_CHARS = 12_000
 const MAX_ICE_CANDIDATES = 20
 
 export type CinemaReaction = (typeof CINEMA_REACTIONS)[number]
+
+/**
+ * A chat message as it is shown: one line (breaks, tabs and control/invisible characters become spaces, runs of spaces
+ * collapse), trimmed, at most CINEMA_CHAT_MAX UTF-16 units without splitting a character. Client and server both apply it.
+ */
+export function cinemaChatText(raw: string): string {
+  const one = raw.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').replace(/\s+/g, ' ').trim()
+  if (one.length <= CINEMA_CHAT_MAX) return one
+  let out = ''
+  for (const ch of one) {
+    if (out.length + ch.length > CINEMA_CHAT_MAX) break
+    out += ch
+  }
+  return out.trimEnd()
+}
 export type CinemaTrackId = 'v' | `a${number}` | `s${number}` | 'poster' | 'thumbs'
 export interface CinemaAudioTrack { id: number; lang: string | null; title: string | null; sourceCodec: string; channels: number; out: 'copy' | 'aac' | 'opus' | 'flac'; mime: string; default: boolean }
 export interface CinemaSubtitleTrack { id: number; lang: string | null; title: string | null; format: 'vtt' | 'ass'; external: boolean }
@@ -91,6 +110,7 @@ export type CinemaClientFrame =
   | { op: 'cinema_options'; sessionId: string; controlLock?: boolean; waitForStalled?: boolean }
   | { op: 'cinema_signal'; sessionId: string; to: string; signal: CinemaSignal }
   | { op: 'cinema_react'; sessionId: string; emoji: CinemaReaction }
+  | { op: 'cinema_chat'; sessionId: string; text: string }
   | { op: 'cinema_end'; sessionId: string }
   | { op: 'cinema_switch'; sessionId: string; film: CinemaFilm; startS: number }
 
@@ -156,6 +176,8 @@ export const CinemaClientFrameSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('cinema_options'), sessionId: uuid, controlLock: z.boolean().optional(), waitForStalled: z.boolean().optional() }),
   z.object({ op: z.literal('cinema_signal'), sessionId: uuid, to: uuid, signal: SignalSchema }),
   z.object({ op: z.literal('cinema_react'), sessionId: uuid, emoji: z.enum(CINEMA_REACTIONS) }),
+  /** Live chat: cleaned by the server again (cinemaChatText); empty after cleaning = dropped. */
+  z.object({ op: z.literal('cinema_chat'), sessionId: uuid, text: z.string().min(1).max(CINEMA_CHAT_MAX) }),
   z.object({ op: z.literal('cinema_end'), sessionId: uuid }),
   /** Host only: next episode in the same session (same seats); clears the piece index, reactions and heat. */
   z.object({ op: z.literal('cinema_switch'), sessionId: uuid, film: FilmSchema, startS: seconds }),

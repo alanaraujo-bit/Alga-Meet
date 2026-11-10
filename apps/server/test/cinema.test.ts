@@ -575,7 +575,7 @@ describe('cinema', () => {
     expect(await x.gb.waitFor('CINEMA_ERROR')).toMatchObject({ op: 'cinema_film', reason: 'forbidden' })
   })
 
-  it('reactions: a seated user is limited to a burst of 5; an emoji outside the list closes the socket', async () => {
+  it('reactions (burst of 5) and live chat (one clean line, blocks hide both ways, flood dropped); bad payloads close the socket', async () => {
     const x = await setup()
     const st = await open(x)
     await seat(x.gb, st.sessionId, x.b.user.id)
@@ -587,6 +587,39 @@ describe('cinema', () => {
     expect(x.gb.events.filter((e) => e.t === 'CINEMA_REACTION')).toHaveLength(5) // the reactor sees them too
     x.gc.send({ op: 'cinema_react', sessionId: st.sessionId, emoji: '🔥' }) // c is not seated
     expect(await x.gc.waitFor('CINEMA_ERROR')).toMatchObject({ op: 'cinema_react', reason: 'not_seated' })
+
+    // Live chat, on the same sockets (the file is at the global per-IP limit with the webhooks and connects).
+    x.gb.send({ op: 'cinema_chat', sessionId: st.sessionId, text: '  que\ncena   incrível  ' })
+    const msg = await x.ga.waitFor('CINEMA_CHAT')
+    expect(msg).toMatchObject({ sessionId: st.sessionId, userId: x.b.user.id, text: 'que cena incrível' })
+    expect(typeof msg.id).toBe('string')
+    expect(msg.at).toBeGreaterThan(0)
+    expect((await x.gb.waitFor('CINEMA_CHAT')).id).toBe(msg.id) // the author sees it come back
+    expect(x.gc.events.some((e) => e.t === 'CINEMA_CHAT')).toBe(false) // c is in the call but not seated
+
+    x.gc.send({ op: 'cinema_chat', sessionId: st.sessionId, text: 'oi' })
+    expect(await x.gc.waitFor('CINEMA_ERROR', (d) => d.op === 'cinema_chat')).toMatchObject({ reason: 'not_seated' })
+
+    // Blocks, both ways: c blocked b. Neither sees the other; a sees both.
+    await seat(x.gc, st.sessionId, x.c.user.id)
+    expect((await api(s.app, 'PUT', `/relationships/${x.b.user.id}`, { token: x.c.token, body: { type: 'blocked' } })).status).toBe(200)
+    x.gb.send({ op: 'cinema_chat', sessionId: st.sessionId, text: 'de b' })
+    await x.ga.waitFor('CINEMA_CHAT', (d) => d.text === 'de b')
+    x.gc.send({ op: 'cinema_chat', sessionId: st.sessionId, text: 'de c' })
+    await x.ga.waitFor('CINEMA_CHAT', (d) => d.text === 'de c')
+    await sleep(200)
+    const seen = (gw: Gateway) => gw.events.filter((e) => e.t === 'CINEMA_CHAT').map((e) => (e.d as { text: string }).text)
+    expect(seen(x.gc)).toEqual(['de c'])
+    expect(seen(x.gb)).toEqual(['que cena incrível', 'de b'])
+    expect(seen(x.ga)).toEqual(['que cena incrível', 'de b', 'de c'])
+
+    // Only blanks after cleaning: dropped in silence. Then a's fresh bucket: 4 in a row pass, the rest of the flood
+    // is dropped (one every 2 s after that).
+    x.ga.send({ op: 'cinema_chat', sessionId: st.sessionId, text: ' \n\t ' })
+    for (let i = 0; i < 8; i++) x.ga.send({ op: 'cinema_chat', sessionId: st.sessionId, text: `msg ${i}` })
+    await sleep(400)
+    expect(seen(x.gb).filter((t) => t.startsWith('msg'))).toEqual(['msg 0', 'msg 1', 'msg 2', 'msg 3'])
+
     x.gb.send({ op: 'cinema_react', sessionId: st.sessionId, emoji: '💩' })
     expect((await x.gb.closed).code).toBe(GatewayClose.INVALID_PAYLOAD)
   })
