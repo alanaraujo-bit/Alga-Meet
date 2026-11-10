@@ -112,8 +112,12 @@ export function openFeedback(opts: { kind?: FeedbackKind; crash?: Crash } = {}):
   if (st.mine === null) void loadMine()
 }
 
-/** Esc, ×, or done: the draft stays (in memory and on disk). */
-export const closeFeedback = (): void => useFeedback.setState({ open: false })
+/**
+ * Esc, ×, or done: the draft stays (in memory and on disk). A crash report closed with nothing written is dropped,
+ * so the next feedback is about this session and not, silently, about the one that crashed.
+ */
+export const closeFeedback = (): void =>
+  useFeedback.setState((s) => (s.crash && !s.text ? { open: false, crash: null, log: null } : { open: false }))
 
 export function setKind(kind: FeedbackKind): void {
   useFeedback.setState({ kind })

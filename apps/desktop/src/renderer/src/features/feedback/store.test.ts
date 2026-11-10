@@ -238,6 +238,31 @@ describe('answering the offer after a crash', () => {
   })
 })
 
+describe('a crash report left behind', () => {
+  const crash = { kind: 'renderer', at: 1, version: '0.1.15' } as const
+
+  it('closed untouched, the crash is forgotten: a later bug is about this session', async () => {
+    useFeedback.setState({ offer: crash })
+    f.answerOffer(true)
+    await flush()
+    f.closeFeedback()
+    f.openFeedback({ kind: 'bug' })
+    await flush()
+    expect(useFeedback.getState()).toMatchObject({ crash: null, log: 'this session\n' })
+  })
+
+  it('closed with something written, it is still the crash report when reopened', async () => {
+    useFeedback.setState({ offer: crash })
+    f.answerOffer(true)
+    await flush()
+    f.setText('abri o cinema')
+    f.closeFeedback()
+    f.openFeedback()
+    await flush()
+    expect(useFeedback.getState()).toMatchObject({ kind: 'crash', crash, text: 'abri o cinema', log: 'old session\n' })
+  })
+})
+
 describe('the offer after a crash', () => {
   const crash = { kind: 'unresponsive', at: 1, version: '0.1.15' } as const
   const TICK = 2500
