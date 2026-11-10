@@ -1,5 +1,20 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-09 noite (3) — Música na call ("bot de música", YouTube) (NÃO publicado)
+- **O que é:** colar um link do YouTube na call e todo mundo ouve junto, no mesmo ponto: fila, pausar, pular, mudar o
+  ponto, parar, volume só seu, "parar de ouvir" só para você. Botão de nota na barra da call e Ctrl K. Como funciona:
+  `docs/music.md`.
+- **Como (e por quê):** nenhum áudio passa pelo servidor. Cada app toca no player embutido do YouTube
+  (`youtube-nocookie.com`), sincronizado pelo relógio da sala. Tirar o áudio do YouTube num servidor (como os bots do
+  Discord Groovy e Rythm, fechados pelo Google em 2021) viola os termos deles.
+- **Servidor:** `src/music.ts`, em memória por canal de voz, some quando a call esvazia; título pelo oEmbed (que também
+  recusa vídeo com incorporação desligada); READY ganha `music: true`.
+- **Desktop:** `features/music/`; o processo principal manda `Referer` no documento do player (`main/music-logic.ts`):
+  sem ele o YouTube recusa (erro 153), e com IP também (150), então API local por IP vira `localhost`.
+- **Testes:** shared 65, servidor 330 (música também em PostgreSQL real), desktop 872, e2e no app real com duas
+  instâncias e vídeos de verdade 8/8, diferença entre os dois players de 0,0–0,1 s (`apps/desktop/scripts/music-e2e.mjs`,
+  capturas em `docs/screenshots/music/`).
+
 ## 2026-11-09 noite (2) — Sala de cinema: tela cheia, chat ao vivo e cadeado (NÃO publicado)
 - **Tela cheia:** menus de legenda/áudio e ⋯, dicas, avisos ("Ana pulou para…") e diálogos (denunciar) não apareciam em
   tela cheia: iam para o `body`, fora do elemento em tela cheia. Agora seguem a tela cheia (`ui/portal.ts`).

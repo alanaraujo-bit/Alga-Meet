@@ -1,0 +1,53 @@
+{
+  "at": "2026-11-10T02:49:05.910Z",
+  "results": [
+    {
+      "name": "O botão Música abre o cartão vazio com o campo pronto; colar um link toca para os dois, no mesmo ponto",
+      "pass": true,
+      "ms": 4041,
+      "detail": "diferença 0.11 s"
+    },
+    {
+      "name": "Bia põe outra na fila; Ana vê \"A seguir\"; pausar e voltar valem para os dois",
+      "pass": true,
+      "ms": 2217,
+      "detail": null
+    },
+    {
+      "name": "Mudar o ponto da música leva os dois para lá",
+      "pass": true,
+      "ms": 838,
+      "detail": "A 120.3 s · B 120.3 s"
+    },
+    {
+      "name": "Pular troca a música dos dois; a fila esvazia",
+      "pass": true,
+      "ms": 1597,
+      "detail": "diferença 0.00 s"
+    },
+    {
+      "name": "Link que não é do YouTube: a frase aparece na hora e nada sai do app",
+      "pass": true,
+      "ms": 135,
+      "detail": null
+    },
+    {
+      "name": "\"Parar de ouvir\" tira o player só de Ana; Bia segue tocando; \"Ouvir de novo\" volta no ponto da sala",
+      "pass": true,
+      "ms": 1566,
+      "detail": null
+    },
+    {
+      "name": "Recolher deixa o player (≥ 200×200) e o título, sem cobrir os controles da call",
+      "pass": true,
+      "ms": 706,
+      "detail": null
+    },
+    {
+      "name": "Parar limpa a música dos dois; sair da call some com o cartão",
+      "pass": true,
+      "ms": 461,
+      "detail": null
+    }
+  ]
+}

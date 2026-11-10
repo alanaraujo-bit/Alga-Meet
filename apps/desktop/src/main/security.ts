@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { app, session, shell } from 'electron'
 import { log } from './log'
+import { embedReferer, isYoutubeEmbed } from './music-logic'
 
 const rendererIndex = join(__dirname, '../renderer/index.html')
 const devUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined
@@ -51,8 +52,14 @@ function rendererCsp(): string {
 // fullscreen: watching a stream full screen. Everything not listed is denied.
 const ALLOWED_PERMISSIONS = new Set(['media', 'display-capture', 'notifications', 'clipboard-sanitized-write', 'fullscreen'])
 
-export function applySecurity(): void {
+export function applySecurity(apiUrl: string): void {
   const ses = session.defaultSession
+
+  // YouTube's embedded player (music in a call) needs a Referer; a file:// page sends none (music-logic.ts).
+  const referer = embedReferer(apiUrl)
+  ses.webRequest.onBeforeSendHeaders({ urls: ['https://www.youtube-nocookie.com/embed/*'] }, (d, callback) => {
+    callback({ requestHeaders: isYoutubeEmbed(d.url) ? { ...d.requestHeaders, Referer: referer } : d.requestHeaders })
+  })
 
   ses.setPermissionRequestHandler((wc, permission, callback, details) => {
     const ok = ALLOWED_PERMISSIONS.has(permission) && isAppUrl(details.requestingUrl || wc.getURL())

@@ -122,7 +122,7 @@ else {
   registerAppIpc()
   const launchedWithLink = receiveDeepLink(process.argv) // a link click always shows the window
   app.whenReady().then(() => {
-    applySecurity()
+    applySecurity(apiUrl)
     initCapture()
     trackDeepLinkPage(createMainWindow(profile === 'default' ? 'Alga Meet' : `Alga Meet (${profile})`, startHidden && !launchedWithLink))
     createTray()

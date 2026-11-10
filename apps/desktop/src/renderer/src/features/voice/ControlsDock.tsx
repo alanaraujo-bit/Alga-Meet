@@ -1,6 +1,6 @@
 import type { Channel } from '@alga/shared'
 import type { Glyph } from '@/ui/icons'
-import { ArrowLeftRight, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, ProjectorScreen, Settings2, Square, Volume2, Waveform } from '@/ui/icons'
+import { ArrowLeftRight, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, ProjectorScreen, Settings2, Square, Volume2, Waveform, MusicNotes } from '@/ui/icons'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Ref, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
@@ -8,6 +8,9 @@ import { useData } from '@/store/data'
 import { Icon, MenuButton, Spinner, Tooltip, useEnvelope } from '@/ui'
 import { end as endCinema, openFromFile, seat } from '../cinema/actions'
 import { useCinema } from '../cinema/store'
+import { closeCard as closeMusic, openCard as openMusic, useMusic } from '../music/store'
+import { t as musicT } from '../music/strings'
+import { useSession } from '@/store/session'
 import { t as cinemaT } from '../cinema/strings'
 import { openSettings } from '../settings/store'
 import { levelNow } from './levels'
@@ -60,6 +63,9 @@ export function ControlsDock({ channel }: { channel: Channel }) {
   useLayoutEffect(() => setSbAnchor(sbOpen ? sbButton.current : null), [sbOpen])
   // Cinema: offered only when READY says this server has it (an older one would close the socket on a cinema op).
   const cinema = useCinema(useShallow((st) => ({ enabled: st.enabled, open: !!st.session, seated: st.mine.seated, busy: st.busy, host: !!st.session && st.session.hostId === meId })))
+  // Music: like the cinema, only when READY says this server has it.
+  const musicOn = useSession((st) => st.music)
+  const music = useMusic(useShallow((st) => ({ open: st.open, playing: !!st.state?.now })))
 
   return (
     <div ref={dock} className={s.dock} role="toolbar" aria-label="Controles da chamada">
@@ -109,6 +115,15 @@ export function ControlsDock({ channel }: { channel: Channel }) {
         aria-pressed={cinema.seated}
         disabled={!connected || cinema.busy}
         onClick={() => (cinema.host ? endCinema() : cinema.open ? seat(!cinema.seated) : void openFromFile())}
+      />}
+      {musicOn && <CallButton
+        icon={MusicNotes}
+        label={musicT.button}
+        hint={musicT.buttonHint}
+        on={music.open || music.playing}
+        aria-pressed={music.open || music.playing}
+        disabled={!connected}
+        onClick={() => (music.open && !music.playing ? closeMusic() : openMusic())}
       />}
       {channel.spaceId && (
         <CallButton

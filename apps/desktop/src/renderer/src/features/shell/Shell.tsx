@@ -32,6 +32,8 @@ import { startVoiceSync } from '../voice/voice'
 import { Center as WhatsNewCenter } from '../whatsnew/Center'
 import { startWhatsNew } from '../whatsnew/store'
 import { FeedbackHost } from '../feedback/Host'
+import { MusicHost } from '../music/MusicCard'
+import { startMusic } from '../music/store'
 import { startFeedback } from '../feedback/store'
 import { Welcome } from '../whatsnew/Welcome'
 import { MemberList } from './MemberList'
@@ -67,6 +69,7 @@ export function Shell() {
   useEffect(() => startNotifications(), [])
   useEffect(() => startBilling(), [])
   useEffect(() => startWhatsNew(), [])
+  useEffect(() => startMusic(), [])
   useInviteLink()
   useDeletionCanceledNotice()
   // Signing out closes the panel, so the next account never starts with it open.
@@ -121,6 +124,7 @@ export function Shell() {
       <WhatsNewCenter />
       <Welcome />
       <FeedbackHost />
+      <MusicHost />
       <VerifyEmailDialog />
       <BillingHost />
       <ReportHost />

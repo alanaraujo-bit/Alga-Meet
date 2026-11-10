@@ -167,7 +167,8 @@
 /* ── Toasts ──────────────────────────────── */
 .toasts {
   position: fixed;
-  right: var(--s-4);
+  /* Set by the music card while it sits in the corner (features/music/MusicCard.tsx). */
+  right: var(--toast-right, var(--s-4));
   /* Set by the call dock when it would sit under the stack (features/voice/ControlsDock.tsx). */
   bottom: var(--toast-bottom, var(--s-4));
   transition: bottom var(--dur-base) var(--ease-out-quad);

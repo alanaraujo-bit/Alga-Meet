@@ -166,6 +166,8 @@ export {
   TrendUp,
   ArrowCircleUp,
   ClockCounterClockwise as History,
+  CaretUp as ChevronUp,
+  SkipForward,
   Megaphone,
   Camera,
 } from '@phosphor-icons/react'
