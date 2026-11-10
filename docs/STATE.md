@@ -11,7 +11,7 @@
   **Sem tela nem rota para a equipe ler:** fica para o painel administrativo.
 - **Desktop:** `features/feedback/`; pontes novas `app.recentLog`, `app.captureWindow`, `app.takeCrash`
   (`main/feedback.ts`); `crash-marker.json` em userData.
-- **Testes:** shared 56, servidor 325 (+ feedback em PostgreSQL real), desktop 831, typecheck de tudo, e2e no app real
+- **Testes:** shared 56, servidor 325 (+ feedback em PostgreSQL real), desktop 833, typecheck de tudo, e2e no app real
   14/14 (`apps/desktop/scripts/feedback-e2e.mjs`, capturas em `docs/screenshots/feedback/`).
 - **Para publicar:** subir a API antes (migração 0019); app novo contra API antiga mostra a falha no cartão e guarda o
   rascunho. A Política de Privacidade ganhou a linha do feedback sem versão nova em `LEGAL_VERSIONS`.
