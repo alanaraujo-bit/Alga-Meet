@@ -121,7 +121,8 @@ verdade e resposta da equipe chegam com o painel. Vazio: Eco `idle` e "Nada por 
 ### Depois de um travamento
 
 O único momento em que o feedback se oferece sozinho. Se a sessão anterior terminou com o processo da interface
-caindo, com erro não tratado no processo principal ou com a janela sem responder, o app guarda um marcador local.
+caindo ou com a janela sem responder, o app guarda um marcador local. (Erro não tratado no processo principal saiu
+na construção: o app registra e segue rodando, então "travei" seria mentira; ele continua indo no log de qualquer bug.)
 Na abertura seguinte, num momento calmo (a mesma regra das boas-vindas de Novidades, `isQuiet` em
 `features/whatsnew/logic.ts`; e nunca junto com as boas-vindas: Novidades primeiro, isto no próximo momento calmo),
 aparece um aviso pequeno no mesmo canto: Eco em `error`, "Travei da última vez. Quer me contar o que aconteceu?",
@@ -170,8 +171,8 @@ consome o marcador; a oferta acontece uma vez por travamento.
   carregado sob demanda.
 - Três pontes novas em `window.alga.app`: ler o fim do log, capturar a janela, pegar (e consumir) o marcador de
   travamento, no padrão de `takeSetupEco`.
-- O marcador é escrito no processo principal, onde hoje `log.ts` só registra `render-process-gone` e
-  `uncaughtException`; a janela sem responder (`unresponsive`) também marca e `responsive` desmarca.
+- O marcador é escrito no processo principal (`main/feedback.ts`): `render-process-gone` com motivo de falha marca;
+  a janela sem responder (`unresponsive`) também marca e `responsive` desmarca.
 - Rascunho (tipo e texto) em `localStorage`, por conta.
 
 ## O que fica com quem constrói

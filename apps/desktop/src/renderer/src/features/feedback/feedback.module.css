@@ -18,8 +18,8 @@
   flex-direction: column;
   width: 400px;
   max-width: calc(100vw - 16px);
-  min-height: 428px;
-  max-height: calc(100vh - var(--titlebar-h) - 84px);
+  min-height: min(428px, var(--fb-max, 428px));
+  max-height: var(--fb-max, calc(100vh - var(--titlebar-h) - 84px));
   border-radius: var(--r-xl);
   background: var(--bg-modal);
   box-shadow: var(--elev-modal);
@@ -367,12 +367,16 @@
   user-select: text;
 }
 
+/* Always in reach: when the card is as tall as it can be (details open, in a call) the rest scrolls under it. */
 .foot {
+  position: sticky;
+  bottom: calc(var(--s-4) * -1);
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  margin-top: auto;
-  padding-top: var(--s-3);
+  margin: auto calc(var(--s-5) * -1) calc(var(--s-4) * -1);
+  padding: var(--s-3) var(--s-5) var(--s-4);
+  background: linear-gradient(to bottom, transparent, var(--bg-modal) 10px);
 }
 
 /* Sent: the Eco stepped to the middle (see .eco), so the words start below it. */

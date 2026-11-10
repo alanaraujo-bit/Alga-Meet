@@ -1,5 +1,21 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-09 noite — Feedback no app ("Conta pro Eco") (branch `feat/feedback`, NÃO mesclada, NÃO publicada)
+- **O que é:** um cartão pequeno e não modal sobre o painel do usuário para contar bug, travamento, ideia ou elogio.
+  O Eco e uma luz na cor do tipo reagem ao que a pessoa faz. Vai junto, à vista: versão, sistema, onde ela estava
+  (sem nomes) e, em bug/travamento, o fim do log (dá para tirar); print opcional (colar, arrastar ou "Tirar print do
+  app"). Abre por Ctrl K, pelo menu do usuário e por Configurações › Avançado; nada no rail. Depois de um travamento,
+  o app oferece uma vez "Quer me contar o que aconteceu?". Como funciona: `docs/feedback.md`.
+- **Servidor:** tabela `feedback` (**migração 0019**, com gatilho que põe o print na fila de remoção), `POST /feedback`
+  (multipart, 10 por hora por pessoa) e `GET /feedback/@me`. Entra na exportação de dados e some com a conta.
+  **Sem tela nem rota para a equipe ler:** fica para o painel administrativo.
+- **Desktop:** `features/feedback/`; pontes novas `app.recentLog`, `app.captureWindow`, `app.takeCrash`
+  (`main/feedback.ts`); `crash-marker.json` em userData.
+- **Testes:** shared 56, servidor 325 (+ feedback em PostgreSQL real), desktop 831, typecheck de tudo, e2e no app real
+  14/14 (`apps/desktop/scripts/feedback-e2e.mjs`, capturas em `docs/screenshots/feedback/`).
+- **Para publicar:** subir a API antes (migração 0019); app novo contra API antiga mostra a falha no cartão e guarda o
+  rascunho. A Política de Privacidade ganhou a linha do feedback sem versão nova em `LEGAL_VERSIONS`.
+
 ## 2026-11-08 noite — Novidades (patch notes e "O que há de novo") — desktop 0.1.15
 - **O que é:** boas-vindas depois de atualizar ("O Alga Meet ficou ainda melhor", com o Eco), Central de Novidades
   permanente (ícone de brilho na barra da esquerda; Configurações › Avançado), pílula "Atualização pronta" na barra de

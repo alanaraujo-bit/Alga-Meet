@@ -1,0 +1,90 @@
+{
+  "at": "2026-11-10T00:13:37.661Z",
+  "version": "0.1.15",
+  "results": [
+    {
+      "name": "Ctrl K › \"Enviar feedback\" abre o cartão no canto, e a barra de espaços não ganha nada",
+      "pass": true,
+      "ms": 1647,
+      "detail": null
+    },
+    {
+      "name": "Os quatro tipos: a pergunta, a cor e o que vai junto mudam",
+      "pass": true,
+      "ms": 5639,
+      "detail": "rgb(230, 110, 104) rgb(230, 180, 99) rgb(139, 142, 247) rgb(97, 194, 142)"
+    },
+    {
+      "name": "\"Vai junto › ver\" mostra a versão, o sistema, onde a pessoa estava e o log; desligado, o log não sai do app",
+      "pass": true,
+      "ms": 731,
+      "detail": null
+    },
+    {
+      "name": "\"Tirar print do app\" captura a janela sem o cartão, e o print chega ao servidor",
+      "pass": true,
+      "ms": 3256,
+      "detail": "distância 0.00 sem o cartão, 16.91 com ele"
+    },
+    {
+      "name": "\"Seus envios\" lista o que foi enviado, com \"Recebido\"",
+      "pass": true,
+      "ms": 815,
+      "detail": null
+    },
+    {
+      "name": "Enviar vazio: nada sai do app e o foco fica no campo",
+      "pass": true,
+      "ms": 1450,
+      "detail": null
+    },
+    {
+      "name": "Sem rede: o erro aparece no lugar, texto e print continuam, \"Tentar de novo\" envia",
+      "pass": true,
+      "ms": 1117,
+      "detail": null
+    },
+    {
+      "name": "O rascunho sobrevive a fechar com Esc e a reiniciar o app",
+      "pass": true,
+      "ms": 6816,
+      "detail": null
+    },
+    {
+      "name": "Não é modal: com o cartão aberto dá para trocar de espaço e de canal",
+      "pass": true,
+      "ms": 889,
+      "detail": null
+    },
+    {
+      "name": "Em chamada: o cartão abre acima do painel de voz, sem cobrir os controles da chamada",
+      "pass": true,
+      "ms": 3813,
+      "detail": null
+    },
+    {
+      "name": "Depois de um travamento: a oferta espera o momento calmo, abre em \"Travou\" com o log da sessão que caiu, e não volta",
+      "pass": true,
+      "ms": 43842,
+      "detail": null
+    },
+    {
+      "name": "Menos movimento: envia sem folhas e com tudo visível",
+      "pass": true,
+      "ms": 2205,
+      "detail": null
+    },
+    {
+      "name": "As outras duas entradas abrem o mesmo cartão: menu do usuário e Configurações › Avançado",
+      "pass": true,
+      "ms": 2195,
+      "detail": null
+    },
+    {
+      "name": "O servidor guardou cada envio uma vez, só para quem enviou",
+      "pass": true,
+      "ms": 316,
+      "detail": "idea,crash,crash,bug,bug"
+    }
+  ]
+}

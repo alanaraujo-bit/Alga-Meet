@@ -61,6 +61,7 @@ Os incisos citados são do art. 7º da LGPD. As bases legais usadas são:
 | **Registros de acesso** (Marco Civil): data, hora e IP de cada uso, ligados à conta `[LACUNA: ainda não implementado]` | Cumprir o art. 15 do Marco Civil | Obrigação legal | **6 meses**, sob sigilo. Depois são apagados | Só por ordem judicial (seção 11) |
 | **Denúncias e moderação**: conteúdo denunciado, quem denunciou, decisão e recurso `[LACUNA: fluxo de denúncia ainda não existe]` | Analisar denúncias, proteger pessoas, cumprir o ECA Digital | Legítimo interesse, obrigação legal (Lei 15.211/2025, arts. 27 a 30) e exercício de direitos | `[PREENCHER: 6 meses após o fim do caso]`. Mais tempo quando houver indício de crime ou ordem judicial | Autoridades, nos casos de exploração de menores (seção 10) |
 | **Atendimento**: mensagens que você nos envia | Responder e resolver o seu pedido | Contrato e obrigação legal (CDC) | `[PREENCHER]` | `[PREENCHER: ferramenta de e-mail usada]` |
+| **Feedback enviado pelo app** ("Enviar feedback"): o tipo (bug, travamento, ideia ou elogio), o que você escreveu, a versão do app e do Windows, onde você estava no app (início, conversa ou espaço; se em chamada, transmitindo ou no Cinema; **sem nomes** de espaços, canais ou pessoas). Só em bug e travamento, e só se você deixar: o fim do registro técnico do app (até 200 linhas; pode mostrar pastas do seu computador). Só se você incluir: um print, guardado sem metadados. Tudo aparece para você antes do envio | Corrigir problemas e decidir melhorias | Legítimo interesse (você inicia o envio e vê o que vai junto) | Enquanto a conta existir; apagado junto com ela, inclusive o print. Entra na cópia dos seus dados | Hospedagem (o print fica no armazenamento de arquivos). Só a equipe lê |
 
 ## 3. O que não fazemos
 
@@ -251,7 +252,9 @@ fica no seu computador:
 | Token de login | Arquivo `session.bin` na pasta de dados do app, cifrado pelo Windows (DPAPI) | Manter você conectado | Só vai para o nosso servidor, para provar que é você |
 | Preferências de áudio e vídeo: microfone e alto-falante escolhidos, modo de entrada, sensibilidade, volume de cada pessoa, qualidade e codec da transmissão, sons | Armazenamento local do app (`localStorage`) | Lembrar suas escolhas | Não |
 | Atalhos globais configurados | Armazenamento local do app | Lembrar seus atalhos | Não |
-| Registro técnico do app (`logs/main.log`, até 1 MB, com mais 3 arquivos antigos) | Pasta de dados do app | Entender erros. Não guarda conteúdo de mensagens nem tokens | Não é enviado. Você pode anexá-lo a um pedido de suporte, se quiser |
+| Registro técnico do app (`logs/main.log`, até 1 MB, com mais 3 arquivos antigos) | Pasta de dados do app | Entender erros. Não guarda conteúdo de mensagens nem tokens | Só se você enviar um feedback de bug ou travamento com o registro ligado: vão as últimas linhas (até 200), que o app mostra antes |
+| Rascunho do feedback (tipo e texto) | Armazenamento local do app | Não perder o que você escrevia | Só quando você envia |
+| Aviso de que o app travou (`crash-marker.json`: quando e em qual versão) | Pasta de dados do app | Perguntar, na próxima abertura, se você quer contar o que aconteceu. Apagado ao ser lido | Não. Se você enviar o feedback, vai só o tipo de falha |
 | Relatórios de travamento | Pasta de dados do app | Diagnóstico. Podem conter trechos da memória do app | Não: o envio automático está desligado |
 | Cache de imagens e arquivos | Pasta de dados do app | Carregar mais rápido | Não |
 

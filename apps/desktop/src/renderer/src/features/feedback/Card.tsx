@@ -127,7 +127,7 @@ export default function Card() {
     >
       <div className={s.light} aria-hidden />
       {pane === 'sent' && !reduced && (
-        <div className={s.leaves} aria-hidden>
+        <div className={s.leaves} data-leaves aria-hidden>
           {[-70, -40, -12, 12, 40, 70].map((r) => (
             <span key={r} className={s.leaf} style={{ '--r': `${r}deg` } as CSSProperties} />
           ))}
