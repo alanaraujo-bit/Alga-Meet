@@ -995,3 +995,156 @@
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* ── Live chat (ChatLayer): lower left, above two lines of subtitles (their bottom is 130 px from the bottom, 194 with
+   the controls) and, while the controls show, above the timeline. Translucent without blur: a backdrop-filter over a playing film costs GPU every frame. ─────── */
+.chat {
+  position: absolute;
+  left: 32px;
+  bottom: 214px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: min(380px, 36vw);
+  pointer-events: none;
+  transition: transform 300ms var(--ease-out-quart);
+}
+.chat[data-raised='true'] {
+  transform: translateY(-56px);
+}
+.chatLog {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chatLine {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
+  padding: 5px 12px 5px 5px;
+  border-radius: 15px;
+  background: rgba(10, 10, 12, 0.64);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 6px 18px rgba(0, 0, 0, 0.22);
+  color: var(--text-primary);
+  font: 400 13px/20px var(--font-ui);
+  letter-spacing: -0.006em;
+  transform-origin: 0 100%;
+}
+.chatLine > :first-child {
+  flex-shrink: 0;
+}
+.chatText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* The name in the person's own color, the way the call's stage paints them. */
+.chatName {
+  margin-right: 2px;
+  font-weight: 590;
+  color: oklch(0.84 0.09 var(--h, 279));
+}
+.chatField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  pointer-events: auto;
+}
+.chatInput {
+  height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 19px;
+  outline: none;
+  background: rgba(10, 10, 12, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 8px 24px rgba(0, 0, 0, 0.3);
+  color: var(--text-primary);
+  font: 400 14px/20px var(--font-ui);
+  transition: box-shadow var(--dur-base) var(--ease-out-quad);
+}
+.chatInput::placeholder {
+  color: var(--text-tertiary);
+}
+.chatInput:focus-visible,
+.chatInput:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.75), 0 0 0 3px rgba(139, 142, 247, 0.18), 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.chatKeys {
+  padding-left: 16px;
+  font: var(--type-meta);
+  color: rgba(255, 255, 255, 0.6);
+  text-shadow: 0 1px 2px #000;
+}
+
+/* ── Lock (LockLayer): a cover that swallows clicks while locked, and a badge that says how to get out ──────────── */
+.lockCover {
+  position: absolute;
+  inset: 0;
+  z-index: 900;
+  cursor: none;
+}
+.lockCover[data-poked] {
+  cursor: default;
+}
+.lockBadge {
+  position: absolute;
+  /* the middle of the screen: clear of the room's notices and the subtitles, and where the eye already is */
+  left: 50%;
+  top: 50%;
+  z-index: 901;
+  translate: -50% -50%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 18px 8px 8px;
+  border-radius: 999px;
+  background: rgba(16, 16, 19, 0.88);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), var(--elev-overlay);
+  color: var(--text-primary);
+  cursor: default;
+  user-select: none;
+  touch-action: none;
+}
+.lockIcon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background-color var(--dur-base) var(--ease-out-quad), color var(--dur-base) var(--ease-out-quad);
+}
+.lockBadge[data-locked='true'] .lockIcon {
+  background: var(--accent-tint-strong);
+  color: var(--accent);
+}
+.lockRing {
+  position: absolute;
+  inset: -3px;
+  width: 40px;
+  height: 40px;
+  color: var(--accent);
+}
+.lockText {
+  display: grid;
+  gap: 1px;
+  font: var(--type-ui);
+}
+.lockText b {
+  font-weight: 590;
+}
+.lockText span {
+  font: var(--type-meta);
+  color: var(--text-tertiary);
+}

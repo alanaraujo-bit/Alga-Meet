@@ -50,7 +50,7 @@ export interface CinemaState {
   /** The <video>'s film audio (volume, ducking, output), once the stage is mounted. */
   audio: FilmAudio | null
   /** route: how the film audio reaches the speakers (FilmAudioOpts); applies to the next session's <video>. ambient: the screen light (§7.1). */
-  prefs: { volume: number; muted: boolean; ducking: boolean; route: FilmRoute; ambient: boolean }
+  prefs: { volume: number; muted: boolean; ducking: boolean; route: FilmRoute; ambient: boolean; chat: boolean }
   stats: CinemaStats | null
   statsOpen: boolean
   /** One-time notices (IP on sitting, headphones), each dismissed on its own. */
@@ -74,7 +74,7 @@ export interface CinemaStats {
 
 const PREFS_KEY = 'alga.cinema.v1'
 type FilmRoute = 'webaudio' | 'mediastream'
-type Stored = { volume?: number; muted?: boolean; ducking?: boolean; route?: FilmRoute; ambient?: boolean; ipSeen?: boolean; echoSeen?: boolean }
+type Stored = { volume?: number; muted?: boolean; ducking?: boolean; route?: FilmRoute; ambient?: boolean; chat?: boolean; ipSeen?: boolean; echoSeen?: boolean }
 const stored = (): Stored => {
   try {
     return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Stored
@@ -93,7 +93,7 @@ const initialPrefs = (): CinemaState['prefs'] => {
   const s = stored()
   return {
     volume: typeof s.volume === 'number' ? Math.min(1, Math.max(0, s.volume)) : 1, muted: s.muted === true, ducking: s.ducking !== false,
-    route: s.route === 'mediastream' ? 'mediastream' : 'webaudio', ambient: s.ambient !== false,
+    route: s.route === 'mediastream' ? 'mediastream' : 'webaudio', ambient: s.ambient !== false, chat: s.chat !== false,
   }
 }
 const freshMine = (): CinemaState['mine'] => ({ seated: false, status: 'preparing', audioId: null, subtitleId: null, offsetS: 0, unsupported: null })

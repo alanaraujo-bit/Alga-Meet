@@ -1,5 +1,17 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-09 noite (2) — Sala de cinema: tela cheia, chat ao vivo e cadeado (NÃO publicado)
+- **Tela cheia:** menus de legenda/áudio e ⋯, dicas, avisos ("Ana pulou para…") e diálogos (denunciar) não apareciam em
+  tela cheia: iam para o `body`, fora do elemento em tela cheia. Agora seguem a tela cheia (`ui/portal.ts`).
+- **Chat ao vivo:** `cinema_chat` → `CINEMA_CHAT` para as poltronas, sem guardar; uma linha de até 200 caracteres,
+  4 seguidas e depois 1 a cada 2 s, respeitando bloqueios nos dois sentidos. No app: canto inferior esquerdo, some em
+  8 s, Enter abre o campo.
+- **Cadeado:** segurar Espaço (ou o selo) 3 s trava/destrava; Espaço tocado pausa ao soltar a tecla.
+- **Testes:** shared 60, servidor 325 (cinema também em PostgreSQL real), desktop 851, e2e no app real com duas
+  instâncias 9/9 (`apps/desktop/scripts/cinema-room-e2e.mjs`, capturas em `docs/screenshots/cinema-room/`).
+- **Para publicar:** API primeiro (sem migração; um app novo contra a API antiga não recebe resposta ao chat), depois
+  o desktop 0.1.17.
+
 ## 2026-11-09 noite — Feedback no app ("Conta pro Eco") — desktop 0.1.16
 - **No ar (2026-11-09):** `main` em `08cf0b6`; API no Railway com a migração 0019 (`/ready` ok, `/feedback` respondendo).
   **Desktop 0.1.16:** https://github.com/alanaraujo-bit/Alga-Meet/releases/tag/v0.1.16 (build de `08cf0b6`, não

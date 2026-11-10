@@ -1,0 +1,59 @@
+{
+  "at": "2026-11-10T02:20:49.918Z",
+  "results": [
+    {
+      "name": "Tela cheia: o menu de legendas abre dentro da sala, escolhe a legenda, e o menu ⋯ e as dicas também aparecem",
+      "pass": true,
+      "ms": 2277,
+      "detail": null
+    },
+    {
+      "name": "Chat: Enter abre, a mensagem chega aos dois, sobe sobre o filme e some sozinha",
+      "pass": true,
+      "ms": 8525,
+      "detail": "sumiu em 8.2 s"
+    },
+    {
+      "name": "Chat: o campo aberto mostra a conversa recente; vazio não envia; Bia responde",
+      "pass": true,
+      "ms": 1335,
+      "detail": null
+    },
+    {
+      "name": "Cadeado: segurar Espaço 3 s trava sem pausar; travada, clique, setas e R não fazem nada",
+      "pass": true,
+      "ms": 5620,
+      "detail": null
+    },
+    {
+      "name": "Cadeado: um toque em Espaço só lembra como destravar; a conversa continua chegando",
+      "pass": true,
+      "ms": 1345,
+      "detail": null
+    },
+    {
+      "name": "Cadeado: segurar o selo com o mouse por 3 s destrava; segurar Espaço também",
+      "pass": true,
+      "ms": 9808,
+      "detail": null
+    },
+    {
+      "name": "Espaço tocado pausa e volta a tocar para todos (no soltar da tecla)",
+      "pass": true,
+      "ms": 634,
+      "detail": null
+    },
+    {
+      "name": "Menos movimento: chat e cadeado funcionam, o anel de progresso ainda enche",
+      "pass": true,
+      "ms": 6563,
+      "detail": null
+    },
+    {
+      "name": "Sair da tela cheia e voltar à chamada nunca deixa a sala travada",
+      "pass": true,
+      "ms": 7156,
+      "detail": null
+    }
+  ]
+}

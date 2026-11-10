@@ -7,13 +7,15 @@ import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
 import { useData } from '@/store/data'
 import { Icon, MenuButton, Tooltip, type MenuEntry } from '@/ui'
-import { Flag, Maximize, Minimize, MoreHorizontal, Pause, Play, RefreshCw, RotateCcw, Smile, Subtitles, Volume2, VolumeX, Wrench } from '@/ui/icons'
+import { Flag, Lock, Maximize, MessageCircle, Minimize, MoreHorizontal, Pause, Play, RefreshCw, RotateCcw, Smile, Subtitles, Volume2, VolumeX, Wrench } from '@/ui/icons'
 import { openReport } from '../../trust/Report'
 import * as act from '../actions'
 import { useCinema } from '../store'
 import { clock, t } from '../strings'
 import { toggleFullscreen } from './CinemaRoom'
+import { closeChat, openChat, useChat } from './chat'
 import { lang } from './film'
+import { lockNow } from './lock'
 import { canSend } from './reactions'
 import s from './room.module.css'
 
@@ -33,6 +35,7 @@ export function Controls({ session, video, root, cur, reactOpen, setReactOpen, o
   const host = useData((st) => st.users[session.hostId])
   const voices = useMedia(useShallow((st) => Object.values(st.participants).map((p) => p.volume)))
   const full = useFullscreen()
+  const chatOpen = useChat((st) => st.open)
   const p = session.playback
   const playing = p.playing || p.reason === 'buffering'
   const locked = p.reason === 'host_away' || p.reason === 'foyer'
@@ -55,6 +58,9 @@ export function Controls({ session, video, root, cur, reactOpen, setReactOpen, o
   const moreItems = (): MenuEntry[] => [
     { label: t.room.screenLight, checked: prefs.ambient, onSelect: () => act.setPrefs({ ambient: !prefs.ambient }) },
     { label: t.room.ducking, checked: prefs.ducking, onSelect: () => act.setPrefs({ ducking: !prefs.ducking }) },
+    { label: t.room.chatShow, checked: prefs.chat, onSelect: () => act.setPrefs({ chat: !prefs.chat }) },
+    { kind: 'separator' },
+    { label: t.room.lock, icon: Lock, onSelect: lockNow },
     { kind: 'separator' },
     // who projected is the target; the details name the session and the moment, never its content (spec §6.8)
     ...(host ? [{ label: t.room.report, icon: Flag, onSelect: () => openReport({ kind: 'user', user: host }, t.reportDetails(f.title, clock(cur))) }] : []),
@@ -86,6 +92,18 @@ export function Controls({ session, video, root, cur, reactOpen, setReactOpen, o
       </span>
 
       <span className={s.controlsEnd}>
+        <Tooltip content={t.room.chat} shortcut="Enter">
+          <button
+            type="button" className={s.ib} aria-label={t.room.chat} aria-pressed={chatOpen}
+            onClick={() => {
+              if (chatOpen) return closeChat()
+              if (!prefs.chat) act.setPrefs({ chat: true })
+              openChat()
+            }}
+          >
+            <Icon icon={MessageCircle} size={20} filled={chatOpen} />
+          </button>
+        </Tooltip>
         <span className={s.reactWrap}>
           {reactOpen && <ReactionPicker onClose={() => setReactOpen(false)} />}
           <Tooltip content={t.room.reactions} shortcut="R">

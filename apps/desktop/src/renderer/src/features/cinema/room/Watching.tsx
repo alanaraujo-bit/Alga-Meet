@@ -5,6 +5,7 @@ import type { Channel, CinemaSessionView } from '@alga/shared'
 import { useEffect, useState, type ReactNode, type RefObject } from 'react'
 import { Button } from '@/ui'
 import * as act from '../actions'
+import { isLocked, useLock } from './lock'
 import { t } from '../strings'
 import { Controls } from './Controls'
 import { NextUp } from './Credits'
@@ -41,9 +42,14 @@ export function Watching({ session, channel, view, video, root, uiShown, onEngin
 }) {
   const cur = useFilmTime(video, view.position)
   const [reactOpen, setReactOpen] = useState(false)
+  const locked = useLock((st) => st.locked)
+  useEffect(() => {
+    if (locked) setReactOpen(false)
+  }, [locked])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || e.key.toLowerCase() !== 'r') return
+      // Registered before the room's own keys (children first): the lock is checked here too.
+      if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || e.key.toLowerCase() !== 'r' || isLocked()) return
       if ((e.target as HTMLElement | null)?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"]')) return
       e.preventDefault()
       setReactOpen((o) => !o)

@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { useData } from '@/store/data'
 import { displayName } from '@/store/selectors'
-import { Button, toast } from '@/ui'
+import { Button, closeMenu, toast } from '@/ui'
 import * as act from '../actions'
 import { createAss, destroyAss, setAssOffset } from '../ass'
 import { CinemaDev, StatsPanel } from '../CinemaDev'
@@ -19,6 +19,10 @@ import { Icon } from '@/ui'
 import { Maximize2 } from '@/ui/icons'
 import { openCall } from '../../voice/voice'
 import { useKeepArt } from './art'
+import { ChatLayer } from './ChatLayer'
+import { closeChat, openChat, startChat } from './chat'
+import { cancelHold, endHold, isLocked, pokeLock, resetLock, startHold, useLock } from './lock'
+import { LockLayer } from './LockLayer'
 import { episodeLabel, nextStep } from './next'
 import { CinemaNotices } from './Notices'
 import { reducedMotion } from './prefs'
@@ -104,8 +108,23 @@ function Room({ channel, mini, onEngineering }: { channel: Channel; mini: boolea
   const playingScreen = view.screen === 'watching' || view.screen === 'credits'
   // the next-episode card keeps the top bar up (mockup 10)
   const idle = useIdle(IDLE_MS, shown && playingScreen && !(view.screen === 'credits' && session.next))
-  const uiShown = view.screen !== 'countdown' && !(playingScreen && idle)
+  const locked = useLock((st) => st.locked)
+  const uiShown = view.screen !== 'countdown' && !(playingScreen && idle) && !locked
   useFilmAudio(audio)
+
+  useEffect(() => startChat(), [])
+  // Never come back to a locked room (the call's screen, the end of the session).
+  useEffect(() => {
+    if (!shown) resetLock()
+  }, [shown])
+  useEffect(() => resetLock, [])
+  // Locking puts away whatever was open: a menu, the chat field, a focused control.
+  useEffect(() => {
+    if (!locked) return
+    closeMenu()
+    closeChat()
+    ;(document.activeElement as HTMLElement | null)?.blur?.()
+  }, [locked])
 
   useEffect(() => {
     const v = vref.current!
@@ -144,7 +163,7 @@ function Room({ channel, mini, onEngineering }: { channel: Channel; mini: boolea
     return () => clearInterval(id)
   }, [isHost, hostFileId, playingNow])
 
-  useRoomKeys(vref, root, !mini)
+  useRoomKeys(vref, root, !mini, shown)
   useKeepArt(session)
   useNextDriver(session, view, isHost)
 
@@ -210,7 +229,9 @@ function Room({ channel, mini, onEngineering }: { channel: Channel; mini: boolea
           </StatsPanel>
         </div>
       )}
+      {shown && <ChatLayer channel={channel} uiShown={uiShown} />}
       {shown && <CinemaNotices room />}
+      {shown && <LockLayer />}
       <div className={s.sr} aria-live="polite">{announce(view, names)}</div>
     </div>,
     document.body,
@@ -275,15 +296,35 @@ function ScreenLight({ video }: { video: RefObject<HTMLVideoElement | null> }) {
   )
 }
 
-/** Spec §7.4 shortcuts, in the capture phase (the DM chat's "type anywhere" skips defaultPrevented keys). */
-function useRoomKeys(video: RefObject<HTMLVideoElement | null>, root: RefObject<HTMLDivElement | null>, enabled: boolean): void {
+/**
+ * Spec §7.4 shortcuts, in the capture phase (the DM chat's "type anywhere" skips defaultPrevented keys). Space is
+ * play/pause on release; held 3 s it locks the room (lock.ts), and while locked every key is swallowed but that hold.
+ * Enter opens the chat. `lockable`: only the full room can be locked (not the foyer on the call's stage).
+ */
+function useRoomKeys(video: RefObject<HTMLVideoElement | null>, root: RefObject<HTMLDivElement | null>, enabled: boolean, lockable: boolean): void {
   useEffect(() => {
     if (!enabled) return
+    let holding = false
     const onKey = (e: KeyboardEvent) => {
+      if (isLocked()) {
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        // Esc still leaves fullscreen (a way out, not an action on the film); the room stays locked.
+        if (e.key === 'Escape') {
+          if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)
+          return pokeLock()
+        }
+        if (e.key !== ' ') return pokeLock()
+        if (!e.repeat) {
+          holding = true
+          startHold()
+        }
+        return
+      }
       if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return
       const el = e.target as HTMLElement | null
       if (el?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], [role="listbox"], [role="radiogroup"], [role="slider"]')) return
-      if (e.key === ' ' && el?.closest('button')) return // the focused button takes its own Space
+      if ((e.key === ' ' || e.key === 'Enter') && el?.closest('button')) return // the focused button takes its own key
       // Windows auto-repeat would flood the gateway with controls: swallow it (volume is local and may repeat)
       if (e.repeat && (e.key === ' ' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return void e.preventDefault()
       const st = useCinema.getState()
@@ -295,10 +336,13 @@ function useRoomKeys(video: RefObject<HTMLVideoElement | null>, root: RefObject<
       const seekBy = (d: number) => act.control('seek', (video.current?.currentTime ?? s.playback.position) + d)
       switch (e.key.length === 1 ? e.key.toLowerCase() : e.key) {
         case ' ':
-          if (s.playback.reason === 'foyer') {
-            if (s.hostId !== useData.getState().me?.id) return
-            act.control('start', s.playback.position)
-          } else act.control(s.playback.playing ? 'pause' : 'play')
+          // On release (keyup): a hold must never pause the whole room before it becomes a lock.
+          holding = true
+          if (lockable) startHold()
+          break
+        case 'Enter':
+          if (!pr.chat) act.setPrefs({ chat: true })
+          openChat()
           break
         case 'ArrowLeft': seekBy(-(e.shiftKey ? SEEK_LONG_S : SEEK_S)); break
         case 'ArrowRight': seekBy(e.shiftKey ? SEEK_LONG_S : SEEK_S); break
@@ -317,9 +361,38 @@ function useRoomKeys(video: RefObject<HTMLVideoElement | null>, root: RefObject<
       }
       e.preventDefault()
     }
+    const onUp = (e: KeyboardEvent) => {
+      if (e.key !== ' ' || !holding) return
+      holding = false
+      e.preventDefault()
+      // Not lockable (the foyer): every release is a tap.
+      const r = lockable ? endHold() : 'toggle'
+      if (r === 'toggle') spaceAction()
+    }
+    // Focus left mid-hold (Alt+Tab): the keyup will never come here.
+    const onBlur = () => {
+      holding = false
+      cancelHold()
+    }
     window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [video, root, enabled])
+    window.addEventListener('keyup', onUp, true)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('keyup', onUp, true)
+      window.removeEventListener('blur', onBlur)
+      cancelHold()
+    }
+  }, [video, root, enabled, lockable])
+}
+
+/** Space, tapped: start (host, in the foyer) or play/pause. */
+function spaceAction(): void {
+  const st = useCinema.getState()
+  const s = st.session
+  if (!s || !st.mine.seated) return
+  if (s.playback.reason !== 'foyer') return act.control(s.playback.playing ? 'pause' : 'play')
+  if (s.hostId === useData.getState().me?.id) act.control('start', s.playback.position)
 }
 
 export function toggleFullscreen(el: HTMLElement | null): void {
