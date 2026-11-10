@@ -1,6 +1,10 @@
 # Alga Meet — Estado do projeto
 
-## 2026-11-09 noite — Feedback no app ("Conta pro Eco") (branch `feat/feedback`, NÃO mesclada, NÃO publicada)
+## 2026-11-09 noite — Feedback no app ("Conta pro Eco") — desktop 0.1.16
+- **No ar (2026-11-09):** `main` em `08cf0b6`; API no Railway com a migração 0019 (`/ready` ok, `/feedback` respondendo).
+  **Desktop 0.1.16:** instalador gerado de `08cf0b6` (não assinado) e testado empacotado (abre, aponta para a API, as
+  três pontes novas respondem). **Falta publicar o GitHub Release `v0.1.16`** (o dono roda o `gh release create`) e
+  escrever a nota da 0.1.16 no estúdio de Novidades; sem a nota ninguém vê boas-vindas desta versão.
 - **O que é:** um cartão pequeno e não modal sobre o painel do usuário para contar bug, travamento, ideia ou elogio.
   O Eco e uma luz na cor do tipo reagem ao que a pessoa faz. Vai junto, à vista: versão, sistema, onde ela estava
   (sem nomes) e, em bug/travamento, o fim do log (dá para tirar); print opcional (colar, arrastar ou "Tirar print do
@@ -13,8 +17,7 @@
   (`main/feedback.ts`); `crash-marker.json` em userData.
 - **Testes:** shared 56, servidor 325 (+ feedback em PostgreSQL real), desktop 833, typecheck de tudo, e2e no app real
   14/14 (`apps/desktop/scripts/feedback-e2e.mjs`, capturas em `docs/screenshots/feedback/`).
-- **Para publicar:** subir a API antes (migração 0019); app novo contra API antiga mostra a falha no cartão e guarda o
-  rascunho. A Política de Privacidade ganhou a linha do feedback sem versão nova em `LEGAL_VERSIONS`.
+- A Política de Privacidade ganhou a linha do feedback sem versão nova em `LEGAL_VERSIONS`.
 
 ## 2026-11-08 noite — Novidades (patch notes e "O que há de novo") — desktop 0.1.15
 - **O que é:** boas-vindas depois de atualizar ("O Alga Meet ficou ainda melhor", com o Eco), Central de Novidades
