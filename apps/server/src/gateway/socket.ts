@@ -1,4 +1,4 @@
-import { ActivitySchema, CINEMA_FRAME_LIMIT, CINEMA_MAX_FRAME_BYTES, CinemaClientFrameSchema, CustomStatusSchema, E2EE_FRAME_LIMIT, E2eeClientFrameSchema, GatewayClose, clampActivity, type ClientFrame, type ReadyPayload } from '@alga/shared'
+import { ActivitySchema, CINEMA_FRAME_LIMIT, CINEMA_MAX_FRAME_BYTES, CinemaClientFrameSchema, CustomStatusSchema, MusicClientFrameSchema, E2EE_FRAME_LIMIT, E2eeClientFrameSchema, GatewayClose, clampActivity, type ClientFrame, type ReadyPayload } from '@alga/shared'
 import { eq, inArray } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import type { WebSocket } from 'ws'
@@ -30,6 +30,7 @@ const KNOWN_CLOSES = new Set([1000, 1001, 1005, 1006, 1011, ...Object.values(Gat
 
 const ClientFrameSchema = z.discriminatedUnion('op', [
   ...CinemaClientFrameSchema.options,
+  ...MusicClientFrameSchema.options,
   z.object({ op: z.literal('identify'), token: z.string().min(1).max(256) }),
   z.object({ op: z.literal('heartbeat') }),
   z.object({ op: z.literal('presence'), status: z.enum(['online', 'idle', 'dnd', 'invisible']) }),
@@ -78,6 +79,7 @@ export async function buildReady(ctx: Ctx, user: UserRow): Promise<ReadyPayload>
     users: strangers.map(publicUser),
     heartbeatIntervalMs: config.heartbeatIntervalMs,
     cinema: config.cinema.enabled,
+    music: true,
   }
 }
 
@@ -210,6 +212,13 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
         case 'cinema_end':
         case 'cinema_switch':
           await ctx.cinema.handle(conn, frame)
+          break
+        case 'music_hello':
+        case 'music_add':
+        case 'music_control':
+        case 'music_remove':
+        case 'music_report':
+          await ctx.music.handle(conn, frame)
           break
       }
     }

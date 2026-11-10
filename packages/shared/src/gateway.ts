@@ -8,6 +8,7 @@ import type {
   CinemaClientFrame, CinemaEndReason, CinemaErrorReason, CinemaPieceMeta, CinemaReaction, CinemaSessionView, CinemaSignal,
   CinemaSummary, CinemaTrackId,
 } from './cinema.js'
+import type { MusicClientFrame, MusicErrorReason, MusicState } from './music.js'
 import type { E2eeClientFrame, E2eeCommit, E2eeEpoch, E2eeProposals, E2eeResyncRequired, E2eeWelcome } from './e2ee.js'
 import type { RsvpStatus, SpaceEvent } from './events.js'
 import type { SpaceSound } from './soundboard.js'
@@ -75,6 +76,8 @@ export type ClientFrame =
    * session, keeps the seats, resets pieces/reactions/heat and rebuffers at `startS`). The server answers with CINEMA_* dispatches only.
    */
   | CinemaClientFrame
+  /** Music in a call (music.ts): `music_hello`, `music_add`, `music_control`, `music_remove`, `music_report`. */
+  | MusicClientFrame
 
 export interface ReadyPayload {
   user: Me
@@ -92,6 +95,8 @@ export interface ReadyPayload {
   heartbeatIntervalMs: number
   /** The server has the Sala de Cinema on. Absent on older servers, which close the socket on cinema ops. */
   cinema: boolean
+  /** The server plays music in calls. Absent on older servers, which close the socket on music ops. */
+  music?: boolean
 }
 
 export type Dispatch =
@@ -227,6 +232,10 @@ export type Dispatch =
   | { t: 'CINEMA_CHAT'; d: { sessionId: string; id: string; userId: string; text: string; at: number } }
   /** Only to the socket that sent `cinema_time`: `c` echoes its clock, `s` is the server clock (ms). */
   | { t: 'CINEMA_PONG'; d: { c: number; s: number } }
+  /** Music of a call (music.ts), to everyone in it, on every change; also the answer to `music_hello`. */
+  | { t: 'MUSIC_STATE'; d: MusicState }
+  /** Only to the socket whose music_* frame was refused. */
+  | { t: 'MUSIC_ERROR'; d: { op: string; reason: MusicErrorReason } }
   /** Only to the socket whose cinema_* frame was refused. */
   | { t: 'CINEMA_ERROR'; d: { op: string; reason: CinemaErrorReason; sessionId?: string } }
 
