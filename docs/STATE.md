@@ -1,6 +1,9 @@
 # Alga Meet — Estado do projeto
 
-## 2026-11-09 noite (3) — Música na call ("bot de música", YouTube) (NÃO publicado)
+## 2026-11-09 noite (3) — Música na call ("bot de música", YouTube) — desktop 0.1.17
+- **No ar (2026-11-10):** API no Railway (deploy `9732ae75`) e https://github.com/alanaraujo-bit/Alga-Meet/releases/tag/v0.1.17
+  (build de `9354da1`, não assinado; testado empacotado: o player do YouTube toca com o Referer do app). Falta a nota
+  da 0.1.17 no estúdio de Novidades.
 - **O que é:** colar um link do YouTube na call e todo mundo ouve junto, no mesmo ponto: fila, pausar, pular, mudar o
   ponto, parar, volume só seu, "parar de ouvir" só para você. Botão de nota na barra da call e Ctrl K. Como funciona:
   `docs/music.md`.
@@ -15,7 +18,7 @@
   instâncias e vídeos de verdade 8/8, diferença entre os dois players de 0,0–0,1 s (`apps/desktop/scripts/music-e2e.mjs`,
   capturas em `docs/screenshots/music/`).
 
-## 2026-11-09 noite (2) — Sala de cinema: tela cheia, chat ao vivo e cadeado (NÃO publicado)
+## 2026-11-09 noite (2) — Sala de cinema: tela cheia, chat ao vivo e cadeado — desktop 0.1.17
 - **Tela cheia:** menus de legenda/áudio e ⋯, dicas, avisos ("Ana pulou para…") e diálogos (denunciar) não apareciam em
   tela cheia: iam para o `body`, fora do elemento em tela cheia. Agora seguem a tela cheia (`ui/portal.ts`).
 - **Chat ao vivo:** `cinema_chat` → `CINEMA_CHAT` para as poltronas, sem guardar; uma linha de até 200 caracteres,
