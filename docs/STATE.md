@@ -2,9 +2,9 @@
 
 ## 2026-11-09 noite — Feedback no app ("Conta pro Eco") — desktop 0.1.16
 - **No ar (2026-11-09):** `main` em `08cf0b6`; API no Railway com a migração 0019 (`/ready` ok, `/feedback` respondendo).
-  **Desktop 0.1.16:** instalador gerado de `08cf0b6` (não assinado) e testado empacotado (abre, aponta para a API, as
-  três pontes novas respondem). **Falta publicar o GitHub Release `v0.1.16`** (o dono roda o `gh release create`) e
-  escrever a nota da 0.1.16 no estúdio de Novidades; sem a nota ninguém vê boas-vindas desta versão.
+  **Desktop 0.1.16:** https://github.com/alanaraujo-bit/Alga-Meet/releases/tag/v0.1.16 (build de `08cf0b6`, não
+  assinado; testado empacotado: abre, aponta para a API, as três pontes novas respondem). Quem está na 0.1.15 recebe
+  sozinho. **Falta escrever a nota da 0.1.16 no estúdio de Novidades;** sem ela ninguém vê boas-vindas desta versão.
 - **O que é:** um cartão pequeno e não modal sobre o painel do usuário para contar bug, travamento, ideia ou elogio.
   O Eco e uma luz na cor do tipo reagem ao que a pessoa faz. Vai junto, à vista: versão, sistema, onde ela estava
   (sem nomes) e, em bug/travamento, o fim do log (dá para tirar); print opcional (colar, arrastar ou "Tirar print do
