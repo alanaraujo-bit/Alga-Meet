@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { Icon } from './Icon'
 import { place, type Align, type Rect, type Side } from './floating'
+import { usePortalTarget } from './portal'
 import s from './overlay.module.css'
 
 export type MenuEntry =
@@ -129,8 +130,9 @@ export function MenuButton({
 /** Mounted once at the app root. */
 export function MenuHost() {
   const open = useMenuStore((st) => st.open)
+  const target = usePortalTarget()
   if (!open) return null
-  return createPortal(<MenuPanel key={`${open.anchor.left},${open.anchor.top}`} menu={open} />, document.body)
+  return createPortal(<MenuPanel key={`${open.anchor.left},${open.anchor.top}`} menu={open} />, target)
 }
 
 function MenuPanel({ menu }: { menu: OpenMenu }) {

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { focusables, originFor, place, type Align, type Side } from './floating'
+import { usePortalTarget } from './portal'
 import s from './overlay.module.css'
 
 /**
@@ -27,12 +28,13 @@ export function Popover({
   children: ReactNode
   width?: number
 }) {
+  const target = usePortalTarget()
   if (!anchor) return null
   return createPortal(
     <PopoverPanel anchor={anchor} onClose={onClose} side={side} align={align} gap={gap} label={label} width={width}>
       {children}
     </PopoverPanel>,
-    document.body,
+    target,
   )
 }
 

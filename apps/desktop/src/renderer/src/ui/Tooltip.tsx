@@ -2,6 +2,7 @@ import { cloneElement, useCallback, useEffect, useId, useLayoutEffect, useRef, u
 import { createPortal } from 'react-dom'
 import { Kbd } from './Kbd'
 import { place, originFor, type Align, type Side } from './floating'
+import { usePortalTarget } from './portal'
 import s from './misc.module.css'
 
 const DELAY = 450
@@ -124,6 +125,7 @@ function TooltipBubble({
   shortcut?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const target = usePortalTarget()
   const [pos, setPos] = useState<{ left: number; top: number; side: Side } | null>(null)
   useLayoutEffect(() => {
     const el = ref.current
@@ -146,6 +148,6 @@ function TooltipBubble({
       <span>{content}</span>
       {shortcut && <Kbd>{shortcut}</Kbd>}
     </div>,
-    document.body,
+    target,
   )
 }

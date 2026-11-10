@@ -2,6 +2,7 @@ import { X } from './icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
+import { usePortalTarget } from './portal'
 import { IconButton } from './Button'
 import { focusables } from './floating'
 import { EASE_IN, EASE_SHEET } from './motion'
@@ -31,6 +32,7 @@ export function Modal({
   initialFocus?: RefObject<HTMLElement | null>
   hideClose?: boolean
 }) {
+  const target = usePortalTarget()
   return createPortal(
     <AnimatePresence>
       {open && (
@@ -39,7 +41,7 @@ export function Modal({
         </ModalPanel>
       )}
     </AnimatePresence>,
-    document.body,
+    target,
   )
 }
 

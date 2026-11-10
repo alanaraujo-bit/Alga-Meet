@@ -1,10 +1,12 @@
 import { AlertCircle, CheckCircle2, Info, X } from './icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { Button, IconButton } from './Button'
 import { Icon } from './Icon'
 import { EASE_IN, EASE_OUT_QUART } from './motion'
+import { usePortalTarget } from './portal'
 import s from './overlay.module.css'
 
 type Kind = 'info' | 'success' | 'error'
@@ -37,7 +39,9 @@ const ICON = { info: Info, success: CheckCircle2, error: AlertCircle }
 
 export function ToastHost() {
   const items = useToasts((st) => st.items)
-  return (
+  // In fullscreen (the cinema room) the toasts go inside it, or nobody sees "Ana pulou para 1:12:40 · Desfazer".
+  const target = usePortalTarget()
+  return createPortal(
     // The live region exists before any toast: text inserted into it is announced (a role=status born with its text
     // is often skipped by NVDA/Narrator). Errors stay role=alert (announced on insertion, assertive).
     <div className={s.toasts} role="region" aria-label="Notificações" aria-live="polite">
@@ -46,7 +50,8 @@ export function ToastHost() {
           <ToastView key={t.id} t={t} />
         ))}
       </AnimatePresence>
-    </div>
+    </div>,
+    target,
   )
 }
 
