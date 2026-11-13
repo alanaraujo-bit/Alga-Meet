@@ -34,10 +34,28 @@
 Não existe mais conta com tudo liberado (`ALGA_OWNER_EMAILS` foi removido do código e do Railway em 2026-11-08, a pedido do dono): Plus e cosméticos só por pagamento ou presente aceito, inclusive para o dono. Linhas `source: grant` antigas são revogadas no primeiro sweep após subir.
 
 ## Como publicar uma nova versão
-```bash
-railway up --service api --environment staging --detach
-```
-(da raiz do repo; `.railwayignore` evita subir docs, app desktop e screenshots). Migrações rodam no boot.
+Dois caminhos; nos dois as migrações rodam no boot.
+
+1. **Pelo GitHub, preso a um commit** (como foi feito em 2026-11-13, numa máquina sem o CLI do Railway): o serviço
+   `api` tem como fonte o repositório `alanaraujo-bit/Alga-Meet`, **fixado num commit** (`b10ece5`). Fixado quer dizer
+   que um push na `main` **não** publica nada sozinho. Para publicar outro commit: no painel do Railway, serviço `api`
+   › Settings › Source, troque o commit (ou, pelo conector MCP do Railway, `connect-service-source` com `commitSha`).
+   O commit precisa estar no GitHub. Para voltar ao modo antigo, basta desconectar a fonte no mesmo lugar.
+2. **Pelo CLI**, da raiz do repo (`.railwayignore` evita subir docs, app desktop e screenshots):
+   ```bash
+   railway up --service api --environment staging --detach
+   ```
+
+Voltar atrás: a implantação anterior fica na lista do serviço com "Rollback" (as migrações são só aditivas).
+
+## Alga Worlds (ligado em 2026-11-13)
+- `WORLDS=true` no serviço `api`. Sem essa variável o Worlds fica desligado em produção: as rotas respondem 404 e o
+  app não mostra o botão Mundo.
+- O pacote 3D (33,5 MiB, `apps/server/assets/worlds/v1`) vai dentro da imagem e sai por
+  `GET /api/v1/worlds/assets/*`. Verificado de fora: `manifest.json` 200 com 90 arquivos, arquivo fora do manifesto
+  404, `GET /worlds/rooms/@me` sem token 401.
+- Os produtos da coleção Ateliê entram no catálogo com os preços de `docs/business/monetization.md` §3.1 e são
+  cobrados de verdade pelo Mercado Pago. O app 0.1.17 ignora esses produtos (não os conhece).
 
 ## Instalador de staging
 `apps/desktop/release/AlgaMeet-Setup-0.1.0-staging.exe` (110 MB, SHA-256 `39f81da0…b28c`), build de `031bbf6` numa worktree limpa com a URL de staging embutida. Verificado: instalação silenciosa, app empacotado abre a tela de login apontando para `api-staging-b3ea.up.railway.app` (`scripts/check-installed.mjs`), desinstalação limpa (pasta e protocolo `algameet://` removidos). **Sem assinatura de código** → SmartScreen avisa "editor desconhecido".

@@ -1,8 +1,26 @@
 # Alga Meet — Estado do projeto
 
-## 2026-11-13 — Alga Worlds: a chamada dentro de uma sala em 3D (branch `feat/worlds`, NÃO mesclada, NÃO publicada)
-- **Estado:** commit `15c3f65` na branch local `feat/worlds` (a partir de `afe95e1`), sem push e sem deploy. Decisão do
-  dono: revisar, mesclar, publicar a API e lançar um desktop novo. Como funciona, medições e o que falta: `docs/worlds.md`.
+## 2026-11-13 — Alga Worlds: a chamada dentro de uma sala em 3D — desktop 0.1.18, NO AR
+- **No ar (2026-11-13, a pedido do dono):** `feat/worlds` mesclada na `main` (`b10ece5`, no GitHub); API no Railway
+  (deploy `4acae5c3`, de `b10ece5`, com **`WORLDS=true`**; migração 0020 aplicada no boot) e
+  https://github.com/alanaraujo-bit/Alga-Meet/releases/tag/v0.1.18 (build de `b10ece5`, não assinado, 167,9 MB).
+  Como funciona, medições e o que falta: `docs/worlds.md`.
+- **Como foi publicado** (a máquina não tinha CLI do Railway, `gh` nem Rust): a API pelo conector do Railway, com o
+  serviço `api` ligado ao repositório do GitHub **preso ao commit** (push na `main` não publica sozinho; ver
+  `docs/infra/staging.md`). O instalador pelo passo a passo do `npm run dist`, com uma diferença: o
+  `alga-setup-ui.exe` é o **mesmo binário do 0.1.17** (tirado do app instalado; as fontes da janela de instalação não
+  mudam desde 2026-11-05, e sem Rust não dava para recompilar). O release, pela API do GitHub com a credencial que o
+  git desta máquina já usa.
+- **Verificado no pacote:** E2E do Worlds **12/12 contra o build empacotado** (`QA_EXE=…/win-unpacked/Alga Meet.exe`,
+  stack própria); `check-package.mjs`; o app empacotado abre na 0.1.18 apontando para a API de produção; o instalador
+  atualizou o 0.1.17 do PC do dono pelo caminho do "Reiniciar e atualizar" e o app abriu; `releases/latest` e
+  `latest.yml` servem a 0.1.18.
+- **ATENÇÃO — voz fora do ar na hora da publicação:** `/api/v1/ready` → `livekit: fail`. O SFU de casa
+  (`infra/home-sfu/`) não respondia em 443/7881 nem de fora nem da rede local; o DNS resolvia normalmente. Não tem
+  relação com o deploy (o `/ready` de 2026-11-10 dava 200 e nada do LiveKit mudou). Sem o SFU ninguém entra em
+  chamada, então **o Worlds não foi exercitado numa chamada real em produção**. Religar o servidor é do dono.
+- **Falta:** a nota da 0.1.18 no estúdio de Novidades (e a da 0.1.17); decidir se os preços da coleção Ateliê ficam
+  (já estão à venda com dinheiro real: `docs/business/monetization.md` §3.1).
 - **O que é:** o botão Mundo no dock leva a chamada para um lugar em 3D sem tocar na voz: o **lounge** (sala pronta do
   grupo) ou a **sala pessoal** de quem abre (persistente, com acesso por chamada / só amigos / só o dono). Cada pessoa é
   um manequim de ateliê montável; anda, senta, gesticula, reage, e a tela da sala mostra a transmissão de tela de
@@ -16,8 +34,8 @@
   Em produção nasce desligado: `WORLDS=true`.
 - **Testes:** shared 76, servidor 361 (mundos também em PostgreSQL real), desktop 908, typecheck de tudo, **e2e no app
   real com duas instâncias 12/12** (`apps/desktop/scripts/worlds-e2e.mjs`, capturas em `docs/screenshots/worlds/`).
-- **Não verificado:** `npm run dist`, app instalado contra o staging, GPU/VRAM/fps com um jogo aberto, chamada E2EE com
-  o mundo aberto. **Limite assumido:** o avatar é um manequim (CC0), não um humano realista com roupa modelada.
+- **Não verificado:** chamada real com o mundo aberto em produção (SFU fora do ar no dia), GPU/VRAM/fps com um jogo
+  aberto, chamada E2EE com o mundo aberto. **Limite assumido:** o avatar é um manequim (CC0), não um humano realista com roupa modelada.
 - **Mudanças fora da pasta do Worlds** (para a revisão): CSP ganhou `blob:` em `connect-src` (o carregador de modelos lê
   blobs criados pela própria página); `CallStage`, `ControlsDock`, `QuickSwitcher`, `Shell`, `session.ts` e `icons.tsx`
   ganharam os pontos de entrada; `billing.ts` tira do manequim a parte paga que a conta perdeu; `wishlist.ts` recusa

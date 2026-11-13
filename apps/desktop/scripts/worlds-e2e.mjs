@@ -3,6 +3,8 @@
 // staying up through all of it, a failing 3D pack leaving the call intact, and the Ateliê (arranging and saving the
 // room, a real sandbox purchase unlocking a piece).
 //   QA_WORK=<dir> QA_API_PORT=4395 QA_LK_PORT=7995 node scripts/worlds-e2e.mjs [--skip-build] [--keep]
+// A packaged build instead of a fresh one (what a release ships): QA_EXE="<...>/release/win-unpacked/Alga Meet.exe",
+// with QA_OUT=<dir> so its screenshots do not replace the ones in docs.
 // Screenshots: docs/screenshots/worlds/. Never touches the dev stack (:4000/:7880). The screen that is shared is
 // Chromium's synthetic one (the fake-device switches), never this computer's.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -14,7 +16,8 @@ import * as Q from './qa-stack.mjs'
 
 const KEEP = process.argv.includes('--keep')
 const APP = join(Q.appDir, 'node_modules', '.alga-qa-worlds')
-const OUT = join(Q.repo, 'docs', 'screenshots', 'worlds')
+const EXE = process.env.QA_EXE
+const OUT = process.env.QA_OUT ?? join(Q.repo, 'docs', 'screenshots', 'worlds')
 mkdirSync(OUT, { recursive: true })
 mkdirSync(Q.WORK, { recursive: true })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -22,7 +25,7 @@ const electronPath = createRequire(join(Q.appDir, 'package.json'))('electron')
 const apps = {}
 const results = []
 
-if (!process.argv.includes('--skip-build')) {
+if (!EXE && !process.argv.includes('--skip-build')) {
   execSync(`npx electron-vite build --outDir "${APP}"`, { cwd: Q.appDir, stdio: 'inherit' })
   writeFileSync(join(APP, 'package.json'), JSON.stringify({ name: '@alga/desktop', productName: 'Alga Meet', version: '0.1.0', main: './main/index.js' }, null, 2))
   cpSync(join(Q.appDir, 'build', 'runtime'), join(APP, 'build', 'runtime'), { recursive: true })
@@ -69,12 +72,12 @@ async function buy(token, productId) {
 }
 
 async function launch(k, x) {
-  rmSync(join(process.env.APPDATA ?? '', 'Alga Meet Dev', 'profiles', `qa-worlds-${k}`), { recursive: true, force: true })
+  rmSync(join(process.env.APPDATA ?? '', EXE ? 'Alga Meet' : 'Alga Meet Dev', 'profiles', `qa-worlds-${k}`), { recursive: true, force: true })
   const env = { ...process.env, ALGA_API_URL: Q.API, ALGA_E2E: '1' }
   delete env.ELECTRON_RENDERER_URL
   const app = await electron.launch({
-    executablePath: electronPath, cwd: Q.appDir, env,
-    args: [APP, `--profile=qa-worlds-${k}`, '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
+    executablePath: EXE ?? electronPath, cwd: Q.appDir, env,
+    args: [...(EXE ? [] : [APP]), `--profile=qa-worlds-${k}`, '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
       '--disable-features=CalculateNativeWinOcclusion', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
       '--force-device-scale-factor=1'],
   })

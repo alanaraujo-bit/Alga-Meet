@@ -128,8 +128,16 @@ Uma peça que não carrega é pulada e o resto da sala abre.
 - Laboratório sem conta nem API: `npx vite --config vite.worlds-lab.config.ts` → `http://localhost:5391/#worlds-lab`.
 - Miniaturas: `node scripts/worlds-thumbs.mjs` (56 imagens, 410 KiB, desenhadas pelo próprio motor).
 
-Não verificado: `npm run dist` com o Worlds (o `check-package.mjs` não foi rodado), o app instalado contra o staging,
-e uma chamada cifrada de ponta a ponta com o mundo aberto (o mundo não toca na mídia, mas não foi exercitado junto).
+- **Build empacotado (0.1.18, 2026-11-13):** o mesmo E2E rodado contra `release/win-unpacked/Alga Meet.exe`
+  (`QA_EXE=…`, API e LiveKit próprios): **12/12**. `check-package.mjs` passou; o `app.asar` leva o chunk do motor e
+  nenhum modelo 3D. O instalador atualizou um 0.1.17 instalado pelo mesmo caminho do "Reiniciar e atualizar"
+  (`--updated /S --force-run`) e o app abriu na 0.1.18.
+- **Produção (2026-11-13):** `manifest.json` do pacote 200 com 90 arquivos, arquivo fora do manifesto 404, sala sem
+  token 401 (`docs/infra/staging.md`).
+
+Não verificado: **uma chamada de verdade com o mundo aberto em produção** (no dia da publicação o SFU de casa estava
+fora do ar: `/api/v1/ready` → `livekit: fail`), GPU/VRAM/fps com um jogo aberto, e uma chamada cifrada de ponta a
+ponta com o mundo aberto (o mundo não toca na mídia, mas não foi exercitado junto).
 
 ## O que falta (sem enfeite)
 - **Corpos humanos realistas com roupa de verdade.** O manequim é uma escolha de direção de arte possível com assets
