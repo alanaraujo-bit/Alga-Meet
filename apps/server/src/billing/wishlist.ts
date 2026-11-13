@@ -28,7 +28,8 @@ export const wishlistOf = (db: Db, billing: Billing, u: UserRow) => view(db, bil
 
 export async function addToWishlist(db: Db, billing: Billing, u: UserRow, productId: string): Promise<Wishlist> {
   const p = productById(productId)
-  if (!p || p.retired || !p.purchasable || (p.kind !== 'cosmetic' && p.kind !== 'bundle')) throw notFound('Produto não encontrado.')
+  // A wishlist is what friends may give: what cannot be a gift (the Alga Worlds pieces, for now) does not go in it.
+  if (!p || p.retired || !p.purchasable || !p.giftable || (p.kind !== 'cosmetic' && p.kind !== 'bundle')) throw notFound('Produto não encontrado.')
   const current = await view(db, billing, u)
   if (current.items.includes(productId)) return current
   if ((await billing.owned(u.id)).has(productId)) throw conflict('Você já tem este item.')

@@ -127,6 +127,24 @@ import { birthDate, termsVersion, type AccountRestriction } from './trust-safety
  *   checks every screen-share publication against them (see VoiceJoinResponse.streamPresets). It also carries
  *   E2EE_ATTRIBUTE (VoiceJoinResponse.e2ee) and, when the body has `capabilities`, DECODE_ATTRIBUTE. 409 `conflict`
  *   with `fields['capabilities.e2ee']` = 'required' when the call is E2EE and `capabilities.e2ee` is false.
+ * Alga Worlds (models, bodies and the realtime part in worlds.ts; the catalog in worlds-catalog.ts). 404 on every route
+ * when the server has Worlds off (READY.worlds absent):
+ * GET    /worlds/rooms/@me                               -> WorldRoom (your room; the first call creates it from
+ *                                                          STARTER_ROOM)
+ * PUT    /worlds/rooms/@me         PutWorldRoomBody      -> WorldRoom (the whole room; 400 `fields.<path>` with the
+ *                                                          RoomProblem reason for an unknown SKU or variant, a
+ *                                                          duplicate id, too many items or something outside the room;
+ *                                                          403 for a SKU you do not hold; a call showing this room
+ *                                                          gets WORLD_ROOM, and whoever sat on a seat that is gone
+ *                                                          stands up; 30/min)
+ * PUT    /worlds/avatar            PutWorldAvatarBody    -> Me (your figure, or null for the automatic one; 400
+ *                                                          `fields.avatar.<part>` unknown part, 403 a part you do not
+ *                                                          hold; ME_UPDATE + USER_UPDATE with PublicUser.world; 20/min)
+ * GET    /worlds/assets/*                                -> the 3D asset pack (public, no auth; `manifest.json` lists
+ *                                                          every file with its SHA-256; files are immutable per pack
+ *                                                          version and cached for a year, the manifest for 5 minutes;
+ *                                                          READY.worlds.assetsUrl is where a client should fetch it
+ *                                                          from, which may be a CDN instead of this route)
  * E2EE devices and key packages (bodies, models and the call flow in e2ee.ts; 10/min per route; 503 when the server
  * has no MLS module):
  * POST   /e2ee/devices             RegisterDeviceBody    -> E2eeDevice (201 new, 200 again: binds the device to this

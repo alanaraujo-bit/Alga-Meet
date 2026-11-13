@@ -3,3 +3,8 @@
 *.ico binary
 *.bmp binary
 *.exe binary
+
+# The 3D asset pack of Alga Worlds is addressed by SHA-256 (apps/server/assets/worlds/*/manifest.json): never touch its bytes.
+*.glb binary
+*.webp binary
+*.hdr binary

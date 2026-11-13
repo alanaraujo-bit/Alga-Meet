@@ -103,7 +103,7 @@ describe('catalog v2', () => {
 
   it('Hora Azul: 28 items in waves 1/2, 25 sold for R$ 240,50, bundles, Plus wardrobe, Casa; v1 retired', () => withWave2At(null, async () => {
     const cat = (await call<BillingCatalog>('GET', '/billing/catalog', null)).body
-    expect(cat.version).toBe(2)
+    expect(cat.version).toBe(3)
     const ha = cat.products.filter((p) => p.collectionId === 'hora_azul' && p.kind === 'cosmetic')
     expect(ha).toHaveLength(28)
     expect(ha.filter((p) => p.wave === 1)).toHaveLength(18)
@@ -115,9 +115,10 @@ describe('catalog v2', () => {
     expect(ha.filter((p) => p.available)).toHaveLength(16) // wave 1 is open, wave 2 not scheduled yet
     expect(ha.filter((p) => p.includedIn?.includes('plus')).map((p) => p.id).sort()).toEqual(['aura_ha_frondes', 'icon_ha_noite', 'icon_ha_porcelana'])
     expect(cat.products.find((p) => p.id === 'aura_ha_respiro')).toMatchObject({ cosmeticType: 'voice_aura', wave: 2, purchasable: true, available: false })
-    expect(cat.collections).toEqual([expect.objectContaining({
-      id: 'hora_azul', waves: [expect.objectContaining({ wave: 1, open: true }), { wave: 2, opensAt: null, open: false }],
-    })])
+    expect(cat.collections).toEqual([
+      expect.objectContaining({ id: 'hora_azul', waves: [expect.objectContaining({ wave: 1, open: true }), { wave: 2, opensAt: null, open: false }] }),
+      expect.objectContaining({ id: 'atelie', waves: [expect.objectContaining({ wave: 1, open: true })] }), // Alga Worlds (worlds.test.ts)
+    ])
     const bundles = cat.products.filter((p) => p.kind === 'bundle').map((p) => [p.id, p.priceBrlCents, p.items!.length, p.available])
     expect(bundles).toEqual([
       ['bundle_ha_hora_azul', 4790, 5, false], ['bundle_ha_vidro', 3590, 5, false],

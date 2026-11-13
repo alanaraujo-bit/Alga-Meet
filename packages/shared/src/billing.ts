@@ -118,8 +118,14 @@ export interface Product {
    * (Pix or card; also what a Plus gift buys). Omitted = 'recurring'.
    */
   billing?: 'recurring' | 'one_time'
-  /** Cosmetics only. */
+  /** Profile and call cosmetics only (they are worn in a slot of the profile, PUT /users/@me/cosmetics). */
   cosmeticType?: CosmeticType
+  /**
+   * Cosmetics of Alga Worlds (worlds-catalog.ts: the WorldEntry with this id says what it is): furniture, finishes
+   * and avatar parts. They have no `cosmeticType` and no profile slot; they are used by placing them in your room
+   * (PUT /worlds/rooms/@me) or wearing them on your figure (PUT /worlds/avatar).
+   */
+  world?: true
   /** Plans whose subscribers can use this cosmetic while subscribed, without buying it. */
   includedIn?: PlanId[]
   /** `includedIn` applies from this instant on (the Plus wardrobe grows by one item a month). Omitted = always. */

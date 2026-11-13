@@ -1,4 +1,7 @@
-import { ACCOUNT_ACTION_REASONS, FEEDBACK_KINDS, REPORT_REASONS, type EcoSpec, type EquippedCosmetics, type FeedbackContext, type ReleaseContent } from '@alga/shared'
+import {
+  ACCOUNT_ACTION_REASONS, FEEDBACK_KINDS, REPORT_REASONS, WORLD_ROOM_ACCESS, WORLD_SHELL_IDS,
+  type EcoSpec, type EquippedCosmetics, type FeedbackContext, type ReleaseContent, type WorldAvatar, type WorldPlacedItem, type WorldRoomFinish,
+} from '@alga/shared'
 import { sql } from 'drizzle-orm'
 import {
   type AnyPgColumn, boolean, date, foreignKey, index, integer, jsonb, pgTable, primaryKey, real, text, timestamp, uniqueIndex, uuid,
@@ -58,6 +61,11 @@ export const users = pgTable('users', {
   plusSince: ts('plus_since'),
   /** Wishlist shown to friends; null = the default for the age bracket (on for 18+, off for 16–17). */
   wishlistVisible: boolean('wishlist_visible'),
+  /**
+   * The 3D figure of Alga Worlds (PublicUser.world); null = the automatic one, derived client-side. Paid parts are
+   * held SKUs only (PUT /worlds/avatar checks; Billing.recompute puts the free part back when one lapses).
+   */
+  worldAvatar: jsonb('world_avatar').$type<WorldAvatar>(),
 }, (t) => [
   // An address belongs to at most one verified account; unverified accounts may claim a taken one.
   uniqueIndex('users_verified_email_key').on(t.email).where(sql`${t.emailVerifiedAt} is not null`),
@@ -850,6 +858,23 @@ export const feedback = pgTable('feedback', {
   createdAt: ts('created_at').notNull().defaultNow(),
 }, (t) => [index('feedback_user_created_idx').on(t.userId, t.createdAt)])
 export type FeedbackRow = typeof feedback.$inferSelect
+
+// ---- Alga Worlds (src/worlds.ts; packages/shared/src/worlds.ts) -----------------------------------------------------
+
+/**
+ * The personal room of an account, as its owner saved it (created from STARTER_ROOM on first need). Pieces the owner
+ * stops holding stay here and are left out when the room is shown, so buying them again brings them back.
+ */
+export const worldRooms = pgTable('world_rooms', {
+  ownerId: uuid('owner_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  access: text('access', { enum: WORLD_ROOM_ACCESS }).notNull().default('call'),
+  shell: text('shell', { enum: WORLD_SHELL_IDS }).notNull().default('loft'),
+  finish: jsonb('finish').$type<WorldRoomFinish>().notNull(),
+  items: jsonb('items').$type<WorldPlacedItem[]>().notNull(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+export type WorldRoomRow = typeof worldRooms.$inferSelect
 
 // ---- Novidades (release notes; packages/shared/src/releases.ts) -----------------------------------------------------
 

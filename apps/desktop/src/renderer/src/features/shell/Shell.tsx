@@ -34,6 +34,9 @@ import { startWhatsNew } from '../whatsnew/store'
 import { FeedbackHost } from '../feedback/Host'
 import { MusicHost } from '../music/MusicCard'
 import { startMusic } from '../music/store'
+import { WorldNotices } from '../worlds/Host'
+import { startWorlds } from '../worlds/store'
+import { useStudio } from '../worlds/studio/store'
 import { startFeedback } from '../feedback/store'
 import { Welcome } from '../whatsnew/Welcome'
 import { MemberList } from './MemberList'
@@ -48,6 +51,8 @@ const SettingsOverlay = lazy(() => import('../settings/SettingsOverlay').then((m
 const SpaceSettingsOverlay = lazy(() => import('../spaceSettings/SpaceSettings').then((m) => ({ default: m.SpaceSettingsOverlay })))
 // Staff only: the moderation panel never loads for anyone else.
 const StaffPanel = lazy(() => import('../staff/StaffPanel'))
+// Alga Worlds' Ateliê (the room editor, the figure and their store): the screen and its 3D engine load when it opens.
+const WorldStudio = lazy(() => import('../worlds/studio/Studio'))
 function useLatch(on: boolean): boolean {
   const [latched, setLatched] = useState(on)
   if (on && !latched) setLatched(true)
@@ -70,6 +75,7 @@ export function Shell() {
   useEffect(() => startBilling(), [])
   useEffect(() => startWhatsNew(), [])
   useEffect(() => startMusic(), [])
+  useEffect(() => startWorlds(), [])
   useInviteLink()
   useDeletionCanceledNotice()
   // Signing out closes the panel, so the next account never starts with it open.
@@ -77,6 +83,8 @@ export function Shell() {
   // Offers the card after a crash; signing out leaves nothing of this account's feedback in memory.
   useEffect(() => startFeedback(), [])
   const staffPanel = useLatch(useStaff((st) => st.open))
+  // Not latched: closing it must unmount it, which is what frees the GPU.
+  const worldStudio = useStudio((st) => st.tab !== null)
   const idle = useIdle()
   const settingsOpen = useSettings((st) => st.section !== null)
   const settings = useLatch(settingsOpen || idle)
@@ -120,11 +128,13 @@ export function Shell() {
         {settings && <SettingsOverlay />}
         {spaceSettings && <SpaceSettingsOverlay />}
         {staffPanel && <StaffPanel />}
+        {worldStudio && <WorldStudio />}
       </Suspense>
       <WhatsNewCenter />
       <Welcome />
       <FeedbackHost />
       <MusicHost />
+      <WorldNotices />
       <VerifyEmailDialog />
       <BillingHost />
       <ReportHost />

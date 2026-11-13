@@ -1,6 +1,6 @@
 import type { Channel } from '@alga/shared'
 import type { Glyph } from '@/ui/icons'
-import { ArrowLeftRight, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, ProjectorScreen, Settings2, Square, Volume2, Waveform, MusicNotes } from '@/ui/icons'
+import { ArrowLeftRight, Cube, Headphones, HeadphoneOff, Mic, MicOff, MonitorUp, PhoneOff, ProjectorScreen, Settings2, Square, Volume2, Waveform, MusicNotes } from '@/ui/icons'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Ref, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { media, useMedia } from '@/media'
@@ -19,6 +19,9 @@ import { SoundboardPanel } from '../soundboard/SoundboardPanel'
 import { SoundEditor } from '../soundboard/SoundEditor'
 import { setOpen, useSoundboard } from '../soundboard/store'
 import { t as sbT } from '../soundboard/strings'
+import { placeEntries, worldEntries } from '../worlds/Host'
+import { amInside, useWorlds } from '../worlds/store'
+import { t as worldsT } from '../worlds/strings'
 import { joinVoice, leaveVoice, useVoice } from './voice'
 import s from './stage.module.css'
 
@@ -66,6 +69,12 @@ export function ControlsDock({ channel }: { channel: Channel }) {
   // Music: like the cinema, only when READY says this server has it.
   const musicOn = useSession((st) => st.music)
   const music = useMusic(useShallow((st) => ({ open: st.open, playing: !!st.state?.now })))
+  const worldsOn = useSession((st) => st.worlds !== null)
+  const world = useWorlds(useShallow((st) => {
+    const open = st.session?.channelId === channel.id
+    const inside = open && amInside(st, meId)
+    return { open, inside, onStage: inside && st.show }
+  }))
 
   return (
     <div ref={dock} className={s.dock} role="toolbar" aria-label="Controles da chamada">
@@ -125,6 +134,23 @@ export function ControlsDock({ channel }: { channel: Channel }) {
         disabled={!connected}
         onClick={() => (music.open && !music.playing ? closeMusic() : openMusic())}
       />}
+      {/* Alga Worlds: like the cinema and the music, only when READY says this server has it. */}
+      {worldsOn && (
+        <MenuButton
+          side="top"
+          align="center"
+          label={worldsT.button}
+          items={() => (world.open ? worldEntries(world.inside, world.onStage) : placeEntries())}
+        >
+          <CallButton
+            icon={Cube}
+            label={worldsT.button}
+            hint={world.open ? undefined : worldsT.buttonHint}
+            on={world.inside}
+            disabled={!connected}
+          />
+        </MenuButton>
+      )}
       {channel.spaceId && (
         <CallButton
           ref={sbButton}

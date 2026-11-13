@@ -98,6 +98,12 @@ const EnvSchema = z
     CINEMA_STUN_URLS: z.string().optional(),
     CINEMA_TURN_URLS: z.string().optional(),
     CINEMA_TURN_SECRET: z.string().min(1).optional(),
+    /** Alga Worlds (src/worlds.ts). Default: on outside production, like the Sala de Cinema; production turns it on with WORLDS=true. */
+    WORLDS: z.enum(['true', 'false', '1', '0']).optional().transform((v) => (v === undefined ? undefined : v === 'true' || v === '1')),
+    /** Where clients fetch the 3D asset pack from: a CDN (absolute https URL). Default: this API's own /api/v1/worlds/assets. */
+    WORLDS_ASSETS_URL: z.url().optional(),
+    /** Folder of the asset pack served by GET /worlds/assets/* (its manifest.json lists what is in it). */
+    WORLDS_ASSETS_DIR: z.string().min(1).default(join(serverRoot, 'assets', 'worlds', 'v1')),
     /** Makes RegisterBody.birthDate and termsVersion mandatory outside production (production always requires them). */
     REQUIRE_BIRTHDATE: bool,
     /** Where the published Termos/Política/Diretrizes live (GET /legal links). */
@@ -149,6 +155,9 @@ const EnvSchema = z
     if (env.NODE_ENV === 'production' && env.CASA_CINEMA) {
       ctx.addIssue({ code: 'custom', path: ['CASA_CINEMA'], message: 'Casa Cinema needs the bandwidth deal, the 60 h/month meter and the voice preset grant (growth-plan §2.3); none is built' })
     }
+    if (env.WORLDS_ASSETS_URL && !(env.NODE_ENV === 'production' ? /^https:\/\//i : /^https?:\/\//i).test(env.WORLDS_ASSETS_URL)) {
+      ctx.addIssue({ code: 'custom', path: ['WORLDS_ASSETS_URL'], message: 'must be an absolute https:// URL (http:// only outside production)' })
+    }
     if (env.BILLING_PROVIDER === 'stripe') {
       for (const k of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'BILLING_RETURN_URL'] as const) {
         if (!env[k]) ctx.addIssue({ code: 'custom', path: [k], message: 'required with BILLING_PROVIDER=stripe' })
@@ -197,6 +206,11 @@ export interface Config {
   /** src/e2ee.ts. `dsSeed`: Ed25519 seed of the Delivery Service's external-sender key. */
   e2ee: { dsSeed: Buffer; mlsPkg: string }
   cinema: { enabled: boolean; stunUrls: string[]; turnUrls: string[]; turnSecret: string | undefined }
+  /**
+   * src/worlds.ts. `assetsUrl`: what READY.worlds tells clients (no trailing slash; a relative value is resolved against
+   * the API origin). `assetsDir`: the pack this server serves at GET /worlds/assets/*.
+   */
+  worlds: { enabled: boolean; assetsUrl: string; assetsDir: string }
 }
 
 export interface BillingConfig {
@@ -287,6 +301,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     cinema: {
       enabled: e.CINEMA ?? e.NODE_ENV !== 'production',
       stunUrls: urlList(e.CINEMA_STUN_URLS), turnUrls: urlList(e.CINEMA_TURN_URLS), turnSecret: e.CINEMA_TURN_SECRET,
+    },
+    worlds: {
+      enabled: e.WORLDS ?? e.NODE_ENV !== 'production',
+      assetsUrl: (e.WORLDS_ASSETS_URL ?? '/api/v1/worlds/assets').replace(/\/+$/, ''),
+      assetsDir: e.WORLDS_ASSETS_DIR,
     },
   }
 }

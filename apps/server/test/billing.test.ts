@@ -250,7 +250,8 @@ describe('entitlements lifecycle', () => {
     const order = (await checkout(u.token, 'effect_ha_poeira_luz')).body
     await sandboxHook(s.app, orderEvent(order.reference, 'paid', { amountCents: 1290, currency: 'BRL', providerPaymentId: `pay_${order.reference}` }))
     const skus = async () => (await billingMe(u.token)).items.map((i) => i.sku).sort()
-    expect(await skus()).toEqual(['accent_ardosia', 'accent_grafite', 'accent_lavanda', 'aura_ha_frondes', 'effect_ha_poeira_luz', 'icon_ha_noite', 'icon_ha_porcelana', 'plan:plus'])
+    // The Plus wardrobe: the profile pieces and, from Alga Worlds, a_perola and w_pendente_linear.
+    expect(await skus()).toEqual(['a_perola', 'accent_ardosia', 'accent_grafite', 'accent_lavanda', 'aura_ha_frondes', 'effect_ha_poeira_luz', 'icon_ha_noite', 'icon_ha_porcelana', 'plan:plus', 'w_pendente_linear'])
     await sandboxHook(s.app, subEvent(u.reference, 'revoked'))
     expect(await skus()).toEqual(['effect_ha_poeira_luz'])
     await sandboxHook(s.app, orderEvent(order.reference, 'refunded'))

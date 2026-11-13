@@ -1,0 +1,77 @@
+{
+  "at": "2026-11-13T17:32:37.195Z",
+  "results": [
+    {
+      "name": "O botão Mundo abre o lounge: a sala desenha e a chamada continua conectada",
+      "pass": true,
+      "ms": 13476,
+      "detail": "low, 114 draws, 214k tris"
+    },
+    {
+      "name": "Quem está na chamada e fora do mundo vê o cartão \"Mundo aberto\" e entra por ele",
+      "pass": true,
+      "ms": 10443,
+      "detail": null
+    },
+    {
+      "name": "Ana anda (W A S D) e Bia vê a figura dela mudar de lugar",
+      "pass": true,
+      "ms": 2733,
+      "detail": "translate(662.076px, 341.152px) → translate(897.987px, 261.858px)"
+    },
+    {
+      "name": "Uma reação de Ana aparece sobre a figura dela na tela de Bia",
+      "pass": true,
+      "ms": 317,
+      "detail": null
+    },
+    {
+      "name": "A tela que Ana compartilha aparece na tela da sala para Bia, sem Bia clicar em Assistir",
+      "pass": true,
+      "ms": 10295,
+      "detail": "640×360"
+    },
+    {
+      "name": "Ana leva a chamada para a sala dela: Bia continua dentro, agora na \"Sala de Ana Souza\"",
+      "pass": true,
+      "ms": 9853,
+      "detail": null
+    },
+    {
+      "name": "Sair do mundo não mexe na voz: para o servidor, os dois nunca saíram da chamada",
+      "pass": true,
+      "ms": 228,
+      "detail": null
+    },
+    {
+      "name": "Se o cenário 3D não baixa, o mundo diz que não abriu e a chamada segue inteira",
+      "pass": true,
+      "ms": 191,
+      "detail": null
+    },
+    {
+      "name": "Ateliê: Ana põe uma peça na sala, salva, e a sala guardada no servidor tem a peça",
+      "pass": true,
+      "ms": 10203,
+      "detail": "29 → 30 peças"
+    },
+    {
+      "name": "Uma peça da loja não salva sem compra; depois de uma compra de verdade (sandbox) ela é de Ana",
+      "pass": true,
+      "ms": 647,
+      "detail": null
+    },
+    {
+      "name": "Manequim: Ana troca a roupa e a peça de cabeça, salva, e o servidor guarda o manequim dela",
+      "pass": true,
+      "ms": 3896,
+      "detail": null
+    },
+    {
+      "name": "Desconectar da chamada fecha o mundo e solta a placa de vídeo",
+      "pass": true,
+      "ms": 10326,
+      "detail": null
+    }
+  ]
+}

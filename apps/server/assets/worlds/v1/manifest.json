@@ -1,0 +1,1006 @@
+{
+  "version": 1,
+  "pack": "2026-11-13",
+  "files": {
+    "CREDITS.md": {
+      "sha256": "f689b839efe24ad94fb7c2ccb9e5cbdfe4b2e2cf79a2a115fca11e41dc857a23",
+      "bytes": 9925
+    },
+    "avatar/animations.glb": {
+      "sha256": "3e9293a711504e458109ab6b38644dd510643615b9fb3b2b727590ff1991422a",
+      "bytes": 302032
+    },
+    "avatar/mannequin_a.glb": {
+      "sha256": "0ecfa0db56b2384c047e19d6d5b67c17339546304c9b3017330709edf046f630",
+      "bytes": 131064
+    },
+    "avatar/mannequin_b.glb": {
+      "sha256": "095da43948552e84cbf0c9763f85ae40487e4952c16938e3c69adcaefd52b8f4",
+      "bytes": 437944
+    },
+    "models/book_encyclopedia_set_01.glb": {
+      "sha256": "789695ad55f50a36c485174a4ebf7e6d4836a4f0a8b57c5df7979d121d2c52ed",
+      "bytes": 619064
+    },
+    "models/boombox.glb": {
+      "sha256": "cce0285808363c185300c0a4d8b94ef32e585d2a350150bb78595db309205549",
+      "bytes": 699376
+    },
+    "models/bronze_whale_statue.glb": {
+      "sha256": "7db00ea3ce87813ce3de496fc169508a5b708a42f9125450e10e4b93af630ed1",
+      "bytes": 594352
+    },
+    "models/ceramic_vase_01.glb": {
+      "sha256": "5199071d9ecb02df5d547368e0ecf561f3cc6606d863a4e1f365c00b38b30d2d",
+      "bytes": 121996
+    },
+    "models/ceramic_vase_02.glb": {
+      "sha256": "280668b294246dbb6ad417834b1c92ca18b02ebb324966a817ca7a202f20a8ea",
+      "bytes": 199044
+    },
+    "models/ceramic_vase_03.glb": {
+      "sha256": "b654d999d29d2d0fcf4e7de6eb9511deaf73576bbd1a127a6aacd69a87611d36",
+      "bytes": 204528
+    },
+    "models/ceramic_vase_04.glb": {
+      "sha256": "8a4855272147379d339c02a3618c745c49c6ec0bff1b73de0938c2bc921ad8b8",
+      "bytes": 158980
+    },
+    "models/chess_set.glb": {
+      "sha256": "1b2e07301cfd887d7ceec8511d21c49e3613f8ef10f22c0c859dfd22ce5e7e4d",
+      "bytes": 887076
+    },
+    "models/coffee_table_round_01.glb": {
+      "sha256": "77ea8a0779c29c51c7efce92106d396d78c84d84d4369c73ccce21bcd23eb3b3",
+      "bytes": 334460
+    },
+    "models/desk_lamp_arm_01.glb": {
+      "sha256": "05acdbb7d2ea3cf979ad7ceacbba7a6027dfee08fccebe608f0fc7f56a5ce6c7",
+      "bytes": 773104
+    },
+    "models/dining_chair_02.glb": {
+      "sha256": "9ae8c6a6f50cdf07efe60e4de2baa8e28a090dca66569a537739035d3f3d1e8b",
+      "bytes": 446776
+    },
+    "models/gaming_console.glb": {
+      "sha256": "e4191dede03377830ee4653dfd9cec7b8dcc56e86c91831b34a7dbf715943d5f",
+      "bytes": 426136
+    },
+    "models/hanging_picture_frame_01.glb": {
+      "sha256": "4a43766b1b13987a358405b9af2aaf870ac96cc4fcf5c2b51bd96b7eb80e018c",
+      "bytes": 164908
+    },
+    "models/hanging_picture_frame_02.glb": {
+      "sha256": "2b69d9846cc2875f2acc47baefb130527285f30f79179fbebd87c035a212bc4f",
+      "bytes": 318652
+    },
+    "models/industrial_pipe_lamp.glb": {
+      "sha256": "2df50d9f9eb1db01dd351a727dd2eaa54e1ce9bdaa472bebb6e1f1e088e6f38c",
+      "bytes": 222308
+    },
+    "models/marble_bust_01.glb": {
+      "sha256": "642b5d77ffdbb0b2ae65f4e282413c1a943214cec78abd283370c65983ecd5d1",
+      "bytes": 288848
+    },
+    "models/metal_stool_01.glb": {
+      "sha256": "baa2c19c7536b8b806ff967a70ebca652cff29f114eef18f0d9b5dec76d244f3",
+      "bytes": 581316
+    },
+    "models/mid_century_lounge_chair.glb": {
+      "sha256": "037d87a9debdbe740ab06c3c54e24d910c4647e54933f7902fe3f81f1f8c37d9",
+      "bytes": 498916
+    },
+    "models/modern_arm_chair_01.glb": {
+      "sha256": "ccfa15f806072aaeb9beec3cc9e3bb2573c69d4c9c8e33e53ce8c02d4d0da378",
+      "bytes": 568772
+    },
+    "models/modern_ceiling_lamp_01.glb": {
+      "sha256": "b85dee8f343eee3832498c0aaf96b9004da23c94ed2800f7dd39c203af6f86d7",
+      "bytes": 249996
+    },
+    "models/modern_coffee_table_01.glb": {
+      "sha256": "5ad52779315577d62c6e5c995450abdcefeca29828132bf0053eae0698a55ee5",
+      "bytes": 288924
+    },
+    "models/modern_wooden_cabinet.glb": {
+      "sha256": "4512e874bb81f48fd47197fce7a3d1a7dc39f6258e389399822f9ef53dee544e",
+      "bytes": 632664
+    },
+    "models/ottoman_01.glb": {
+      "sha256": "27840918f78341296c8559f40e9cb8d925939f19efc463231c96d5294c3f4160",
+      "bytes": 542696
+    },
+    "models/potted_plant_01.glb": {
+      "sha256": "bf5579c28b69c26275e9abdd88480c2b8c6dea9edafd32bf556de2efb7e97028",
+      "bytes": 2489852
+    },
+    "models/potted_plant_02.glb": {
+      "sha256": "dcea523fbcc4db0020b7ba42a21e21a3d2d66f235aa425890faffa763a78ff39",
+      "bytes": 1270256
+    },
+    "models/potted_plant_04.glb": {
+      "sha256": "059296f4de6a14d5183a41517f73518c0688bc685ae111dfeeff2e2cc87fa444",
+      "bytes": 262948
+    },
+    "models/round_wooden_table_02.glb": {
+      "sha256": "4516c58e0feae82b2a34a3ef7597472401cad1b6abcb32bb1c14943ace32f2e9",
+      "bytes": 391304
+    },
+    "models/side_table_01.glb": {
+      "sha256": "ae64911170d7714179ca565955542f4b6d70d6ff0dbbb59f1dbb5674bb57f5bd",
+      "bytes": 124064
+    },
+    "models/side_table_tall_01.glb": {
+      "sha256": "e7930a01f7e6cff52a63359e73f7be033b3491d2bea05b238e1a056b1184089d",
+      "bytes": 268512
+    },
+    "models/small_wooden_table_01.glb": {
+      "sha256": "90d321c3f95bd75f080596aa9d10f36ca75633c9e7d9a5933e90490c81f0800d",
+      "bytes": 234288
+    },
+    "models/sofa_02.glb": {
+      "sha256": "1728d8281cd59effc29b7e644e065f08a2e51e12c8d1edc4438a269ccccb0fab",
+      "bytes": 275668
+    },
+    "models/standing_picture_frame_01.glb": {
+      "sha256": "cf85cecfe0b23789daaa382bf480522a09aecf9cd667b77000fbf275430773ba",
+      "bytes": 81908
+    },
+    "models/standing_picture_frame_02.glb": {
+      "sha256": "f17e08e45505497fd0440e92eeafbac25db80838c5e038beb7ba914a7e0dc4f3",
+      "bytes": 116908
+    },
+    "models/steel_frame_shelves_01.glb": {
+      "sha256": "0299c07dc6712f37b42fae189c033ffec21099b3b35a996fe8b541640a856993",
+      "bytes": 301764
+    },
+    "models/steel_frame_shelves_03.glb": {
+      "sha256": "50ae1c549a803e83f5d10dc2f7c8322e3db729d70a7991bc39efed6928f745ca",
+      "bytes": 697396
+    },
+    "models/tea_set_01.glb": {
+      "sha256": "db7ad97ed36779b5941ffa64848c86fb83cbe4f005637b6003a685a6b6327f2f",
+      "bytes": 549412
+    },
+    "models/ukulele_01.glb": {
+      "sha256": "9e2299245c35c86fce31e35f8b1ef9025506ed4d3669c0d350bfe2872275cb3f",
+      "bytes": 233632
+    },
+    "models/wall_clock.glb": {
+      "sha256": "5f02e86052e55d672ac213ec757cd6817961b3c6ce1b4963aa453b8e359b2a5a",
+      "bytes": 142152
+    },
+    "models/wicker_basket_01.glb": {
+      "sha256": "34961631efb3ae5506e586ac48449a50f7b16249061c845ab26ce53ff454b8c2",
+      "bytes": 400540
+    },
+    "models/wooden_display_shelves_01.glb": {
+      "sha256": "20fd7c0ebb9dd326d5d8acf30fe0cdbe0976d6e5370391de693d81d6671e932a",
+      "bytes": 276256
+    },
+    "models/wooden_table_02.glb": {
+      "sha256": "85b24ebdde9b863ab7cb53d91cbe0bcc45f20ac05a67c7944633da1d909c44da",
+      "bytes": 343044
+    },
+    "sky/hora_azul.hdr": {
+      "sha256": "67f51d0f158de3d32649379d0988d0663283392e763e4b74971b4ac746a12a63",
+      "bytes": 1578108
+    },
+    "sky/hora_azul.webp": {
+      "sha256": "faee3025e12836db505b8aa1089bbbeaba1ce1ac16e0d99a7201917e9afdd129",
+      "bytes": 770990
+    },
+    "sky/noite.hdr": {
+      "sha256": "04d23c6b243742b5046310b29211aec671d7a0570f3596e1a6b43e614c9acadf",
+      "bytes": 1740414
+    },
+    "sky/noite.webp": {
+      "sha256": "dca5611417bbb4317531fb12021eb58e37ed323d18fc8d955735a52f7346b98e",
+      "bytes": 1167286
+    },
+    "sky/tarde.hdr": {
+      "sha256": "5d78000be481a5f4840972b90b60f59ae952908e934a5f5a57be83872708c1cb",
+      "bytes": 1635241
+    },
+    "sky/tarde.webp": {
+      "sha256": "976da12869f0e526011f4c5ade05a4da8f3c1948188c539a4ccaef420f631b80",
+      "bytes": 1591104
+    },
+    "textures/fabric_boucle/arm.webp": {
+      "sha256": "6faa6f115e6796cce4511f0fc466c44c950fbdbf4364e82f64aaf22138765769",
+      "bytes": 321320
+    },
+    "textures/fabric_boucle/color.webp": {
+      "sha256": "bc46e15eb9d6fdc3454c9998d2441139189c19dc6d62252fa7f7951dd7d0a6b8",
+      "bytes": 117616
+    },
+    "textures/fabric_boucle/normal.webp": {
+      "sha256": "743cf048550537aca3d5fb727d97682a1d0501b22985bc78ee7ce68e7c400128",
+      "bytes": 122120
+    },
+    "textures/fabric_linen/arm.webp": {
+      "sha256": "838d7addb400a9700964bed0763cd664a62a9c391dbceb4cd4f473607cece131",
+      "bytes": 524196
+    },
+    "textures/fabric_linen/color.webp": {
+      "sha256": "e427b067234a62fa1e20a4576141c77cf23334b7488faa6c574bbf73d7941c93",
+      "bytes": 266460
+    },
+    "textures/fabric_linen/normal.webp": {
+      "sha256": "78377f9c47b8d10bacabf01877bf586effc92b88618b2ab52b84cf67a8ea5d31",
+      "bytes": 361522
+    },
+    "textures/fabric_velvet/arm.webp": {
+      "sha256": "e4860b5d0ad024c53fb15e4c4ebb70c867620ba606c7a5e0aca83384010fe9a2",
+      "bytes": 417760
+    },
+    "textures/fabric_velvet/color.webp": {
+      "sha256": "aab513f39768c741dc0f772b0008c5f792d771534dd2201bbc4bb6cacacdbccd",
+      "bytes": 195828
+    },
+    "textures/fabric_velvet/normal.webp": {
+      "sha256": "6d06eeb10f55b56660aec5a36f16f19b4a84943f7d0e13570f8ea7612e3d6122",
+      "bytes": 146956
+    },
+    "textures/floor_concrete/arm.webp": {
+      "sha256": "a253195a52122440f28906613fcd7a70c40f97e592abc1c7e3719fd639fa8b35",
+      "bytes": 135508
+    },
+    "textures/floor_concrete/color.webp": {
+      "sha256": "3df9877170ab602557a610002f160a27b2187aab4b19b9a04bfdc1e45858a083",
+      "bytes": 21794
+    },
+    "textures/floor_concrete/normal.webp": {
+      "sha256": "077efe74f51ecf9fb96f69216c1036b4d7f3413d8446d09e4caf442c90384ba5",
+      "bytes": 178664
+    },
+    "textures/floor_oak/arm.webp": {
+      "sha256": "a4660fe8707fe1cbe868206cb8d871c7de41742b6a92248ffebb0cd7c52fcd1d",
+      "bytes": 365114
+    },
+    "textures/floor_oak/color.webp": {
+      "sha256": "1f3db59c4743eef211a76f0c99c52992d354afaa1e1eb3bbffbf3848537651b7",
+      "bytes": 142720
+    },
+    "textures/floor_oak/normal.webp": {
+      "sha256": "38ab3c27470c8a08b28b447cb8e25e112a77a71a8ab55c9ba956d3ab181d70de",
+      "bytes": 21946
+    },
+    "textures/floor_stone/arm.webp": {
+      "sha256": "3eab68e524b4da9a87b2ea45fc365c0b91400ac133c560efd2512fdd1864873c",
+      "bytes": 31214
+    },
+    "textures/floor_stone/color.webp": {
+      "sha256": "8b223ae361720110df844804328a281aa8169c97115b1fe69fb10d84e52fd799",
+      "bytes": 69742
+    },
+    "textures/floor_stone/normal.webp": {
+      "sha256": "f3c040802f5990be19ca34ed9a6c20ce2679ae21e0002a2f68b53cb2a8274ee6",
+      "bytes": 13624
+    },
+    "textures/floor_walnut/arm.webp": {
+      "sha256": "0c047651680968366ccea7f565cf6b26eba2bdd60b40681da6749f30cdfbac47",
+      "bytes": 71488
+    },
+    "textures/floor_walnut/color.webp": {
+      "sha256": "3725c225c2d4123d101df02b21a2945d8ef3ad4d1100cc45362327a80ae9663e",
+      "bytes": 146948
+    },
+    "textures/floor_walnut/normal.webp": {
+      "sha256": "19be65ec4817699b440f1d0534803f5bdbb839639666d211101eb9cb209318f1",
+      "bytes": 32702
+    },
+    "textures/leather_smooth/arm.webp": {
+      "sha256": "c76e0104316e8f6db10a0efc458b612a66941248618bb109edaa76427ca53d77",
+      "bytes": 333840
+    },
+    "textures/leather_smooth/color.webp": {
+      "sha256": "dda3fa37fa5ebf40d74940d214abb35af5ad33f103ed99a913173c47d9d12803",
+      "bytes": 194970
+    },
+    "textures/leather_smooth/normal.webp": {
+      "sha256": "d3e1cc5c16a1346f37447cfba4f3c1513621d07d2bbf54c56eb6a63c7fa837e1",
+      "bytes": 138770
+    },
+    "textures/rug_jute/arm.webp": {
+      "sha256": "3e83e099544516d2fedf2bdfc7386f565ce0149dca387c11175faea2271e53c0",
+      "bytes": 463266
+    },
+    "textures/rug_jute/color.webp": {
+      "sha256": "9264bf11deecd1fbb982d37a979bd5372f16e04f00f358299285bf16a9841775",
+      "bytes": 286500
+    },
+    "textures/rug_jute/normal.webp": {
+      "sha256": "6144f93bfe34219c94ccf1689c86dd50ea24f15993bfdbb92075c437e5ee9f84",
+      "bytes": 463892
+    },
+    "textures/rug_wool/arm.webp": {
+      "sha256": "14a889b032b3f54d9b5796d499215a83feb5c188da7a3557b4747ed44be69a14",
+      "bytes": 357066
+    },
+    "textures/rug_wool/color.webp": {
+      "sha256": "3bf96fd9dfc9ff67d177057be9850f7ccb033b9f513ce84da1986774203be12b",
+      "bytes": 186674
+    },
+    "textures/rug_wool/normal.webp": {
+      "sha256": "b42b7275a3b18085c310e4425adf15efc279ecde8fcb58274b5fdac4dc5e0e11",
+      "bytes": 333998
+    },
+    "textures/wall_concrete/arm.webp": {
+      "sha256": "22991fd3b69a08891cdc14e7e37256a629ed5e0fbfdb1222abab013dc4891ea3",
+      "bytes": 131564
+    },
+    "textures/wall_concrete/color.webp": {
+      "sha256": "8d658071e600a535f2b7f3bd0f00180b51fcc63db4cd94064930e4a3f2a7a507",
+      "bytes": 102254
+    },
+    "textures/wall_concrete/normal.webp": {
+      "sha256": "8d38c769c24e9c06df7f054d06d607c64acf6f513df91330fea3d7d32246c033",
+      "bytes": 57946
+    },
+    "textures/wall_plaster/arm.webp": {
+      "sha256": "eea794e2e3b7fab24b600bd742542840b3d2b8407c25437f59456a3323ad26df",
+      "bytes": 31812
+    },
+    "textures/wall_plaster/color.webp": {
+      "sha256": "5a8913de55e781f5a0fe5a377cc7b3bbce2ff14637f3a0f1dc95bdb4fd02680f",
+      "bytes": 70160
+    },
+    "textures/wall_plaster/normal.webp": {
+      "sha256": "f7168f1f7b0dc90c2e28d914940c0529e72fd4e8074ea0183879aca060747952",
+      "bytes": 365196
+    },
+    "textures/wall_wood/arm.webp": {
+      "sha256": "f3e99436b447f141f6adc68beb669ffb8a34e1f86f3037186fc83a0a986d2442",
+      "bytes": 182782
+    },
+    "textures/wall_wood/color.webp": {
+      "sha256": "2496a2851b810471894453f33a83754ca2a75f60ac24d73dd27cb4dc0927d01a",
+      "bytes": 71752
+    },
+    "textures/wall_wood/normal.webp": {
+      "sha256": "2c979dfe546ad61d989f17582c5274f69ba10732d6907965d5a61fa585d6ee33",
+      "bytes": 27138
+    }
+  },
+  "models": {
+    "modern_arm_chair_01": {
+      "file": "models/modern_arm_chair_01.glb",
+      "size": [
+        0.82,
+        1.023,
+        0.987
+      ],
+      "tris": 8916,
+      "bytes": 568772,
+      "source": "polyhaven:modern_arm_chair_01"
+    },
+    "mid_century_lounge_chair": {
+      "file": "models/mid_century_lounge_chair.glb",
+      "size": [
+        1.009,
+        1.169,
+        1.19
+      ],
+      "tris": 6148,
+      "bytes": 498916,
+      "source": "polyhaven:mid_century_lounge_chair"
+    },
+    "ottoman_01": {
+      "file": "models/ottoman_01.glb",
+      "size": [
+        0.885,
+        0.624,
+        0.621
+      ],
+      "tris": 4240,
+      "bytes": 542696,
+      "source": "polyhaven:Ottoman_01"
+    },
+    "sofa_02": {
+      "file": "models/sofa_02.glb",
+      "size": [
+        1.807,
+        0.709,
+        0.818
+      ],
+      "tris": 2728,
+      "bytes": 275668,
+      "source": "polyhaven:sofa_02"
+    },
+    "dining_chair_02": {
+      "file": "models/dining_chair_02.glb",
+      "size": [
+        0.434,
+        0.973,
+        0.576
+      ],
+      "tris": 22013,
+      "bytes": 446776,
+      "source": "polyhaven:dining_chair_02"
+    },
+    "metal_stool_01": {
+      "file": "models/metal_stool_01.glb",
+      "size": [
+        0.352,
+        0.883,
+        0.355
+      ],
+      "tris": 8334,
+      "bytes": 581316,
+      "source": "polyhaven:metal_stool_01"
+    },
+    "modern_coffee_table_01": {
+      "file": "models/modern_coffee_table_01.glb",
+      "size": [
+        0.6,
+        0.39,
+        1.202
+      ],
+      "tris": 4504,
+      "bytes": 288924,
+      "source": "polyhaven:modern_coffee_table_01"
+    },
+    "coffee_table_round_01": {
+      "file": "models/coffee_table_round_01.glb",
+      "size": [
+        1.301,
+        0.491,
+        1.301
+      ],
+      "tris": 4044,
+      "bytes": 334460,
+      "source": "polyhaven:coffee_table_round_01"
+    },
+    "modern_wooden_cabinet": {
+      "file": "models/modern_wooden_cabinet.glb",
+      "size": [
+        2.44,
+        0.68,
+        0.52
+      ],
+      "tris": 24976,
+      "bytes": 632664,
+      "source": "polyhaven:modern_wooden_cabinet"
+    },
+    "side_table_01": {
+      "file": "models/side_table_01.glb",
+      "size": [
+        0.55,
+        0.551,
+        0.45
+      ],
+      "tris": 2756,
+      "bytes": 124064,
+      "source": "polyhaven:side_table_01"
+    },
+    "side_table_tall_01": {
+      "file": "models/side_table_tall_01.glb",
+      "size": [
+        0.384,
+        0.761,
+        0.384
+      ],
+      "tris": 6408,
+      "bytes": 268512,
+      "source": "polyhaven:side_table_tall_01"
+    },
+    "round_wooden_table_02": {
+      "file": "models/round_wooden_table_02.glb",
+      "size": [
+        0.796,
+        0.746,
+        0.796
+      ],
+      "tris": 4254,
+      "bytes": 391304,
+      "source": "polyhaven:round_wooden_table_02"
+    },
+    "wooden_table_02": {
+      "file": "models/wooden_table_02.glb",
+      "size": [
+        1.134,
+        0.8,
+        0.706
+      ],
+      "tris": 196,
+      "bytes": 343044,
+      "source": "polyhaven:wooden_table_02"
+    },
+    "small_wooden_table_01": {
+      "file": "models/small_wooden_table_01.glb",
+      "size": [
+        0.916,
+        0.533,
+        0.44
+      ],
+      "tris": 3410,
+      "bytes": 234288,
+      "source": "polyhaven:small_wooden_table_01"
+    },
+    "steel_frame_shelves_01": {
+      "file": "models/steel_frame_shelves_01.glb",
+      "size": [
+        1.097,
+        2.141,
+        0.502
+      ],
+      "tris": 4348,
+      "bytes": 301764,
+      "source": "polyhaven:steel_frame_shelves_01"
+    },
+    "steel_frame_shelves_03": {
+      "file": "models/steel_frame_shelves_03.glb",
+      "size": [
+        2.351,
+        2.312,
+        0.721
+      ],
+      "tris": 8396,
+      "bytes": 697396,
+      "source": "polyhaven:steel_frame_shelves_03"
+    },
+    "wooden_display_shelves_01": {
+      "file": "models/wooden_display_shelves_01.glb",
+      "size": [
+        0.372,
+        1.556,
+        1.078
+      ],
+      "tris": 3174,
+      "bytes": 276256,
+      "source": "polyhaven:wooden_display_shelves_01"
+    },
+    "potted_plant_01": {
+      "file": "models/potted_plant_01.glb",
+      "size": [
+        0.587,
+        1.35,
+        0.634
+      ],
+      "tris": 176226,
+      "bytes": 2489852,
+      "source": "polyhaven:potted_plant_01"
+    },
+    "potted_plant_02": {
+      "file": "models/potted_plant_02.glb",
+      "size": [
+        0.701,
+        0.841,
+        0.657
+      ],
+      "tris": 69806,
+      "bytes": 1270256,
+      "source": "polyhaven:potted_plant_02"
+    },
+    "potted_plant_04": {
+      "file": "models/potted_plant_04.glb",
+      "size": [
+        0.168,
+        0.267,
+        0.185
+      ],
+      "tris": 8929,
+      "bytes": 262948,
+      "source": "polyhaven:potted_plant_04"
+    },
+    "ceramic_vase_01": {
+      "file": "models/ceramic_vase_01.glb",
+      "size": [
+        0.204,
+        0.4,
+        0.204
+      ],
+      "tris": 10296,
+      "bytes": 121996,
+      "source": "polyhaven:ceramic_vase_01"
+    },
+    "ceramic_vase_02": {
+      "file": "models/ceramic_vase_02.glb",
+      "size": [
+        0.218,
+        0.309,
+        0.218
+      ],
+      "tris": 11128,
+      "bytes": 199044,
+      "source": "polyhaven:ceramic_vase_02"
+    },
+    "ceramic_vase_03": {
+      "file": "models/ceramic_vase_03.glb",
+      "size": [
+        0.112,
+        0.414,
+        0.112
+      ],
+      "tris": 11136,
+      "bytes": 204528,
+      "source": "polyhaven:ceramic_vase_03"
+    },
+    "ceramic_vase_04": {
+      "file": "models/ceramic_vase_04.glb",
+      "size": [
+        0.181,
+        0.342,
+        0.181
+      ],
+      "tris": 9000,
+      "bytes": 158980,
+      "source": "polyhaven:ceramic_vase_04"
+    },
+    "book_encyclopedia_set_01": {
+      "file": "models/book_encyclopedia_set_01.glb",
+      "size": [
+        0.551,
+        0.237,
+        0.163
+      ],
+      "tris": 46582,
+      "bytes": 619064,
+      "source": "polyhaven:book_encyclopedia_set_01"
+    },
+    "standing_picture_frame_01": {
+      "file": "models/standing_picture_frame_01.glb",
+      "size": [
+        0.1,
+        0.25,
+        0.201
+      ],
+      "tris": 1634,
+      "bytes": 81908,
+      "source": "polyhaven:standing_picture_frame_01"
+    },
+    "standing_picture_frame_02": {
+      "file": "models/standing_picture_frame_02.glb",
+      "size": [
+        0.102,
+        0.266,
+        0.217
+      ],
+      "tris": 2986,
+      "bytes": 116908,
+      "source": "polyhaven:standing_picture_frame_02"
+    },
+    "hanging_picture_frame_01": {
+      "file": "models/hanging_picture_frame_01.glb",
+      "size": [
+        0.594,
+        0.841,
+        0.016
+      ],
+      "tris": 2586,
+      "bytes": 164908,
+      "source": "polyhaven:hanging_picture_frame_01"
+    },
+    "hanging_picture_frame_02": {
+      "file": "models/hanging_picture_frame_02.glb",
+      "size": [
+        0.752,
+        0.5,
+        0.033
+      ],
+      "tris": 3678,
+      "bytes": 318652,
+      "source": "polyhaven:hanging_picture_frame_02"
+    },
+    "marble_bust_01": {
+      "file": "models/marble_bust_01.glb",
+      "size": [
+        0.272,
+        0.515,
+        0.3
+      ],
+      "tris": 17456,
+      "bytes": 288848,
+      "source": "polyhaven:marble_bust_01"
+    },
+    "chess_set": {
+      "file": "models/chess_set.glb",
+      "size": [
+        0.553,
+        0.112,
+        0.553
+      ],
+      "tris": 46152,
+      "bytes": 887076,
+      "source": "polyhaven:chess_set"
+    },
+    "tea_set_01": {
+      "file": "models/tea_set_01.glb",
+      "size": [
+        0.918,
+        0.165,
+        0.484
+      ],
+      "tris": 40296,
+      "bytes": 549412,
+      "source": "polyhaven:tea_set_01"
+    },
+    "wall_clock": {
+      "file": "models/wall_clock.glb",
+      "size": [
+        0.32,
+        0.32,
+        0.047
+      ],
+      "tris": 3658,
+      "bytes": 142152,
+      "source": "polyhaven:wall_clock"
+    },
+    "bronze_whale_statue": {
+      "file": "models/bronze_whale_statue.glb",
+      "size": [
+        0.932,
+        1.073,
+        1.366
+      ],
+      "tris": 3816,
+      "bytes": 594352,
+      "source": "polyhaven:bronze_whale_statue"
+    },
+    "ukulele_01": {
+      "file": "models/ukulele_01.glb",
+      "size": [
+        0.178,
+        0.527,
+        0.051
+      ],
+      "tris": 8912,
+      "bytes": 233632,
+      "source": "polyhaven:Ukulele_01"
+    },
+    "wicker_basket_01": {
+      "file": "models/wicker_basket_01.glb",
+      "size": [
+        0.383,
+        0.117,
+        0.295
+      ],
+      "tris": 22276,
+      "bytes": 400540,
+      "source": "polyhaven:wicker_basket_01"
+    },
+    "boombox": {
+      "file": "models/boombox.glb",
+      "size": [
+        0.724,
+        0.47,
+        0.186
+      ],
+      "tris": 10168,
+      "bytes": 699376,
+      "source": "polyhaven:boombox"
+    },
+    "gaming_console": {
+      "file": "models/gaming_console.glb",
+      "size": [
+        0.325,
+        0.1,
+        0.319
+      ],
+      "tris": 31710,
+      "bytes": 426136,
+      "source": "polyhaven:gaming_console"
+    },
+    "modern_ceiling_lamp_01": {
+      "file": "models/modern_ceiling_lamp_01.glb",
+      "size": [
+        0.432,
+        0.952,
+        0.432
+      ],
+      "tris": 5602,
+      "bytes": 249996,
+      "source": "polyhaven:modern_ceiling_lamp_01"
+    },
+    "desk_lamp_arm_01": {
+      "file": "models/desk_lamp_arm_01.glb",
+      "size": [
+        0.202,
+        0.893,
+        0.614
+      ],
+      "tris": 24102,
+      "bytes": 773104,
+      "source": "polyhaven:desk_lamp_arm_01"
+    },
+    "industrial_pipe_lamp": {
+      "file": "models/industrial_pipe_lamp.glb",
+      "size": [
+        0.183,
+        0.364,
+        0.262
+      ],
+      "tris": 8626,
+      "bytes": 222308,
+      "source": "polyhaven:industrial_pipe_lamp"
+    }
+  },
+  "textures": {
+    "floor_oak": {
+      "color": "textures/floor_oak/color.webp",
+      "normal": "textures/floor_oak/normal.webp",
+      "arm": "textures/floor_oak/arm.webp",
+      "tileMeters": 1.2,
+      "source": "polyhaven:oak_wood_planks"
+    },
+    "floor_walnut": {
+      "color": "textures/floor_walnut/color.webp",
+      "normal": "textures/floor_walnut/normal.webp",
+      "arm": "textures/floor_walnut/arm.webp",
+      "tileMeters": 1.7,
+      "source": "polyhaven:wood_floor"
+    },
+    "floor_concrete": {
+      "color": "textures/floor_concrete/color.webp",
+      "normal": "textures/floor_concrete/normal.webp",
+      "arm": "textures/floor_concrete/arm.webp",
+      "tileMeters": 4,
+      "source": "polyhaven:painted_concrete_02"
+    },
+    "floor_stone": {
+      "color": "textures/floor_stone/color.webp",
+      "normal": "textures/floor_stone/normal.webp",
+      "arm": "textures/floor_stone/arm.webp",
+      "tileMeters": 1.5,
+      "source": "polyhaven:marble_01"
+    },
+    "wall_plaster": {
+      "color": "textures/wall_plaster/color.webp",
+      "normal": "textures/wall_plaster/normal.webp",
+      "arm": "textures/wall_plaster/arm.webp",
+      "tileMeters": 1.998,
+      "source": "polyhaven:white_stucco"
+    },
+    "wall_concrete": {
+      "color": "textures/wall_concrete/color.webp",
+      "normal": "textures/wall_concrete/normal.webp",
+      "arm": "textures/wall_concrete/arm.webp",
+      "tileMeters": 2.71,
+      "source": "polyhaven:concrete_wall_008"
+    },
+    "wall_wood": {
+      "color": "textures/wall_wood/color.webp",
+      "normal": "textures/wall_wood/normal.webp",
+      "arm": "textures/wall_wood/arm.webp",
+      "tileMeters": 1,
+      "source": "polyhaven:european_walnut_veneer_04"
+    },
+    "fabric_boucle": {
+      "color": "textures/fabric_boucle/color.webp",
+      "normal": "textures/fabric_boucle/normal.webp",
+      "arm": "textures/fabric_boucle/arm.webp",
+      "tileMeters": 0.333,
+      "source": "polyhaven:curly_teddy_natural"
+    },
+    "fabric_linen": {
+      "color": "textures/fabric_linen/color.webp",
+      "normal": "textures/fabric_linen/normal.webp",
+      "arm": "textures/fabric_linen/arm.webp",
+      "tileMeters": 0.271,
+      "source": "polyhaven:rough_linen"
+    },
+    "fabric_velvet": {
+      "color": "textures/fabric_velvet/color.webp",
+      "normal": "textures/fabric_velvet/normal.webp",
+      "arm": "textures/fabric_velvet/arm.webp",
+      "tileMeters": 0.279,
+      "source": "polyhaven:velour_velvet"
+    },
+    "leather_smooth": {
+      "color": "textures/leather_smooth/color.webp",
+      "normal": "textures/leather_smooth/normal.webp",
+      "arm": "textures/leather_smooth/arm.webp",
+      "tileMeters": 0.3,
+      "source": "polyhaven:leather_white"
+    },
+    "rug_wool": {
+      "color": "textures/rug_wool/color.webp",
+      "normal": "textures/rug_wool/normal.webp",
+      "arm": "textures/rug_wool/arm.webp",
+      "tileMeters": 0.273,
+      "source": "polyhaven:jogging_melange"
+    },
+    "rug_jute": {
+      "color": "textures/rug_jute/color.webp",
+      "normal": "textures/rug_jute/normal.webp",
+      "arm": "textures/rug_jute/arm.webp",
+      "tileMeters": 0.274,
+      "source": "polyhaven:hessian_380"
+    }
+  },
+  "skies": {
+    "tarde": {
+      "image": "sky/tarde.webp",
+      "hdr": "sky/tarde.hdr",
+      "source": "polyhaven:autumn_hill_view"
+    },
+    "hora_azul": {
+      "image": "sky/hora_azul.webp",
+      "hdr": "sky/hora_azul.hdr",
+      "source": "polyhaven:qwantani_dusk_2"
+    },
+    "noite": {
+      "image": "sky/noite.webp",
+      "hdr": "sky/noite.hdr",
+      "source": "polyhaven:kloppenheim_02"
+    }
+  },
+  "avatar": {
+    "bodies": {
+      "a": "avatar/mannequin_a.glb",
+      "b": "avatar/mannequin_b.glb"
+    },
+    "animations": "avatar/animations.glb",
+    "clips": {
+      "idle": {
+        "duration": 2.5,
+        "loop": true
+      },
+      "idle_talk": {
+        "duration": 2.9333,
+        "loop": true
+      },
+      "walk": {
+        "duration": 1.3333,
+        "loop": true
+      },
+      "walk_formal": {
+        "duration": 1.3333,
+        "loop": true
+      },
+      "jog": {
+        "duration": 0.9333,
+        "loop": true
+      },
+      "sit_enter": {
+        "duration": 1.3,
+        "loop": false
+      },
+      "sit_exit": {
+        "duration": 1.0333,
+        "loop": false
+      },
+      "sit_idle": {
+        "duration": 1.6667,
+        "loop": true
+      },
+      "sit_talk": {
+        "duration": 2.9333,
+        "loop": true
+      },
+      "dance": {
+        "duration": 1,
+        "loop": true
+      },
+      "interact": {
+        "duration": 2,
+        "loop": false
+      },
+      "pickup": {
+        "duration": 0.8333,
+        "loop": false
+      },
+      "idle_fold": {
+        "duration": 2.5,
+        "loop": true
+      },
+      "idle_phone": {
+        "duration": 2.9333,
+        "loop": true
+      },
+      "yes": {
+        "duration": 2.5,
+        "loop": false
+      },
+      "no": {
+        "duration": 2.5,
+        "loop": true
+      },
+      "drink": {
+        "duration": 1.3333,
+        "loop": false
+      }
+    }
+  }
+}

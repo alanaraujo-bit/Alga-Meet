@@ -1,4 +1,4 @@
-import { MusicNotes, Megaphone, CornerDownLeft, Hash, Headphones, HeadphoneOff, Mic, MicOff, MonitorOff, MonitorUp, Phone, PhoneOff, Search, Settings2, Volume2 } from '@/ui/icons'
+import { Couch, Cube, MusicNotes, Megaphone, CornerDownLeft, Hash, Headphones, HeadphoneOff, Mic, MicOff, MonitorOff, MonitorUp, Phone, PhoneOff, Search, Settings2, Volume2 } from '@/ui/icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -18,6 +18,9 @@ import { openSettings } from '../settings/store'
 import { openFeedback } from '../feedback/store'
 import { openCard as openMusic } from '../music/store'
 import { t as musicT } from '../music/strings'
+import { enterWorld, openWorld, useWorlds } from '../worlds/store'
+import { openStudio } from '../worlds/studio/store'
+import { t as worldsT } from '../worlds/strings'
 import { t as feedbackT } from '../feedback/strings'
 import { inVoice, joinVoice, leaveVoice, openCall, useVoice } from '../voice/voice'
 import s from './switcher.module.css'
@@ -113,6 +116,10 @@ function collectActions(d: DataState): Item[] {
   items.push(action('settings', t.act.settings, <Icon icon={Settings2} size={16} />, () => openSettings('account'), { kbd: 'Ctrl ,', keywords: 'preferências configurar opções' }))
   items.push(action('voice-settings', t.act.voiceSettings, <Icon icon={Settings2} size={16} />, () => openSettings('voice'), { keywords: 'microfone dispositivos fone câmera' }))
   if (here && useSession.getState().music) items.push(action('music', musicT.action, <Icon icon={MusicNotes} size={16} />, openMusic, { keywords: musicT.actionKeywords }))
+  if (useSession.getState().worlds) {
+    if (here) items.push(action('world', worldsT.action, <Icon icon={Cube} size={16} />, () => (useWorlds.getState().session ? enterWorld() : openWorld({ kind: 'lounge' })), { keywords: worldsT.actionKeywords }))
+    items.push(action('world-studio', worldsT.studio.open, <Icon icon={Couch} size={16} />, () => openStudio('room'), { keywords: worldsT.studio.openKeywords }))
+  }
   items.push(action('feedback', feedbackT.entry.action, <Icon icon={Megaphone} size={16} />, () => openFeedback(), { keywords: feedbackT.entry.keywords }))
   return items
 }

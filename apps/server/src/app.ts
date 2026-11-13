@@ -40,12 +40,14 @@ import { invitePublicRoutes, spaceRoutes } from './routes/spaces.js'
 import { telemetryRoutes } from './routes/telemetry.js'
 import { feedbackPublicRoutes, feedbackRoutes } from './routes/feedback.js'
 import { userRoutes } from './routes/users.js'
+import { worldPublicRoutes, worldRoutes } from './routes/worlds.js'
 import { livekitWebhookRoute, voiceRoutes } from './routes/voice.js'
 import { soundRoutes } from './routes/sounds.js'
 import { createStorage } from './storage.js'
 import { Telemetry } from './telemetry.js'
 import { TrustSafety, restrictedError } from './trust-safety.js'
 import { Voice } from './voice.js'
+import { Worlds } from './worlds.js'
 
 /** Shared services handed to every route module. */
 export interface Ctx {
@@ -56,6 +58,7 @@ export interface Ctx {
   e2ee: E2ee
   cinema: Cinema
   music: Music
+  worlds: Worlds
   files: Files
   mail: Mailer
   billing: Billing
@@ -105,7 +108,9 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   // After E2ee: both chain onto voice.onLeave.
   const cinema = new Cinema(config, database.db, hub, voice, app.log)
   const music = new Music(hub, voice, app.log)
-  const ctx = { config, db: database.db, hub, voice, e2ee, cinema, music, files, mail, billing, telemetry: new Telemetry(database.db, app.log), log: app.log } as Ctx
+  // Chains onto voice.onLeave / onDrop too, and onto billing's entitlement changes.
+  const worlds = new Worlds(config, database.db, hub, voice, billing, app.log)
+  const ctx = { config, db: database.db, hub, voice, e2ee, cinema, music, worlds, files, mail, billing, telemetry: new Telemetry(database.db, app.log), log: app.log } as Ctx
   ctx.trust = new TrustSafety(ctx)
   ctx.privacy = new Privacy(ctx)
   ctx.events = new Events(ctx)
@@ -118,6 +123,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   ctx.privacy.start()
   ctx.telemetry.start()
   ctx.activity.start()
+  if (config.worlds.enabled) worlds.start()
   app.log.info({ provider: config.billing.provider }, 'billing ready')
   if (config.email.autoVerify) app.log.warn('staging: auto-verifying e-mails')
 
@@ -137,6 +143,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     e2ee.stop()
     cinema.stop()
     music.stop()
+    worlds.stop()
     await database.close()
   })
 
@@ -187,6 +194,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     privacyPublicRoutes(api, ctx)
     reportPublicRoutes(api, ctx)
     feedbackPublicRoutes(api, ctx)
+    worldPublicRoutes(api, ctx)
     await api.register(async (pub) => activityPublicRoutes(pub, ctx))
 
     await api.register(async (authed) => {
@@ -216,6 +224,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       profileRoutes(authed, ctx)
       releaseRoutes(authed, ctx)
       feedbackRoutes(authed, ctx)
+      worldRoutes(authed, ctx)
       await authed.register(async (admin) => {
         adminRoutes(admin, ctx)
         releaseAdminRoutes(admin, ctx)

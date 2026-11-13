@@ -6,13 +6,16 @@
  * Existing subscriptions keep the price they were sold at (`subscriptions.amount_cents`).
  * v2 (docs/business/growth-plan.md §2–§3): Coleção 01 "Hora Azul", Plus v2 wardrobe, bundles, one-time Plus, Casa;
  * the v1 "oceano" items are retired (kept equippable by anyone who owns one).
+ * v3: the "Ateliê" collection of Alga Worlds (furniture, finishes and avatar parts; names and tiers come from
+ * packages/shared/src/worlds-catalog.ts, the prices live here).
  */
 import {
-  PLUS_BADGES, PLUS_PASS_PRODUCT_ID,
+  PLUS_BADGES, PLUS_PASS_PRODUCT_ID, WORLD_COLLECTION, WORLD_PAID_SKUS, worldEntry,
   type Collection, type PlusBadge, type CosmeticType, type PlanId, type PlanPerk, type PlanSummary, type Product, type SpaceUpgradePerk, type StreamPreset,
+  type WorldCatalogKind,
 } from '@alga/shared'
 
-export const CATALOG_VERSION = 2
+export const CATALOG_VERSION = 3
 
 const MiB = 1024 * 1024
 const FREE_PRESETS: StreamPreset[] = ['720p30', '720p60', '1080p30']
@@ -53,6 +56,8 @@ export const COLLECTIONS: (Omit<Collection, 'waves'> & { waves: { wave: number; 
     // Wave 2 (auras, sounds, reactions, frames) opened early by the owner on 2026-11-08 (bundles go on sale with it).
     waves: [{ wave: 1, opensAt: '2026-11-01T00:00:00-03:00' }, { wave: 2, opensAt: '2026-11-08T00:00:00-03:00' }],
   },
+  // Alga Worlds: one wave, on sale from the day the catalog got it.
+  { id: WORLD_COLLECTION.id, name: WORLD_COLLECTION.name, description: WORLD_COLLECTION.description, waves: [{ wave: 1, opensAt: '2026-11-13T00:00:00-03:00' }] },
 ]
 
 const waveOpen = (collectionId: string | undefined, wave: number | undefined, now: number) => {
@@ -92,6 +97,36 @@ const casa = (id: string, brl: number, days: number): Product => ({
   id, kind: 'space_upgrade', name: `Casa: +${days} dias`, description: `Acende a Casa do espaço por mais ${days} dias. Sem renovação automática.`,
   priceBrlCents: brl, priceUsdCents: usd(brl), purchasable: true, days,
 })
+
+/** Ateliê: BRL price of every `store` SKU of the worlds catalog (`plus` ones are not sold: they come with the plan). */
+const WORLD_PRICES: Record<string, number> = {
+  w_sofa_canto: 1290, w_poltrona_lounge: 990, w_sofa_chesterfield: 990, w_mesa_centro_marmore: 790, w_estante_aco_dupla: 790,
+  w_luminaria_industrial: 590, w_tela_grande: 790, w_busto_marmore: 590, w_xadrez: 590, w_jogo_cha: 590, w_baleia_bronze: 790,
+  w_ukulele: 590, w_boombox: 590, w_console_jogos: 590, w_tapete_grande: 790, w_tv_cinema: 1290,
+  f_pedra: 790, p_madeira: 790,
+  a_bronze: 990, a_obsidiana: 790, o_alfaiataria: 990, o_veludo: 790, h_chapeu: 590, h_oculos_sol: 590,
+}
+const ROOM_PIECE = 'Peça para a sua sala no Alga Worlds. Fica na sua conta.'
+const ROOM_FINISH = 'Acabamento para a sua sala no Alga Worlds. Fica na sua conta.'
+const AVATAR_PART = 'Peça para o seu manequim no Alga Worlds. Fica na sua conta.'
+const WORLD_DESCRIPTIONS: Record<WorldCatalogKind, string> = {
+  item: ROOM_PIECE, floor: ROOM_FINISH, wall: ROOM_FINISH, mood: ROOM_FINISH,
+  avatar_finish: AVATAR_PART, avatar_outfit: AVATAR_PART, avatar_head: AVATAR_PART,
+}
+
+/** A sold or plan-included SKU of the worlds catalog: the name comes from there, so the two never drift. */
+const world = (sku: string): Product => {
+  const e = worldEntry(sku)!
+  const brl = e.tier === 'store' ? WORLD_PRICES[sku] : 0
+  if (brl === undefined) throw new Error(`billing catalog: no price for the world SKU ${sku}`)
+  return {
+    id: sku, kind: 'cosmetic', world: true, name: e.name, description: WORLD_DESCRIPTIONS[e.kind],
+    priceBrlCents: brl, priceUsdCents: brl ? usd(brl) : 0, collectionId: WORLD_COLLECTION.id, wave: 1, ...(e.hero ? { hero: true } : {}),
+    // Not giftable yet: the gift reveal cannot draw 3D items.
+    giftable: false,
+    ...(e.tier === 'store' ? { purchasable: true } : { purchasable: false, includedIn: ['plus'] as PlanId[] }),
+  }
+}
 
 const retired = (id: string, cosmeticType: CosmeticType, name: string, brl: number): Product => ({
   id, kind: 'cosmetic', cosmeticType, name, description: 'Item da coleção anterior: não é mais vendido.', priceBrlCents: brl,
@@ -158,6 +193,10 @@ export const PRODUCTS: Product[] = [
     ['aura_ha_respiro', 'sound_ha_corda', 'reactions_ha_hora_azul']),
   bundle('bundle_ha_kit_transmissao', 2690, 'Kit de quem transmite', 'Para a noite de cinema.',
     ['aura_ha_prisma', 'reactions_ha_hora_azul', 'frame_ha_cinema']),
+
+  // ---- Ateliê (Alga Worlds): one product per paid SKU of the worlds catalog. No cosmeticType: nothing here goes in a
+  // profile slot; they are placed in a room or worn by the 3D figure (src/worlds.ts).
+  ...WORLD_PAID_SKUS.map(world),
 
   // ---- Casa contributions (growth-plan §2.3): any member 18+ adds days; no auto-renewal, no tiers.
   casa('casa_7d', 500, 7),

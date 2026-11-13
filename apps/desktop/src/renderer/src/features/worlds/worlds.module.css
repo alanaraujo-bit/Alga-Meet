@@ -1,0 +1,364 @@
+/* Alga Worlds: the 3D room and what is drawn over it. */
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: #0b0b0c;
+  isolation: isolate;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+  cursor: grab;
+  touch-action: none;
+}
+.canvas:active {
+  cursor: grabbing;
+}
+
+/* Name tags and reactions follow the figures; the engine moves them every frame. */
+.overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+.overlay :global(.world-tag) {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 2px var(--s-2);
+  border-radius: var(--r-full);
+  background: rgba(15, 16, 17, 0.62);
+  backdrop-filter: blur(8px);
+  color: var(--text-primary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-ui);
+  white-space: nowrap;
+  will-change: transform;
+}
+/* My own tag only anchors my reactions. */
+.overlay :global(.world-tag[data-me]) {
+  background: none;
+  backdrop-filter: none;
+  color: transparent;
+}
+.overlay :global(.world-reaction) {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  font-size: 30px;
+  line-height: 1;
+  color: initial;
+  animation: world-rise 2.2s var(--ease-out-quart) forwards;
+}
+@keyframes world-rise {
+  0% { transform: translate(-50%, 6px) scale(0.4); opacity: 0; }
+  14% { transform: translate(-50%, -8px) scale(1.12); opacity: 1; }
+  24% { transform: translate(-50%, -12px) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -64px) scale(1); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .overlay :global(.world-reaction) {
+    animation: world-fade 2.2s linear forwards;
+    transform: translate(-50%, -16px);
+  }
+}
+:global(html.reduce-motion) .overlay :global(.world-reaction) {
+  animation: world-fade 2.2s linear forwards;
+  transform: translate(-50%, -16px);
+}
+@keyframes world-fade {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Lab only. */
+.labBar {
+  position: absolute;
+  left: var(--s-3);
+  top: var(--s-3);
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1_5);
+  max-width: 70%;
+  padding: var(--s-2);
+  border-radius: var(--r-lg);
+  background: var(--bg-glass);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border-default);
+  font: var(--type-meta);
+  color: var(--text-secondary);
+}
+.labBar button {
+  height: var(--h-compact);
+  padding: 0 var(--s-2);
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, var(--state-selected));
+  color: var(--text-primary);
+  font: inherit;
+}
+.labBar button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.labStat {
+  position: absolute;
+  right: var(--s-3);
+  top: var(--s-3);
+  z-index: 2;
+  padding: var(--s-1_5) var(--s-2);
+  border-radius: var(--r-md);
+  background: var(--bg-glass);
+  font: var(--type-meta);
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  white-space: pre;
+}
+
+/* ── On the call's stage ─────────────────────────────────────────────────────────────────────────────────────────── */
+.world {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  background: #0b0b0c;
+  isolation: isolate;
+}
+/* The shared screen's own <video>: under the canvas, never seen, sized like the stage. */
+.feed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  z-index: 0;
+}
+.host {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.world .overlay {
+  z-index: 2;
+}
+
+.place {
+  position: absolute;
+  left: var(--s-4);
+  top: var(--s-4);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1_5);
+  height: var(--h-row);
+  padding: 0 var(--s-3) 0 var(--s-2);
+  border-radius: var(--r-full);
+  background: rgba(15, 16, 17, 0.6);
+  backdrop-filter: blur(12px);
+  color: var(--text-secondary);
+  font: var(--type-meta);
+  font-weight: var(--w-medium);
+}
+
+/* The room's own controls sit above the call's dock, never over it. */
+.hud {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--s-4) + var(--h-call) + 12px + var(--s-3));
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: var(--s-1);
+  border-radius: var(--r-full);
+  background: var(--bg-glass);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--elev-low), inset 0 0 0 1px var(--border-subtle);
+}
+.hudSep {
+  width: 1px;
+  height: 16px;
+  margin: 0 var(--s-1);
+  background: var(--border-default);
+}
+.reactions {
+  display: flex;
+  gap: 2px;
+}
+.reaction,
+.hudButton {
+  display: grid;
+  place-items: center;
+  width: var(--h-control);
+  height: var(--h-control);
+  border: 0;
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--text-secondary);
+  font-size: 17px;
+  line-height: 1;
+  cursor: default;
+  transition: background var(--dur-fast) var(--ease-out-quad), transform var(--dur-fast) var(--ease-out-quad);
+}
+.reaction:hover,
+.hudButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, var(--state-pressed));
+  color: var(--text-primary);
+}
+.reaction:active {
+  transform: scale(0.88);
+}
+.hudButton:disabled {
+  color: var(--text-disabled);
+}
+.hudButton.on {
+  background: var(--accent-tint-strong);
+  color: var(--accent);
+}
+.reaction:focus-visible,
+.hudButton:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--s-4) + var(--h-call) + 12px + var(--s-3) + var(--h-control) + var(--s-5));
+  transform: translateX(-50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--h-row);
+  padding: 0 var(--s-3) 0 var(--s-1_5);
+  border-radius: var(--r-full);
+  background: rgba(15, 16, 17, 0.72);
+  backdrop-filter: blur(12px);
+  color: var(--text-primary);
+  font: var(--type-ui);
+  pointer-events: none;
+}
+.hint kbd {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: var(--r-xs);
+  background: rgba(255, 255, 255, 0.14);
+  font: var(--type-badge);
+  font-family: var(--font-ui);
+}
+
+/* Loading and failure cover the room, never the call's controls. */
+.veil {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  padding: var(--s-6);
+  padding-bottom: calc(var(--h-call) + var(--s-12));
+  background: var(--bg-content);
+  color: var(--text-tertiary);
+  font: var(--type-ui);
+  text-align: center;
+}
+.veil strong {
+  margin-top: var(--s-2);
+  color: var(--text-primary);
+  font: var(--type-ui-lg);
+}
+.bar {
+  width: 220px;
+  height: 3px;
+  margin: var(--s-2) 0 var(--s-1);
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  transition: transform var(--dur-morph) var(--ease-out-quad);
+}
+.veilActions {
+  display: flex;
+  gap: var(--s-2);
+  margin-top: var(--s-4);
+}
+
+/* ── The card on the call: a world is open here ──────────────────────────────────────────────────────────────────── */
+.card {
+  position: absolute;
+  top: var(--s-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  max-width: min(560px, calc(100% - var(--s-8)));
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
+  border-radius: var(--r-xl);
+  background: var(--bg-raised);
+  box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-subtle);
+}
+.cardIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-md);
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.cardText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-right: var(--s-2);
+}
+.cardText strong {
+  color: var(--text-primary);
+  font: var(--type-ui-lg);
+  letter-spacing: var(--track-ui-lg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cardBadge,
+.cardMeta {
+  color: var(--text-tertiary);
+  font: var(--type-meta);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cardFaces {
+  display: flex;
+  flex: none;
+}
+.cardFaces > * + * {
+  margin-left: -6px;
+}

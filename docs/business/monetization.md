@@ -93,6 +93,26 @@ Receita esperada: pequena e complementar. [HIPÓTESE] 1% do MAU compra 1 item po
 
 Pix a 0,99% é o meio certo para o cosmético. O boleto (R$ 3,49 fixo) come 59% de um item de R$ 5,90 e fica fora.
 
+### 3.1 Catálogo v3: coleção "Ateliê" (Alga Worlds, 2026-11-13) — proposta, aguarda aprovação do dono
+Itens para a sala e o manequim 3D (`docs/worlds.md`). Mesmos princípios acima, na mesma faixa de preço já usada
+(R$ 5,90 a 12,90). Nomes e níveis vêm de `packages/shared/src/worlds-catalog.ts`; os preços, de `WORLD_PRICES` em
+`apps/server/src/billing/catalog.ts`.
+
+| Preço | SKUs |
+|---|---|
+| R$ 12,90 | `w_sofa_canto`, `w_tv_cinema` |
+| R$ 9,90 | `w_poltrona_lounge`, `w_sofa_chesterfield`, `a_bronze`, `o_alfaiataria` |
+| R$ 7,90 | `w_mesa_centro_marmore`, `w_estante_aco_dupla`, `w_tela_grande`, `w_baleia_bronze`, `w_tapete_grande`, `f_pedra`, `p_madeira`, `a_obsidiana`, `o_veludo` |
+| R$ 5,90 | `w_luminaria_industrial`, `w_busto_marmore`, `w_xadrez`, `w_jogo_cha`, `w_ukulele`, `w_boombox`, `w_console_jogos`, `h_chapeu`, `h_oculos_sol` |
+| Inclusos no Plus | `w_pendente_linear`, `a_perola` |
+
+- **O que continua de graça, para sempre:** a sala inicial completa, todos os climas de luz, a tela para assistir, e um
+  manequim inteiro (4 acabamentos, 5 roupas, 16 tecidos, 5 peças de cabeça). Nada do que se vende muda quem pode
+  falar, ouvir, sentar ou assistir.
+- **Decisões que são do dono:** os preços; se `w_tv_cinema` (um telão maior) deve ser vendido ou ser de todos; se a
+  coleção entra à venda junto com o `WORLDS=true` ou antes.
+- **Ainda não:** presentear e lista de desejos para itens de mundo; conjuntos (bundles); coleções sazonais.
+
 ## 4. Economia unitária
 
 ### 4.1 Custo do perk de stream (o único perk caro)

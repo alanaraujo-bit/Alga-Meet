@@ -9,6 +9,7 @@ import type {
   CinemaSummary, CinemaTrackId,
 } from './cinema.js'
 import type { MusicClientFrame, MusicErrorReason, MusicState } from './music.js'
+import type { WorldClientFrame, WorldEmote, WorldErrorReason, WorldPose, WorldRoomView, WorldSession, WorldsReady } from './worlds.js'
 import type { E2eeClientFrame, E2eeCommit, E2eeEpoch, E2eeProposals, E2eeResyncRequired, E2eeWelcome } from './e2ee.js'
 import type { RsvpStatus, SpaceEvent } from './events.js'
 import type { SpaceSound } from './soundboard.js'
@@ -37,6 +38,9 @@ import type { SpaceSound } from './soundboard.js'
  * refused as `stale` when behind; accepted commands are stamped CINEMA_LEAD_MS ahead and fan out in CINEMA_STATE.
  * `cinema_time` / CINEMA_PONG sample the clock offset. Own quota: CINEMA_FRAME_LIMIT frames per 60 s per socket, apart
  * from the 120 above; reactions are rate limited (CINEMA_REACTION_RATE). Invalid cinema frames close with 4003.
+ * Worlds (worlds.ts, docs/worlds.md): `world_*` ops and `WORLD_*` dispatches put a call in a 3D place. One session per
+ * channel, only for users connected to the call (else WORLD_ERROR `not_in_call`). Own quota: WORLD_FRAME_LIMIT frames per
+ * 60 s per socket. Positions fan out every WORLD_TICK_MS, only to the people inside and only what changed.
  */
 
 export const GatewayClose = {
@@ -78,6 +82,11 @@ export type ClientFrame =
   | CinemaClientFrame
   /** Music in a call (music.ts): `music_hello`, `music_add`, `music_control`, `music_remove`, `music_report`. */
   | MusicClientFrame
+  /**
+   * Worlds (worlds.ts): `world_hello`, `world_open`, `world_enter`, `world_leave`, `world_move`, `world_sit`,
+   * `world_stand`, `world_emote`, `world_rest`, `world_tv`. The server answers with WORLD_* dispatches only.
+   */
+  | WorldClientFrame
 
 export interface ReadyPayload {
   user: Me
@@ -97,6 +106,8 @@ export interface ReadyPayload {
   cinema: boolean
   /** The server plays music in calls. Absent on older servers, which close the socket on music ops. */
   music?: boolean
+  /** The server has Alga Worlds on. Absent on older servers (which close the socket on world ops) or when it is off. */
+  worlds?: WorldsReady
 }
 
 export type Dispatch =
@@ -238,6 +249,32 @@ export type Dispatch =
   | { t: 'MUSIC_ERROR'; d: { op: string; reason: MusicErrorReason } }
   /** Only to the socket whose cinema_* frame was refused. */
   | { t: 'CINEMA_ERROR'; d: { op: string; reason: CinemaErrorReason; sessionId?: string } }
+  /**
+   * Worlds (worlds.ts), to everyone in the call, on every change of the session (opened, moved to another place,
+   * someone walked in or out, sat, stood, started or stopped a looping gesture, the screen changed); also the answer to
+   * `world_hello`. `session: null` = the call has no world (never opened, or it ended).
+   */
+  | { t: 'WORLD_STATE'; d: { channelId: string; session: WorldSession | null } }
+  /**
+   * The room the call's world is showing, to everyone in the call: after `world_hello` / `world_open`, when the place
+   * changes and when the owner saves the room while it is open (WorldRoomView.rev grows).
+   */
+  | { t: 'WORLD_ROOM'; d: WorldRoomView }
+  /**
+   * Only to the people inside, every WORLD_TICK_MS while someone moved: [k, x cm, z cm, yaw degrees, gait] per person
+   * who moved since the last one (k = WorldMember.k). Never includes the recipient's own pose.
+   */
+  | { t: 'WORLD_TICK'; d: { channelId: string; e: [number, ...WorldPose][] } }
+  /** Only to the people inside: a one-shot gesture or a reaction of `userId`. Looping gestures come in WORLD_STATE. */
+  | { t: 'WORLD_EMOTE'; d: { channelId: string; userId: string; emote: WorldEmote } }
+  /**
+   * Only to the affected user: the server took them out of the world (the place changed to a room they may not enter,
+   * or its owner changed who may). When the owner of the room leaves the call nobody is taken out: the world goes back
+   * to the lounge with everyone still inside.
+   */
+  | { t: 'WORLD_REMOVED'; d: { channelId: string; reason: WorldErrorReason } }
+  /** Only to the socket whose world_* frame was refused. */
+  | { t: 'WORLD_ERROR'; d: { op: string; reason: WorldErrorReason } }
 
 export type DispatchType = Dispatch['t']
 export type DispatchOf<T extends DispatchType> = Extract<Dispatch, { t: T }>['d']

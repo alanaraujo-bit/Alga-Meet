@@ -17,7 +17,7 @@ import { revokeAllSessions, sha256Hex } from './auth.js'
 import {
   accessLogs, accountActions, activityDays, activityEmails, activitySettings, appeals, attachments, channelRecipients, channels,
   consentRecords, dataExports, releaseReactions, deletedAccounts, feedback, eventRsvps, events, memberRoles, messages, orders, reactions, relationships, uninstallFeedback,
-  reports, roles, sessions, spaceMembers, spaces, subscriptions, users, voiceNotifyPrefs, voiceSessions, voiceWeekly, weeklyRecaps,
+  reports, roles, sessions, spaceMembers, spaces, subscriptions, users, voiceNotifyPrefs, voiceSessions, voiceWeekly, weeklyRecaps, worldRooms,
   type DataExportRow, type UserRow,
 } from './db/schema.js'
 import { accountDeletedMail, dataExportMail, deletionCanceledMail, deletionScheduledMail } from './email-templates.js'
@@ -59,7 +59,8 @@ dados.json traz, em JSON:
 - moderation: medidas aplicadas à sua conta, seus recursos e as denúncias que você fez;
 - retention: eventos que você criou, suas respostas (Vou/Talvez/Não), suas configurações de atividade, seus dias de
   uso (últimos 90 dias), suas sessões de voz (últimos 35 dias), seus minutos por semana e seus resumos semanais
-  (sem a lista de pessoas, que é dado de terceiros), os e-mails de atividade enviados e suas escolhas de aviso.
+  (sem a lista de pessoas, que é dado de terceiros), os e-mails de atividade enviados e suas escolhas de aviso;
+- worlds: seu manequim 3D e a sua sala do Alga Worlds, como você salvou (móveis, acabamentos e quem pode entrar).
 
 Não incluímos denúncias feitas contra você nem quem as fez (direitos de terceiros). Dúvidas: encarregado de dados,
 na Política de Privacidade.
@@ -349,6 +350,12 @@ export class Privacy {
       // What the person told the team from the app; the screenshot is indicated, not bundled.
       feedback: (await db.select().from(feedback).where(eq(feedback.userId, userId)).orderBy(asc(feedback.createdAt)))
         .map((f) => ({ kind: f.kind, text: f.text, context: f.context, log: f.log, client: f.client, hasScreenshot: f.storageKey !== null, createdAt: f.createdAt.toISOString() })),
+      // Alga Worlds: the 3D figure and the personal room as saved (null = never made one).
+      worlds: {
+        avatar: u.worldAvatar,
+        room: (await db.select().from(worldRooms).where(eq(worldRooms.ownerId, userId)))
+          .map((r) => ({ name: r.name, access: r.access, shell: r.shell, finish: r.finish, items: r.items, updatedAt: r.updatedAt.toISOString() }))[0] ?? null,
+      },
       retention: await this.collectRetention(userId),
     }
   }

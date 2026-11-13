@@ -31,7 +31,8 @@ Ver `.env.example` (copie para `.env`; é carregado automaticamente). Validaçã
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_URL_STYLE` (`virtual` | `path`), `EMAIL_DRIVER` (`console` | `resend`),
 `ALGA_ALLOW_CONSOLE_EMAIL`, `ALGA_AUTO_VERIFY_EMAIL`, `EMAIL_OUTBOX_DIR`, `EMAIL_FROM`, `RESEND_API_KEY`, `EMAIL_LINK_URL`, `BILLING_PROVIDER`
 (`none` | `sandbox` | `mercadopago`), `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `MP_API_URL`, `BILLING_RETURN_URL`, `CASA_CINEMA`,
-`REQUIRE_BIRTHDATE`, `LEGAL_URL`, `METRICS_TOKEN`, `E2EE_DS_KEY`, `E2EE_MLS_PKG`.
+`REQUIRE_BIRTHDATE`, `LEGAL_URL`, `METRICS_TOKEN`, `E2EE_DS_KEY`, `E2EE_MLS_PKG`, `WORLDS` (`true` | `false`),
+`WORLDS_ASSETS_URL`, `WORLDS_ASSETS_DIR`.
 
 Falha fechada:
 - **Sem `NODE_ENV` o servidor é produção**: exige `DATABASE_URL`, `CORS_ORIGINS`, `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET`
@@ -49,6 +50,12 @@ Falha fechada:
   `mercadopago` exige `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` e `BILLING_RETURN_URL` (https). `CASA_CINEMA=1` (1080p60
   da Casa) é recusado em produção: falta o pacote de banda, o medidor de 60 h/mês e a concessão no `voice.ts`; em
   dev só lista o perk.
+- **Alga Worlds** (`src/worlds.ts`): ligado fora de produção e **desligado em produção** até `WORLDS=true` (mesma regra
+  da Sala de Cinema). Desligado: `READY` não traz `worlds`, os ops `world_*` respondem `disabled` e as rotas
+  `/worlds/*` dão 404. `WORLDS_ASSETS_URL` é de onde os clientes baixam o pacote 3D (URL absoluta https de um CDN, sem
+  barra no fim; em produção só https); sem ela vale `/api/v1/worlds/assets`, servido por esta API a partir de
+  `WORLDS_ASSETS_DIR` (padrão `assets/worlds/v1`). Sem o `manifest.json` do pacote a subida só avisa no log (warn) e a
+  rota responde 404.
 - A chave `devkey` e o segredo de `infra/livekit/livekit.dev.yaml` (públicos) só são aceitos com `NODE_ENV=development`
   ou `test` **e** `HOST` loopback, ou com `ALGA_ALLOW_DEV_SECRETS=1` (ex. teste em LAN com `HOST=0.0.0.0`).
 - **Cadastro em produção** exige `birthDate` e `termsVersion` (`GET /legal`); fora de produção só com

@@ -33,6 +33,8 @@ import { cardWidth, featuredWidth, seatWidth, stripTile, voiceLayout, type SeatS
 import { useLevelGetter } from './levels'
 import { t } from './strings'
 import { SoundLayer } from '../soundboard/SoundLayer'
+import { WorldCard, WorldOnStage, useWorldOnStage } from '../worlds/Host'
+import { useWorlds } from '../worlds/store'
 import { joinVoice, leaveVoice, useVoice } from './voice'
 import sh from '../shell/shell.module.css'
 import s from './stage.module.css'
@@ -74,6 +76,10 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
   const cinema = useCinema(useShallow((st) => ({ id: st.session?.channelId === channel.id ? st.session.sessionId : null, seated: st.mine.seated, host: st.session?.hostId === meId })))
   const watching = live && cinema.id !== null && cinema.seated
   const drop = useCinemaDrop(live && cinema.id === null)
+  // Alga Worlds: inside and looking at it → the stage is the 3D room (its own lazy chunk); a world I am not looking at →
+  // a card above the faces. The call itself (header, dock, voice) is the same either way.
+  const world3d = useWorldOnStage(channel.id, live) && !watching
+  const worldOpen = useWorlds((st) => live && st.session?.channelId === channel.id)
 
   // Watching is opt-in and costs bandwidth: leaving the call's stage keeps one stream for the mini-player
   // (the one in focus, else the first) and stops the rest.
@@ -119,7 +125,13 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
     ) : null
 
   return (
-    <section className={`${s.stage} ${variant === 'dm' ? s.dm : ''} ${live ? '' : s.idle}`} aria-label={channel.name} {...drop.props}>
+    <section
+      className={`${s.stage} ${variant === 'dm' ? s.dm : ''} ${live ? '' : s.idle}`}
+      // A DM call is a strip above the conversation: a room needs more of the window than faces do.
+      style={world3d && variant === 'dm' ? { height: 'clamp(360px, 64vh, 780px)' } : undefined}
+      aria-label={channel.name}
+      {...drop.props}
+    >
       {header}
       <MismatchBanner channel={channel} />
       <Room stale={conn.state !== 'connected' && here} live={live}>
@@ -130,6 +142,8 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
         )}
         {watching ? (
           <Foyer channel={channel} />
+        ) : world3d ? (
+          <WorldOnStage channel={channel} />
         ) : live && cinema.id !== null && !cinema.seated ? (
           // the session's card above the faces (mockup 01)
           <div className={cc.withCard}>
@@ -144,6 +158,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
           <PreJoin channel={channel} people={people.map((p) => p.userId)} streaming={people.filter((p) => p.streaming).map((p) => p.userId)} variant={variant} />
         )}
         {live && cinema.id === null && <CinemaCard channel={channel} />}
+        {worldOpen && !world3d && !watching && <WorldCard channel={channel} />}
         {live && <CinemaNotices />}
         {drop.dragging && <div className={cs.dropHint}>{cinemaT.dropHint}</div>}
         {here && conn.state === 'reconnecting' && (

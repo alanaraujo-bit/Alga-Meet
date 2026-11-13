@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto'
 import {
   ANNUAL_ITEM_MAX_CENTS, COSMETIC_SLOTS, GIFT_CARD_LIMIT_CENTS, GIFT_MAX_SCHEDULE_DAYS, GIFT_MIN_FRIENDSHIP_HOURS,
   GIFT_PIX_LIMIT_CENTS, PLUS_PASSES_PER_MONTH, PLUS_PASS_DAYS, PLUS_PASS_PRODUCT_ID, PRIVATE_COSMETIC_SLOTS, REFUND_WINDOW_DAYS,
-  REMOVED_USER_ID, SPACE_TONES, uuidv7,
+  REMOVED_USER_ID, SPACE_TONES, holdsWorldSku, uuidv7,
   type BillingCatalog, type BillingMe, type CheckoutResponse, type CosmeticSlot, type Entitlement, type Entitlements,
   type EquippedCosmetics, type Gift, type GiftBody, type Order, type PlanId, type PlanSummary, type PlusPassBody,
   type PayBody, type PayResponse, type PlusStatus, type Product, type PutCosmeticsBody, type Quote, type Subscription,
@@ -165,6 +165,8 @@ const orderView = (o: OrderRow, extra: { giftId?: string | null; spaceId?: strin
 })
 
 interface Change { userId: string; planChanged: boolean; cosmeticsChanged: boolean; profileChanged: boolean }
+/** What a paid part of the 3D figure (users.world_avatar) falls back to when the account stops holding it. */
+const FREE_AVATAR_PARTS = { finish: 'a_porcelana', outfit: 'o_basico', head: 'h_nenhum' } as const
 type Desired = Omit<typeof entitlements.$inferInsert, 'userId' | 'sku'>
 
 /** What a transaction touched; the notifications go out after commit. */
@@ -183,6 +185,8 @@ export class Billing {
   private sweeping: Promise<number> | undefined
   private lastSweepAt: Date | undefined
   readonly tryOns: TryOns
+  /** A user's entitlements changed and were announced: src/worlds.ts re-filters the room they have open in a call. */
+  onEntitlementsChange: (userId: string) => void = () => {}
 
   constructor(
     private readonly config: Config,
@@ -1033,12 +1037,12 @@ export class Billing {
 
   /**
    * Rebuilds the user's entitlements, users.plan and users.plus_since from subscriptions, paid orders and accepted
-   * gifts. null = nothing changed.
+   * gifts; what they wear and no longer hold comes off (profile slots, paid parts of the 3D figure). null = nothing changed.
    */
   private async recompute(tx: Tx, userId: string, now: Date): Promise<Change | null> {
     // Payment rows of purged accounts move to the "removed user" (src/privacy.ts): they never grant anything again.
     if (userId === REMOVED_USER_ID) return null
-    const [u] = await tx.select({ plan: users.plan, cosmetics: users.cosmetics, plusSince: users.plusSince }).from(users)
+    const [u] = await tx.select({ plan: users.plan, cosmetics: users.cosmetics, plusSince: users.plusSince, worldAvatar: users.worldAvatar }).from(users)
       .where(eq(users.id, userId)).for('update')
     if (!u) return null
     const subs = (await tx.select().from(subscriptions).where(eq(subscriptions.userId, userId))).filter((s) => this.counts(s.provider))
@@ -1075,26 +1079,34 @@ export class Billing {
     const equipped = Object.entries(u.cosmetics)
     const kept = equipped.filter(([, sku]) => desired.has(sku))
     const cosmeticsChanged = kept.length !== equipped.length
+    // Same for the 3D figure: a paid part no longer held gives way to the free one (the stored room is left alone:
+    // src/worlds.ts filters it when it is shown, so buying the piece again brings it back).
+    const held = new Set(desired.keys())
+    const lapsed = u.worldAvatar ? (['finish', 'outfit', 'head'] as const).filter((part) => !holdsWorldSku(u.worldAvatar![part], held)) : []
+    const worldAvatar = lapsed.length ? { ...u.worldAvatar!, ...Object.fromEntries(lapsed.map((part) => [part, FREE_AVATAR_PARTS[part]])) } : u.worldAvatar
+    const avatarChanged = lapsed.length > 0
     const planChanged = plan !== u.plan
     const sinceChanged = iso(plusSince) !== iso(u.plusSince)
-    if (same && !planChanged && !cosmeticsChanged && !sinceChanged) return null
+    if (same && !planChanged && !cosmeticsChanged && !sinceChanged && !avatarChanged) return null
     if (!same) {
       await tx.delete(entitlements).where(eq(entitlements.userId, userId))
       if (desired.size) await tx.insert(entitlements).values([...desired].map(([sku, d]) => ({ userId, sku, ...d })))
     }
-    if (planChanged || cosmeticsChanged || sinceChanged) {
+    if (planChanged || cosmeticsChanged || sinceChanged || avatarChanged) {
       await tx.update(users).set({
         ...(planChanged ? { plan } : {}), ...(cosmeticsChanged ? { cosmetics: Object.fromEntries(kept) } : {}), ...(sinceChanged ? { plusSince } : {}),
+        ...(avatarChanged ? { worldAvatar } : {}),
       }).where(eq(users.id, userId))
     }
     const shown = (c: [string, string][]) => c.filter(([slot]) => !PRIVATE_COSMETIC_SLOTS.includes(slot as CosmeticSlot)).length
     // The badge others see changes only with the plan or with the summed time (both move plusSince).
-    return { userId, planChanged, cosmeticsChanged, profileChanged: shown(kept) !== shown(equipped) || sinceChanged }
+    return { userId, planChanged, cosmeticsChanged, profileChanged: shown(kept) !== shown(equipped) || sinceChanged || avatarChanged }
   }
 
   /**
-   * After commit: ENTITLEMENTS_UPDATE; ME_UPDATE when the plan, the equipped cosmetics or the badge changed;
-   * USER_UPDATE to the profile audience when what others see changed; the new stream presets at the SFU on a plan change.
+   * After commit: ENTITLEMENTS_UPDATE; ME_UPDATE when the plan, the equipped cosmetics, the 3D figure or the badge
+   * changed; USER_UPDATE to the profile audience when what others see changed; the new stream presets at the SFU on a
+   * plan change; onEntitlementsChange for whoever else depends on what the user holds.
    */
   private async notify(changes: Change[]): Promise<void> {
     for (const c of changes) {
@@ -1104,6 +1116,7 @@ export class Billing {
       if (c.planChanged || c.cosmeticsChanged || c.profileChanged) this.hub.dispatch([c.userId], 'ME_UPDATE', meView(row, this.config.files.maxAttachmentBytes))
       if (c.profileChanged) this.hub.dispatch(await profileAudience(this.db, c.userId), 'USER_UPDATE', publicUser(row))
       if (c.planChanged) await this.voice.setStreamPresets(c.userId, this.plan(row.plan).streamPresets)
+      this.onEntitlementsChange(c.userId)
     }
   }
 

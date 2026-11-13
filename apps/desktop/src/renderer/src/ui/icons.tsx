@@ -170,4 +170,14 @@ export {
   SkipForward,
   Megaphone,
   Camera,
+  // Alga Worlds
+  Cube,
+  Couch,
+  DoorOpen,
+  HandWaving,
+  Storefront,
+  TShirt,
+  Television,
+  PaintRoller,
+  ArrowsOutCardinal as Move,
 } from '@phosphor-icons/react'

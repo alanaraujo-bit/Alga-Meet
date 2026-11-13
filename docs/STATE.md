@@ -1,5 +1,28 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-13 — Alga Worlds: a chamada dentro de uma sala em 3D (NÃO commitado, NÃO publicado)
+- **Estado:** tudo no working tree de `main`, sem commit e sem deploy. Decisão do dono: revisar, commitar (numa branch),
+  publicar a API e lançar um desktop novo. Como funciona, medições e o que falta: `docs/worlds.md`.
+- **O que é:** o botão Mundo no dock leva a chamada para um lugar em 3D sem tocar na voz: o **lounge** (sala pronta do
+  grupo) ou a **sala pessoal** de quem abre (persistente, com acesso por chamada / só amigos / só o dono). Cada pessoa é
+  um manequim de ateliê montável; anda, senta, gesticula, reage, e a tela da sala mostra a transmissão de tela de
+  alguém da chamada. **Ateliê** (Ctrl K, dock, HUD): montar a sala, vestir o manequim, loja da coleção Ateliê.
+- **Como:** sessão por canal em memória no gateway (`world_*`/`WORLD_*`, posições a cada 100 ms só para quem está
+  dentro); motor próprio em three.js num chunk à parte (~1,0 MB, só carrega ao entrar); pacote de assets **fora do
+  instalador** (33,5 MiB, CC0, baixado sob demanda com SHA-256 e guardado no OPFS; `tools/worlds-assets` regenera).
+  Nada no motor de mídia mudou: a tela da sala usa `media.watch`/`attachScreen`.
+- **Servidor:** `src/worlds.ts`, `routes/worlds.ts`, **migração 0020** (`users.world_avatar`, `world_rooms`), 26 produtos
+  da coleção Ateliê no catálogo (v3; `kind: 'cosmetic'`, `world: true`), exportação de dados com a sala e o manequim.
+  Em produção nasce desligado: `WORLDS=true`.
+- **Testes:** shared 76, servidor 361 (mundos também em PostgreSQL real), desktop 908, typecheck de tudo, **e2e no app
+  real com duas instâncias 12/12** (`apps/desktop/scripts/worlds-e2e.mjs`, capturas em `docs/screenshots/worlds/`).
+- **Não verificado:** `npm run dist`, app instalado contra o staging, GPU/VRAM/fps com um jogo aberto, chamada E2EE com
+  o mundo aberto. **Limite assumido:** o avatar é um manequim (CC0), não um humano realista com roupa modelada.
+- **Mudanças fora da pasta do Worlds** (para a revisão): CSP ganhou `blob:` em `connect-src` (o carregador de modelos lê
+  blobs criados pela própria página); `CallStage`, `ControlsDock`, `QuickSwitcher`, `Shell`, `session.ts` e `icons.tsx`
+  ganharam os pontos de entrada; `billing.ts` tira do manequim a parte paga que a conta perdeu; `wishlist.ts` recusa
+  itens não presenteáveis; `.gitattributes` marca `.glb/.webp/.hdr` como binários; `three` nas devDependencies.
+
 ## 2026-11-09 noite (3) — Música na call ("bot de música", YouTube) — desktop 0.1.17
 - **No ar (2026-11-10):** API no Railway (deploy `9732ae75`) e https://github.com/alanaraujo-bit/Alga-Meet/releases/tag/v0.1.17
   (build de `9354da1`, não assinado; testado empacotado: o player do YouTube toca com o Referer do app). Falta a nota

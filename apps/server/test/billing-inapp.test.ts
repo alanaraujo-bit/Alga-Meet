@@ -152,6 +152,24 @@ describe('in-app checkout (Mercado Pago)', () => {
     expect((await api<BillingMe>(m.app, 'GET', '/billing/me', { token: u.token })).body.items.map((i) => i.sku)).toContain('deco_ha_constelacao')
   })
 
+  it('an Alga Worlds piece (no profile slot) is paid in the app like any item: by card at once, by Pix through the webhook', async () => {
+    const u = await register(m.app)
+    const held = async () => (await api<BillingMe>(m.app, 'GET', '/billing/me', { token: u.token })).body.items.map((i) => i.sku).sort()
+    const co = (await api<CheckoutResponse>(m.app, 'POST', '/billing/checkout', { token: u.token, body: { productId: 'w_xadrez' } })).body
+    expect(co).toMatchObject({ kind: 'order', amountCents: 590 })
+    expect((await api<PayResponse>(m.app, 'POST', '/billing/pay', { token: u.token, body: card(co.reference, 'good-card-tok-w') })).body).toEqual({ status: 'approved' })
+    expect(calls.findLast((c) => c.body?.token === 'good-card-tok-w')!.body).toMatchObject({ external_reference: `o_${co.reference}`, transaction_amount: 5.9 })
+    expect(await held()).toEqual(['w_xadrez'])
+
+    const co2 = (await api<CheckoutResponse>(m.app, 'POST', '/billing/checkout', { token: u.token, body: { productId: 'h_chapeu' } })).body
+    const pix = (await api<PayResponse>(m.app, 'POST', '/billing/pay', { token: u.token, body: { method: 'pix', reference: co2.reference } })).body
+    expect(await held()).toEqual(['w_xadrez']) // a QR is not a payment
+    const paymentId = pix.pix!.qrCode.replace('000201pix', '')
+    store.set(`/v1/payments/${paymentId}`, { ...store.get(`/v1/payments/${paymentId}`), status: 'approved', date_last_updated: new Date(Date.now() + 1000).toISOString() })
+    expect((await hook('payment', paymentId)).statusCode).toBe(200)
+    expect(await held()).toEqual(['h_chapeu', 'w_xadrez'])
+  })
+
   it('only the buyer pays their checkout, and bad input never reaches the provider', async () => {
     const owner = await register(m.app)
     const other = await register(m.app)

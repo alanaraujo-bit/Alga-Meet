@@ -3,6 +3,7 @@ import type { EquippedCosmetics, PlanSummary, PlusBadge, SpaceUpgradeState, TryO
 import type { EcoSpec } from './eco.js'
 import type { AgeBracket, StaffRole } from './trust-safety.js'
 import type { Activity, CustomStatus } from './activity.js'
+import type { WorldAvatar } from './worlds.js'
 
 
 export type PresenceStatus = 'online' | 'idle' | 'dnd' | 'offline'
@@ -32,6 +33,11 @@ export interface PublicUser {
   plusBadge?: PlusBadge
   /** Only in USER_UPDATE to the user's voice channel: an item they are trying on ("provando") until expiresAt. */
   tryOn?: TryOn
+  /**
+   * The 3D figure this person made for Alga Worlds (PUT /worlds/avatar); omitted = the automatic one
+   * (defaultWorldAvatar from their id and Eco). Paid parts are dropped from it when the account stops holding them.
+   */
+  world?: WorldAvatar
 }
 
 export interface Me extends PublicUser {

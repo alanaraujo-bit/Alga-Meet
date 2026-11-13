@@ -36,7 +36,7 @@ export function isExternalWebUrl(url: string): boolean {
 
 // Used only if the built index.html lost its CSP meta (should never happen).
 const FALLBACK_CSP =
-  "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream: https:; font-src 'self' data:; connect-src 'self' https: wss:; frame-src https:; worker-src 'self' blob:"
+  "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream: https:; font-src 'self' data:; connect-src 'self' blob: https: wss:; frame-src https:; worker-src 'self' blob:"
 
 /** The header mirrors the <meta> CSP of the built index.html, so the two can never drift apart. */
 function rendererCsp(): string {
