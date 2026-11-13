@@ -1,8 +1,8 @@
 # Alga Meet — Estado do projeto
 
-## 2026-11-13 — Alga Worlds: a chamada dentro de uma sala em 3D (NÃO commitado, NÃO publicado)
-- **Estado:** tudo no working tree de `main`, sem commit e sem deploy. Decisão do dono: revisar, commitar (numa branch),
-  publicar a API e lançar um desktop novo. Como funciona, medições e o que falta: `docs/worlds.md`.
+## 2026-11-13 — Alga Worlds: a chamada dentro de uma sala em 3D (branch `feat/worlds`, NÃO mesclada, NÃO publicada)
+- **Estado:** commit `15c3f65` na branch local `feat/worlds` (a partir de `afe95e1`), sem push e sem deploy. Decisão do
+  dono: revisar, mesclar, publicar a API e lançar um desktop novo. Como funciona, medições e o que falta: `docs/worlds.md`.
 - **O que é:** o botão Mundo no dock leva a chamada para um lugar em 3D sem tocar na voz: o **lounge** (sala pronta do
   grupo) ou a **sala pessoal** de quem abre (persistente, com acesso por chamada / só amigos / só o dono). Cada pessoa é
   um manequim de ateliê montável; anda, senta, gesticula, reage, e a tela da sala mostra a transmissão de tela de
