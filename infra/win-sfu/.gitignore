@@ -1,0 +1,8 @@
+# Downloaded by fetch-caddy.mjs (51 MB): never commit
+bin/
+# A local test install (install.ps1 -DryInstall into this folder) would leave these: secrets and generated files
+.env
+run/
+logs/
+data/
+control/

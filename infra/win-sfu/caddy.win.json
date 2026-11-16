@@ -1,0 +1,31 @@
+{
+  "admin": { "disabled": true, "config": { "persist": false } },
+  "logging": { "logs": { "default": { "level": "INFO" } } },
+  "storage": { "module": "file_system", "root": "<DATA>" },
+  "apps": {
+    "tls": { "certificates": { "automate": ["<DOMAIN>", "turn.<DOMAIN>"] } },
+    "layer4": {
+      "servers": {
+        "main": {
+          "listen": [":443"],
+          "routes": [
+            {
+              "match": [{ "tls": { "sni": ["turn.<DOMAIN>"] } }],
+              "handle": [
+                { "handler": "tls" },
+                { "handler": "proxy", "upstreams": [{ "dial": ["127.0.0.1:5349"] }] }
+              ]
+            },
+            {
+              "match": [{ "tls": { "sni": ["<DOMAIN>"] } }],
+              "handle": [
+                { "handler": "tls", "connection_policies": [{ "alpn": ["http/1.1"] }] },
+                { "handler": "proxy", "upstreams": [{ "dial": ["127.0.0.1:7870"] }] }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

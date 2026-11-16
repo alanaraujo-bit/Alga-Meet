@@ -1,5 +1,47 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-16 — SFU saiu do servidor de casa e roda no PC do dono (Windows, nativo) — NO AR
+- **Decisão do dono (2026-11-16):** não usar mais o servidor Ubuntu de casa; o PC principal (Windows 11 Pro) é o
+  servidor de voz/tela. O dono desligou o servidor antigo por volta de 16:45 UTC, antes da virada; a voz ficou fora
+  do ar até 17:54 UTC.
+- **Kit: `infra/win-sfu/`** (README lá). LiveKit 1.13.11 e Caddy 2.11.9 (com layer4) direto no Windows, sem Docker,
+  sob um supervisor em Node (`sfu.mjs`) que também faz DuckDNS, UPnP e a vigia do IP. Instalado pelo dono em
+  `C:\ProgramData\AlgaMeetSFU`; sobe no boot como `LocalService` por tarefa agendada (`AlgaMeetSFU`).
+- **No ar e verificado (17:55 UTC):** 5 encaminhamentos UPnP para este PC; 3 regras de firewall; certificados Let's
+  Encrypt para o nome e para `turn.`; NAT loopback funciona (o app do próprio dono, neste PC, alcança o SFU);
+  `/api/v1/ready` → `livekit: ok`; a API **autenticou** no SFU novo (log da API: `voice: reconciled with LiveKit`;
+  log do LiveKit: `RoomService.ListRooms` com a chave nova, 200).
+- **NÃO verificado:** uma chamada de verdade (áudio e tela, de fora de casa) e o comportamento depois de reiniciar o PC.
+- **Par de chaves do LiveKit trocado.** O conector do Railway não devolve valores de variáveis (só nomes), então não
+  dava para copiar o par antigo. Com o OK do dono, um par novo foi gerado, gravado no `.env` do SFU e em
+  `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` do serviço `api`. O par antigo (o do `.env` do servidor aposentado) não
+  vale mais: para voltar ao servidor Linux é preciso pôr o par novo lá.
+- **O redeploy por troca de variável construiu `c03a13d` (ponta da `main`), não o commit fixado `b10ece5`.** Os
+  dois só diferem em docs e num script de e2e do desktop. Vale saber: mudar uma variável publica o que estiver na
+  `main` do GitHub.
+- **DuckDNS:** a virada foi feita sem o token (o nome já apontava para o IP público desta casa). O dono gravou o
+  token às 18:52 UTC com `install.ps1 -SetDuckToken`; o supervisor atualiza o registro a cada 5 min
+  (`OK … NOCHANGE`). O token apareceu numa captura de tela dentro da sessão do Claude daquele dia.
+- **Perdido na mudança:** o relay da Sala de Cinema. O coturn não tem versão para Windows; a API continua anunciando
+  `CINEMA_TURN_URLS`, que não respondem. O cinema segue funcionando entre quem conecta direto. Recolocar o relay
+  (WSL2 é o caminho provável) é decisão do dono.
+- **O que o roteador (Huawei EchoLife, `192.168.18.1`) ensinou:** sem CGNAT; só a máquina que criou um
+  encaminhamento UPnP pode apagá-lo ou substituí-lo (714 e 718 para as outras, e 714 também no
+  `GetSpecificPortMappingEntry`, por isso o kit lê a tabela inteira); os encaminhamentos do servidor desligado
+  venceram sozinhos em cerca de 1 h, e só então este PC pôde assumir as portas.
+- **Tropeços da virada, para não repetir:** (1) o Caddy tentou o Let's Encrypt 5 vezes por nome enquanto 80/443
+  ainda iam para a máquina desligada; o `sfu.mjs` do repositório agora espera as portas chegarem. (2) Uma cópia
+  provisória do kit, subida sem admin enquanto o dono estava longe, segurou as portas do LiveKit e fez o LiveKit da
+  instalação definitiva reiniciar 21 vezes até ser parada. (3) Colar no prompt oculto do token com Ctrl+V não
+  funcionou (entrou um caractere só, o DuckDNS respondeu `KO`); com o botão direito, sim. O dono rodou o
+  `install.ps1` de novo às 18:49 e 18:52 UTC: a instalação em `C:\ProgramData` está com o `sfu.mjs` atual e a
+  liberação de firewall de teste que tinha sobrado foi removida. `doctor.mjs` às 18:53 UTC: tudo certo, sem avisos.
+- **Dev neste PC:** o SFU de produção ocupa 7881/tcp, então `infra/livekit/livekit.dev.yaml` passou o `tcp_port` do
+  dev para 7885; a sinalização de produção fica em 127.0.0.1:7870 para não disputar a 7880 do dev.
+- **Consequência assumida:** PC desligado, reiniciando ou suspenso = ninguém entra em chamada. As portas da internet
+  agora chegam ao PC principal do dono (README do kit, §7).
+- **Nada disto está commitado** (`infra/win-sfu/`, este arquivo, `livekit.dev.yaml`).
+
 ## 2026-11-13 — Alga Worlds: a chamada dentro de uma sala em 3D — desktop 0.1.18, NO AR
 - **No ar (2026-11-13, a pedido do dono):** `feat/worlds` mesclada na `main` (`b10ece5`, no GitHub); API no Railway
   (deploy `4acae5c3`, de `b10ece5`, com **`WORLDS=true`**; migração 0020 aplicada no boot) e

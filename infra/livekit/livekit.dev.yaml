@@ -2,7 +2,9 @@
 port: 7880
 bind_addresses: ["127.0.0.1"]
 rtc:
-  tcp_port: 7881
+  # Not LiveKit's usual 7881: on the owner's PC the production SFU (infra/win-sfu) listens on 7881 on every
+  # interface, and two processes cannot share it. Dev media goes over UDP 50000-50200; this is only the TCP fallback.
+  tcp_port: 7885
   port_range_start: 50000
   port_range_end: 50200
   use_external_ip: false
