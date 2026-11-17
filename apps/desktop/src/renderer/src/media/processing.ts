@@ -53,6 +53,7 @@ export class VoiceGraph {
   private dest: MediaStreamAudioDestinationNode
   private ready: Promise<void>
   private rnnoiseLoaded = false
+  private rewire: Promise<void> = Promise.resolve()
   private lastConfig: GateMessage = { type: 'config', thresholdDb: null, hangoverMs: 300 }
   private lastMode: GateMessage = { type: 'mode', mode: 'vad', forcedOpen: false }
   rnnoiseActive = false
@@ -85,8 +86,17 @@ export class VoiceGraph {
   }
 
   /** Insert/remove RNNoise without touching the capture track. Throws if it can't load (CSP/WASM). */
-  async setRnnoise(on: boolean): Promise<void> {
+  setRnnoise(on: boolean): Promise<void> {
     this.opts.rnnoise = on
+    // One rewiring at a time, applying the latest wish: a LiveKit track restart (setInput) can land while RNNoise
+    // is still loading, and two interleaved rewirings left the mic wired both through RNNoise and around it.
+    const run = this.rewire.then(() => this.wireRnnoise())
+    this.rewire = run.catch(() => undefined)
+    return run
+  }
+
+  private async wireRnnoise(): Promise<void> {
+    const on = this.opts.rnnoise
     if (!this.source || !this.gate) return
     this.source.disconnect()
     this.rnnoise?.disconnect()

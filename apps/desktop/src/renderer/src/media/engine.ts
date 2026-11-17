@@ -2,12 +2,14 @@
 // resilience and screen sharing. The UI talks to `media` and reads `useMedia`; never to livekit-client.
 import {
   AudioPresets,
+  ConnectionState as RoomState,
   DefaultReconnectPolicy,
   DisconnectReason,
   LocalAudioTrack,
   Room,
   RoomEvent,
   Track,
+  TrackEvent,
   VideoPreset,
   VideoQuality,
   createLocalAudioTrack,
@@ -265,6 +267,8 @@ class MediaEngine {
     try {
       // In parallel with the LiveKit connection: the MLS join (0004 §3.4). null = this call is not E2EE.
       e2ee = await this.e2eeStart(params.channelId, params.e2ee)
+      // Left, or joined somewhere else, while the MLS join ran: connecting now would publish a mic nobody wants.
+      if (this.userLeft || this.last !== params) return
       room = new Room({
         adaptiveStream: ADAPTIVE,
         dynacast: true,
@@ -366,6 +370,8 @@ class MediaEngine {
       const allowed = this.micAllowed(room)
       patch('self', { serverMuted: !allowed })
       if (this.last?.publishMic === false) return
+      // Our mic no longer among the published tracks (unpublished by the SFU mid-reconnect): start it again.
+      if (this.mic && ![...room.localParticipant.audioTrackPublications.values()].some((p) => p.track === this.mic)) await this.dropMic(room)
       if (allowed && !this.mic) await this.publishMic(room, this.last?.bitrateKbps ?? DEFAULT_KBPS)
       else if (!allowed && this.mic) await this.dropMic(room)
       this.syncTray()
@@ -393,11 +399,17 @@ class MediaEngine {
     const graph = new VoiceGraph({ rnnoise: false, onReport: (r) => this.onGateReport(r) })
     this.graph = graph
     this.applyGate()
+    let opened: LocalAudioTrack | null = null
     try {
-      const track = await createLocalAudioTrack(captureConstraints(p.processing, this.activeInput))
+      const track = (opened = await this.openMic(p.processing))
       await track.setAudioContext(graph.ctx)
       await track.setProcessor(new VoiceProcessor(graph))
       this.mic = track
+      track.on(TrackEvent.Muted, () => this.onSdkMute(track))
+      // Windows (mic-mute key, headset button) silenced the device: LiveKit tells the SFU we're muted after 5 s.
+      track.on(TrackEvent.UpstreamPaused, () => {
+        if (track === this.mic && !useMedia.getState().self.muted) this.notify('O sistema mutou o seu microfone (tecla ou botão do headset): os outros não estão te ouvindo.')
+      })
       await this.applyRnnoise(p.processing)
       const s = useMedia.getState().self
       if (s.muted || s.deafened) await track.mute()
@@ -408,13 +420,27 @@ class MediaEngine {
       // After the join, not in its way: queued behind this op. At most 2 repairs (the race can repeat right away).
       if (repairs < 2) this.micOp = this.micOp.then(() => this.ensureDtx(room, track, kbps, repairs + 1))
     } catch (e) {
-      this.mic?.stop()
+      opened?.stop()
       this.mic = null
       await graph.close()
       this.graph = null
       patch('self', { micAvailable: false })
       this.notify(`Microfone indisponível (${errText(e)}). Você está só ouvindo.`)
     }
+  }
+
+  /** A fresh capture. Republish paths open it right after releasing it, and Windows can refuse it for a moment. */
+  private async openMic(mode: ProcessingMode): Promise<LocalAudioTrack> {
+    let err: unknown
+    for (const waitMs of [0, 300, 1000]) {
+      if (waitMs) await new Promise((r) => setTimeout(r, waitMs))
+      try {
+        return await createLocalAudioTrack(captureConstraints(mode, this.activeInput))
+      } catch (e) {
+        err = e
+      }
+    }
+    throw err
   }
 
   /**
@@ -467,10 +493,20 @@ class MediaEngine {
         if (p === room.localParticipant && STREAM_PRESETS_ATTRIBUTE in changed) this.planFromRoom(room)
       })
       // The SFU can unpublish our mic itself (permission revoked): LiveKit stops the track; release our side too.
+      // Not while reconnecting: a full reconnect unpublishes and republishes every track itself (republishAllTracks);
+      // dropping the mic then left a dead second mic publication that others read as "unmuted" (syncMic squares it).
       .on(RoomEvent.LocalTrackUnpublished, (pub) => {
+        if (room.state !== RoomState.Connected) return
         if (pub.source === Track.Source.Microphone && this.mic && pub.track === this.mic) {
           this.micOp = this.micOp.then(() => this.dropMic(null))
         }
+      })
+      // A full reconnect republishes our share under new publications: follow them, or "stop" would stop nothing.
+      .on(RoomEvent.LocalTrackPublished, (pub) => {
+        const cur = this.screenPub
+        if (!cur) return
+        if (pub.source === Track.Source.ScreenShare && !cur.video.track) cur.video = pub
+        else if (pub.source === Track.Source.ScreenShareAudio && cur.audio && !cur.audio.track) cur.audio = pub
       })
       .on(RoomEvent.TrackUnpublished, (pub, rp) => {
         // Another one left = a republish (plan downgrade): whoever watched follows the new one.
@@ -840,7 +876,15 @@ class MediaEngine {
     if (!muted && s.deafened) return this.setDeafened(false)
     if (s.muted === muted) return
     patch('self', { muted })
-    if (this.mic) await (muted ? this.mic.mute() : this.mic.unmute())
+    try {
+      if (this.mic) await (muted ? this.mic.mute() : this.mic.unmute())
+    } catch (e) {
+      // Unmuting reopens a capture that died (see onSdkMute); if that fails, say so instead of showing a live mic.
+      patch('self', { muted: true })
+      this.notify(`O microfone não respondeu (${errText(e)}). Tente desmutar de novo ou escolha outro microfone.`)
+      this.syncTray()
+      return
+    }
     if (cue) this.cue(muted ? 'mute' : 'unmute')
     this.syncTray()
   }
@@ -855,8 +899,14 @@ class MediaEngine {
     if (s.deafened === deafened) return
     if (deafened) this.mutedBeforeDeafen = s.muted
     patch('self', { deafened, muted: deafened ? true : this.mutedBeforeDeafen })
-    if (this.mic) await (deafened || this.mutedBeforeDeafen ? this.mic.mute() : this.mic.unmute())
+    // Hearing comes back first: a mic that fails to reopen must not leave everyone silent too.
     for (const id of this.room?.remoteParticipants.keys() ?? []) this.applyVolume(id)
+    try {
+      if (this.mic) await (deafened || this.mutedBeforeDeafen ? this.mic.mute() : this.mic.unmute())
+    } catch (e) {
+      patch('self', { muted: true })
+      this.notify(`O microfone não respondeu (${errText(e)}). Tente desmutar de novo ou escolha outro microfone.`)
+    }
     this.cue(deafened ? 'deafen' : 'undeafen')
     this.syncTray()
   }
@@ -943,12 +993,20 @@ class MediaEngine {
     this.start()
     this.prefs.set({ processing: mode })
     patch('self', { processing: mode })
-    if (this.mic) {
-      await this.mic.restartTrack(captureConstraints(mode, this.activeInput))
-      await this.applyRnnoise(mode)
-    } else if (this.test.graph) {
-      await this.startMicTest({ loopback: useMedia.getState().micTest.loopback })
+    // In the mic queue: quick clicks, a join or a mic republish must never reopen the capture at the same time.
+    const run = async () => {
+      if (this.prefs.get().processing !== mode) return // a newer choice is queued right behind
+      const mic = this.mic
+      if (mic) {
+        const err = await this.restartMic(mic, mode)
+        if (err === null) await this.applyRnnoise(mode)
+        else if (mic === this.mic) this.notify(`O microfone não respondeu ao trocar o processamento de voz (${errText(err)}). Tente de novo ou escolha outro microfone.`)
+      } else if (this.test.graph) {
+        await this.startMicTest({ loopback: useMedia.getState().micTest.loopback })
+      }
     }
+    this.micOp = this.micOp.then(run, run).catch((e: unknown) => this.notify(`Não foi possível trocar o processamento de voz: ${errText(e)}`))
+    return this.micOp
   }
 
   private async applyRnnoise(mode: ProcessingMode, graph = this.graph): Promise<void> {
@@ -959,8 +1017,52 @@ class MediaEngine {
     } catch (e) {
       patch('self', { processingActive: 'standard' })
       this.notify(`Supressão avançada indisponível (${errText(e)}). Usando o processamento padrão.`)
-      if (graph === this.graph && this.mic) await this.mic.restartTrack(captureConstraints('standard', this.activeInput))
+      if (graph === this.graph && this.mic) await this.restartMic(this.mic, 'standard')
     }
+  }
+
+  /**
+   * Reopen the mic with `mode`'s constraints (Chromium accepts a processing change through applyConstraints but
+   * ignores it). LiveKit releases the device before reopening it and Windows can refuse it for a moment
+   * (NotReadableError), so retry a little. Returns the last error, or null once the mic is live again.
+   */
+  private async restartMic(mic: LocalAudioTrack, mode: ProcessingMode): Promise<unknown> {
+    let err: unknown = null
+    for (const waitMs of [0, 300, 1000]) {
+      if (waitMs) await new Promise((r) => setTimeout(r, waitMs))
+      if (mic !== this.mic) return err
+      try {
+        await mic.restartTrack(captureConstraints(mode, this.activeInput))
+        return null
+      } catch (e) {
+        err = e
+      }
+    }
+    return err
+  }
+
+  /**
+   * LiveKit mutes the mic on its own when the capture dies and it can't reopen it (LocalParticipant.handleTrackEnded).
+   * Nobody asked: everyone saw us muted while our UI said live, and only leaving the call cleared it. Reopen and
+   * unmute; if the device still refuses, show the mute so one click on "desmutar" tries again.
+   */
+  private onSdkMute(track: LocalAudioTrack): void {
+    const wanted = () => useMedia.getState().self.muted || useMedia.getState().self.deafened
+    if (wanted()) return
+    const run = async () => {
+      if (track !== this.mic || !track.isMuted || wanted()) return
+      const err = await this.restartMic(track, this.prefs.get().processing)
+      if (track !== this.mic || wanted()) return
+      if (err === null) {
+        await track.unmute()
+        this.notify('O microfone parou de responder e foi reconectado.')
+      } else {
+        patch('self', { muted: true })
+        this.notify(`O microfone parou de responder (${errText(err)}). Desmute para tentar de novo ou escolha outro microfone.`)
+        this.syncTray()
+      }
+    }
+    this.micOp = this.micOp.then(run, run).catch((e: unknown) => this.notify(`O microfone parou de responder: ${errText(e)}`))
   }
 
   // ───────────────────────────── devices ─────────────────────────────
@@ -980,6 +1082,9 @@ class MediaEngine {
     const outputs = map('audiooutput')
     patch('devices', { inputs, outputs })
     if (reconcile) await this.reconcileDevices(inputs, outputs)
+    // In a call without a mic (it failed to open, or none was plugged in): a new device is a reason to try again.
+    const room = this.room
+    if (reconcile && room && !this.mic && inputs.length > 0 && useMedia.getState().connection.state === 'connected') void this.syncMic(room)
   }
 
   /** Unplugged preferred device -> system default + notice; replugged -> back to preferred. */
@@ -988,14 +1093,15 @@ class MediaEngine {
     const label = (l: DeviceInfo[], id: string) => l.find((d) => d.deviceId === id)?.label ?? id
     if (p.inputDeviceId) {
       const present = inputs.some((d) => d.deviceId === p.inputDeviceId)
+      const prev = this.activeInput
       if (!present && this.activeInput === p.inputDeviceId) {
         this.activeInput = null
         this.notify('Microfone desconectado. Usando o microfone padrão do sistema.')
-        await this.switchInput(null)
+        await this.switchInput(null, prev)
       } else if (present && this.activeInput !== p.inputDeviceId) {
         this.activeInput = p.inputDeviceId
         this.notify(`${label(inputs, p.inputDeviceId)} reconectado.`)
-        await this.switchInput(p.inputDeviceId)
+        await this.switchInput(p.inputDeviceId, prev)
       }
     }
     if (p.outputDeviceId) {
@@ -1015,9 +1121,11 @@ class MediaEngine {
   /** User picks a mic (null = system default). Applies live during a call. */
   async setInputDevice(deviceId: string | null): Promise<void> {
     this.start()
+    const prev = { pref: this.prefs.get().inputDeviceId, active: this.activeInput }
     this.prefs.set({ inputDeviceId: deviceId })
     this.activeInput = deviceId
-    await this.switchInput(deviceId)
+    // Refused: keep the mic that works as the choice too, or the next device change would try this one again.
+    if (!(await this.switchInput(deviceId, prev.active))) this.prefs.set({ inputDeviceId: prev.pref })
   }
 
   async setOutputDevice(deviceId: string | null): Promise<void> {
@@ -1027,14 +1135,33 @@ class MediaEngine {
     await this.switchOutput(deviceId)
   }
 
-  private async switchInput(id: string | null): Promise<void> {
+  /**
+   * In the mic queue, so a mic being published right now opens the new device (it reads activeInput then).
+   * Returns false when the device was refused: LiveKit released the old one before trying it, so the mic is
+   * reopened on `prev`; if even that fails it is shown muted, never as live while sending silence.
+   */
+  private switchInput(id: string | null, prev: string | null): Promise<boolean> {
     patch('devices', { inputId: id })
-    try {
-      if (this.room && this.mic) await this.room.switchActiveDevice('audioinput', id ?? 'default')
-      else if (this.test.graph) await this.startMicTest({ loopback: useMedia.getState().micTest.loopback })
-    } catch (e) {
-      this.notify(`Não foi possível usar este microfone: ${errText(e)}`)
+    let ok = true
+    const run = async () => {
+      try {
+        if (this.room && this.mic) await this.room.switchActiveDevice('audioinput', id ?? 'default')
+        else if (this.test.graph) await this.startMicTest({ loopback: useMedia.getState().micTest.loopback })
+      } catch (e) {
+        ok = false
+        this.notify(`Não foi possível usar este microfone: ${errText(e)}`)
+        this.activeInput = prev
+        patch('devices', { inputId: prev })
+        const mic = this.mic
+        if (mic && (await this.restartMic(mic, this.prefs.get().processing)) !== null && mic === this.mic) {
+          patch('self', { muted: true })
+          await mic.mute().catch(() => undefined)
+          this.syncTray()
+        }
+      }
     }
+    this.micOp = this.micOp.then(run, run)
+    return this.micOp.then(() => ok)
   }
 
   private async switchOutput(id: string | null): Promise<void> {
@@ -1177,6 +1304,8 @@ class MediaEngine {
       this.cue('streamStart')
     } catch (e) {
       stream.getTracks().forEach((t) => t.stop())
+      // The video may be out already (the audio failed after it): others would see a frozen "live" until we leave.
+      if (!this.screenPub) await this.dropScreenTracks(room, this.screenPubsIn(room))
       patch('screen', { error: `Falha ao publicar a transmissão: ${errText(e)}` })
       throw e
     }
@@ -1208,13 +1337,27 @@ class MediaEngine {
     })
   }
 
-  /** Change what is being captured without stopping the stream (viewers stay subscribed). */
-  async switchScreenSource(sourceId: string): Promise<void> {
+  /**
+   * Change what is being captured without stopping the stream (viewers stay subscribed). In the recap queue: a
+   * quality recap or a republish in flight would otherwise swap the old source back in. Errors reach the picker.
+   */
+  switchScreenSource(sourceId: string): Promise<void> {
+    const run = () => this.swapScreenSource(sourceId)
+    const p = this.recapOp.then(run, run)
+    this.recapOp = p.catch(() => undefined)
+    return p
+  }
+
+  private async swapScreenSource(sourceId: string): Promise<void> {
     const cur = this.screenPub
     const room = this.room
     if (!cur || !room) throw new Error('Nenhuma transmissão ativa.')
     const audio = useMedia.getState().screen.audio
     const stream = await this.capture(sourceId, audio, cur.preset)
+    if (this.screenPub !== cur || this.room !== room) {
+      stream.getTracks().forEach((t) => t.stop())
+      throw new Error('A transmissão terminou enquanto a nova fonte abria.')
+    }
     const video = stream.getVideoTracks()[0]!
     const vtrack = cur.video.track as LocalVideoTrack
     const old = vtrack.mediaStreamTrack
@@ -1239,7 +1382,8 @@ class MediaEngine {
     if (!cur) return
     this.screenPub = null
     for (const el of this.ownEls) cur.video.track?.detach(el)
-    await this.dropScreenTracks(this.room, [cur.video, cur.audio])
+    // Every screen publication, not only the ones we hold: stopping must never leave the screen going out.
+    await this.dropScreenTracks(this.room, [cur.video, cur.audio, ...this.screenPubsIn(this.room)])
     // The sustain record is per preset for the machine's codec: a share the room moved to another codec says nothing about it.
     if (cur.cpuLimited.length >= 10 && cur.codec === useMedia.getState().screen.codec) {
       this.prefs.set({ encoderSustain: recordSustain(this.prefs.get().encoderSustain, cur.preset.id, cur.cpuLimited) })
@@ -1255,8 +1399,12 @@ class MediaEngine {
    * the life of the connection: +39 MB per share with OpenH264, +165 MB with VP9 (docs/benchmarks/media-baseline.md
    * §4). Stopping the transceivers releases them.
    */
+  private screenPubsIn(room: Room | null): LocalTrackPublication[] {
+    return [...(room?.localParticipant.trackPublications.values() ?? [])].filter((p) => p.source === Track.Source.ScreenShare || p.source === Track.Source.ScreenShareAudio)
+  }
+
   private async dropScreenTracks(room: Room | null, pubs: (LocalTrackPublication | null)[]): Promise<void> {
-    const tracks = pubs.map((p) => p?.track).filter((t) => !!t)
+    const tracks = [...new Set(pubs.map((p) => p?.track).filter((t) => !!t))]
     const senders = new Set(tracks.flatMap((t) => [t.sender, ...('simulcastCodecs' in t ? [...(t as LocalVideoTrack).simulcastCodecs.values()].map((c) => c.sender) : [])]))
     const transceivers = room?.engine.pcManager?.publisher.getTransceivers().filter((t) => senders.has(t.sender)) ?? []
     for (const track of tracks) {

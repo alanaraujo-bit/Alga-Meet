@@ -913,6 +913,121 @@ async function phaseUnmute(sig) {
   }
 }
 
+/**
+ * The mic must survive its capture failing (2026-11-16 bug: after "Supressão avançada" a person stayed muted for
+ * everyone until they left the call). Windows can refuse a device for a moment after it is released, and a live
+ * capture can die; both are simulated in A: getUserMedia rejects with NotReadableError, the raw track fires "ended".
+ * Pass = B keeps hearing A and never sees A muted, A's own state says unmuted, after each step.
+ */
+async function phaseMicFail(sig) {
+  const a = await launch('lab-a', sig.beeps)
+  const b = await launch('lab-b', sig.silence)
+  a.token = await token('lab-a')
+  b.token = await token('lab-b')
+  const out = { when: new Date().toISOString(), steps: [] }
+  mem.micFail = out
+  const rx = () => ev(b, async () => (await window.__mediaLab.rawStats({ remote: 'lab-a', source: 'mic' })).find((s) => s.type === 'inbound-rtp')?.bytesReceived ?? 0)
+  const check = async (name) => {
+    await sleep(2500)
+    const r0 = await rx()
+    await sleep(2000)
+    const rate = Math.round((await rx()) - r0) / 2
+    const [sa, sb] = await Promise.all([state(a), state(b)])
+    const lk = await ev(a, () => ({ raw: window.__mediaLab.media.debug.mic?.mediaStreamTrack.readyState, sdkMuted: window.__mediaLab.media.debug.mic?.isMuted }))
+    const step = { step: name, rxBytesPerSec: rate, bSeesAMuted: sb.participants['lab-a']?.micMuted ?? null, aMuted: sa.self.muted, active: sa.self.processingActive, notice: sa.notice?.text ?? null, ...lk }
+    step.ok = rate > 1000 && step.bSeesAMuted === false && !step.aMuted && !step.sdkMuted && step.raw === 'live'
+    out.steps.push(step)
+    log('micfail', JSON.stringify(step))
+  }
+  const failNext = (n) => ev(a, (n) => {
+    if (!window.__gum) {
+      const real = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices)
+      window.__gum = { fail: 0 }
+      navigator.mediaDevices.getUserMedia = async (c) => {
+        if (window.__gum.fail > 0 && c?.audio) {
+          window.__gum.fail--
+          throw new DOMException('Could not start audio source', 'NotReadableError')
+        }
+        return real(c)
+      }
+    }
+    window.__gum.fail = n
+  }, n)
+  try {
+    await Promise.all([gotoLab(a), gotoLab(b)])
+    await join_(b)
+    await join_(a)
+    await check('em chamada')
+    await failNext(1)
+    await ev(a, () => window.__mediaLab.media.setProcessing('advanced'))
+    await check('avançada com o dispositivo ocupado uma vez')
+    await ev(a, () => window.__mediaLab.media.setProcessing('standard'))
+    await check('volta ao padrão')
+    // The capture dies and LiveKit's own reopen fails (it then mutes the track): the engine must take it back.
+    await failNext(2)
+    await ev(a, () => window.__mediaLab.media.debug.mic._mediaStreamTrack.dispatchEvent(new Event('ended')))
+    await check('captura morreu')
+    await ev(a, () => Promise.all(['advanced', 'standard', 'off', 'advanced'].map((m) => window.__mediaLab.media.setProcessing(m))))
+    await check('quatro trocas seguidas')
+    saveMem()
+  } finally {
+    await close(a)
+    await close(b)
+  }
+}
+
+/**
+ * A full reconnect (the SFU restarted: LiveKit unpublishes and republishes every local track) while A talks and
+ * shares. Before 2026-11-16 A came back with a second, dead mic publication (B kept showing A unmuted after A muted)
+ * and "stop sharing" left the screen going out. Pass = one mic, B sees A's mute, stop removes the share for B.
+ */
+async function phaseRepublish(sig) {
+  const a = await launch('lab-a', sig.beeps)
+  const b = await launch('lab-b', sig.silence)
+  a.token = await token('lab-a')
+  b.token = await token('lab-b')
+  const out = { when: new Date().toISOString(), steps: [] }
+  mem.republish = out
+  const view = async (name, ok) => {
+    const pubs = await ev(a, () => [...(window.__mediaLab.media.debug.room?.localParticipant.trackPublications.values() ?? [])].map((p) => `${p.source}:${p.track?.mediaStreamTrack?.readyState ?? 'none'}:${p.isMuted ? 'muted' : 'live'}`))
+    const bSees = await ev(b, () => [...(window.__mediaLab.media.debug.room?.remoteParticipants.get('lab-a')?.trackPublications.values() ?? [])].map((p) => `${p.source}:${p.isMuted ? 'muted' : 'live'}`))
+    const step = { step: name, aPublishes: pubs, bSeesA: bSees, aScreenActive: (await state(a)).screen.active }
+    step.ok = ok(step)
+    out.steps.push(step)
+    log('republish', JSON.stringify(step))
+  }
+  const mics = (l) => l.filter((x) => x.startsWith('microphone'))
+  const screens = (l) => l.filter((x) => x.startsWith('screen'))
+  try {
+    await Promise.all([gotoLab(a), gotoLab(b)])
+    await join_(b)
+    await join_(a)
+    await sleep(3000)
+    await ev(a, () => window.__mediaLab.media.startScreenShare({ sourceId: null, quality: '720p30' }))
+    await sleep(3000)
+    await view('transmitindo', (s) => mics(s.bSeesA).length === 1 && screens(s.bSeesA).length === 1)
+    stopLiveKit()
+    await sleep(3000)
+    await startLiveKit()
+    for (let i = 0; i < 60; i++) {
+      await sleep(500)
+      if ((await state(a)).connection.state === 'connected' && (await state(b)).connection.state === 'connected') break
+    }
+    await sleep(4000)
+    await view('depois da reconexão completa', (s) => mics(s.aPublishes).length === 1 && mics(s.bSeesA).length === 1 && s.aScreenActive)
+    await ev(a, () => window.__mediaLab.media.setMuted(true))
+    await sleep(1500)
+    await view('mutado', (s) => s.bSeesA.includes('microphone:muted') && !s.bSeesA.includes('microphone:live'))
+    await ev(a, () => window.__mediaLab.media.stopScreenShare())
+    await sleep(2500)
+    await view('parou de transmitir', (s) => screens(s.aPublishes).length === 0 && screens(s.bSeesA).length === 0 && !s.aScreenActive)
+    saveMem()
+  } finally {
+    await close(a)
+    await close(b)
+  }
+}
+
 // ─────────────── main ───────────────
 // Importable: scripts/media-net.mjs (and ad-hoc probes) reuse launch/token/metrics without running the phases.
 export { ROOM, LK_PORT, secret, arg, startWindowPattern, stopWindowPattern, children, close, ev, gotoLab, join_, killTree, launch, leave, liveKitOverride, log, makeSignals, memSample, metrics, median, q, r1, results, sampler, save, sleep, startLiveKit, state, stopLiveKit, summary, token, cleanup, LK_URL, MEM_FLAGS, desktop, repo, work }
@@ -931,7 +1046,7 @@ if (isMain) try {
   }
   const sig = makeSignals()
   await startLiveKit()
-  const baselinePhases = phases.filter((p) => !['leak', 'unmute'].includes(p))
+  const baselinePhases = phases.filter((p) => !['leak', 'unmute', 'micfail', 'republish'].includes(p))
   if (baselinePhases.length) results.when = new Date().toISOString()
   if (argv.includes('--proposed-csp')) patchCsp()
   const csp = argv.includes('--proposed-csp') ? "script-src 'self' 'wasm-unsafe-eval' (proposta, só no build do lab)" : "script-src 'self' (como enviado)"
@@ -943,6 +1058,8 @@ if (isMain) try {
   if (phases.includes('reconnect')) await phaseReconnect(sig)
   if (phases.includes('leak')) await phaseLeak(sig)
   if (phases.includes('unmute')) await phaseUnmute(sig)
+  if (phases.includes('micfail')) await phaseMicFail(sig)
+  if (phases.includes('republish')) await phaseRepublish(sig)
   if (baselinePhases.length) save()
   log('done →', baselinePhases.length ? outJson : memJson)
 } catch (e) {

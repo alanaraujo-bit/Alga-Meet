@@ -9981,24 +9981,24 @@
     ]
   },
   "unmute": {
-    "when": "2026-11-01T07:07:43.707Z",
+    "when": "2026-11-16T23:58:58.871Z",
     "steps": [
       {
         "step": "em chamada",
         "ok": true,
-        "ms": 258,
-        "rxBytesPerSec": 11876,
+        "ms": 270,
+        "rxBytesPerSec": 14772,
         "aServerMuted": false,
         "aMuted": false,
         "aMicTrack": "live",
         "aNotice": null,
         "bSeesAMuted": false,
-        "bLevelA": 0.02
+        "bLevelA": 0.04
       },
       {
         "step": "server mute",
         "ok": true,
-        "ms": 260,
+        "ms": 257,
         "rxBytesPerSec": 0,
         "aServerMuted": true,
         "aMuted": false,
@@ -10010,8 +10010,8 @@
       {
         "step": "server unmute",
         "ok": true,
-        "ms": 1063,
-        "rxBytesPerSec": 11024,
+        "ms": 1058,
+        "rxBytesPerSec": 16992,
         "aServerMuted": false,
         "aMuted": false,
         "aMicTrack": "live",
@@ -10022,7 +10022,7 @@
       {
         "step": "auto-mutado + server mute",
         "ok": true,
-        "ms": 270,
+        "ms": 261,
         "rxBytesPerSec": 0,
         "aServerMuted": true,
         "aMuted": true,
@@ -10034,7 +10034,7 @@
       {
         "step": "auto-mutado + server unmute",
         "ok": true,
-        "ms": 258,
+        "ms": 268,
         "rxBytesPerSec": 0,
         "aServerMuted": false,
         "aMuted": true,
@@ -10046,8 +10046,8 @@
       {
         "step": "desmuta a si mesmo",
         "ok": true,
-        "ms": 261,
-        "rxBytesPerSec": 11140,
+        "ms": 260,
+        "rxBytesPerSec": 11176,
         "aServerMuted": false,
         "aMuted": false,
         "aMicTrack": "live",
@@ -10058,7 +10058,7 @@
       {
         "step": "entra já server-mutado",
         "ok": true,
-        "ms": 529,
+        "ms": 267,
         "rxBytesPerSec": 0,
         "aServerMuted": true,
         "aMuted": false,
@@ -10070,14 +10070,129 @@
       {
         "step": "server unmute após entrar mutado",
         "ok": true,
-        "ms": 267,
-        "rxBytesPerSec": 5876,
+        "ms": 264,
+        "rxBytesPerSec": 8976,
         "aServerMuted": false,
         "aMuted": false,
         "aMicTrack": "live",
         "aNotice": null,
         "bSeesAMuted": false,
-        "bLevelA": 0.64
+        "bLevelA": 0.8
+      }
+    ]
+  },
+  "micFail": {
+    "when": "2026-11-16T23:59:03.912Z",
+    "steps": [
+      {
+        "step": "em chamada",
+        "rxBytesPerSec": 4827.5,
+        "bSeesAMuted": false,
+        "aMuted": false,
+        "active": "advanced",
+        "notice": null,
+        "raw": "live",
+        "sdkMuted": false,
+        "ok": true
+      },
+      {
+        "step": "avançada com o dispositivo ocupado uma vez",
+        "rxBytesPerSec": 4778.5,
+        "bSeesAMuted": false,
+        "aMuted": false,
+        "active": "advanced",
+        "notice": null,
+        "raw": "live",
+        "sdkMuted": false,
+        "ok": true
+      },
+      {
+        "step": "volta ao padrão",
+        "rxBytesPerSec": 5651,
+        "bSeesAMuted": false,
+        "aMuted": false,
+        "active": "standard",
+        "notice": null,
+        "raw": "live",
+        "sdkMuted": false,
+        "ok": true
+      },
+      {
+        "step": "captura morreu",
+        "rxBytesPerSec": 6367,
+        "bSeesAMuted": false,
+        "aMuted": false,
+        "active": "standard",
+        "notice": "O microfone parou de responder e foi reconectado.",
+        "raw": "live",
+        "sdkMuted": false,
+        "ok": true
+      },
+      {
+        "step": "quatro trocas seguidas",
+        "rxBytesPerSec": 4934.5,
+        "bSeesAMuted": false,
+        "aMuted": false,
+        "active": "advanced",
+        "notice": "O microfone parou de responder e foi reconectado.",
+        "raw": "live",
+        "sdkMuted": false,
+        "ok": true
+      }
+    ]
+  },
+  "republish": {
+    "when": "2026-11-16T23:59:28.943Z",
+    "steps": [
+      {
+        "step": "transmitindo",
+        "aPublishes": [
+          "microphone:live:live",
+          "screen_share:live:live"
+        ],
+        "bSeesA": [
+          "microphone:live",
+          "screen_share:live"
+        ],
+        "aScreenActive": true,
+        "ok": true
+      },
+      {
+        "step": "depois da reconexão completa",
+        "aPublishes": [
+          "screen_share:live:live",
+          "microphone:live:live"
+        ],
+        "bSeesA": [
+          "microphone:live",
+          "screen_share:live"
+        ],
+        "aScreenActive": true,
+        "ok": true
+      },
+      {
+        "step": "mutado",
+        "aPublishes": [
+          "screen_share:live:live",
+          "microphone:live:muted"
+        ],
+        "bSeesA": [
+          "microphone:muted",
+          "screen_share:live"
+        ],
+        "aScreenActive": true,
+        "ok": true
+      },
+      {
+        "step": "parou de transmitir",
+        "aPublishes": [
+          "microphone:live:muted"
+        ],
+        "bSeesA": [
+          "microphone:muted"
+        ],
+        "aScreenActive": false,
+        "ok": true
       }
     ]
   }
