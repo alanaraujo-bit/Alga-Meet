@@ -106,6 +106,8 @@ export interface ReadyPayload {
   cinema: boolean
   /** The server plays music in calls. Absent on older servers, which close the socket on music ops. */
   music?: boolean
+  /** Saved playlists (/music/playlists) and `music_add_many`. Absent on older servers. */
+  musicPlaylists?: boolean
   /** The server has Alga Worlds on. Absent on older servers (which close the socket on world ops) or when it is off. */
   worlds?: WorldsReady
 }

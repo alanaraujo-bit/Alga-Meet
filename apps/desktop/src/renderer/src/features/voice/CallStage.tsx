@@ -134,7 +134,7 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
     >
       {header}
       <MismatchBanner channel={channel} />
-      <Room stale={conn.state !== 'connected' && here} live={live}>
+      <Room stale={conn.state !== 'connected' && here}>
         {variant === 'dm' && (
           <div className={s.dmLock}>
             <E2eeChip channelId={channel.id} />
@@ -184,82 +184,9 @@ export function CallStage({ channel, variant = 'channel' }: { channel: Channel; 
   )
 }
 
-/**
- * The stage area. The room's light (RoomLight) is the one ambient thing: a wide, very soft pool in the speaker's own
- * hue that drifts to whoever is talking. Speaking itself lives on the faces (the 2 px ring).
- */
-function Room({ stale, live, children }: { stale: boolean; live: boolean; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null)
-  return (
-    <div ref={ref} className={`${s.area} ${stale ? s.stale : ''}`}>
-      {live && <RoomLight host={ref} />}
-      {children}
-    </div>
-  )
-}
-
-/** Moves only when a new voice has held for 300 ms (no flicker between two people), fades out after 900 ms of quiet. */
-const LIGHT_HOLD_MS = 300
-const LIGHT_QUIET_MS = 900
-const LIGHT_MIN = 0.18
-
-/**
- * Reads the faces' own envelopes (--speak, written by useEnvelope on each seat) 10× a second: no React work, no
- * per-frame writes. The light is a transformed, blurred-by-gradient layer: compositor only.
- */
-function RoomLight({ host }: { host: RefObject<HTMLElement | null> }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const el = ref.current
-    const root = host.current
-    if (!el || !root) return
-    let current: string | null = null
-    let cand: string | null = null
-    let since = performance.now()
-    let placed = false
-    let last = ''
-    const id = setInterval(() => {
-      let best: HTMLElement | null = null
-      let bestV = LIGHT_MIN
-      for (const seat of root.querySelectorAll<HTMLElement>('[data-seat]')) {
-        const v = Number(seat.style.getPropertyValue('--speak') || 0)
-        if (v > bestV) {
-          bestV = v
-          best = seat
-        }
-      }
-      const key = best?.dataset.userId ?? null
-      const now = performance.now()
-      if (key !== cand) {
-        cand = key
-        since = now
-      }
-      if (key !== current && now - since >= (key ? LIGHT_HOLD_MS : LIGHT_QUIET_MS)) current = key
-      const seat = current ? root.querySelector<HTMLElement>(`[data-seat][data-user-id="${current}"]`) : null
-      const face = seat?.querySelector<HTMLElement>('[data-face]')
-      if (!seat || !face) {
-        if (el.style.opacity !== '0') el.style.opacity = '0'
-        return
-      }
-      const a = root.getBoundingClientRect()
-      const b = face.getBoundingClientRect()
-      const transform = `translate(${Math.round(b.left + b.width / 2 - a.left)}px, ${Math.round(b.top + b.height * 0.7 - a.top)}px) translate(-50%, -50%)`
-      if (transform !== last) {
-        // The first time, the light appears in place instead of sweeping in from the corner.
-        if (!placed) el.style.transition = 'none'
-        el.style.transform = last = transform
-        if (!placed) {
-          void el.offsetWidth
-          el.style.transition = ''
-          placed = true
-        }
-      }
-      el.style.setProperty('--lh', seat.dataset.hue ?? '279')
-      if (el.style.opacity !== '1') el.style.opacity = '1'
-    }, 100)
-    return () => clearInterval(id)
-  }, [host])
-  return <div ref={ref} className={s.light} aria-hidden />
+/** The stage area. Speaking lives on the faces only (the 2 px ring): no ambient light behind them. */
+function Room({ stale, children }: { stale: boolean; children: ReactNode }) {
+  return <div className={`${s.area} ${stale ? s.stale : ''}`}>{children}</div>
 }
 
 function Notice({ title, children, action, dismiss }: { title: string; children: ReactNode; action?: ReactNode; dismiss?: () => void }) {

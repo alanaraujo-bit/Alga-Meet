@@ -6,7 +6,8 @@
  */
 import { z } from 'zod'
 
-export const MUSIC_QUEUE_MAX = 50
+/** A whole playlist fits. */
+export const MUSIC_QUEUE_MAX = 200
 /** A few links at once is fine; a flood is not (then one every 2 s). */
 export const MUSIC_ADD_RATE = { perSecond: 0.5, burst: 5 } as const
 /** The room starts a song this long after it is chosen, so every app has time to load it. */
@@ -37,6 +38,63 @@ export function youtubeId(input: string): string | null {
   return id && YT_ID.test(id) ? id : null
 }
 
+const YT_LIST = /^[A-Za-z0-9_-]{10,64}$/
+/**
+ * The playlist id of a YouTube link (`/playlist?list=`, or `watch?v=…&list=`), or null. Mixes (`RD…`) are YouTube's own
+ * endless radios: its embed refuses them (error 150), so they are not playlists here.
+ */
+export function youtubeListId(input: string): string | null {
+  const raw = input.trim()
+  if (!raw) return null
+  let u: URL
+  try {
+    u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`)
+  } catch {
+    return null
+  }
+  if ((u.protocol !== 'https:' && u.protocol !== 'http:') || !(YT_HOSTS.has(u.hostname.toLowerCase()) || u.hostname.toLowerCase() === 'youtu.be')) return null
+  const list = u.searchParams.get('list')
+  return list && YT_LIST.test(list) && !list.startsWith('RD') ? list : null
+}
+
+/** Video ids, deduplicated in order, at most `max`: what a saved playlist or a playlist link turns into. */
+export const uniqueVideoIds = (ids: readonly string[], max = PLAYLIST_MAX_ITEMS): string[] =>
+  [...new Set(ids.filter((id) => YT_ID.test(id)))].slice(0, max)
+
+// ── Saved playlists (per person; REST, routes in apps/server/src/routes/playlists.ts) ─────────────────────────────────
+//   GET    /music/playlists         → SavedPlaylist[] (mine, last changed first)
+//   POST   /music/playlists         PlaylistCreateBody → 201 SavedPlaylist
+//   PATCH  /music/playlists/:id     PlaylistPatchBody  → SavedPlaylist
+//   DELETE /music/playlists/:id     → 204
+// The server looks every song up on YouTube itself (title, can it play outside YouTube): songs that cannot are left out.
+
+export const PLAYLISTS_MAX = 50
+export const PLAYLIST_MAX_ITEMS = 200
+export const PLAYLIST_NAME_MAX = 80
+
+export interface PlaylistItem { videoId: string; title: string; author: string | null }
+export interface SavedPlaylist {
+  id: string
+  name: string
+  items: PlaylistItem[]
+  createdAt: string
+  updatedAt: string
+}
+
+const videoIds = z.array(z.string().regex(YT_ID)).min(1).max(PLAYLIST_MAX_ITEMS)
+const playlistName = z.string().trim().min(1).max(PLAYLIST_NAME_MAX)
+export const PlaylistCreateBody = z.object({
+  /** Omitted with `listId`: the YouTube playlist's own name. */
+  name: playlistName.optional(),
+  videoIds,
+  /** The YouTube playlist it came from (its name is looked up when `name` is omitted). */
+  listId: z.string().regex(YT_LIST).optional(),
+})
+export type PlaylistCreateBody = z.infer<typeof PlaylistCreateBody>
+export const PlaylistPatchBody = z.object({ name: playlistName.optional(), videoIds: videoIds.optional() })
+  .refine((b) => b.name !== undefined || b.videoIds !== undefined, 'Nada para mudar.')
+export type PlaylistPatchBody = z.infer<typeof PlaylistPatchBody>
+
 export interface MusicTrack {
   /** One per place in the queue (the same video twice is two tracks). */
   id: string
@@ -56,7 +114,7 @@ export interface MusicPlayback {
   seq: number
 }
 
-export type MusicEventKind = 'add' | 'play' | 'pause' | 'skip' | 'seek' | 'remove' | 'stop' | 'unplayable' | 'ended'
+export type MusicEventKind = 'add' | 'playlist' | 'previous' | 'play' | 'pause' | 'skip' | 'seek' | 'remove' | 'stop' | 'unplayable' | 'ended'
 export interface MusicState {
   channelId: string
   /** null: nothing playing (the queue may still be empty). */
@@ -67,7 +125,9 @@ export interface MusicState {
   /** Server clock when this was sent (ms): the app's offset to the shared clock. */
   serverNow: number
   /** What just happened, for the one line under the player ("Ana pulou"). */
-  last: { kind: MusicEventKind; by: string | null; title: string | null } | null
+  last: { kind: MusicEventKind; by: string | null; title: string | null; count?: number } | null
+  /** Songs that already played and "voltar" can bring back. Absent on older servers (they have no "voltar"). */
+  previous?: number
 }
 
 export type MusicErrorReason = 'disabled' | 'not_in_call' | 'invalid_link' | 'unavailable' | 'not_embeddable' | 'queue_full' | 'slow_down' | 'not_found'
@@ -75,7 +135,8 @@ export type MusicErrorReason = 'disabled' | 'not_in_call' | 'invalid_link' | 'un
 export type MusicClientFrame =
   | { op: 'music_hello'; channelId: string }
   | { op: 'music_add'; channelId: string; url: string }
-  | { op: 'music_control'; channelId: string; action: 'play' | 'pause' | 'skip' | 'seek' | 'stop'; position?: number }
+  | { op: 'music_add_many'; channelId: string; videoIds: string[]; replace: boolean; label: string; listId?: string }
+  | { op: 'music_control'; channelId: string; action: 'play' | 'pause' | 'skip' | 'previous' | 'seek' | 'stop'; position?: number }
   | { op: 'music_remove'; channelId: string; trackId: string }
   | { op: 'music_report'; channelId: string; trackId: string; kind: 'ended' | 'unplayable' | 'duration'; durationS?: number }
 
@@ -84,8 +145,15 @@ export const MusicClientFrameSchema = z.discriminatedUnion('op', [
   /** Ask for the MUSIC_STATE of a call I am in (after joining or reconnecting). */
   z.object({ op: z.literal('music_hello'), channelId: uuid }),
   z.object({ op: z.literal('music_add'), channelId: uuid, url: z.string().min(1).max(2048) }),
+  /** A playlist (saved, or read from a YouTube playlist link): `replace` clears what plays; `label` names it in "last". */
   z.object({
-    op: z.literal('music_control'), channelId: uuid, action: z.enum(['play', 'pause', 'skip', 'seek', 'stop']),
+    op: z.literal('music_add_many'), channelId: uuid, videoIds: z.array(z.string().regex(YT_ID)).min(1).max(PLAYLIST_MAX_ITEMS),
+    replace: z.boolean(), label: z.string().trim().min(1).max(PLAYLIST_NAME_MAX),
+    /** A YouTube playlist link's list: its own name is said instead of `label` when YouTube knows it. */
+    listId: z.string().regex(YT_LIST).optional(),
+  }),
+  z.object({
+    op: z.literal('music_control'), channelId: uuid, action: z.enum(['play', 'pause', 'skip', 'previous', 'seek', 'stop']),
     position: z.number().finite().min(0).max(24 * 3600).optional(),
   }),
   z.object({ op: z.literal('music_remove'), channelId: uuid, trackId: uuid }),

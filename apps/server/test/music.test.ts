@@ -1,4 +1,4 @@
-import { GatewayClose, MUSIC_LEAD_MS, type Invite, type MusicState, type SpaceSnapshot } from '@alga/shared'
+import { GatewayClose, MUSIC_LEAD_MS, MUSIC_QUEUE_MAX, type Invite, type MusicState, type SpaceSnapshot } from '@alga/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { api, connect, postWebhook, register, startServer, type Gateway, type TestServer } from './helpers.js'
 
@@ -154,7 +154,7 @@ describe('music in a call', () => {
 
     // The queue limit (b has a fresh bucket of its own; the limit is checked before the rate).
     const music = s.app.ctx.music as unknown as { calls: Map<string, { queue: unknown[] }> }
-    music.calls.get(ch)!.queue.push(...Array.from({ length: 50 }, (_, i) => ({ id: `f${i}`, videoId: A3, title: 'x', author: null, durationS: null, addedBy: x.a.user.id })))
+    music.calls.get(ch)!.queue.push(...Array.from({ length: MUSIC_QUEUE_MAX }, (_, i) => ({ id: `f${i}`, videoId: A3, title: 'x', author: null, durationS: null, addedBy: x.a.user.id })))
     x.gb.send({ op: 'music_add', channelId: ch, url: link(A3) })
     expect((await error(x.gb, 'music_add')).reason).toBe('queue_full')
   })

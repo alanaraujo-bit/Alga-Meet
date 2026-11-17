@@ -14,6 +14,7 @@ import { bool, handle, isTrustedSender, on, str } from './ipc'
 import { initLog, log, logDir } from './log'
 import { cinemaRoot, cleanupStale } from './cinema/pieces'
 import { closeAllCinema, registerCinemaIpc } from './cinema/ipc'
+import { registerMusicPopIpc } from './music-window'
 import { registerE2eeIpc, startE2ee, stopE2ee } from './mls/e2ee'
 import { registerNotificationIpc } from './notifications'
 import { initPower } from './power'
@@ -109,6 +110,7 @@ function registerAppIpc(): void {
   registerDeepLinkIpc()
   registerE2eeIpc()
   registerCinemaIpc()
+  registerMusicPopIpc()
   registerActivityIpc()
   registerFeedbackIpc()
 }

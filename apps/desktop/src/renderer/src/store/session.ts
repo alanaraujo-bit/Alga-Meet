@@ -20,6 +20,8 @@ interface SessionState {
   cinema: boolean
   /** The last READY said this server plays music in calls (older ones close the socket on music_*). */
   music: boolean
+  /** Saved playlists and whole playlists into the call (READY.musicPlaylists). */
+  musicPlaylists: boolean
   /** The last READY said this server has Alga Worlds on, and where its 3D asset pack is (older ones close the socket on world_*). */
   worlds: WorldsReady | null
   /** Login (or the birth-date declaration) answered 403 with a restriction: the restricted-account screen shows it. */
@@ -60,7 +62,7 @@ export const useSession = create<SessionState>()((set, get) => {
     gw = new Gateway(window.alga.config.gatewayUrl, token, {
       onDispatch: (d) => {
         useData.getState().apply(d)
-        if (d.t === 'READY') set({ hydrated: true, cinema: d.d.cinema === true, music: d.d.music === true, worlds: d.d.worlds ?? null })
+        if (d.t === 'READY') set({ hydrated: true, cinema: d.d.cinema === true, music: d.d.music === true, musicPlaylists: d.d.musicPlaylists === true, worlds: d.d.worlds ?? null })
         listeners.forEach((l) => l(d))
       },
       onStatus: (s, info) => set({ gateway: s, retryInMs: info?.retryInMs ?? null }),
@@ -82,7 +84,7 @@ export const useSession = create<SessionState>()((set, get) => {
     setApiToken(null)
     await tokenStore.set(null)
     useData.getState().reset()
-    set({ phase: 'signed_out', hydrated: false, cinema: false, music: false, worlds: null, gateway: 'idle', deletionCanceled: false, ...extra })
+    set({ phase: 'signed_out', hydrated: false, cinema: false, music: false, musicPlaylists: false, worlds: null, gateway: 'idle', deletionCanceled: false, ...extra })
   }
 
   const authCall = async (path: string, body: LoginBody | RegisterBody) => {
@@ -101,6 +103,7 @@ export const useSession = create<SessionState>()((set, get) => {
     hydrated: false,
     cinema: false,
     music: false,
+  musicPlaylists: false,
     worlds: null,
     restricted: null,
     notice: null,

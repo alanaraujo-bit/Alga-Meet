@@ -34,6 +34,8 @@ export interface Settings {
   activityShare: boolean
   activityApps: SavedActivityApp[]
   window?: SavedBounds
+  /** The music's floating player (music-window.ts): where it was left. */
+  miniPlayer?: SavedBounds
 }
 
 const DEFAULTS: Settings = { closeToTray: true, zoomFactor: 1, trayAnimation: true, activityShare: true, activityApps: [] }

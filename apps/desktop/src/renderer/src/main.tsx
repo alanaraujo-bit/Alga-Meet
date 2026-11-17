@@ -10,6 +10,9 @@ const gallery = location.hash.startsWith('#cosmetics-gallery') && !window.alga?.
 // Dev-only bench of the 3D rooms (unpackaged builds): index.html#worlds-lab, see vite.worlds-lab.config.ts
 const WorldsLab = lazy(() => import('./features/worlds/Lab').then((m) => ({ default: m.WorldsLab })))
 const worldsLab = location.hash.startsWith('#worlds-lab') && !window.alga?.config?.isPackaged
+// The music's floating player window (main/music-window.ts): its own small page, in packaged builds too.
+const MusicMini = lazy(() => import('./features/music/MiniWindow').then((m) => ({ default: m.MiniWindow })))
+const musicMini = location.hash === '#music-mini'
 // The app (and its global styles) is its own chunk so the media lab keeps a clean page.
 const App = lazy(() => import('./features/app/App').then((m) => ({ default: m.App })))
 
@@ -21,6 +24,10 @@ createRoot(document.getElementById('root')!).render(
   ) : gallery ? (
     <Suspense>
       <Gallery />
+    </Suspense>
+  ) : musicMini ? (
+    <Suspense>
+      <MusicMini />
     </Suspense>
   ) : worldsLab ? (
     <Suspense>

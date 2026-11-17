@@ -119,10 +119,9 @@ Usado em 2026-11-16 para a conta do dono.
 
 ## Antes de produção (decisão do dono)
 
-- A migração é `0021_admin_app` e já está em produção (2026-11-16). Há uma `0021_music_playlists` ainda não commitada
-  no checkout principal: o `when` da minha no `_journal.json` foi posto 1 s antes do dela, para o migrador de produção
-  (que aplica só o que tem `when` maior que o último aplicado) não pular a de playlists quando ela subir. Ao juntar os
-  dois, renumere a de playlists para `0022` mantendo o `when` dela e gere o snapshot de novo.
+- A migração é `0021_admin_app` e já está em produção (2026-11-16). A das playlists de música, que nasceu como `0021`
+  num checkout sem esta, entrou como `0022_music_playlists` (gerada de novo por cima desta, mesmo SQL), com `when`
+  maior: o migrador de produção só aplica o que tem `when` maior que o último aplicado.
 - Deploy da API com `FCM_SERVICE_ACCOUNT` e o app compilado com o `google-services.json`.
 - O APK de release usa a chave de debug (`shortcut` em `app/build.gradle.kts`): criar uma chave própria antes de
   distribuir para outra pessoa da equipe.

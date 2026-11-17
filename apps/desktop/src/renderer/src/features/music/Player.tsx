@@ -11,7 +11,14 @@ const TICK_MS = 500
 
 export interface PlayerTime { time: number | null; duration: number | null }
 
-export function Player({ music, play, onTime }: { music: MusicState; play: boolean; onTime: (p: PlayerTime) => void }) {
+export type Report = (kind: 'ended' | 'unplayable' | 'duration', durationS?: number) => void
+
+/**
+ * `onReport`: where what the player saw goes (the gateway here; the main window from the floating one).
+ * `hidden`: the mini player is a line with no picture; the same iframe keeps playing out of sight. The owner's call
+ * (2026-11-16), knowing YouTube's terms want the player visible at 200 × 200 or more.
+ */
+export function Player({ music, play, onTime, onReport = report, hidden = false }: { music: MusicState; play: boolean; onTime: (p: PlayerTime) => void; onReport?: Report; hidden?: boolean }) {
   const now = music.now!
   const ref = useRef<HTMLIFrameElement>(null)
   const volume = useMusic((st) => st.volume)
@@ -22,8 +29,8 @@ export function Player({ music, play, onTime }: { music: MusicState; play: boole
   const sentFor = useRef({ duration: '', ended: '', unplayable: '' })
   // By track, not video: the same song queued twice must load again.
   const loaded = useRef(now.id)
-  const live = useRef({ music, play })
-  live.current = { music, play }
+  const live = useRef({ music, play, onReport })
+  live.current = { music, play, onReport }
 
   const post = (func: PlayerFunc, args: unknown[] = []) => ref.current?.contentWindow?.postMessage(command(func, args), 'https://www.youtube-nocookie.com')
 
@@ -41,18 +48,18 @@ export function Player({ music, play, onTime }: { music: MusicState; play: boole
         news.current.duration = n.duration
         if (m.now?.durationS == null && sentFor.current.duration !== id) {
           sentFor.current.duration = id
-          report('duration', Math.round(n.duration * 10) / 10)
+          live.current.onReport('duration', Math.round(n.duration * 10) / 10)
         }
       }
       if (n.state === 0 && sentFor.current.ended !== id) {
         sentFor.current.ended = id
-        report('ended')
+        live.current.onReport('ended')
       }
       if (n.error !== undefined) {
         if (refusedHere(n.error)) setRefused(true)
         else if (unplayable(n.error) && sentFor.current.unplayable !== id) {
           sentFor.current.unplayable = id
-          report('unplayable')
+          live.current.onReport('unplayable')
         }
       }
       onTime({ time: news.current.time, duration: news.current.duration ?? m.now?.durationS ?? null })
@@ -102,7 +109,7 @@ export function Player({ music, play, onTime }: { music: MusicState; play: boole
   }, [])
 
   return (
-    <div className={s.screen}>
+    <div className={hidden ? `${s.screen} ${s.screenHidden}` : s.screen} aria-hidden={hidden || undefined}>
       <iframe
         ref={ref}
         className={s.iframe}

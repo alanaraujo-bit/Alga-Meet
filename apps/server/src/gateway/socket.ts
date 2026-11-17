@@ -81,6 +81,7 @@ export async function buildReady(ctx: Ctx, user: UserRow): Promise<ReadyPayload>
     heartbeatIntervalMs: config.heartbeatIntervalMs,
     cinema: config.cinema.enabled,
     music: true,
+    musicPlaylists: true,
     ...(config.worlds.enabled ? { worlds: { assetsUrl: config.worlds.assetsUrl } } : {}),
   }
 }
@@ -218,6 +219,7 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
           break
         case 'music_hello':
         case 'music_add':
+        case 'music_add_many':
         case 'music_control':
         case 'music_remove':
         case 'music_report':

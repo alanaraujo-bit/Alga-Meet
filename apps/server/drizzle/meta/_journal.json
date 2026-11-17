@@ -155,6 +155,13 @@
       "when": 1794874458058,
       "tag": "0021_admin_app",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794881760274,
+      "tag": "0022_music_playlists",
+      "breakpoints": true
     }
   ]
 }

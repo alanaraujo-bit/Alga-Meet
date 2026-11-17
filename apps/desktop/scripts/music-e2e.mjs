@@ -262,17 +262,123 @@ await check('"Parar de ouvir" tira o player só de Ana; Bia segue tocando; "Ouvi
   await inStep(pa, pb)
 })
 
-await check('Recolher deixa o player (≥ 200×200) e o título, sem cobrir os controles da call', async () => {
-  await card(pb).getByRole('button', { name: 'Recolher' }).click()
-  await sleep(500)
+const LIST = 'https://www.youtube.com/playlist?list=PLBCF2DAC6FFB574DE'
+const floating = (k) => apps[k].app.windows().find((w) => w.url().includes('#music-mini'))
+const near = async (pa_, pb_, tol = 2.5) => {
+  const [a, b] = [await yt(pa_), await yt(pb_)]
+  if (a?.state !== 1 || b?.state !== 1 || a.time === null || b.time === null) return null
+  const now = Date.now()
+  const d = Math.abs(a.time + (now - a.at) / 1000 - (b.time + (now - b.at) / 1000))
+  return d <= tol ? d : null
+}
+
+await check('Mini player: uma linha só de áudio (sem vídeo à vista) que segue tocando; arrastada para cima à esquerda, vai com mola para o canto; "Voltar" recomeça a música', async () => {
+  await card(pb).getByRole('button', { name: 'Mini player' }).click()
+  await card(pb).getByRole('button', { name: 'Abrir o player' }).waitFor({ state: 'attached', timeout: 4000 })
+  await sleep(900)
   const box = await card(pb).boundingBox()
-  const frame = await card(pb).locator('iframe').boundingBox()
-  if (!frame || frame.width < 200 || frame.height < 200) throw new Error(`player ${JSON.stringify(frame)}: YouTube wants at least 200×200`)
+  if (box.height > 70) throw new Error(`the line is ${box.height}px tall`)
+  const shown = await card(pb).locator('iframe').evaluate((el) => getComputedStyle(el.parentElement).opacity)
+  if (shown !== '0') throw new Error(`the video shows (opacity ${shown})`)
+  const t0 = (await yt(pb))?.time
+  await sleep(2500)
+  const y1 = await yt(pb)
+  if (y1?.state !== 1 || !(y1.time > t0)) throw new Error(`the sound stopped: ${JSON.stringify({ t0, y1 })}`)
   const d = await dock(pb).boundingBox()
-  if (d && box.y + box.height > d.y && box.x < d.x + d.width) throw new Error('the card covers the call controls')
-  await shot('b', '06-compact')
+  if (d && box.y + box.height > d.y && box.x < d.x + d.width && box.x + box.width > d.x) throw new Error('the line covers the call controls')
+  await shot('b', '06-mini')
+  await card(pb).hover()
+  await card(pb).getByRole('button', { name: 'Volume da música (só para você)' }).first().hover()
+  await sleep(500)
+  await shot('b', '06b-mini-hover')
+  const bar = card(pb).locator('[title="Arraste para qualquer canto"]')
+  const bb = await bar.boundingBox()
+  await pb.mouse.move(bb.x + 26, bb.y + bb.height / 2) // the cover: the line's natural handle
+  await pb.mouse.down()
+  await pb.mouse.move(420, 200, { steps: 14 })
+  await pb.mouse.up()
+  await sleep(1000)
+  const after = await card(pb).boundingBox()
+  if (after.x > 40 || after.y > 120) throw new Error(`not in the top-left corner: ${JSON.stringify(after)}`)
+  if ((await yt(pb))?.state !== 1) throw new Error('the sound stopped while moving')
+  await shot('b', '07-mini-corner')
+  await until(async () => (await yt(pa))?.time > 5, 'A past 5 s', 15_000)
+  await card(pb).getByRole('button', { name: 'Música anterior' }).click()
+  await until(async () => (await yt(pa))?.time < 4, 'A back at the start', 10_000)
+  await card(pb).getByRole('button', { name: 'Abrir o player' }).click({ force: true })
+  await card(pb).getByRole('tab', { name: 'Tocando' }).waitFor({ timeout: 4000 })
+  return `${box.width.toFixed(0)}×${box.height.toFixed(0)} · canto ${after.x.toFixed(0)},${after.y.toFixed(0)}`
+})
+await check('Destacar: janela flutuante por cima de tudo, no ponto da sala; pausar nela pausa a call; "Voltar para o Alga" traz o cartão', async () => {
+  await card(pb).getByRole('button', { name: 'Destacar (janela por cima de tudo)' }).click()
+  const win = await until(async () => floating('b'), 'floating window', 10_000)
+  await win.waitForLoadState('domcontentloaded')
+  await card(pb).waitFor({ state: 'detached', timeout: 5000 })
+  const onTop = await apps.b.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('#music-mini'))?.isAlwaysOnTop())
+  if (!onTop) throw new Error('the floating window is not always on top')
+  const diff = await until(async () => {
+    const f = await win.evaluate(() => window.__yt)
+    const a = await yt(pa)
+    if (f?.state !== 1 || a?.state !== 1) return null
+    const now = Date.now()
+    const dd = Math.abs(f.time + (now - f.at) / 1000 - (a.time + (now - a.at) / 1000))
+    return dd <= 2.5 ? dd : null
+  }, 'floating player in step with the call', 30_000)
+  await sleep(800)
+  const wh = await win.evaluate(() => document.querySelector('section')?.getBoundingClientRect().height)
+  if (!(wh < 70)) throw new Error(`floating line is ${wh}px tall`)
+  await win.screenshot({ path: join(OUT, '08-floating.png') })
+  await win.getByRole('button', { name: 'Pausar' }).click()
+  await until(async () => (await yt(pa))?.state === 2, 'A paused from the floating window', 8000)
+  await win.getByRole('button', { name: 'Tocar' }).click()
+  await until(async () => (await yt(pa))?.state === 1, 'A playing again', 8000)
+  await win.getByRole('button', { name: 'Voltar para o Alga' }).click()
+  await card(pb).waitFor({ timeout: 8000 })
+  await until(async () => !floating('b'), 'floating window closed', 6000)
+  await until(async () => near(pa, pb), 'back in step in the app', 30_000)
+  return `diferença ${diff.toFixed(2)} s`
 })
 
+await check('Colar o link de uma playlist mostra quantas músicas tem; "Tocar agora" toca para os dois, com o nome dela', async () => {
+  await paste(pa, LIST)
+  const count = await card(pa).getByText(/^\d+ músicas$/).first()
+  await count.waitFor({ timeout: 25_000 })
+  const n = Number((await count.textContent()).split(' ')[0])
+  await sleep(400)
+  await shot('a', '09-playlist-chip')
+  await card(pa).getByRole('button', { name: 'Tocar agora' }).click()
+  await card(pb).getByText(/pôs a playlist Google Search Stories/).waitFor({ timeout: 40_000 })
+  await card(pb).getByText(/^A seguir · \d+$/).waitFor({ timeout: 10_000 })
+  await until(async () => near(pa, pb), 'playlist playing in step', 45_000)
+  await sleep(800)
+  await shot('b', '10-playlist-playing')
+  return `${n} músicas lidas do YouTube`
+})
+
+await check('Salvar a playlist do link; ela aparece na aba Playlists com capa; aleatório toca para a call', async () => {
+  await paste(pa, LIST)
+  await card(pa).getByRole('button', { name: 'Salvar', exact: true }).click({ timeout: 25_000 })
+  await card(pa).getByText(/Salva em Google Search Stories/).waitFor({ timeout: 25_000 })
+  await card(pa).getByRole('tab', { name: 'Playlists' }).click()
+  await card(pa).getByRole('button', { name: /^Google Search Stories/ }).first().click({ timeout: 8000 })
+  await card(pa).getByRole('button', { name: 'Aleatório' }).waitFor({ timeout: 4000 })
+  await sleep(500)
+  const big = await card(pa).locator('iframe').boundingBox()
+  if (!big || big.height < 200) throw new Error(`player squeezed to ${JSON.stringify(big)}`)
+  await shot('a', '11-playlist-detail')
+  const before = (await card(pb).locator('iframe').count()) > 0
+  await card(pa).getByRole('button', { name: 'Aleatório' }).click()
+  await sleep(1500)
+  if (!before) throw new Error('B has no player')
+  await until(async () => near(pa, pb), 'shuffled playlist in step', 45_000)
+  const saved = await rest(A.token, 'GET', '/music/playlists')
+  if (saved.length !== 1 || saved[0].items.length < 2) throw new Error(`saved ${JSON.stringify(saved).slice(0, 200)}`)
+  await card(pa).getByRole('button', { name: 'Voltar' }).click()
+  await sleep(400)
+  await shot('a', '12-library')
+  await card(pa).getByRole('tab', { name: 'Tocando' }).click()
+  return `${saved[0].items.length} músicas salvas`
+})
 await check('Parar limpa a música dos dois; sair da call some com o cartão', async () => {
   await card(pa).getByRole('button', { name: 'Parar e limpar a fila' }).click()
   await card(pb).waitFor({ state: 'detached', timeout: 8000 }) // Bia did not open it: it goes with the music

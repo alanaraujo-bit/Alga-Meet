@@ -174,6 +174,25 @@ export interface AlgaBridge {
     }
   }
 
+  /**
+   * The music's floating player: a small always-on-top window outside Alga. The main window owns the call and sends
+   * it snapshots (JSON: the room's music state, clock offset, volume); the floating one plays and sends commands back.
+   */
+  musicPop: {
+    /** Main window: open it (or bring it forward). */
+    open(): Promise<void>
+    /** Either window: close it. */
+    close(): Promise<void>
+    /** Main window → floating player. */
+    push(snapshot: string): void
+    onState(cb: (snapshot: string) => void): Unsubscribe
+    /** Floating player → main window. */
+    command(cmd: string): void
+    onCommand(cb: (cmd: string) => void): Unsubscribe
+    /** Main window: the floating player was closed (its × or the OS). */
+    onClosed(cb: () => void): Unsubscribe
+  }
+
   screen: {
     getSources(types: Array<'screen' | 'window'>): Promise<CaptureSource[]>
     /**

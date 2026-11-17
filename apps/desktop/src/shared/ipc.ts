@@ -68,6 +68,13 @@ export const IPC = {
   e2eeEpoch: 'alga:e2ee:epoch', // event
   e2eeCinemaTag: 'alga:e2ee:cinema-tag', // invoke
 
+  musicPopOpen: 'alga:music-pop:open', // invoke (main window)
+  musicPopClose: 'alga:music-pop:close', // invoke (either window)
+  musicPopPush: 'alga:music-pop:push', // send (main window → floating player: JSON snapshot)
+  musicPopState: 'alga:music-pop:state', // event (floating player)
+  musicPopCommand: 'alga:music-pop:command', // send (floating player → main window: JSON command)
+  musicPopCommandEvent: 'alga:music-pop:command-event', // event (main window)
+  musicPopClosed: 'alga:music-pop:closed', // event (main window)
   cinemaCheckFfmpeg: 'alga:cinema:check-ffmpeg', // invoke
   cinemaPick: 'alga:cinema:pick', // invoke
   cinemaFromDrop: 'alga:cinema:from-drop', // invoke (path only)

@@ -71,7 +71,7 @@ const ERRORS: Record<MusicErrorReason, string> = {
   invalid_link: 'Esse link não é de um vídeo do YouTube.',
   not_embeddable: 'O dono desse vídeo não deixa ele tocar fora do YouTube.',
   unavailable: 'Não achei esse vídeo. Ele pode ser privado ou ter sido removido.',
-  queue_full: 'A fila está cheia (50 músicas).',
+  queue_full: 'A fila está cheia (200 músicas).',
   slow_down: 'Calma, espere um instante antes de pôr outra.',
   not_in_call: 'Entre na call para tocar música.',
   not_found: 'Essa música já saiu da fila.',

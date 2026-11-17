@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MUSIC_QUEUE_MAX, MusicClientFrameSchema, musicPosition, youtubeId } from './music.js'
+import { MUSIC_QUEUE_MAX, MusicClientFrameSchema, PlaylistCreateBody, PlaylistPatchBody, musicPosition, uniqueVideoIds, youtubeId, youtubeListId } from './music.js'
 
 const ID = 'dQw4w9WgXcQ'
 const chan = '0190f3a2-7b4c-7d00-8000-000000000001'
@@ -35,6 +35,33 @@ describe('youtubeId: the links people paste', () => {
   })
 })
 
+describe('youtubeListId: playlist links', () => {
+  it('playlist pages and videos played from a playlist', () => {
+    expect(youtubeListId('https://www.youtube.com/playlist?list=PLBCF2DAC6FFB574DE')).toBe('PLBCF2DAC6FFB574DE')
+    expect(youtubeListId(`https://youtube.com/watch?v=${ID}&list=PLBCF2DAC6FFB574DE&index=3`)).toBe('PLBCF2DAC6FFB574DE')
+    expect(youtubeListId('music.youtube.com/playlist?list=OLAK5uy_kAbCdEfGhIjK')).toBe('OLAK5uy_kAbCdEfGhIjK')
+  })
+  it('not mixes, not other sites, not single videos', () => {
+    expect(youtubeListId(`https://www.youtube.com/watch?v=${ID}&list=RD${ID}`)).toBeNull()
+    expect(youtubeListId('https://evil.example/playlist?list=PLBCF2DAC6FFB574DE')).toBeNull()
+    expect(youtubeListId(`https://youtu.be/${ID}`)).toBeNull()
+    expect(youtubeListId('https://www.youtube.com/playlist?list=<script>')).toBeNull()
+  })
+})
+
+describe('playlist bodies', () => {
+  it('dedups ids in order and caps them', () => {
+    expect(uniqueVideoIds([ID, 'aaaaaaaaaa1', ID, 'bad'])).toEqual([ID, 'aaaaaaaaaa1'])
+  })
+  it('names are trimmed and bounded; a patch must change something', () => {
+    expect(PlaylistCreateBody.safeParse({ name: '  Rock  ', videoIds: [ID] }).data?.name).toBe('Rock')
+    expect(PlaylistCreateBody.safeParse({ name: ' ', videoIds: [ID] }).success).toBe(false)
+    expect(PlaylistCreateBody.safeParse({ name: 'x'.repeat(81), videoIds: [ID] }).success).toBe(false)
+    expect(PlaylistPatchBody.safeParse({}).success).toBe(false)
+    expect(PlaylistPatchBody.safeParse({ name: 'Nova' }).success).toBe(true)
+  })
+})
+
 describe('frames', () => {
   const ok = (f: object) => MusicClientFrameSchema.safeParse(f).success
   it('accepts the commands of a call', () => {
@@ -43,13 +70,17 @@ describe('frames', () => {
     expect(ok({ op: 'music_control', channelId: chan, action: 'seek', position: 30 })).toBe(true)
     expect(ok({ op: 'music_remove', channelId: chan, trackId: chan })).toBe(true)
     expect(ok({ op: 'music_report', channelId: chan, trackId: chan, kind: 'duration', durationS: 213 })).toBe(true)
+    expect(ok({ op: 'music_add_many', channelId: chan, videoIds: [ID], replace: true, label: 'Rock' })).toBe(true)
   })
   it('refuses the rest', () => {
     expect(ok({ op: 'music_add', channelId: chan, url: 'x'.repeat(2049) })).toBe(false)
     expect(ok({ op: 'music_control', channelId: chan, action: 'explode' })).toBe(false)
     expect(ok({ op: 'music_control', channelId: chan, action: 'seek', position: -1 })).toBe(false)
     expect(ok({ op: 'music_report', channelId: chan, trackId: chan, kind: 'duration', durationS: Infinity })).toBe(false)
-    expect(MUSIC_QUEUE_MAX).toBe(50)
+    expect(ok({ op: 'music_add_many', channelId: chan, videoIds: [], replace: false, label: 'x' })).toBe(false)
+    expect(ok({ op: 'music_add_many', channelId: chan, videoIds: [ID, 'bad id'], replace: false, label: 'x' })).toBe(false)
+    expect(ok({ op: 'music_add_many', channelId: chan, videoIds: Array(201).fill(ID), replace: false, label: 'x' })).toBe(false)
+    expect(MUSIC_QUEUE_MAX).toBe(200)
   })
 })
 

@@ -5,7 +5,7 @@
  * The music of a call ends when the call empties.
  */
 import {
-  MUSIC_ADD_RATE, MUSIC_LEAD_MS, MUSIC_QUEUE_MAX, musicPosition, uuidv7, youtubeId,
+  MUSIC_ADD_RATE, MUSIC_LEAD_MS, MUSIC_QUEUE_MAX, musicPosition, uniqueVideoIds, uuidv7, youtubeId,
   type DispatchOf, type DispatchType, type MusicClientFrame, type MusicErrorReason, type MusicEventKind, type MusicPlayback, type MusicState, type MusicTrack,
 } from '@alga/shared'
 import type { FastifyBaseLogger } from 'fastify'
@@ -31,12 +31,32 @@ export async function youtubeMeta(videoId: string): Promise<MusicMeta> {
   return { title, author: typeof d.author_name === 'string' ? d.author_name.trim().slice(0, TITLE_MAX) || null : null }
 }
 
+/** A YouTube playlist's own name (oEmbed answers for playlist links too), or null. */
+export async function youtubeListName(listId: string): Promise<string | null> {
+  const url = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/playlist?list=${listId}`)}`
+  const res = await fetch(url, { signal: AbortSignal.timeout(META_TIMEOUT_MS) })
+  if (!res.ok) return null
+  const d = (await res.json()) as { title?: unknown }
+  return typeof d.title === 'string' && d.title.trim() ? d.title.trim().slice(0, TITLE_MAX) : null
+}
+
+/** Songs of a playlist looked up this many at a time: fast without hammering YouTube. */
+const LOOKUP_BATCH = 8
+const META_CACHE_MAX = 5_000
+const META_TTL_MS = 6 * 3600_000
+/** Songs remembered for "voltar". */
+const HISTORY_MAX = 50
+/** "Voltar" this far into a song starts it again instead (like every player). */
+const RESTART_AFTER_S = 3
+
 interface Call {
   channelId: string
   now: MusicTrack | null
   queue: MusicTrack[]
   playback: MusicPlayback
   last: MusicState['last']
+  /** What already played, oldest first (for "voltar"). */
+  played: MusicTrack[]
   /** Moves on when a known song ends and no app said so. */
   endTimer?: NodeJS.Timeout
 }
@@ -46,6 +66,9 @@ export class Music {
   private readonly rate = new Map<string, { tokens: number; at: number }>()
   /** Replaced in tests (no network). */
   meta: (videoId: string) => Promise<MusicMeta> = youtubeMeta
+  listName: (listId: string) => Promise<string | null> = youtubeListName
+  /** YouTube's answers by video, so a playlist played again (or saved after playing) is instant. Insertion-ordered. */
+  private readonly metaCache = new Map<string, { meta: MusicMeta; at: number }>()
 
   constructor(private readonly hub: Hub, private readonly voice: Voice, private readonly log: FastifyBaseLogger) {
     // voice.onLeave is a single slot others chain onto (e2ee, cinema): chain too.
@@ -68,6 +91,10 @@ export class Music {
         return this.reply(conn, 'MUSIC_STATE', this.view(this.calls.get(f.channelId) ?? this.empty(f.channelId)))
       case 'music_add':
         return this.add(conn, f.channelId, f.url)
+      case 'music_add_many':
+        // Not awaited: looking up a long playlist takes seconds and must not hold this socket's next frames (pause, skip).
+        void this.addMany(conn, f.channelId, f.videoIds, f.replace, f.label, f.listId).catch((err: Error) => this.log.warn({ err: err.message }, 'music: playlist failed'))
+        return
       case 'music_control':
         return this.control(conn.userId, f.channelId, f.action, f.position)
       case 'music_remove':
@@ -83,13 +110,7 @@ export class Music {
     if (!videoId) return this.error(conn, 'music_add', 'invalid_link')
     const queued = this.calls.get(channelId)?.queue.length ?? 0
     if (queued >= MUSIC_QUEUE_MAX) return this.error(conn, 'music_add', 'queue_full')
-    let meta: MusicMeta
-    try {
-      meta = await this.meta(videoId)
-    } catch (err) {
-      this.log.warn({ err: (err as Error).message }, 'music: oEmbed failed')
-      meta = 'unavailable'
-    }
+    const meta = await this.lookup(videoId)
     if (typeof meta === 'string') return this.error(conn, 'music_add', meta)
     // The call may have emptied, or the person left it, while YouTube answered.
     if (this.voice.stateOf(conn.userId)?.channelId !== channelId) return this.error(conn, 'music_add', 'not_in_call')
@@ -103,8 +124,88 @@ export class Music {
     this.broadcast(c)
   }
 
-  private control(by: string, channelId: string, action: 'play' | 'pause' | 'skip' | 'seek' | 'stop', position?: number): void {
+  /** Title and author of each video, in order, leaving out the ones that cannot play outside YouTube. */
+  async lookupMany(videoIds: readonly string[], onBatch?: (found: Array<{ videoId: string; title: string; author: string | null }>) => void) {
+    const found: Array<{ videoId: string; title: string; author: string | null }> = []
+    for (let i = 0; i < videoIds.length; i += LOOKUP_BATCH) {
+      const batch = videoIds.slice(i, i + LOOKUP_BATCH)
+      const metas = await Promise.all(batch.map((id) => this.lookup(id)))
+      const ok = batch.flatMap((videoId, j) => {
+        const m = metas[j]!
+        return typeof m === 'string' ? [] : [{ videoId, title: m.title, author: m.author }]
+      })
+      found.push(...ok)
+      onBatch?.(ok)
+    }
+    return found
+  }
+
+  /** oEmbed through the cache. A network failure is 'unavailable' now and asked again next time. */
+  async lookup(videoId: string): Promise<MusicMeta> {
+    const hit = this.metaCache.get(videoId)
+    if (hit && Date.now() - hit.at < META_TTL_MS) return hit.meta
+    let meta: MusicMeta
+    try {
+      meta = await this.meta(videoId)
+    } catch (err) {
+      this.log.warn({ err: (err as Error).message }, 'music: oEmbed failed')
+      return 'unavailable'
+    }
+    this.metaCache.delete(videoId)
+    this.metaCache.set(videoId, { meta, at: Date.now() })
+    if (this.metaCache.size > META_CACHE_MAX) this.metaCache.delete(this.metaCache.keys().next().value!)
+    return meta
+  }
+
+  /**
+   * A playlist into the call: one rate token for all of it. The first songs start as soon as they are known (the room
+   * hears music in a second, not after 200 lookups); the rest join the queue when looked up.
+   */
+  private async addMany(conn: Conn, channelId: string, ids: string[], replace: boolean, given: string, listId?: string): Promise<void> {
+    if (!this.take(conn.userId)) return this.error(conn, 'music_add_many', 'slow_down')
+    const label = (listId ? await this.listName(listId).catch(() => null) : null) ?? given
+    const videoIds = uniqueVideoIds(ids, MUSIC_QUEUE_MAX)
+    let added = 0
+    let first = true
+    let gone = false
+    const inCall = () => this.voice.stateOf(conn.userId)?.channelId === channelId
+    const put = (found: Array<{ videoId: string; title: string; author: string | null }>) => {
+      if (gone || !inCall()) {
+        gone = true
+        return
+      }
+      const c = this.calls.get(channelId) ?? this.empty(channelId)
+      this.calls.set(channelId, c)
+      if (first && replace && found.length > 0) {
+        c.queue = []
+        c.now = null
+      }
+      for (const f of found) {
+        if (c.queue.length >= MUSIC_QUEUE_MAX) break
+        const track: MusicTrack = { id: uuidv7(), ...f, durationS: null, addedBy: conn.userId }
+        if (c.now) c.queue.push(track)
+        else this.start(c, track)
+        added++
+      }
+      // The first batch is heard at once; the rest arrive in one broadcast at the end.
+      if (first && added > 0) {
+        first = false
+        c.last = { kind: 'playlist', by: conn.userId, title: label, count: videoIds.length }
+        this.broadcast(c)
+      }
+    }
+    await this.lookupMany(videoIds, put)
+    if (gone) return this.error(conn, 'music_add_many', 'not_in_call')
+    if (added === 0) return this.error(conn, 'music_add_many', 'unavailable')
     const c = this.calls.get(channelId)
+    if (!c) return
+    c.last = { kind: 'playlist', by: conn.userId, title: label, count: added }
+    this.broadcast(c)
+  }
+
+  private control(by: string, channelId: string, action: 'play' | 'pause' | 'skip' | 'previous' | 'seek' | 'stop', position?: number): void {
+    const c = this.calls.get(channelId)
+    if (action === 'previous') return c ? this.previous(by, c) : undefined
     if (!c?.now) return
     const now = Date.now()
     const here = musicPosition(c.playback, now, c.now.durationS)
@@ -162,7 +263,7 @@ export class Music {
     // "ended" before the song could have ended (an app that jumped ahead, or lies): not believed.
     if (kind === 'ended' && c.now.durationS !== null && musicPosition(c.playback, Date.now(), null) < c.now.durationS - 5) return
     const title = c.now.title
-    this.advance(c)
+    this.advance(c, kind !== 'unplayable')
     c.last = { kind, by: null, title }
     this.arm(c)
     this.broadcast(c)
@@ -174,7 +275,30 @@ export class Music {
     this.arm(c)
   }
 
-  private advance(c: Call): void {
+  /** "Voltar": a few seconds in, the song starts again; otherwise the one before it plays and this one comes next. */
+  private previous(by: string, c: Call): void {
+    const now = Date.now()
+    const at = c.now ? musicPosition(c.playback, now, c.now.durationS) : 0
+    const before = c.played.at(-1)
+    if (c.now && (at > RESTART_AFTER_S || !before)) {
+      c.playback = { playing: c.playback.playing, position: 0, at: c.playback.playing ? now + MUSIC_LEAD_MS / 2 : now, seq: c.playback.seq + 1 }
+    } else if (before) {
+      c.played.pop()
+      // Fresh ids: to every player these are new places in the queue (a replayed song must load and report again).
+      if (c.now) c.queue.unshift({ ...c.now, id: uuidv7() })
+      this.start(c, { ...before, id: uuidv7() })
+    } else return
+    c.last = { kind: 'previous', by, title: c.now?.title ?? null }
+    this.arm(c)
+    this.broadcast(c)
+  }
+
+  /** `keep`: remember the song for "voltar" (not one that cannot play). */
+  private advance(c: Call, keep = true): void {
+    if (c.now && keep) {
+      c.played.push(c.now)
+      if (c.played.length > HISTORY_MAX) c.played.shift()
+    }
     const next = c.queue.shift()
     if (next) return this.start(c, next)
     c.now = null
@@ -221,11 +345,11 @@ export class Music {
   }
 
   private empty(channelId: string): Call {
-    return { channelId, now: null, queue: [], playback: { playing: false, position: 0, at: Date.now(), seq: 0 }, last: null }
+    return { channelId, now: null, queue: [], playback: { playing: false, position: 0, at: Date.now(), seq: 0 }, last: null, played: [] }
   }
 
   private view(c: Call): MusicState {
-    return { channelId: c.channelId, now: c.now, queue: c.queue, playback: c.playback, serverNow: Date.now(), last: c.last }
+    return { channelId: c.channelId, now: c.now, queue: c.queue, playback: c.playback, serverNow: Date.now(), last: c.last, previous: c.played.length }
   }
 
   private broadcast(c: Call): void {

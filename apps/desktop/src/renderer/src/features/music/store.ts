@@ -1,6 +1,6 @@
 // Music in my call: the room's state from the server (MUSIC_STATE), my own volume and whether I listen, and the
 // commands. Only on a server whose READY says it plays music (an older one closes the socket on music_*).
-import { youtubeId, type MusicClientFrame, type MusicState } from '@alga/shared'
+import { MUSIC_QUEUE_MAX, PLAYLIST_NAME_MAX, youtubeId, type MusicClientFrame, type MusicState } from '@alga/shared'
 import { create } from 'zustand'
 import { useData } from '@/store/data'
 import { onDispatch, useSession } from '@/store/session'
@@ -19,18 +19,36 @@ interface MusicStore {
   listening: boolean
   /** The card is open (also with nothing playing: to paste the first link). */
   open: boolean
+  /** Where the player lives: the full card, the small floating player, or its own window outside Alga. */
+  view: MusicView
+  tab: 'now' | 'playlists'
+  /** Where the small player rests inside the app (it springs to the nearest corner). */
+  corner: Corner
 }
 
-const savedVolume = (): number => {
+export type MusicView = 'card' | 'mini' | 'popout'
+export type Corner = 'tl' | 'tr' | 'bl' | 'br'
+
+const CORNERS: readonly Corner[] = ['tl', 'tr', 'bl', 'br']
+function savedPrefs(): { volume: number; corner: Corner } {
   try {
-    const v = (JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as { volume?: unknown }).volume
-    return typeof v === 'number' ? Math.min(1, Math.max(0, v)) : 0.5
+    const p = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as { volume?: unknown; corner?: unknown }
+    return {
+      volume: typeof p.volume === 'number' ? Math.min(1, Math.max(0, p.volume)) : 0.5,
+      corner: CORNERS.includes(p.corner as Corner) ? (p.corner as Corner) : 'br',
+    }
   } catch {
-    return 0.5
+    return { volume: 0.5, corner: 'br' }
   }
 }
+function savePrefs(): void {
+  const { volume, corner } = useMusic.getState()
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ volume, corner }))
+  } catch {}
+}
 
-export const useMusic = create<MusicStore>(() => ({ state: null, offset: 0, error: null, volume: savedVolume(), listening: true, open: false }))
+export const useMusic = create<MusicStore>(() => ({ state: null, offset: 0, error: null, ...savedPrefs(), listening: true, open: false, view: 'card', tab: 'now' }))
 
 const myChannel = (): string | null => {
   const st = useData.getState()
@@ -56,7 +74,17 @@ export function addLink(raw: string): 'sent' | 'invalid' | 'no_call' | 'disabled
   return 'sent'
 }
 
-export function control(action: 'play' | 'pause' | 'skip' | 'seek' | 'stop', position?: number): void {
+/** A whole playlist into the call: eplace swaps what plays now. The server looks every song up and says who put it. */
+export function addMany(videoIds: string[], replace: boolean, label: string, listId?: string): 'sent' | 'no_call' | 'disabled' {
+  if (!enabled() || !useSession.getState().musicPlaylists) return 'disabled'
+  const channelId = myChannel()
+  if (!channelId) return 'no_call'
+  useMusic.setState({ error: null, listening: true })
+  send({ op: 'music_add_many', channelId, videoIds: videoIds.slice(0, MUSIC_QUEUE_MAX), replace, label: label.trim().slice(0, PLAYLIST_NAME_MAX) || 'Playlist', ...(listId && { listId }) })
+  return 'sent'
+}
+
+export function control(action: 'play' | 'pause' | 'skip' | 'previous' | 'seek' | 'stop', position?: number): void {
   const channelId = myChannel()
   if (!channelId || !enabled()) return
   send({ op: 'music_control', channelId, action, ...(position === undefined ? {} : { position }) })
@@ -78,14 +106,19 @@ export function report(kind: 'ended' | 'unplayable' | 'duration', durationS?: nu
 export function setVolume(v: number): void {
   const volume = Math.min(1, Math.max(0, v))
   useMusic.setState({ volume })
-  try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ volume }))
-  } catch {}
+  savePrefs()
 }
+
+export function setCorner(corner: Corner): void {
+  useMusic.setState({ corner })
+  savePrefs()
+}
+export const setView = (view: MusicView): void => useMusic.setState({ view })
+export const setTab = (tab: 'now' | 'playlists'): void => useMusic.setState({ tab })
 
 export const setListening = (listening: boolean): void => useMusic.setState({ listening })
 export const openCard = (): void => useMusic.setState({ open: true })
-export const closeCard = (): void => useMusic.setState({ open: false })
+export const closeCard = (): void => useMusic.setState({ open: false, view: 'card' })
 
 function hello(): void {
   const channelId = myChannel()
@@ -110,7 +143,7 @@ export function startMusic(): () => void {
       const c = myChannel()
       if (c === channel) return
       channel = c
-      useMusic.setState({ state: null, error: null, open: false, listening: true })
+      useMusic.setState({ state: null, error: null, open: false, listening: true, view: 'card' })
       if (c) hello()
     }),
   ]

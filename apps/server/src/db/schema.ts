@@ -1,6 +1,7 @@
 import {
   ACCOUNT_ACTION_REASONS, ADMIN_EVENT_KINDS, FEEDBACK_KINDS, REPORT_REASONS, WORLD_ROOM_ACCESS, WORLD_SHELL_IDS,
-  type AdminEventKind, type EcoSpec, type EquippedCosmetics, type FeedbackContext, type ReleaseContent, type WorldAvatar, type WorldPlacedItem, type WorldRoomFinish,
+  type AdminEventKind, type EcoSpec, type EquippedCosmetics, type FeedbackContext, type PlaylistItem, type ReleaseContent, type WorldAvatar, type WorldPlacedItem,
+  type WorldRoomFinish,
 } from '@alga/shared'
 import { sql } from 'drizzle-orm'
 import {
@@ -875,6 +876,19 @@ export const worldRooms = pgTable('world_rooms', {
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
 export type WorldRoomRow = typeof worldRooms.$inferSelect
+
+// ---- Music: saved playlists (packages/shared/src/music.ts) ----------------------------------------------------------
+
+/** One person's playlist. Songs as the server looked them up on YouTube (title, author), in order. */
+export const musicPlaylists = pgTable('music_playlists', {
+  id: uuid('id').primaryKey(),
+  ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  items: jsonb('items').$type<PlaylistItem[]>().notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+}, (t) => [index('music_playlists_owner_idx').on(t.ownerId)])
+export type MusicPlaylistRow = typeof musicPlaylists.$inferSelect
 
 // ---- Novidades (release notes; packages/shared/src/releases.ts) -----------------------------------------------------
 

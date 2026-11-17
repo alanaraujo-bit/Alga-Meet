@@ -40,6 +40,15 @@ const bridge: AlgaBridge = {
     setToken: (token) => ipcRenderer.invoke(IPC.authSetToken, token === null ? null : String(token)),
   },
 
+  musicPop: {
+    open: () => ipcRenderer.invoke(IPC.musicPopOpen),
+    close: () => ipcRenderer.invoke(IPC.musicPopClose),
+    push: (snapshot) => ipcRenderer.send(IPC.musicPopPush, String(snapshot)),
+    onState: (cb) => subscribe<string>(IPC.musicPopState, (s) => cb(String(s))),
+    command: (cmd) => ipcRenderer.send(IPC.musicPopCommand, String(cmd)),
+    onCommand: (cb) => subscribe<string>(IPC.musicPopCommandEvent, (s) => cb(String(s))),
+    onClosed: (cb) => subscribe<void>(IPC.musicPopClosed, () => cb()),
+  },
   window: {
     minimize: () => ipcRenderer.send(IPC.winMinimize),
     toggleMaximize: () => ipcRenderer.send(IPC.winToggleMaximize),
