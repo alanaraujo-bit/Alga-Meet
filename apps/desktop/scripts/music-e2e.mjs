@@ -2,6 +2,9 @@
 // starts and stops. Plays real YouTube videos (needs internet). Each window's player position is read from the
 // messages YouTube's embed posts to the page (the same ones the app listens to).
 //   QA_WORK=<dir> QA_API_PORT=4390 QA_LK_PORT=7990 node scripts/music-e2e.mjs [--skip-build] [--keep]
+// A packaged build instead of a fresh one (what a release ships): QA_EXE="<...>/release/win-unpacked/Alga Meet.exe",
+// with QA_OUT=<dir> so its screenshots do not replace the ones in docs. That run is silent (--mute-audio): what the
+// test reads is the position YouTube's embed reports, not the speakers.
 // Screenshots: docs/screenshots/music/. Never touches the dev stack (:4000/:7880).
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
@@ -12,7 +15,8 @@ import * as Q from './qa-stack.mjs'
 
 const KEEP = process.argv.includes('--keep')
 const APP = join(Q.appDir, 'node_modules', '.alga-qa-music')
-const OUT = join(Q.repo, 'docs', 'screenshots', 'music')
+const EXE = process.env.QA_EXE
+const OUT = process.env.QA_OUT ?? join(Q.repo, 'docs', 'screenshots', 'music')
 mkdirSync(OUT, { recursive: true })
 mkdirSync(Q.WORK, { recursive: true })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -22,7 +26,7 @@ const results = []
 const SONG_1 = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
 const SONG_2 = 'https://youtu.be/9bZkp7q19f0?si=share'
 
-if (!process.argv.includes('--skip-build')) {
+if (!EXE && !process.argv.includes('--skip-build')) {
   execSync(`npx electron-vite build --outDir "${APP}"`, { cwd: Q.appDir, stdio: 'inherit' })
   writeFileSync(join(APP, 'package.json'), JSON.stringify({ name: '@alga/desktop', productName: 'Alga Meet', version: '0.1.0', main: './main/index.js' }, null, 2))
   cpSync(join(Q.appDir, 'build', 'runtime'), join(APP, 'build', 'runtime'), { recursive: true })
@@ -83,12 +87,12 @@ const TAP = () => {
 }
 
 async function launch(k, x) {
-  rmSync(join(process.env.APPDATA ?? '', 'Alga Meet Dev', 'profiles', `qa-music-${k}`), { recursive: true, force: true })
+  rmSync(join(process.env.APPDATA ?? '', EXE ? 'Alga Meet' : 'Alga Meet Dev', 'profiles', `qa-music-${k}`), { recursive: true, force: true })
   const env = { ...process.env, ALGA_API_URL: Q.API, ALGA_E2E: '1' }
   delete env.ELECTRON_RENDERER_URL
   const app = await electron.launch({
-    executablePath: electronPath, cwd: Q.appDir, env,
-    args: [APP, `--profile=qa-music-${k}`, '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
+    executablePath: EXE ?? electronPath, cwd: Q.appDir, env,
+    args: [...(EXE ? ['--mute-audio'] : [APP]), `--profile=qa-music-${k}`, '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
       '--disable-features=CalculateNativeWinOcclusion', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
       '--force-device-scale-factor=1'],
   })
