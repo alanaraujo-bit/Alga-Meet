@@ -37,8 +37,8 @@ Não existe mais conta com tudo liberado (`ALGA_OWNER_EMAILS` foi removido do c�
 Dois caminhos; nos dois as migrações rodam no boot.
 
 1. **Pelo GitHub, preso a um commit** (como foi feito em 2026-11-13, numa máquina sem o CLI do Railway): o serviço
-   `api` tem como fonte o repositório `alanaraujo-bit/Alga-Meet`, **fixado num commit** (desde 2026-11-16, `c8e03ff`,
-   a tag `v0.1.19`). Fixado quer dizer que um push na `main` **não** publica nada sozinho. Para publicar outro commit:
+   `api` tem como fonte o repositório `alanaraujo-bit/Alga-Meet`, **fixado num commit** (desde 2026-11-17, `4518f9d`,
+   a tag `v0.1.21`). Fixado quer dizer que um push na `main` **não** publica nada sozinho. Para publicar outro commit:
    no painel do Railway, serviço `api` › Settings › Source, troque o commit (ou, pelo conector MCP do Railway,
    `connect-service-source` com `commitSha`, preparado com `staged: true` e confirmado com `accept-deploy`).
    O commit precisa estar no GitHub. Para voltar ao modo antigo, basta desconectar a fonte no mesmo lugar.

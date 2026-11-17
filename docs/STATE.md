@@ -1,5 +1,29 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-17 — desktop 0.1.21 NO AR: dominó no Mundo
+- **No ar (2026-11-17, a pedido do dono: "faça tudo você mesmo e depois suba tudo para a produção"):** `main` no
+  GitHub em `4518f9d`; API no Railway (deploy `4e64f952`, construiu `4518f9d`, o mesmo commit em que o serviço está
+  preso; sem migração) e https://github.com/alanaraujo-bit/Alga-Meet/releases/tag/v0.1.21 (tag em `4518f9d`, não
+  assinado, 168.005.326 bytes, SHA-256 `95210d46…cc70`).
+- **O que foi junto:** só o dominó (`b203fa1`, entrada logo abaixo da 0.1.20 e `docs/worlds-domino.md`). Antes de
+  publicar, as outras worktrees (`admin-app`, `cinema`) e o checkout principal foram conferidos: nada fora da `main`.
+- **Como foi juntado:** a branch `feat/worlds-domino` (worktree `.claude/worktrees/release`) tinha saído da 0.1.19;
+  foi trazida para cima da `a199760` (0.1.20) por rebase, com conflito só no `docs/STATE.md`.
+- **Verificado antes de sair:** typecheck dos três pacotes; shared 124, desktop 946, servidor 394 testes;
+  `check-package.mjs`; o pacote abre na 0.1.21 apontando para a API de produção (`check-installed.mjs`); **E2E contra
+  o build empacotado** (`QA_EXE`, stack própria): dominó 7/7, Worlds 12/12, sinuca 7/7.
+- **Verificado depois:** deploy `SUCCESS` em 48 s; boot sem erro (`database ready`, `voice: reconciled with LiveKit`,
+  0 salas: ninguém estava em chamada); `/api/v1/ready` 200 (`database: ok`, `livekit: ok`); manifesto dos assets 200;
+  `releases/latest/download/latest.yml` serve a 0.1.21 com o mesmo SHA-512 do arquivo local, e o instalador responde
+  200 com 168.005.326 bytes pelos dois nomes.
+- **NÃO verificado:** a atualização pelo app instalado (o app do dono estava aberto: o instalador não foi rodado por
+  cima dele); o `READY.worlds.domino` lido de fora em produção e uma partida de dominó lá (não há conta de teste: o
+  que há é o commit construído e o boot); o cinema e a música contra este pacote (os E2E deles não foram rodados de
+  novo; o código deles não mudou desde a 0.1.20); os sons do dominó (ninguém ouviu).
+- **`alga-setup-ui.exe` é o mesmo binário desde a 0.1.17** (sem Rust nesta máquina). As fontes da janela de
+  instalação não mudam desde `v0.1.20` (conferido por diff).
+- **Falta:** a nota da 0.1.21 no estúdio de Novidades (e as da 0.1.17 a 0.1.20).
+
 ## 2026-11-17 — desktop 0.1.20 NO AR: a Sala de Cinema aguenta rede com perda de pacotes
 - **No ar (2026-11-17, a pedido do dono: "organize e corrija o que tem pra resolver e suba para a produção, mas com
   testes reais e com resultados reais"):** `main` no GitHub em `3dddee9`; API no Railway (deploy `b087a042`, construiu
@@ -84,7 +108,7 @@
   cinema (perdido na mudança do SFU) continua fora e a API segue anunciando `CINEMA_TURN_URLS` que não respondem.
 - **Falta:** a nota da 0.1.20 no estúdio de Novidades (e as da 0.1.17 a 0.1.19).
 
-## 2026-11-17 — Dominó no Alga Worlds — feito na branch `feat/worlds-domino`, NÃO publicado
+## 2026-11-17 — Dominó no Alga Worlds — publicado na 0.1.21
 - **Pedido do dono (2026-11-17):** "o da sinuca tá perfeito"; o próximo jogo é o dominó, "bem feito, sexy, agradável e
   muito gostoso, fácil de se jogar". Regra escolhida por ele: **duplas quando são 4**, batida 1 / carroça 2 /
   lá-e-lô 3 / cruzada 4, fecha em 6; com 2 ou 3, cada um por si com monte. Como funciona, o que foi medido e o que
@@ -94,13 +118,9 @@
   só as próprias pedras), bots e temporizadores (`apps/server/src/worlds.ts`); no desktop, sentar é entrar no jogo,
   câmera sobre o seu lugar, arrastar/clicar/teclado para jogar, corrente em cobra, embaralhar e distribuir animados,
   sons sintetizados, placar (`features/worlds/domino/`). `READY.worlds.domino` avisa o app.
-- **Verificado:** compartilhado 124, desktop 928, servidor 393 testes; typecheck dos três; **E2E em dois apps reais
-  7/7** (`apps/desktop/scripts/domino-e2e.mjs`, `docs/screenshots/domino/`).
-- **Onde está:** worktree `.claude/worktrees/release`, branch `feat/worlds-domino`, sobre `0ed182c` (0.1.19). **Sem
-  commit** até o dono pedir. A `main` já está na 0.1.20 (`a199760`): falta trazer a branch para cima dela (arquivos
-  em comum: `packages/shared/src/gateway.ts` e `apps/server/src/gateway/socket.ts`) e rodar o E2E de novo.
-- **NÃO verificado:** build empacotado; produção; os sons (ninguém ouviu); a sensação de jogo com gente de verdade.
-- **Para jogar à mão antes de publicar:** `node scripts/domino-e2e.mjs --play` em `apps/desktop` (com `QA_WORK`,
+- **Verificado:** **E2E em dois apps reais 7/7** (`apps/desktop/scripts/domino-e2e.mjs`, `docs/screenshots/domino/`);
+  o resto está na entrada da 0.1.21, no topo.
+- **Para jogar à mão fora da produção:** `node scripts/domino-e2e.mjs --play` em `apps/desktop` (com `QA_WORK`,
   `QA_API_PORT`, `QA_LK_PORT`) deixa dois apps lado a lado no Lounge.
 
 ## 2026-11-16 — desktop 0.1.19 NO AR: sinuca no Mundo, player de música, microfone que não some

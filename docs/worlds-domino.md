@@ -83,12 +83,14 @@ Duplo-seis, 28 pedras, 7 para cada. As cadeiras jogam em sentido anti-horário.
   mesas iguais a cada jogada (numa das execuções, 27 pedras na mesa e batida de lá-e-lô); "Jogar agora"; Bia levanta no
   meio e um bot assume, e de fora ela só conhece as pedras da corrente; Ana levanta e a mesa fica livre; o `joinedAt`
   da voz dos dois é o mesmo do começo ao fim.
-- Suítes inteiras depois de tudo: compartilhado 124, desktop 928, servidor 393; typecheck dos três pacotes limpo.
+- Suítes inteiras depois de tudo, já em cima da 0.1.20: compartilhado 124, desktop 946, servidor 394; typecheck dos
+  três pacotes limpo.
+- **Build empacotado (0.1.21, 2026-11-17):** o mesmo E2E contra `release/win-unpacked/Alga Meet.exe` (`QA_EXE=…`,
+  API e LiveKit próprios): **7/7**; no mesmo pacote, Worlds 12/12 e sinuca 7/7. Publicado na 0.1.21
+  (`docs/STATE.md`); em produção `READY.worlds.domino` vem ligado junto com o Worlds. Uma partida em produção ainda
+  não foi jogada por ninguém.
 
 ## O que falta (sem enfeite)
-- **Não está publicado.** Está na branch `feat/worlds-domino` (worktree `.claude/worktrees/release`), feita sobre a
-  0.1.19; a `main` já está na 0.1.20 e a branch ainda não foi trazida para cima dela (dois arquivos em comum:
-  `gateway.ts` e `socket.ts`). O E2E não rodou contra build empacotado.
 - **Som não foi ouvido por ninguém**, como na sinuca: timbre e volume escolhidos no papel.
 - **Sensação de jogo não foi calibrada por gente jogando:** tempo dos bots, da compra e do passe, tamanho das pedras na
   mão, posição da câmera, os 45 s de espera.
