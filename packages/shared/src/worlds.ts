@@ -73,8 +73,8 @@ export const WORLD_SHELLS: Readonly<Record<WorldShellId, WorldShell>> = {
   // Shared room: wider, two seating groups and a long table.
   lounge: {
     id: 'lounge', width: 14, depth: 10, height: 3.6,
-    // The open floor between the long table and the sofas.
-    spawns: [[-1.2, -3.0, 0.5], [-0.3, -3.3, 0.4], [-2.0, -2.5, 0.7], [0.5, -3.0, 0.2], [-1.6, -1.7, 0.8], [-0.6, -2.2, 0.5], [-2.6, -3.3, 0.7], [0.2, -2.0, 0.3]],
+    // Round the pool table that stands in the open floor between the long table and the sofas.
+    spawns: [[0.4, -3.4, 0.3], [-0.6, -3.7, 0.2], [0.5, -2.2, 0.1], [-1.9, -3.8, 0.4], [0.3, -0.6, 0], [-2.6, -3.3, 0.7], [0.6, 0.6, -0.2], [-0.2, 1.0, 0]],
   },
 }
 /** People and floor items stay this far from the walls. */
@@ -286,6 +286,8 @@ export const WorldClientFrameSchema = z.discriminatedUnion('op', [
 /** READY.worlds: the server has Alga Worlds on, and this is where the 3D asset pack is (no trailing slash). */
 export interface WorldsReady {
   assetsUrl: string
+  /** The server plays pool on the tables of a room (pool.ts). Absent on older servers, which close the socket on world_pool_*. */
+  pool?: boolean
 }
 
 /** Gestures that keep going until the person moves, sits or picks another. */

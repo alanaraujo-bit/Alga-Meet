@@ -9,6 +9,7 @@ import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import type { WorldItemDef } from '@alga/shared'
 import type { Assets } from '../assets/loaders'
+import { poolTable } from '../pool/table'
 import { boxUv, kelvin, plain, surface } from './materials'
 
 export interface Piece {
@@ -22,7 +23,7 @@ export interface Piece {
 const FABRIC_TINT: Record<string, string> = { areia: '#d3c8b4', grafite: '#44454b', musgo: '#66735a', terracota: '#b2644a', indigo: '#474c8a' }
 const RUG_TINT: Record<string, string> = { marfim: '#e9e2d3', cinza: '#a3a3a1', carvao: '#38393d' }
 
-class Kit {
+export class Kit {
   readonly group = new THREE.Group()
   constructor(readonly assets: Assets) {}
 
@@ -299,6 +300,7 @@ export async function buildPiece(assets: Assets, def: WorldItemDef, id: string, 
     case 'tv_stand': tvStand(k, piece, def); break
     case 'canvas': canvasArt(k, variant, def.size[0], def.size[1]); break
     case 'canvas_large': canvasArt(k, variant, def.size[0], def.size[1]); break
+    case 'pool_table': await poolTable(k, piece, variant); break
     default: throw new Error(`unknown generated piece "${id}"`)
   }
   return piece

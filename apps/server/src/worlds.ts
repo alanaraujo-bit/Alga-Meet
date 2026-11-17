@@ -6,10 +6,12 @@
  * shortcut: sessions are in memory, single instance (like Voice, Cinema and Music); a restart ends them for everyone.
  */
 import {
-  LOUNGE_ROOM, STARTER_ROOM, WORLD_EMOTE_RATE, WORLD_LOOP_GESTURES, WORLD_MAX_AVATARS, WORLD_MAX_SPEED, WORLD_PLACE_COOLDOWN_MS,
-  WORLD_ROOM_NAME_MAX, WORLD_SHELLS, WORLD_TICK_MS, avatarProblem, clampPose, holdsWorldSku, roomSeats, seatPlace, spawnPose, toPose,
-  type DispatchOf, type DispatchType, type WorldAvatar, type WorldClientFrame, type WorldEmote, type WorldErrorReason, type WorldMember,
-  type WorldPlace, type WorldPose, type WorldRoomAccess, type WorldRoomLayout, type WorldRoomView, type WorldSession,
+  LOUNGE_ROOM, POOL_AIM_HZ, STARTER_ROOM, WORLD_EMOTE_RATE, WORLD_LOOP_GESTURES, WORLD_MAX_AVATARS, WORLD_MAX_SPEED, WORLD_PLACE_COOLDOWN_MS,
+  WORLD_ROOM_NAME_MAX, WORLD_SHELLS, WORLD_TICK_MS, avatarProblem, clampPose, holdsWorldSku, newPool, poolJoin, poolLeave, poolRack, poolShoot,
+  roomSeats, seatPlace, spawnPose, toPose, worldItem,
+  type DispatchOf, type DispatchType, type PoolClientFrame, type PoolState, type WorldAvatar, type WorldClientFrame, type WorldEmote,
+  type WorldErrorReason, type WorldMember, type WorldPlace, type WorldPose, type WorldRoomAccess, type WorldRoomLayout, type WorldRoomView,
+  type WorldSession,
 } from '@alga/shared'
 import { eq } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
@@ -34,6 +36,19 @@ interface Member extends WorldMember {
   movedAt: number
 }
 
+/** A pool table someone is playing on (pool.ts): the game, and the clock of its last shot. */
+interface PoolGame {
+  state: PoolState
+  /** When the last shot was played (ms), and until when its balls roll: nobody shoots or racks before that. */
+  playedAt: number
+  busyUntil: number
+  /** When the shooter's aim was last relayed. */
+  aimAt: number
+}
+/** Apps play a shot out by their own clock: the next one may arrive this much before the server's says the balls stopped. */
+const POOL_EARLY_MS = 400
+const poolSeed = (): number => Math.floor(Math.random() * 2 ** 32)
+
 /** A room ready to be shown: its name, who may walk in (personal rooms only) and the layout. */
 interface Shown {
   name: string
@@ -56,6 +71,8 @@ interface Session {
   placedAt: number
   /** Gesture and reaction token buckets of the people in the call: they go when the person or the call does. */
   emotes: Map<string, { tokens: number; at: number }>
+  /** Pool tables with someone playing, by the id of the table's item. A table that is not here has a fresh rack. */
+  pools: Map<string, PoolGame>
 }
 
 const LOUNGE: Shown = { name: 'Lounge', layout: LOUNGE_ROOM }
@@ -159,6 +176,7 @@ export class Worlds {
         const at = this.inside(conn, f)
         if (!at) return
         at.s.members.delete(conn.userId)
+        this.poolGone(at.s, conn.userId)
         return this.broadcast(at.s)
       }
       case 'world_move':
@@ -200,7 +218,96 @@ export class Worlds {
     const s = channelId ? this.sessions.get(channelId) : undefined
     if (!s || s.members.get(conn.userId)?.conn !== conn) return
     s.members.delete(conn.userId)
+    this.poolGone(s, conn.userId)
     this.broadcast(s)
+  }
+
+  // ---- pool (pool.ts) -----------------------------------------------------------------------------------------------
+
+  /** A `world_pool_*` frame: taking a cue, aiming, shooting. Only for people inside the world. */
+  handlePool(conn: Conn, f: PoolClientFrame): void {
+    if (!this.cfg.enabled) return this.error(conn, f.op, 'disabled')
+    if (!this.inChannel(conn.userId, f.channelId)) return this.error(conn, f.op, 'not_in_call')
+    const at = this.inside(conn, f)
+    if (!at) return
+    const { s } = at
+    const uid = conn.userId
+    const now = Date.now()
+    if (f.op === 'world_pool_join') {
+      if (!s.room.items.some((i) => i.id === f.table && worldItem(i.sku)?.game === 'pool')) return this.error(conn, f.op, 'not_found')
+      const g = s.pools.get(f.table)
+      const next = poolJoin(g?.state ?? newPool(f.table, poolSeed()), uid, poolSeed())
+      if (!next) return g?.state.players.includes(uid) ? undefined : this.error(conn, f.op, 'full')
+      // One cue per person: taking this one puts down the other.
+      this.poolGone(s, uid)
+      return this.poolPut(s, f.table, next)
+    }
+    const g = s.pools.get(f.table)
+    if (!g) return this.error(conn, f.op, 'not_found')
+    switch (f.op) {
+      case 'world_pool_leave':
+        return this.poolPut(s, f.table, poolLeave(g.state, uid, poolSeed()))
+      case 'world_pool_rack':
+        if (now < g.busyUntil) return this.error(conn, f.op, 'slow_down')
+        return this.poolPut(s, f.table, poolRack(g.state, uid, poolSeed()))
+      case 'world_pool_aim': {
+        // Only the cue that is about to shoot is shown to the others, and no more often than they can use.
+        if (g.state.phase !== 'play' || g.state.players[g.state.turn] !== uid || now < g.busyUntil || now - g.aimAt < 500 / POOL_AIM_HZ) return
+        g.aimAt = now
+        const others = [...s.members.keys()].filter((id) => id !== uid)
+        return this.hub.dispatch(others, 'WORLD_POOL_AIM', { channelId: s.channelId, table: f.table, userId: uid, a: f.a })
+      }
+      case 'world_pool_shot': {
+        if (now < g.busyUntil) return this.error(conn, f.op, 'slow_down')
+        const r = poolShoot(g.state, uid, f.seq, f.shot, f.cue)
+        if ('error' in r) return this.error(conn, f.op, 'invalid')
+        g.playedAt = now
+        g.busyUntil = now + (r.state.last?.ms ?? 0) - POOL_EARLY_MS
+        return this.poolPut(s, f.table, r.state)
+      }
+    }
+  }
+
+  /** Sets the game of a table (`'empty'`: nobody plays there any more) and tells everyone inside. Null changes nothing. */
+  private poolPut(s: Session, table: string, next: PoolState | 'empty' | null): void {
+    if (next === null) return
+    const g = s.pools.get(table)
+    if (next === 'empty') {
+      s.pools.delete(table)
+    } else if (g) {
+      // A fresh rack has no shot still rolling.
+      if (next.last === null) g.busyUntil = 0
+      g.state = next
+    } else {
+      s.pools.set(table, { state: next, playedAt: 0, busyUntil: 0, aimAt: 0 })
+    }
+    const now = s.pools.get(table)
+    this.hub.dispatch(s.members.keys(), 'WORLD_POOL', { channelId: s.channelId, table, pool: now ? this.poolView(now) : null })
+  }
+
+  /** The state as it goes out: with how old its last shot is, for whoever starts playing it out late. */
+  private poolView(g: PoolGame): PoolState {
+    const last = g.state.last
+    return last ? { ...g.state, last: { ...last, age: Date.now() - g.playedAt } } : g.state
+  }
+
+  /** `userId` is no longer in the room: any cue they held is put down. */
+  private poolGone(s: Session, userId: string): void {
+    for (const [table, g] of [...s.pools]) this.poolPut(s, table, poolLeave(g.state, userId, poolSeed()))
+  }
+
+  /** Forgets every game on a table that is not in the room any more (all of them when the place changed). */
+  private poolPrune(s: Session, all: boolean): void {
+    for (const table of [...s.pools.keys()]) {
+      if (!all && s.room.items.some((i) => i.id === table && worldItem(i.sku)?.game === 'pool')) continue
+      s.pools.delete(table)
+      this.hub.dispatch(s.members.keys(), 'WORLD_POOL', { channelId: s.channelId, table, pool: null })
+    }
+  }
+
+  /** Tells one socket about every table being played on (it has just walked in). */
+  private poolHello(conn: Conn, s: Session): void {
+    for (const [table, g] of s.pools) this.reply(conn, 'WORLD_POOL', { channelId: s.channelId, table, pool: this.poolView(g) })
   }
 
   /** Fans out who moved since the last tick, to the people inside, never a person's own pose. Driven by the timer. */
@@ -252,6 +359,7 @@ export class Worlds {
       const room: WorldRoomView = { channelId, place, name: shown.name, ...(shown.access ? { access: shown.access } : {}), rev: 1, ...shown.layout }
       this.sessions.set(channelId, {
         channelId, place, hostId: uid, members: new Map(), tv: null, seq: 0, room, seats: roomSeats(room), placedAt: Date.now(), emotes: new Map(),
+        pools: new Map(),
       })
     }
     const now = this.sessions.get(channelId)!
@@ -269,7 +377,8 @@ export class Worlds {
     if (already) {
       // Entering twice changes nothing; a reconnected app takes the figure over, so the old socket's close leaves it.
       already.conn = conn
-      return this.reply(conn, 'WORLD_STATE', { channelId, session: this.view(s) })
+      this.reply(conn, 'WORLD_STATE', { channelId, session: this.view(s) })
+      return this.poolHello(conn, s)
     }
     if (s.place.kind === 'room') {
       const { place } = s
@@ -288,6 +397,7 @@ export class Worlds {
       userId: uid, k, pose: spawnPose(WORLD_SHELLS[s.room.shell], s.members.size), seat: null, loop: null, conn, dirty: false, movedAt: Date.now(),
     })
     this.broadcast(s)
+    this.poolHello(conn, s)
   }
 
   private move(userId: string, channelId: string, p: WorldPose): void {
@@ -346,6 +456,7 @@ export class Worlds {
     if (this.voice.inChannel(channelId).length === 0) return this.forget(s)
     s.emotes.delete(userId)
     let changed = s.members.delete(userId)
+    if (changed) this.poolGone(s, userId)
     if (s.tv === userId) {
       s.tv = null
       changed = true
@@ -390,6 +501,7 @@ export class Worlds {
     this.remove(s, denied)
     s.room = next
     s.seats = roomSeats(next)
+    this.poolPrune(s, false)
     const shell = WORLD_SHELLS[next.shell]
     for (const m of s.members.values()) {
       if (m.seat === null) continue
@@ -474,13 +586,16 @@ export class Worlds {
   /** Takes people out of the room, telling each why. */
   private remove(s: Session, denied: Map<string, WorldErrorReason>): void {
     for (const [userId, reason] of denied) {
-      if (s.members.delete(userId)) this.hub.dispatch([userId], 'WORLD_REMOVED', { channelId: s.channelId, reason })
+      if (!s.members.delete(userId)) continue
+      this.hub.dispatch([userId], 'WORLD_REMOVED', { channelId: s.channelId, reason })
+      this.poolGone(s, userId)
     }
   }
 
   /** The world goes to another place: who may not be there leaves, the others arrive again, standing and at rest. */
   private moveTo(s: Session, place: WorldPlace, shown: Shown, denied: Map<string, WorldErrorReason>): void {
     this.remove(s, denied)
+    this.poolPrune(s, true)
     s.place = place
     s.room = this.roomView(s, place, shown, s.room.rev + 1)
     s.seats = roomSeats(s.room)

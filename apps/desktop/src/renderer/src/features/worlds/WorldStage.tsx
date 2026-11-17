@@ -16,6 +16,9 @@ import { levelNow } from '../voice/levels'
 import { AssetPack, PackError, resolveAssetsUrl, type PackProgress } from './assets/pack'
 import { WorldEngine, type EngineStatus, type WorldPerson } from './engine/World'
 import { QUALITY_TIERS, type QualityPref, type QualityTier } from './engine/quality'
+import { PoolHud } from './pool/PoolHud'
+import type { PoolUi } from './pool/PoolRoom'
+import { poolAim, poolJoin, poolLeave, poolRack, poolSettled, poolShot, usePool } from './pool/store'
 import { emote, leaveWorld, rest, sendMove, setQuality, setTv, showWorld, sit, stand, useWorlds, worldFailed } from './store'
 import { t } from './strings'
 import s from './worlds.module.css'
@@ -40,6 +43,7 @@ export default function WorldStage({ channel }: { channel: Channel }) {
   const [seatHint, setSeatHint] = useState<string | null>(null)
   const [watching, setWatching] = useState(false)
   const [tier, setTier] = useState<QualityTier | null>(null)
+  const [poolUi, setPoolUi] = useState<PoolUi | null>(null)
   /** Grows when a new engine exists: what feeds it runs again. */
   const [engineReady, setEngineReady] = useState(0)
 
@@ -90,6 +94,7 @@ export default function WorldStage({ channel }: { channel: Channel }) {
             onSeatHint: (seat) => !dead && setSeatHint(seat),
             onTier: (q) => !dead && setTier(q),
             voice: levelNow,
+            pool: { onJoin: poolJoin, onLeave: poolLeave, onAim: poolAim, onShot: poolShot, onSettled: poolSettled, onUi: (ui) => !dead && setPoolUi(ui) },
             onStatus: (st: EngineStatus) => {
               if (dead) return
               if (st.phase === 'error') setPhase({ kind: 'error', message: st.reason === 'context_lost' ? t.failed.contextLost : t.failed.body })
@@ -129,6 +134,13 @@ export default function WorldStage({ channel }: { channel: Channel }) {
     engine.current?.setPeople(meId, people)
   }, [people, meId, engineReady])
 
+  // Pool: the tables as the server has them go to the room, which plays each shot out; the scoreboard reads the
+  // version that waits for the balls to stop.
+  const pool = usePool(useShallow((st) => ({ tables: st.tables, shown: st.shown })))
+  useEffect(() => {
+    engine.current?.setPools(Object.values(pool.tables))
+  }, [pool.tables, engineReady])
+
   useEffect(() => {
     engine.current?.setQuality(world.quality)
   }, [world.quality, engineReady])
@@ -140,6 +152,7 @@ export default function WorldStage({ channel }: { channel: Channel }) {
   useEffect(() => onDispatch((d) => {
     if (d.t === 'WORLD_TICK' && d.d.channelId === channel.id) engine.current?.applyTick(d.d.e)
     else if (d.t === 'WORLD_EMOTE' && d.d.channelId === channel.id) engine.current?.emote(d.d.userId, d.d.emote)
+    else if (d.t === 'WORLD_POOL_AIM' && d.d.channelId === channel.id) engine.current?.poolAim(d.d.table, d.d.userId, d.d.a)
   }), [channel.id])
 
   // The room's screens show a screen share of this call, decoded by the call's own media engine.
@@ -244,7 +257,14 @@ export default function WorldStage({ channel }: { channel: Channel }) {
             <IconButton icon={Minimize} label={t.hud.backToCall} tooltipSide="top" onClick={() => showWorld(false)} />
             <IconButton icon={LogOut} label={t.hud.leave} tooltipSide="top" onClick={leaveWorld} />
           </div>
-          {(seatHint || seated) && (
+          {poolUi && (
+            <PoolHud
+              ui={seatHint || seated ? { ...poolUi, near: null } : poolUi}
+              state={poolUi.table ? pool.shown[poolUi.table] ?? null : null}
+              meId={meId} nameOf={(id) => names[id] ?? ''} room={() => engine.current?.pool ?? null} onRack={poolRack}
+            />
+          )}
+          {(seatHint || seated) && !poolUi?.aiming && (
             <div className={s.hint} role="status">
               <kbd>E</kbd>
               <span>{seated ? t.hud.stand : t.hud.sit}</span>

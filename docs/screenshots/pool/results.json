@@ -1,0 +1,47 @@
+{
+  "at": "2026-11-17T01:39:37.337Z",
+  "results": [
+    {
+      "name": "O lounge abre com a mesa de sinuca arrumada, igual nas duas telas",
+      "pass": true,
+      "ms": 21685,
+      "detail": "sin:0:a5b2fd82"
+    },
+    {
+      "name": "Perto da mesa aparece \"Jogar sinuca\"; E pega o taco e começa o treino livre",
+      "pass": true,
+      "ms": 5584,
+      "detail": "Treino livre Chame alguém para pegar o outro taco e começa a partida. 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 Saída: arraste a branca atrás da linha"
+    },
+    {
+      "name": "Bia pega o outro taco: vira partida, bolas arrumadas de novo, saída de Ana",
+      "pass": true,
+      "ms": 4375,
+      "detail": "Você Mesa aberta Bia Lima Mesa aberta Saída: arraste a branca atrás da linha | Ana Souza Mesa aberta Você Mesa aberta Vez de Ana Souza"
+    },
+    {
+      "name": "Ana dá a saída puxando o taco com o botão direito: as bolas rolam nas duas telas e param no mesmo lugar",
+      "pass": true,
+      "ms": 11736,
+      "detail": "sin:1:58a618c3 · Você Mesa aberta Bia Lima Mesa aberta Vez de Bia Lima | Ana Souza Mesa aberta Você Mesa aberta Sua vez"
+    },
+    {
+      "name": "Quem está na vez taca com Espaço; de novo as duas mesas terminam iguais e só um tem a vez",
+      "pass": true,
+      "ms": 8386,
+      "detail": "Bia tacou · sin:2:656a81de · Você Lisas 1 2 3 4 5 6 7 Bia Lima Listradas 9 10 11 12 13 14 15 Vez de Bia Lima Caíram 2 bolas. | Ana Souza Lisas 1 2 3 4 5 6 7 Você Listradas 9 10 11 12 13 14 15 Sua vez Caíram 2 bolas."
+    },
+    {
+      "name": "A vista de cima (V) mostra a mesa inteira",
+      "pass": true,
+      "ms": 2905,
+      "detail": null
+    },
+    {
+      "name": "Esc larga o taco: quem ficou segue em treino livre na mesma mesa, e a voz dos dois nunca caiu",
+      "pass": true,
+      "ms": 76,
+      "detail": "Treino livre Chame alguém para pegar o outro taco e começa a partida. 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 13 bolas na mesa Caíram 2 bolas."
+    }
+  ]
+}

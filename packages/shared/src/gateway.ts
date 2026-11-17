@@ -10,6 +10,7 @@ import type {
 } from './cinema.js'
 import type { MusicClientFrame, MusicErrorReason, MusicState } from './music.js'
 import type { WorldClientFrame, WorldEmote, WorldErrorReason, WorldPose, WorldRoomView, WorldSession, WorldsReady } from './worlds.js'
+import type { PoolAim, PoolClientFrame, PoolState } from './pool.js'
 import type { E2eeClientFrame, E2eeCommit, E2eeEpoch, E2eeProposals, E2eeResyncRequired, E2eeWelcome } from './e2ee.js'
 import type { RsvpStatus, SpaceEvent } from './events.js'
 import type { SpaceSound } from './soundboard.js'
@@ -41,6 +42,8 @@ import type { SpaceSound } from './soundboard.js'
  * Worlds (worlds.ts, docs/worlds.md): `world_*` ops and `WORLD_*` dispatches put a call in a 3D place. One session per
  * channel, only for users connected to the call (else WORLD_ERROR `not_in_call`). Own quota: WORLD_FRAME_LIMIT frames per
  * 60 s per socket. Positions fan out every WORLD_TICK_MS, only to the people inside and only what changed.
+ * Pool (pool.ts, docs/worlds-pool.md): `world_pool_*` ops and WORLD_POOL* dispatches play 8-ball on a pool table of the
+ * room, only for people inside the world and only when READY.worlds.pool is set. They count in the world quota.
  */
 
 export const GatewayClose = {
@@ -87,6 +90,8 @@ export type ClientFrame =
    * `world_stand`, `world_emote`, `world_rest`, `world_tv`. The server answers with WORLD_* dispatches only.
    */
   | WorldClientFrame
+  /** Pool on a table of the world (pool.ts): `world_pool_join`, `world_pool_leave`, `world_pool_rack`, `world_pool_aim`, `world_pool_shot`. */
+  | PoolClientFrame
 
 export interface ReadyPayload {
   user: Me
@@ -277,6 +282,14 @@ export type Dispatch =
   | { t: 'WORLD_REMOVED'; d: { channelId: string; reason: WorldErrorReason } }
   /** Only to the socket whose world_* frame was refused. */
   | { t: 'WORLD_ERROR'; d: { op: string; reason: WorldErrorReason } }
+  /**
+   * Pool (pool.ts), only to the people inside the world: the state of one table, on every change (someone took or put
+   * down a cue, a shot was played, a new rack) and to whoever walks in. After a shot it carries the shot itself
+   * (`pool.last`), which each app plays out. `pool: null` = nobody is playing there any more: a fresh rack.
+   */
+  | { t: 'WORLD_POOL'; d: { channelId: string; table: string; pool: PoolState | null } }
+  /** Only to the other people inside: where `userId`, who is about to shoot, has the cue. */
+  | { t: 'WORLD_POOL_AIM'; d: { channelId: string; table: string; userId: string; a: PoolAim } }
 
 export type DispatchType = Dispatch['t']
 export type DispatchOf<T extends DispatchType> = Extract<Dispatch, { t: T }>['d']

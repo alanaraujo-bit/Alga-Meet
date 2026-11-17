@@ -8,7 +8,8 @@ import { create } from 'zustand'
 import { useData } from '@/store/data'
 import { onDispatch, useSession } from '@/store/session'
 import type { QualityPref } from './engine/quality'
-import { errorText } from './strings'
+import { startPool } from './pool/store'
+import { errorText, t } from './strings'
 
 const PREFS_KEY = 'alga.worlds.v1'
 
@@ -126,6 +127,11 @@ export function worldFailed(): void {
 const hello = (): void => withChannel((channelId) => send({ op: 'world_hello', channelId }))
 
 function refused(op: string, reason: WorldErrorReason): void {
+  // Pool: the table shows what happened by itself (a refused shot is simply not played); only a full table needs words.
+  if (op.startsWith('world_pool_')) {
+    if (op === 'world_pool_join' && reason === 'full') useWorlds.setState({ notice: t.pool.full })
+    return
+  }
   // Being refused at the door is not wanting in any more; a refused gesture changes nothing.
   if (op === 'world_enter' || op === 'world_open') {
     wantIn = false
@@ -184,6 +190,7 @@ export function startWorlds(): () => void {
       reset()
       if (c) hello()
     }),
+    startPool(),
   ]
   return () => {
     for (const off of offs) off()

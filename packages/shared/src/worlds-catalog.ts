@@ -20,7 +20,7 @@ import {
 
 export type WorldTier = 'base' | 'store' | 'plus'
 export type WorldCatalogKind = 'item' | 'floor' | 'wall' | 'mood' | 'avatar_finish' | 'avatar_outfit' | 'avatar_head'
-export const WORLD_ITEM_CATEGORIES = ['seating', 'tables', 'storage', 'lighting', 'plants', 'decor', 'rugs', 'media', 'beds'] as const
+export const WORLD_ITEM_CATEGORIES = ['seating', 'tables', 'storage', 'lighting', 'plants', 'decor', 'rugs', 'media', 'beds', 'games'] as const
 export type WorldItemCategory = (typeof WORLD_ITEM_CATEGORIES)[number]
 /** Where an item goes: standing on the floor, hung on a wall, on top of a piece of furniture, from the ceiling, or flat on the floor under everything. */
 export type WorldItemPlace = 'floor' | 'wall' | 'surface' | 'ceiling' | 'rug'
@@ -52,6 +52,8 @@ export interface WorldItemDef extends EntryBase {
   screen?: readonly [number, number, number, number]
   /** It lights the room: [colour temperature in K, strength 0..1, height of the source]. */
   light?: readonly [number, number, number]
+  /** People can play on it: a pool table (pool.ts). Its light is the lamp that hangs over it. */
+  game?: 'pool'
   variants?: readonly { id: string; name: string }[]
 }
 export interface WorldFinishDef extends EntryBase {
@@ -76,6 +78,7 @@ const FABRIC = [
   { id: 'terracota', name: 'Terracota' }, { id: 'indigo', name: 'Índigo' },
 ] as const
 const RUG = [{ id: 'marfim', name: 'Marfim' }, { id: 'cinza', name: 'Cinza' }, { id: 'carvao', name: 'Carvão' }] as const
+const CLOTH = [{ id: 'verde', name: 'Verde' }, { id: 'azul', name: 'Azul' }, { id: 'vinho', name: 'Vinho' }, { id: 'grafite', name: 'Grafite' }] as const
 const ART = [{ id: 'mare', name: 'Maré' }, { id: 'duna', name: 'Duna' }, { id: 'noturno', name: 'Noturno' }, { id: 'brasa', name: 'Brasa' }] as const
 
 type ItemInit = Omit<WorldItemDef, 'kind' | 'sku' | 'name' | 'tier' | 'category' | 'place' | 'size' | 'model'>
@@ -160,6 +163,9 @@ const ITEMS: WorldItemDef[] = [
   item('w_tv_parede', 'Tela de parede 85"', 'base', 'media', 'wall', [1.9, 1.09, 0.05], proc('tv_wall'), { screen: [1.872, 1.053, 0.545, 0.03] }),
   item('w_tv_pedestal', 'Tela com pedestal 55"', 'base', 'media', 'floor', [1.26, 1.32, 0.42], proc('tv_stand'), { screen: [1.21, 0.68, 0.94, 0.03], solid: true }),
   item('w_tv_cinema', 'Telão 110"', 'store', 'media', 'wall', [2.48, 1.42, 0.06], proc('tv_cinema'), { screen: [2.44, 1.3725, 0.71, 0.035], hero: true }),
+
+  // ---- games: free for everyone, like the screen. Playing is the point of having friends over.
+  item('w_mesa_sinuca', 'Mesa de sinuca', 'base', 'games', 'floor', [2.57, 0.85, 1.45], proc('pool_table'), { game: 'pool', light: [3200, 1, 1.92], variants: CLOTH }),
 
   // ---- beds
   item('w_cama_casal', 'Cama Plataforma', 'base', 'beds', 'floor', [1.9, 0.9, 2.2], proc('bed'), { seats: [[-0.5, 0.86, 0, 0.42], [0.5, 0.86, 0, 0.42]], variants: FABRIC }),
@@ -420,5 +426,7 @@ export const LOUNGE_ROOM: WorldRoomLayout = {
     place('ban1', 'w_banqueta', 0.9, -4.3, 0),
     place('uku', 'w_ukulele', -6.98, 1.4, HALF_PI, 1.3),
     place('qua', 'w_quadro_paisagem', -6.98, 2.6, HALF_PI, 1.35),
+    // The open floor in the middle: the pool table, with room to walk round it and cue from every side.
+    place('sin', 'w_mesa_sinuca', -1.1, -1.3, HALF_PI, 0, 'verde'),
   ],
 }

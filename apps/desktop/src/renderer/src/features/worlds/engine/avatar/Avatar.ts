@@ -10,6 +10,7 @@ import type { BodyAsset } from '../../assets/loaders'
 import { turn } from '../collision'
 import type { SeatSpot } from '../items'
 import { LIVE_LAYER } from '../lighting'
+import type { CueHold } from '../../pool/PoolRoom'
 import { buildGear, disposeGear, type HeadBox } from './gear'
 import { applyLook, bodyMaterial, jointsMaterial, lookOf, prepareBody } from './look'
 
@@ -31,6 +32,8 @@ export interface AvatarInput {
   loop: WorldGesture | null
   /** 0..1, how loud the person is right now. */
   voice: number
+  /** Aiming a cue at a pool table: where the hands are and how far to bend. */
+  cue?: CueHold | null
 }
 
 const LOOPS: Partial<Record<WorldGesture, string>> = { dance: 'dance', fold: 'idle_fold', phone: 'idle_phone' }
@@ -43,6 +46,7 @@ const ONE_SHOT_S: Partial<Record<WorldGesture, number>> = { wave: 2.3, yes: 1.5,
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3()
 const q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion(), q3 = new THREE.Quaternion()
 const smooth = (t: number) => t * t * (3 - 2 * t)
+const STANCE_BONES = ['spine_01', 'spine_02', 'spine_03', 'neck_01', 'Head', 'upperarm_l', 'lowerarm_l', 'upperarm_r', 'lowerarm_r']
 
 /**
  * Gets a body of the pack ready to be cloned, once: smooth shading and the panels of the body (look.ts). The larger
@@ -115,6 +119,11 @@ export class Avatar {
   private sitBack = 0
   private ringLevel = 0
   private placed = false
+  /** How far into the cue stance the figure is (0..1), and the stance it is easing into or out of. */
+  private cueLevel = 0
+  private cueHold: CueHold | null = null
+  /** Bones the cue stance turns: what the clip had them at, and what the stance left them at. */
+  private readonly stanced = new Map<THREE.Bone, { clip: THREE.Quaternion; left: THREE.Quaternion }>()
 
   constructor(private readonly kit: AvatarKit, spec: WorldAvatar) {
     this.spec = spec
@@ -299,6 +308,15 @@ export class Avatar {
       else this.pose(this.shot.id, this.shot.t, this.shot.d)
     }
 
+    if (s.cue) this.cueHold = s.cue
+    this.cueLevel += ((s.cue ? 1 : 0) - this.cueLevel) * (1 - Math.exp(-dt * 7))
+    if (this.cueLevel > 0.01 && this.cueHold) {
+      this.poseCue(this.cueHold, smooth(this.cueLevel))
+    } else if (!s.cue) {
+      this.cueHold = null
+      this.unstance()
+    }
+
     this.ringLevel += (Math.min(1, s.voice * 2.2) - this.ringLevel) * (1 - Math.exp(-dt * (s.voice > this.ringLevel ? 30 : 6)))
     this.ring.material.opacity = this.ringLevel * 0.9
     this.ring.visible = this.ringLevel > 0.01
@@ -341,10 +359,15 @@ export class Avatar {
 
   /** Turns `bone` so that it points from itself to `child` along `dir` (in the figure's own frame), by weight `w`. */
   private aim(bone: string, child: string, dir: THREE.Vector3, w: number): void {
+    this.aimWorld(bone, child, v2.copy(dir).applyQuaternion(this.root.getWorldQuaternion(q1)), w)
+  }
+
+  /** The same, with `dir` in the room's frame. */
+  private aimWorld(bone: string, child: string, dir: THREE.Vector3, w: number): void {
     const b = this.bones.get(bone), c = this.bones.get(child)
     if (!b || !c || w <= 0) return
     b.updateWorldMatrix(true, true)
-    const want = v2.copy(dir).normalize().applyQuaternion(this.root.getWorldQuaternion(q1))
+    const want = v2.copy(dir).normalize()
     const now = v3.subVectors(c.getWorldPosition(new THREE.Vector3()), b.getWorldPosition(new THREE.Vector3())).normalize()
     const delta = q2.setFromUnitVectors(now, want)
     const world = b.getWorldQuaternion(q3)
@@ -355,9 +378,71 @@ export class Avatar {
     b.updateWorldMatrix(false, true)
   }
 
-  /** Turns the head around one of the figure's own axes. */
-  private nod(axis: 'x' | 'y', angle: number): void {
-    const h = this.bones.get('Head')
+  /**
+   * The cue stance, on top of whatever clip is playing: the back bends over the table, the head stays up to look down
+   * the line, one hand goes to rest behind the cue ball and the other to the butt of the cue.
+   */
+  private poseCue(c: CueHold, w: number): void {
+    // The mixer only writes a bone when its clip value changed since the last frame. On the frames it does not, the
+    // bone still has what this stance left there: start again from what the clip said, or the turns pile up.
+    for (const name of STANCE_BONES) {
+      const b = this.bones.get(name)
+      if (!b) continue
+      const s = this.stanced.get(b)
+      if (!s) this.stanced.set(b, { clip: b.quaternion.clone(), left: new THREE.Quaternion() })
+      else if (b.quaternion.equals(s.left)) b.quaternion.copy(s.clip)
+      else s.clip.copy(b.quaternion)
+    }
+    this.root.updateMatrixWorld(true)
+    const bend = (0.22 + 0.85 * c.lean) * w
+    this.nod('x', bend * 0.42, 'spine_01')
+    this.nod('x', bend * 0.3, 'spine_02')
+    this.nod('x', bend * 0.28, 'spine_03')
+    this.nod('x', -bend * 0.3, 'neck_01')
+    this.nod('x', -bend * 0.28)
+    // Seen from the figure: the elbow of the resting arm goes out to its side, the other one up and back.
+    this.reach('l', c.bridge, v3.set(0.9, -0.25, -0.2), w)
+    this.reach('r', c.grip, v3.set(-0.35, 0.8, -0.6), w)
+    for (const [b, s] of this.stanced) s.left.copy(b.quaternion)
+  }
+
+  /** Out of the cue stance: the bones go back to what the clip had them at. */
+  private unstance(): void {
+    for (const [b, s] of this.stanced) if (b.quaternion.equals(s.left)) b.quaternion.copy(s.clip)
+    this.stanced.clear()
+  }
+
+  /** Brings a hand to a point of the room by turning the two bones of its arm; `pole`: where the elbow goes, in the figure's frame. */
+  private reach(side: 'l' | 'r', target: THREE.Vector3, pole: THREE.Vector3, w: number): void {
+    const upper = this.bones.get(`upperarm_${side}`), lower = this.bones.get(`lowerarm_${side}`), hand = this.bones.get(`hand_${side}`)
+    if (!upper || !lower || !hand) return
+    upper.updateWorldMatrix(true, true)
+    const s = upper.getWorldPosition(new THREE.Vector3()), e = lower.getWorldPosition(new THREE.Vector3()), h = hand.getWorldPosition(new THREE.Vector3())
+    const l1 = s.distanceTo(e), l2 = e.distanceTo(h)
+    const to = new THREE.Vector3().subVectors(target, s)
+    const d = THREE.MathUtils.clamp(to.length(), Math.abs(l1 - l2) + 0.02, l1 + l2 - 0.004)
+    to.normalize()
+    // The elbow: on the circle both bones allow, on the side the pole says.
+    const along = (l1 * l1 - l2 * l2 + d * d) / (2 * d)
+    const out = Math.sqrt(Math.max(0, l1 * l1 - along * along))
+    const side3 = pole.clone().applyQuaternion(this.root.getWorldQuaternion(q1))
+    side3.addScaledVector(to, -side3.dot(to)).normalize()
+    const elbow = new THREE.Vector3().copy(to).multiplyScalar(along).addScaledVector(side3, out)
+    this.aimWorld(`upperarm_${side}`, `lowerarm_${side}`, elbow, w)
+    lower.updateWorldMatrix(true, true)
+    this.aimWorld(`lowerarm_${side}`, `hand_${side}`, new THREE.Vector3().copy(to).multiplyScalar(d).sub(elbow), w)
+  }
+
+  /** The middle of the right palm, in the room: where a carried cue is held. Null before the figure is drawn. */
+  handPoint(target: THREE.Vector3): THREE.Vector3 | null {
+    const hand = this.bones.get('hand_r')
+    if (!hand || !this.placed) return null
+    return hand.localToWorld(target.set(0, 0.075, 0))
+  }
+
+  /** Turns a bone (the head, unless another is named) around one of the figure's own axes. */
+  private nod(axis: 'x' | 'y', angle: number, bone = 'Head'): void {
+    const h = this.bones.get(bone)
     if (!h || angle === 0) return
     h.updateWorldMatrix(true, false)
     const rootQ = this.root.getWorldQuaternion(q1)

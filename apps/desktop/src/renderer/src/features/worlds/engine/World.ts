@@ -6,7 +6,7 @@
 import * as THREE from 'three'
 import {
   WORLD_GAITS, WORLD_MOVE_HZ, WORLD_RUN_SPEED, WORLD_SHELLS, WORLD_WALK_SPEED, WORLD_WALL_MARGIN, toPose,
-  type WorldAvatar, type WorldEmote, type WorldGesture, type WorldPose, type WorldRoomLayout,
+  type PoolAim, type PoolState, type WorldAvatar, type WorldEmote, type WorldGesture, type WorldPose, type WorldRoomLayout,
 } from '@alga/shared'
 import { Assets } from '../assets/loaders'
 import type { AssetPack } from '../assets/pack'
@@ -17,6 +17,7 @@ import { buildItems, type RoomItems, type SeatSpot } from './items'
 import { LIVE_LAYER, Lighting } from './lighting'
 import { blobTexture } from './materials'
 import { PoseSender, PoseTrack } from './net'
+import { PoolRoom, type PoolHooks } from '../pool/PoolRoom'
 import { PostChain } from './post'
 import { QualityGovernor, TIERS, frameBudget, type QualityPref, type QualityTier } from './quality'
 import { ScreenSurface } from './screen'
@@ -50,6 +51,8 @@ export interface EngineHooks {
   onTier?(tier: QualityTier): void
   /** How loud someone is, 0..1. */
   voice?(userId: string): number
+  /** The pool tables of the room: what the person does at one, and what the screen should show about it. */
+  pool?: PoolHooks
 }
 
 export interface EngineOptions {
@@ -115,6 +118,13 @@ export class WorldEngine {
   private editor: RoomEditor | null = null
   private post: PostChain | null = null
   private figureLight: THREE.SpotLight | null = null
+  /** The pool tables of the room, and my play at one of them. */
+  readonly pool: PoolRoom
+  /** Walking to where a shot is taken from: whether I got there, and for how long something was in the way. */
+  private atCue = false
+  private cueBlocked = 0
+  /** The table I clicked and am walking to, to take a cue when I get there. */
+  private wantCue: string | null = null
 
   // Camera
   private camYaw = Math.PI * 0.85
@@ -170,6 +180,14 @@ export class WorldEngine {
     this.lighting = new Lighting(this.renderer, this.scene, this.assets)
     this.lighting.setTier(t)
     this.screen = new ScreenSurface(this.scene)
+    this.pool = new PoolRoom({
+      assets: this.assets, camera: this.camera, blob: this.blob,
+      meId: () => (this.me ? this.meId : null),
+      me: () => this.me,
+      hand: (id, target) => (id === this.meId ? this.me?.avatar : this.remotes.get(id)?.avatar)?.handPoint(target) ?? null,
+      inRoom: (p) => this.inRoom(p),
+      hooks: opts.hooks.pool ?? {},
+    })
     this.camera.layers.enable(LIVE_LAYER)
     this.raycaster.layers.enableAll()
     this.applyPixelRatio()
@@ -185,7 +203,7 @@ export class WorldEngine {
     on(canvas, 'contextmenu', (e: Event) => e.preventDefault())
     on(window, 'keydown', this.onKeyDown)
     on(window, 'keyup', this.onKeyUp)
-    on(window, 'blur', () => { this.keys.clear(); this.focused = false })
+    on(window, 'blur', () => { this.keys.clear(); this.pool.blur(); this.focused = false })
     on(window, 'focus', () => { this.focused = true })
     on(document, 'visibilitychange', () => { this.visible = !document.hidden })
     on(canvas, 'webglcontextlost', (e: Event) => {
@@ -220,6 +238,7 @@ export class WorldEngine {
       this.layout = layout
       this.bounds = { hw: spec.width / 2 - WORLD_WALL_MARGIN + PERSON_RADIUS, hd: spec.depth / 2 - WORLD_WALL_MARGIN + PERSON_RADIUS }
       this.scene.add(shell.group, items.group)
+      this.pool.setItems(items.items.values())
       this.screen.setScreens([...items.items.values()].flatMap((i) => (i.screen ? [i.screen] : [])))
       const moodSku = layout.finish.mood.replace(/^m_/, '')
       await this.lighting.setRoom(shell, spec, moodSku, items.lamps)
@@ -411,6 +430,30 @@ export class WorldEngine {
 
   // ---- screen --------------------------------------------------------------------------------------------------------
 
+  // ---- pool ----------------------------------------------------------------------------------------------------------
+
+  /** What the server says about the pool tables of the room. */
+  setPools(states: readonly PoolState[]): void {
+    this.pool.setStates(states)
+  }
+
+  /** Someone else moved their cue. */
+  poolAim(table: string, userId: string, aim: PoolAim): void {
+    if (userId !== this.meId) this.pool.aim(table, userId, aim)
+  }
+
+  /** A point kept inside the walls and under the ceiling (for a camera). */
+  private inRoom(p: THREE.Vector3): THREE.Vector3 {
+    const spec = this.layout ? WORLD_SHELLS[this.layout.shell] : null
+    if (!spec) return p
+    p.x = THREE.MathUtils.clamp(p.x, -spec.width / 2 + 0.22, spec.width / 2 - 0.22)
+    p.z = THREE.MathUtils.clamp(p.z, -spec.depth / 2 + 0.22, spec.depth / 2 - 0.22)
+    p.y = THREE.MathUtils.clamp(p.y, 0.22, spec.height - 0.24)
+    return p
+  }
+
+  // ---- screen --------------------------------------------------------------------------------------------------------
+
   /** The video shown on the screens of the room (a shared screen), or null for none. */
   setScreenSource(video: HTMLVideoElement | null): void {
     this.screen.setSource(video)
@@ -453,6 +496,7 @@ export class WorldEngine {
     this.inputEnabled = on
     if (!on) {
       this.keys.clear()
+      this.pool.blur()
       this.drag = null
     }
   }
@@ -517,6 +561,7 @@ export class WorldEngine {
     if (!this.inputEnabled) return
     this.canvas.setPointerCapture?.(e.pointerId)
     this.setPointer(e)
+    if (this.pool.pointerDown(e, this.pointer)) return void (this.drag = null)
     // Editing: a press on a piece picks it up; anywhere else looks around as usual.
     if (this.editor && e.button === 0 && this.editor.begin(this.pointer)) return void (this.drag = null)
     this.drag = { x: e.clientX, y: e.clientY, moved: false, button: e.button }
@@ -529,6 +574,7 @@ export class WorldEngine {
 
   private readonly onPointerMove = (e: PointerEvent): void => {
     this.setPointer(e)
+    if (this.pool.pointerMove(e, this.pointer)) return
     if (this.editor?.dragging) return void this.editor.move(this.pointer)
     const d = this.drag
     if (!d) return
@@ -544,6 +590,7 @@ export class WorldEngine {
   }
 
   private readonly onPointerUp = (): void => {
+    if (this.pool.pointerUp(this.pointer)) return
     if (this.editor?.dragging) return void this.editor.end()
     const d = this.drag
     this.drag = null
@@ -556,6 +603,7 @@ export class WorldEngine {
   private readonly onWheel = (e: WheelEvent): void => {
     if (!this.inputEnabled) return
     e.preventDefault()
+    if (this.pool.wheel(e)) return
     this.watching = false
     this.camDist = THREE.MathUtils.clamp(this.camDist * Math.exp(e.deltaY * 0.0011), 1.5, 8)
   }
@@ -566,9 +614,11 @@ export class WorldEngine {
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
     const k = e.code
     if (this.editor?.selection && this.editKey(k)) return void e.preventDefault()
+    if (this.pool.keyDown(e)) return void e.preventDefault()
     if (k === 'KeyE' && !e.repeat) {
       if (this.me?.person.seat) this.stand()
       else if (this.hintSeat) this.goSit(this.hintSeat)
+      else this.pool.join()
       return
     }
     if (MOVE_KEYS.has(k)) {
@@ -578,6 +628,7 @@ export class WorldEngine {
   }
 
   private readonly onKeyUp = (e: KeyboardEvent): void => {
+    this.pool.keyUp(e)
     this.keys.delete(e.code)
   }
 
@@ -605,6 +656,16 @@ export class WorldEngine {
     if (seat) return void this.goSit(seat.id)
     this.raycaster.setFromCamera(this.pointer, this.camera)
     const ray = this.raycaster.ray
+    // A pool table with a free cue: walk up to it and take one.
+    const cue = this.pool.pick(ray)
+    if (cue) {
+      if (this.me.person.seat) this.stand()
+      this.watching = false
+      this.walkTo = { x: cue.x, z: cue.z, seat: null, stuck: 0 }
+      this.wantCue = cue.table
+      return
+    }
+    this.wantCue = null
     if (ray.direction.y >= -0.01) return
     const t = -ray.origin.y / ray.direction.y
     const p = ray.at(t, tmp)
@@ -688,6 +749,9 @@ export class WorldEngine {
       d.tier = this.tier
       d.calls = String(this.renderer.info.render.calls)
       d.triangles = String(this.renderer.info.render.triangles)
+      d.pool = this.pool.digest
+      // Where I am and which way the camera looks (x, z, yaw).
+      d.at = this.me ? `${this.me.x.toFixed(2)},${this.me.z.toFixed(2)},${this.camYaw.toFixed(3)}` : ''
     }
     if (this.governor && this.focused && this.status.phase === 'ready') {
       // When the display itself cannot be kept up with, that is the cost; otherwise only what the CPU saw.
@@ -698,6 +762,18 @@ export class WorldEngine {
   }
 
   private update(dt: number, now: number): void {
+    // First, so that this frame's figures know what their hands are doing with a cue.
+    this.pool.update(dt, now)
+    if (this.wantCue) {
+      // Walking to a table I clicked: the cue is taken on arriving, and forgotten if I went somewhere else.
+      if (this.pool.nearTable === this.wantCue) {
+        this.pool.join()
+        this.wantCue = null
+        this.walkTo = null
+      } else if (!this.walkTo) {
+        this.wantCue = null
+      }
+    }
     this.updateMe(dt)
     const voice = this.hooks.voice
     for (const r of this.remotes.values()) {
@@ -706,7 +782,7 @@ export class WorldEngine {
       const s = r.track.sample(now)
       r.avatar.update(dt, {
         x: s?.x ?? r.person.pose[0] / 100, z: s?.z ?? r.person.pose[1] / 100, yaw: s?.yaw ?? 0, gait: s?.gait ?? 0, speed: s?.speed ?? 0,
-        seat, loop: r.person.loop, voice: voice?.(r.person.userId) ?? 0,
+        seat, loop: r.person.loop, voice: voice?.(r.person.userId) ?? 0, cue: seat ? null : this.pool.hold(r.person.userId),
       })
     }
     this.updateCamera(dt)
@@ -726,13 +802,35 @@ export class WorldEngine {
     if (!me || !this.room) return
     const seated = !!me.person.seat
     let mx = 0, mz = 0
-    if (this.inputEnabled) {
+    // My shot at a pool table: the figure goes to where the shot is taken from, and stays with the cue as it turns.
+    const stance = this.pool.stance()
+    if (stance && seated) this.stand()
+    if (!stance) {
+      this.atCue = false
+      this.cueBlocked = 0
+    } else if (!seated) {
+      const far = Math.hypot(stance.x - me.x, stance.z - me.z)
+      if (this.atCue && far > 1.6) {
+        this.atCue = false
+        this.cueBlocked = 0
+      }
+      if (!this.atCue && (far < 0.5 || this.cueBlocked > 0.5)) this.atCue = true
+      if (this.atCue) {
+        me.x = stance.x
+        me.z = stance.z
+        me.yaw = stance.yaw
+        this.walkTo = null
+      } else {
+        this.walkTo = { ...this.pool.route(me, stance), seat: null, stuck: 0 }
+      }
+    }
+    if (this.inputEnabled && !this.pool.capturing) {
       if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) mz += 1
       if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) mz -= 1
       if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) mx -= 1
       if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) mx += 1
     }
-    const run = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight')
+    const run = (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight')) && !stance
     let vx = 0, vz = 0, gait: number = WORLD_GAITS.idle
     if (mx || mz) {
       if (seated) {
@@ -759,7 +857,7 @@ export class WorldEngine {
       } else {
         vx = dx / d
         vz = dz / d
-        gait = run ? WORLD_GAITS.run : WORLD_GAITS.walk
+        gait = run || (stance && d > 2.2) ? WORLD_GAITS.run : WORLD_GAITS.walk
       }
     }
     const speed = gait === WORLD_GAITS.run ? WORLD_RUN_SPEED : gait === WORLD_GAITS.walk ? WORLD_WALK_SPEED : 0
@@ -772,7 +870,9 @@ export class WorldEngine {
       if (this.walkTo) {
         // Pushing against a piece of furniture without getting anywhere: stop there.
         this.walkTo.stuck = moved < speed * dt * 0.25 ? this.walkTo.stuck + dt : 0
-        if (this.walkTo.stuck > 0.45) {
+        // Something stands between me and the shot (a chair by the table): no point in walking into it.
+        if (stance) this.cueBlocked = moved < speed * dt * 0.25 ? this.cueBlocked + dt : 0
+        else if (this.walkTo.stuck > 0.45) {
           const seat = this.walkTo.seat
           this.walkTo = null
           if (seat && !this.seatTaken(seat)) this.hooks.onSit?.(seat)
@@ -783,7 +883,10 @@ export class WorldEngine {
     me.gait = gait
     me.speed = speed
     const seat = seated ? this.room.seats.find((s) => s.id === me.person.seat) ?? null : null
-    me.avatar?.update(dt, { x: me.x, z: me.z, yaw: me.yaw, gait, speed, seat, loop: me.person.loop, voice: this.hooks.voice?.(me.person.userId) ?? 0 })
+    me.avatar?.update(dt, {
+      x: me.x, z: me.z, yaw: me.yaw, gait, speed, seat, loop: me.person.loop, voice: this.hooks.voice?.(me.person.userId) ?? 0,
+      cue: this.atCue ? this.pool.hold(me.person.userId) : null,
+    })
     if (!seated) {
       const pose = this.sender.next(performance.now(), toPose(me.x, me.z, me.yaw, gait as 0 | 1 | 2))
       if (pose) this.hooks.onMove?.(pose as WorldPose)
@@ -793,6 +896,12 @@ export class WorldEngine {
   private updateCamera(dt: number): void {
     const me = this.me
     const spec = this.layout ? WORLD_SHELLS[this.layout.shell] : null
+    if (this.pool.camera(dt)) {
+      // Down the line of a shot my own figure would be all I see: it steps out, the cue stays.
+      if (me?.avatar) me.avatar.root.visible = !this.pool.hidesMe
+      return
+    }
+    this.camera.up.copy(UP)
     if (this.watching) {
       if (me?.avatar) me.avatar.root.visible = true
       const k = 1 - Math.exp(-dt * 4.5)
@@ -893,6 +1002,7 @@ export class WorldEngine {
       const room = this.room, layout = this.layout
       if (!room || !layout) return
       this.screen.setScreens([...room.items.values()].flatMap((i) => (i.screen ? [i.screen] : [])))
+      this.pool.setItems(room.items.values())
       if (lamps) this.lighting.relight(room.lamps, WORLD_SHELLS[layout.shell])
       else this.lighting.refreshShadows()
     })
@@ -946,6 +1056,7 @@ export class WorldEngine {
       r.label.remove()
     }
     this.remotes.clear()
+    this.pool.dispose()
     this.post?.dispose()
     this.screen.dispose()
     this.lighting.dispose()

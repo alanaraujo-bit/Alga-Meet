@@ -9,6 +9,8 @@ import { STARTER_ROOM, worldEntries } from '@alga/shared'
 import { Assets } from '../assets/loaders'
 import type { AssetPack } from '../assets/pack'
 import { buildItems } from '../engine/items'
+import { PoolView } from '../pool/PoolView'
+import { PoolSound } from '../pool/sound'
 
 export async function renderThumbs(pack: AssetPack, size = 320, only?: string[]): Promise<Record<string, string>> {
   const canvas = document.createElement('canvas')
@@ -31,6 +33,8 @@ export async function renderThumbs(pack: AssetPack, size = 320, only?: string[])
   rim.position.set(-3, 2, -2.5)
   scene.add(key, rim)
   const camera = new THREE.PerspectiveCamera(26, 1, 0.02, 60)
+  // Balls of a pool table live on the layer of things that move.
+  camera.layers.enableAll()
   const assets = new Assets(pack, 1024, 8)
   const out: Record<string, string> = {}
   const box = new THREE.Box3(), part = new THREE.Box3(), centre = new THREE.Vector3(), dims = new THREE.Vector3()
@@ -44,12 +48,18 @@ export async function renderThumbs(pack: AssetPack, size = 320, only?: string[])
       console.warn('[thumbs] skipped', def.sku, built.failed[0]?.[1])
       continue
     }
+    if (def.game === 'pool') {
+      // A table is pictured racked and without the lamp that hangs over it (it would dwarf the table in the frame).
+      const item = built.items.get('t')!.object
+      item.getObjectByName('pool:lamp')?.removeFromParent()
+      new PoolView('t', item, assets, new THREE.Texture(), new PoolSound(), {})
+    }
     scene.add(built.group)
     built.group.updateMatrixWorld(true)
     box.makeEmpty()
     built.group.traverse((o) => {
       const mesh = o as THREE.Mesh
-      if (!mesh.isMesh || mesh.name === 'contact') return
+      if (!mesh.isMesh || mesh.name === 'contact' || !mesh.visible || mesh.parent?.visible === false) return
       mesh.geometry.computeBoundingBox()
       box.union(part.copy(mesh.geometry.boundingBox!).applyMatrix4(mesh.matrixWorld))
     })

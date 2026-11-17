@@ -85,7 +85,7 @@ export const t = {
   } satisfies Record<WorldRoomAccess, string>,
 
   categories: {
-    seating: 'Assentos', tables: 'Mesas', storage: 'Estantes', lighting: 'Luz', plants: 'Plantas', decor: 'Decoração', rugs: 'Tapetes', media: 'Telas', beds: 'Camas',
+    seating: 'Assentos', tables: 'Mesas', storage: 'Estantes', lighting: 'Luz', plants: 'Plantas', decor: 'Decoração', rugs: 'Tapetes', media: 'Telas', beds: 'Camas', games: 'Jogos',
   } satisfies Record<WorldItemCategory, string>,
 
   studio: {
@@ -142,6 +142,48 @@ export const t = {
     highlights: 'Destaques',
     kind: { item: 'Peça', floor: 'Piso', wall: 'Parede', mood: 'Luz', avatar_finish: 'Acabamento', avatar_outfit: 'Roupa', avatar_head: 'Cabeça' },
     walkHint: 'W A S D para andar pela sala',
+  },
+
+  pool: {
+    join: 'Jogar sinuca',
+    watch: 'Mesa ocupada',
+    practice: 'Treino livre',
+    practiceHint: 'Chame alguém para pegar o outro taco e começa a partida.',
+    left: (n: number) => (n === 1 ? '1 bola na mesa' : `${n} bolas na mesa`),
+    you: 'Você',
+    yourTurn: 'Sua vez',
+    turnOf: (name: string) => `Vez de ${name}`,
+    breakShot: 'Saída',
+    open: 'Mesa aberta',
+    rolling: 'Bolas rolando…',
+    hand: 'Bola na mão: arraste a branca',
+    handKitchen: 'Saída: arraste a branca atrás da linha',
+    groups: { solid: 'Lisas', stripe: 'Listradas' },
+    eight: 'Bola 8',
+    foul: {
+      scratch: 'Falta: a branca caiu.',
+      no_hit: 'Falta: a branca não tocou em nenhuma bola.',
+      wrong_ball: 'Falta: tocou primeiro na bola errada.',
+      no_rail: 'Falta: nenhuma bola caiu nem chegou à tabela.',
+    },
+    potted: (n: number) => (n === 1 ? 'Caiu 1 bola.' : `Caíram ${n} bolas.`),
+    youWon: 'Você venceu!',
+    won: (name: string) => `${name} venceu.`,
+    again: 'Nova partida',
+    rack: 'Arrumar as bolas de novo',
+    rackConfirm: 'Recomeçar agora?',
+    leave: 'Sair da mesa',
+    top: 'Ver de cima',
+    topOff: 'Voltar para trás do taco',
+    power: 'Força',
+    powerHint: 'Puxe para baixo e solte para tacar',
+    spin: 'Efeito',
+    spinHint: 'Onde o taco bate na bola. Dois cliques voltam ao centro.',
+    spinReset: 'Efeito no centro',
+    controls: 'Arraste para mirar · Shift ajuste fino · segure o botão direito (ou Espaço), puxe e solte para tacar',
+    controlsTop: 'Aponte com o mouse · segure o botão direito (ou Espaço), puxe e solte para tacar',
+    full: 'A mesa já tem dois jogadores.',
+    scoreboard: 'Placar da sinuca',
   },
 
   failed: {

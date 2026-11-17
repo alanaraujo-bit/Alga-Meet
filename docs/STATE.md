@@ -1,5 +1,19 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-16 — Sinuca no Alga Worlds — NO CÓDIGO, NÃO PUBLICADA
+- **Pedido do dono (2026-11-16):** interações de verdade dentro do mundo 3D, começando por uma mesa de sinuca
+  jogável entre amigos, "o melhor jogo de sinuca do mundo dentro do nosso Meet". Como funciona, o que foi medido e o
+  que falta: `docs/worlds-pool.md`.
+- **O que entrou:** peça `w_mesa_sinuca` (gratuita, categoria nova "Jogos", 4 panos) já colocada no Lounge; física
+  própria e determinística em `packages/shared/src/pool-physics.ts`; Bola 8 e protocolo em `pool.ts`; partidas no
+  servidor dentro de `apps/server/src/worlds.ts` (`world_pool_*` / `WORLD_POOL*`, `READY.worlds.pool`); mesa, bolas,
+  taco, mira, câmera, sons e HUD em `apps/desktop/src/renderer/src/features/worlds/pool/`; pose de tacada no manequim.
+- **Mudou junto:** os pontos de chegada do Lounge (`WORLD_SHELLS.lounge.spawns`) saíram do meio da sala, onde agora
+  está a mesa.
+- **Sem migração de banco.** Nada foi publicado: desktop continua 0.1.18 e a API de produção não tem este código
+  (regra do dono de 2026-11-16: nada vai para produção até ele dizer que está perfeito).
+- **Não verificado:** os sons (ninguém ouviu), a sensação de jogo com gente de verdade, e uma partida em produção.
+
 ## 2026-11-16 — SFU saiu do servidor de casa e roda no PC do dono (Windows, nativo) — NO AR
 - **Decisão do dono (2026-11-16):** não usar mais o servidor Ubuntu de casa; o PC principal (Windows 11 Pro) é o
   servidor de voz/tela. O dono desligou o servidor antigo por volta de 16:45 UTC, antes da virada; a voz ficou fora

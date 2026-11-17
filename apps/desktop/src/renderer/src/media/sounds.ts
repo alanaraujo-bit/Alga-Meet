@@ -23,6 +23,20 @@ export function setCueOutput(deviceId: string | null): void {
   if (c?.setSinkId) void c.setSinkId(deviceId && deviceId !== 'default' ? deviceId : '').catch(() => undefined)
 }
 
+/** The context the cues play on (made on first use, routed to the chosen output), for other small synthesized sounds. Null when audio is unavailable. */
+export function cueContext(): AudioContext | null {
+  try {
+    if (!ctx) {
+      ctx = new AudioContext({ latencyHint: 'interactive' })
+      setCueOutput(sink)
+    }
+    if (ctx.state === 'suspended') void ctx.resume()
+    return ctx
+  } catch {
+    return null
+  }
+}
+
 export function playCue(cue: Cue, volume = 0.18): void {
   play(CUES[cue], volume)
 }

@@ -24,6 +24,8 @@ do LiveKit, mesma voz, mesma transmissão de tela); o mundo só diz **onde** as 
   dançar, cruzar os braços, telefone, brindar, apontar), reações, e a **tela da sala**, que mostra a transmissão de tela
   de alguém da chamada. "Assistir à tela" leva a câmera para a frente dela.
 - **Quem fala gesticula** (o nível de voz vem do mesmo motor de mídia da chamada) e ganha um anel na cor das juntas.
+- **Sinuca:** o Lounge tem uma mesa de sinuca jogável (Bola 8, física própria, partida sincronizada pelo servidor), e
+  a peça pode ir para a sala pessoal. Tudo sobre ela em `docs/worlds-pool.md`.
 
 ## Como funciona
 ### Tempo real (gateway)
@@ -149,6 +151,8 @@ ponta com o mundo aberto (o mundo não toca na mídia, mas não foi exercitado j
 - O segundo corpo ainda mostra dois painéis pequenos no peito com a cor do acabamento por baixo da roupa.
 - **Não medido:** VRAM e fps com um jogo pesado aberto, GPUs integradas, sessão longa, 16 pessoas reais.
 - Áudio espacial (volume por distância): fora de propósito nesta entrega, para não tocar no motor de voz.
+- Interações com a sala além de sentar e da sinuca (ligar a TV com o controle, apagar a luminária, abrir a porta):
+  pedidas pelo dono em 2026-11-16 como direção; nada disso existe ainda.
 - Presentear e lista de desejos para itens de mundo; miniatura 3D na revelação.
 - Editar a sala **de dentro da chamada** (hoje o Ateliê é uma tela própria; quem está na sala vê a mudança ao salvar).
 - Mais ambientes (só `loft` e `lounge`), sala pessoal em mais de um formato, coleções sazonais.

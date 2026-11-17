@@ -5,18 +5,23 @@
 import { useEffect, useRef, useState } from 'react'
 import '@/styles/base.css'
 import {
-  ECO_ACCENTS, LOUNGE_ROOM, STARTER_ROOM, WORLD_GESTURES, WORLD_SHELLS, defaultWorldAvatar, roomSeats, spawnPose, worldEntries,
-  type WorldAvatar, type WorldRoomLayout,
+  ECO_ACCENTS, LOUNGE_ROOM, STARTER_ROOM, WORLD_GESTURES, WORLD_SHELLS, cueSpot, defaultWorldAvatar, newPool, poolJoin, poolLeave, poolRack, poolShoot,
+  roomSeats, spawnPose, worldEntries,
+  type PoolState, type WorldAvatar, type WorldRoomLayout,
 } from '@alga/shared'
 import { AssetPack } from './assets/pack'
 import { WorldEngine, type WorldPerson } from './engine/World'
 import type { QualityPref } from './engine/quality'
+import { PoolHud } from './pool/PoolHud'
+import type { PoolUi } from './pool/PoolRoom'
 import s from './worlds.module.css'
 
 const NAMES = ['Ana', 'Bruno', 'Carol', 'Davi', 'Elisa', 'Fábio', 'Gabi', 'Heitor', 'Íris', 'João', 'Lia', 'Marcos', 'Nina', 'Otto', 'Paula']
 const VIEWS: Record<string, [number, number, number, [number, number, number]?]> = {
   // yaw, pitch, distance, target
   wide: [Math.PI * 1.22, 0.3, 7.6, [0.4, 1.2, 0.2]],
+  pool: [Math.PI * 0.2, 0.42, 4.6, [-1.1, 0.8, -1.3]],
+  cloth: [Math.PI * 0.5, 0.5, 1.9, [-1.1, 0.83, -2.1]],
   sofa: [Math.PI * 1.5, 0.16, 3.4, [1.6, 1.0, 0.4]],
   window: [Math.PI * 1.02, 0.14, 6.5, [0, 1.3, 0.6]],
   table: [Math.PI * 0.72, 0.3, 4.2, [-3.0, 1.0, 1.6]],
@@ -77,6 +82,9 @@ export function WorldsLab() {
   const engine = useRef<WorldEngine | null>(null)
   const [stat, setStat] = useState('…')
   const [error, setError] = useState<string | null>(null)
+  const [poolUi, setPoolUi] = useState<PoolUi | null>(null)
+  const [poolShown, setPoolShown] = useState<Record<string, PoolState>>({})
+  const rack = useRef<(table: string) => void>(() => {})
   const q = new URLSearchParams(location.search)
   const [roomId, setRoomId] = useState(q.get('room') ?? 'starter')
   const [mood, setMood] = useState(q.get('mood') ?? 'hora_azul')
@@ -104,6 +112,29 @@ export function WorldsLab() {
       levels.set(i === 0 ? 'me' : `p${i}`, 0.5)
     }, 2600)
     const video = q.get('tv') === 'off' ? null : testVideo()
+    // Pool: the lab is its own server (the same shared rules), so a table can be played here. ?pool=match seats a
+    // second player, who shoots by itself at whatever ball it likes.
+    let pools: PoolState[] = []
+    const seed = (): number => Math.floor(Math.random() * 2 ** 32)
+    const tableOf = (table: string): PoolState => pools.find((p) => p.table === table) ?? newPool(table, seed())
+    // The scoreboard waits for the balls of a shot to stop, like the app's.
+    const show = (): void => setPoolShown(Object.fromEntries(pools.map((p) => [p.table, p])))
+    const put = (table: string, next: PoolState | null): void => {
+      const shot = !!next?.last && pools.find((p) => p.table === table)?.shot === next.shot - 1
+      pools = [...pools.filter((p) => p.table !== table), ...(next ? [next] : [])]
+      if (!shot) show()
+      world?.setPools(pools)
+      ;(window as unknown as { __pools: PoolState[] }).__pools = pools
+    }
+    const bot = (table: string): void => {
+      const st = tableOf(table)
+      if (dead || st.phase !== 'play' || st.players[st.turn] !== 'p1') return
+      const c = st.balls[0] ?? cueSpot(st.balls)
+      const targets = st.balls.flatMap((b, i) => (b && i > 0 ? [b] : []))
+      const t = targets[Math.floor(Math.random() * targets.length)] ?? [0, 0]
+      const r = poolShoot(st, 'p1', st.shot, { dx: t[0] - c[0] + (Math.random() - 0.5) * 0.03, dy: t[1] - c[1] + (Math.random() - 0.5) * 0.03, v: st.breaking ? 6.5 : 1.2 + Math.random() * 2.5, a: 0, b: 0, e: 0.05 }, st.hand ? [c[0], c[1]] : undefined)
+      if ('state' in r) put(table, r.state)
+    }
     void (async () => {
       try {
         await pack.open()
@@ -116,10 +147,38 @@ export function WorldsLab() {
             onSit: (seat) => { me.seat = seat; push() },
             onStand: (pose) => { me.seat = null; me.pose = pose; push() },
             onRest: () => { me.loop = null; push() },
+            pool: {
+              onJoin: (table) => {
+                let next = poolJoin(tableOf(table), 'me', seed())
+                if (next && q.get('pool') === 'match') next = poolJoin(next, 'p1', seed()) ?? next
+                if (next) put(table, next)
+              },
+              onLeave: (table) => {
+                const left = poolLeave(tableOf(table), 'me', seed())
+                if (left) put(table, left === 'empty' || q.get('pool') === 'match' ? null : left)
+              },
+              onShot: (table, n, shot, cue) => {
+                const r = poolShoot(tableOf(table), 'me', n, shot, cue)
+                if ('state' in r) put(table, r.state)
+                else console.warn('[lab] shot refused:', r.error)
+              },
+              onSettled: (table) => {
+                show()
+                setTimeout(() => bot(table), 1600)
+              },
+              onUi: (ui) => {
+                ;(window as unknown as { __poolUi: unknown }).__poolUi = ui
+                setPoolUi(ui)
+              },
+            },
           },
         })
         engine.current = world
         ;(window as unknown as { __world: WorldEngine }).__world = world
+        rack.current = (table) => {
+          const next = poolRack(tableOf(table), 'me', seed())
+          if (next) put(table, next)
+        }
         const base: WorldRoomLayout = roomId === 'lounge' ? LOUNGE_ROOM : STARTER_ROOM
         const layout: WorldRoomLayout = { ...base, finish: { ...base.finish, mood: `m_${mood}` } }
         const shell = WORLD_SHELLS[layout.shell]
@@ -172,6 +231,12 @@ export function WorldsLab() {
         <button onClick={() => engine.current?.emote('p1', { kind: 'reaction', id: '👏' })}>👏</button>
         <button onClick={() => engine.current?.setWatching(!engine.current.isWatching)}>assistir</button>
       </div>
+      {poolUi && (
+        <PoolHud
+          ui={poolUi} state={poolUi.table ? poolShown[poolUi.table] ?? null : null} meId="me" nameOf={(id) => (id === 'p1' ? NAMES[0]! : id)}
+          room={() => engine.current?.pool ?? null} onRack={(table) => rack.current(table)}
+        />
+      )}
       <div className={s.labStat}>{error ? `ERRO: ${error}` : stat}</div>
     </div>
   )
