@@ -8,8 +8,9 @@
 - **O que foi junto:** o admin (`feat/admin-app`, que já estava na `main` do GitHub e em produção desde o mesmo dia);
   a correção do microfone (`fc4d856`); o player de música com playlists, música anterior, mini player e janela
   flutuante (`c50625d`); a sinuca (`0a86095`, entrada logo abaixo e `docs/worlds-pool.md`).
-- **Ficou de fora, por decisão do dono:** o trabalho em andamento da sessão que investiga o gargalo do cinema
-  (`apps/desktop/src/renderer/src/features/cinema/swarm/*`), que segue sem commit no checkout principal.
+- **Ficou de fora, por decisão do dono:** o trabalho em andamento da sessão que investiga o gargalo do cinema, que
+  segue sem commit no checkout principal. Ele é maior que `features/cinema/swarm/*` (lista no fim desta entrada).
+  Conferido depois da release: nada dele está na `origin/main` nem na foto `refs/snapshots/main-2026-11-16`.
 - **Como foi juntado:** numa worktree (`.claude/worktrees/release`, branch `release/0.1.19`) a partir da
   `origin/main`, porque o checkout principal tinha outra sessão escrevendo nele. O trabalho sem commit do checkout
   principal foi fotografado num commit sem tocar a árvore (`refs/snapshots/main-2026-11-16`, `d89cadf`, só local) e
@@ -33,9 +34,20 @@
 - **`alga-setup-ui.exe` é o mesmo binário desde a 0.1.17** (sem Rust nesta máquina). As fontes da janela de
   instalação e o que ela importa não mudam desde `v0.1.18` (conferido por diff).
 - **O checkout principal ficou para trás de propósito:** `main` local em `0dd1613`, com o mesmo trabalho ainda sem
-  commit lá (agora ele está na `origin/main`) e com o cinema em andamento. Para acertar quando a sessão do cinema
-  terminar: guardar o diff de `features/cinema/swarm`, descartar o resto das mudanças locais, `git merge --ff-only
-  origin/main` e reaplicar o diff do cinema. Não fazer isso com a outra sessão escrevendo.
+  commit lá (agora ele está na `origin/main`) e com o cinema em andamento. **Não limpar nem descartar nada nesse
+  checkout sem a palavra do dono.** (Uma versão anterior desta entrada mandava guardar só `features/cinema/swarm` e
+  descartar o resto: estava errada, apagaria boa parte do cinema.) O trabalho do cinema está em:
+  - só dele: `apps/desktop/src/renderer/src/features/cinema/` inteiro, `apps/desktop/src/main/cinema/ipc.ts` e
+    `ipc.test.ts`, `packages/shared/src/cinema.ts` e `cinema.test.ts`, `apps/server/test/cinema.test.ts`,
+    `docs/benchmarks/cinema-engine-loss3-grow.json` (arquivo novo, sem rastreio);
+  - trechos pequenos em arquivos que também têm cópias velhas do que já foi publicado (reaplicar à mão por cima da
+    `origin/main`): `apps/desktop/src/shared/ipc.ts` (`cinemaDiag`), `apps/desktop/src/preload/index.ts` e
+    `apps/desktop/src/shared/bridge.ts` (`diag`), `apps/desktop/src/renderer/src/store/session.ts` e
+    `packages/shared/src/gateway.ts` (`cinemaLanes`), `apps/server/src/gateway/socket.ts`
+    (`cinemaLanes: CINEMA_MAX_LANES`), `docs/STATE.md` (entrada "2026-11-16 noite — Sala de Cinema travando").
+  A sessão do cinema guardou uma foto disso em `refs/snapshots/cinema-2026-11-16` (`519cfa7`, só local, sem os
+  arquivos sem rastreio) e propõe reaplicar só o cinema numa branch nova a partir da `origin/main`, numa worktree,
+  sem tocar o checkout principal. A lista acima veio dela e não foi conferida arquivo por arquivo aqui.
 - **Falta:** a nota da 0.1.19 no estúdio de Novidades (e as da 0.1.17 e 0.1.18).
 
 ## 2026-11-16 — Sinuca no Alga Worlds — publicada na 0.1.19
