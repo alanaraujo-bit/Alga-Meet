@@ -79,5 +79,6 @@ class Session(context: Context) {
 object Servers {
     /** The QA stack on the owner's PC, reached through "adb reverse tcp:4340 tcp:4340". */
     const val QA_USB = "http://127.0.0.1:4340"
-    const val PRODUCTION = "https://api.algameet.com"
+    /** The real API on Railway (service "api"); there is no custom domain yet. */
+    const val PRODUCTION = "https://api-staging-b3ea.up.railway.app"
 }
