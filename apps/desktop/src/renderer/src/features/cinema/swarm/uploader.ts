@@ -58,6 +58,11 @@ export class Pacer {
     return this.rate
   }
 
+  /** Backed off: some lane's RTT says a queue is building. */
+  get slowed(): boolean {
+    return this.baseBps > 0 && this.rate < this.baseBps
+  }
+
   /** ms until a prefetch piece may start. */
   waitMs(now = Date.now()): number {
     if (this.baseBps <= 0) return 0

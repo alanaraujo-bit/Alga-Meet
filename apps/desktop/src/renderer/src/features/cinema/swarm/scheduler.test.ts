@@ -64,6 +64,17 @@ describe('nextRequests', () => {
     expect(asked(lonely)).toEqual(['1@host', '2@host', '3@host']) // no friend holds them: the host, MAX_PEER_INFLIGHT at a time
   })
 
+  it('a starving seat takes its critical window from the fastest holder, host included, beyond HOST_NEAR_S; prefetch stays with the friend', () => {
+    const v = view({
+      starving: true,
+      index: new Map([['v', track(0, 10, 20, 30, 40, 50, 60)]]),
+      mine: new Map([['v', new Set([0])]]),
+      peers: [peer('host', 100, all(8), { isHost: true }), peer('p', 1, [1, 2, 3, 4, 5, 6, 7])],
+    })
+    // n1–n3 (0–30 s) are the critical window: the host is 100× faster. n4–n6 are prefetch: the friend holds them.
+    expect(asked(v)).toEqual(['1@host', '2@host', '3@host', '4@p', '5@p', '6@p'])
+  })
+
   it('never asks for pieces held, in flight, without a holder, or from a peer banned for them', () => {
     const v = view({
       index: new Map([['v', track(0, 10, 20, 30, 40)]]),

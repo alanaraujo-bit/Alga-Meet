@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { CINEMA_LANES, CINEMA_MAX_LANES } from '@alga/shared'
 import { z } from 'zod'
 
 /** apps/server — this file sits one level below it both in src/ and in the bundled dist/. */
@@ -98,6 +99,8 @@ const EnvSchema = z
     CINEMA_STUN_URLS: z.string().optional(),
     CINEMA_TURN_URLS: z.string().optional(),
     CINEMA_TURN_SECRET: z.string().min(1).optional(),
+    /** Lanes a cinema pair may grow to on a lossy network (READY's `cinemaLanes`). 3 turns the growth off without a release. */
+    CINEMA_MAX_LANES: z.coerce.number().int().min(CINEMA_LANES).max(CINEMA_MAX_LANES).optional(),
     /** Alga Worlds (src/worlds.ts). Default: on outside production, like the Sala de Cinema; production turns it on with WORLDS=true. */
     WORLDS: z.enum(['true', 'false', '1', '0']).optional().transform((v) => (v === undefined ? undefined : v === 'true' || v === '1')),
     /** Where clients fetch the 3D asset pack from: a CDN (absolute https URL). Default: this API's own /api/v1/worlds/assets. */
@@ -210,7 +213,7 @@ export interface Config {
   metricsToken: string | undefined
   /** src/e2ee.ts. `dsSeed`: Ed25519 seed of the Delivery Service's external-sender key. */
   e2ee: { dsSeed: Buffer; mlsPkg: string }
-  cinema: { enabled: boolean; stunUrls: string[]; turnUrls: string[]; turnSecret: string | undefined }
+  cinema: { enabled: boolean; stunUrls: string[]; turnUrls: string[]; turnSecret: string | undefined; maxLanes: number }
   /**
    * src/worlds.ts. `assetsUrl`: what READY.worlds tells clients (no trailing slash; a relative value is resolved against
    * the API origin). `assetsDir`: the pack this server serves at GET /worlds/assets/*.
@@ -310,6 +313,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     cinema: {
       enabled: e.CINEMA ?? e.NODE_ENV !== 'production',
       stunUrls: urlList(e.CINEMA_STUN_URLS), turnUrls: urlList(e.CINEMA_TURN_URLS), turnSecret: e.CINEMA_TURN_SECRET,
+      maxLanes: e.CINEMA_MAX_LANES ?? CINEMA_MAX_LANES,
     },
     worlds: {
       enabled: e.WORLDS ?? e.NODE_ENV !== 'production',

@@ -31,6 +31,8 @@ vi.mock('./swarm/swarm', () => ({
     aheadS = (_track?: string) => 0
     recvMbps = (): number | null => null
     setCriticalS = vi.fn()
+    setStarving = vi.fn()
+    congested = (_peer: string) => false
     addLane = vi.fn()
     removeLane = vi.fn()
     setRtt = vi.fn()
@@ -58,6 +60,8 @@ vi.mock('./mesh', () => ({
     onPeerGone = () => () => undefined
     onRtt = () => () => undefined
     relayed = () => []
+    paths = () => [{ peer: '0190a0a0-aaaa-7000-8000-000000000001', lane: 0, path: 'udp host→host teredo', rttMs: 54, upMbps: 0, downMbps: 3.44 }]
+    grow = vi.fn((_peer: string) => true)
     close = vi.fn()
     constructor(readonly opts: unknown) {
       engine.meshes.push(this)
@@ -94,6 +98,7 @@ const bridge = {
   ensure: vi.fn(),
   setPlayhead: vi.fn(),
   piece: vi.fn(async () => null),
+  diag: vi.fn(),
   close: vi.fn(async () => undefined),
   onPieces: vi.fn((cb: (e: { fileId: string; track: string; from: number; items: CinemaPieceMeta[] }) => void) => ((bridge.emitPieces = cb), () => undefined)),
   onError: vi.fn(() => () => undefined),
@@ -101,7 +106,7 @@ const bridge = {
 }
 vi.stubGlobal('window', { alga: { cinema: bridge, e2ee: { cinemaTag: async () => null } } })
 
-const { handleCinemaDispatch, onMediaChange, useCinema, resetCinema, attachVideo, detachVideo, readyAheadS, extraPiece, startCinema } = await import('./store')
+const { handleCinemaDispatch, onMediaChange, useCinema, resetCinema, attachVideo, detachVideo, readyAheadS, waitTargetS, diagLine, extraPiece, startCinema } = await import('./store')
 const { useMedia } = await import('@/media/store')
 const { cancelDraft, chooseEpisode, openFromFile, openSession } = await import('./actions')
 const { t } = await import('./strings')
@@ -609,6 +614,21 @@ describe('adaptive pre-roll (poor networks start later instead of stalling again
     expect(readyAheadS({ ...base, recvMbps: 1, leftS: -1 })).toBe(0)
   })
 
+  it('diagLine never exceeds what main accepts (2000 chars), however many lanes a full room has', () => {
+    const paths = Array.from({ length: 56 }, (_, i) => ({ peer: `0190a0a0-0000-7000-8000-0000000000${10 + (i % 7)}`, lane: i % 8, path: 'udp srflx→srflx ipv4', rttMs: 60, upMbps: 1.1, downMbps: 0 }))
+    const st = { cache: null, clock: { offsetMs: 0, rttMs: 20 }, swarm: null, player: null, relayed: [], paths, driftMs: null, roomS: 10, videoS: null, audioTrack: null }
+    const line = diagLine('tick', st, [], { status: 'ready', aheadS: 40, recvMbps: 9 }, [])
+    expect(line.length).toBeLessThanOrEqual(2000)
+    expect(line.startsWith('tick pos=10s me=ready')).toBe(true)
+  })
+
+  it('waitTargetS: what the waiting screen counts to: 10 s, or the 60 s pre-roll once a seat is past 10 s and still not back', () => {
+    expect(waitTargetS(0)).toBe(10)
+    expect(waitTargetS(9.9)).toBe(10)
+    expect(waitTargetS(10)).toBe(60)
+    expect(waitTargetS(45)).toBe(60)
+  })
+
   const el = { currentTime: 100 } as HTMLVideoElement
   const lastStatus = () => (sent.filter((f) => f.op === 'cinema_status').at(-1) as { status?: string } | undefined)?.status
   const seated = async (ahead: number, mbps: number | null) => {
@@ -641,6 +661,71 @@ describe('adaptive pre-roll (poor networks start later instead of stalling again
     await seated(3, 40)
     await vi.advanceTimersByTimeAsync(600)
     expect(lastStatus()).toBe('ready')
+  })
+
+  it('tells the swarm the seat is starving while it is not ready or holds under 10 s ahead, and not once it is comfortable', async () => {
+    const s = await seated(2, 40) // good network, 2 s ahead: still preparing
+    await vi.advanceTimersByTimeAsync(600)
+    expect(lastStatus()).toBe('preparing')
+    expect(s.setStarving).toHaveBeenLastCalledWith(true)
+    s.aheadS = () => 5 // ready, but one hiccup away from a stall
+    await vi.advanceTimersByTimeAsync(600)
+    expect(lastStatus()).toBe('ready')
+    expect(s.setStarving).toHaveBeenLastCalledWith(true)
+    s.aheadS = () => 40
+    await vi.advanceTimersByTimeAsync(600)
+    expect(s.setStarving).toHaveBeenLastCalledWith(false)
+  })
+
+  it('more lanes: a seat still not ready after 8 s gets one more lane per pair every 4 s; none on a congested pair or once it is ready', async () => {
+    const s = await seated(2, 4) // poor network: I stay preparing
+    const mesh = engine.meshes.at(-1)
+    await vi.advanceTimersByTimeAsync(7_000)
+    expect(mesh.grow).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1_500)
+    expect(mesh.grow.mock.calls).toEqual([['ana']]) // my pair with the only other seat
+    await vi.advanceTimersByTimeAsync(4_000)
+    expect(mesh.grow).toHaveBeenCalledTimes(2)
+    s.congested = () => true // a queue is building: more lanes would only make it worse
+    await vi.advanceTimersByTimeAsync(8_000)
+    expect(mesh.grow).toHaveBeenCalledTimes(2)
+    s.congested = () => false
+    s.aheadS = () => 40 // ready: nobody in the room is short of film
+    await vi.advanceTimersByTimeAsync(600)
+    expect(lastStatus()).toBe('ready')
+    mesh.grow.mockClear()
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(mesh.grow).not.toHaveBeenCalled()
+  })
+
+  it('more lanes: another seat the room waits on grows my pair with it, not my pairs with the seats that are fine', async () => {
+    const s = await seated(40, 40) // I am fine
+    const mesh = engine.meshes.at(-1)
+    const seats = [{ userId: 'ana', status: 'ready', aheadS: 99, direct: true }, { userId: 'me', status: 'ready', aheadS: 40, direct: true }, { userId: 'bia', status: 'stalled', aheadS: 0, direct: true }, { userId: 'caio', status: 'stalled', aheadS: 0, direct: false }]
+    dispatch({ t: 'CINEMA_STATE', d: view({ seats: seats as CinemaSessionView['seats'] }) })
+    await vi.advanceTimersByTimeAsync(9_000)
+    expect(mesh.grow.mock.calls).toEqual([['bia']]) // not ana (fine), not caio (no direct connection)
+    expect(s.setStarving).toHaveBeenLastCalledWith(false)
+  })
+
+  it('logs one diagnostic line when the seat\'s state changes and every 30 s: route and rates, ids cut short, no address', async () => {
+    bridge.diag.mockClear()
+    const s = await seated(2, 4)
+    await vi.advanceTimersByTimeAsync(600)
+    expect(bridge.diag).toHaveBeenCalledTimes(1)
+    const line = bridge.diag.mock.calls[0]![0] as string
+    expect(line).toContain('me=preparing ahead=2s recv=4Mbps')
+    expect(line).toContain('00000001 L0 udp host→host teredo 54ms ↑0 ↓3.4') // the id's tail: a UUIDv7's head is its timestamp
+    expect(line).toContain('seats ana:ready:0 me:preparing:0')
+    expect(line).not.toContain('0190a0a0-aaaa')
+    await vi.advanceTimersByTimeAsync(10_000) // nothing changed: quiet
+    expect(bridge.diag).toHaveBeenCalledTimes(1)
+    s.aheadS = () => 40
+    await vi.advanceTimersByTimeAsync(600) // ready now
+    expect(bridge.diag).toHaveBeenCalledTimes(2)
+    expect(bridge.diag.mock.calls[1]![0]).toContain('me=ready')
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(bridge.diag).toHaveBeenCalledTimes(3)
   })
 
   it('after a stall on a poor network: stays stalled until 60 s ahead (the swarm fetches 60 s as critical), then ready', async () => {

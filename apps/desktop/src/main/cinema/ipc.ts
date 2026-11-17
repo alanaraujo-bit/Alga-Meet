@@ -207,6 +207,8 @@ export function registerCinemaIpc(): void {
   on(IPC.cinemaEnsure, (id, t, at) => factory(id).ensure(track(t), seconds(at)))
   on(IPC.cinemaAddAudio, (id, a) => factory(id).addAudio(int(a, 0, 999)))
   on(IPC.cinemaSetPlayhead, (id, s) => factory(id).setPlayhead(seconds(s)))
+  // What a seat's engine saw (state, routes, rates): the only record of a stall once the session is over.
+  on(IPC.cinemaDiag, (line) => log.info('[cinema]', str(line, 2000).replace(/[\r\n]+/g, ' ')))
 
   handle(IPC.cinemaAddSubtitle, async (id) => {
     const f = factory(id)

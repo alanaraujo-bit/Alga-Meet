@@ -389,6 +389,8 @@ export function StatsPanel({ names, children }: { names: Record<string, string>;
     [t.stats.clock, `offset ${ms(stats?.clock.offsetMs, 1)} · RTT ${stats?.clock.rttMs ?? '—'} ms`],
     [t.stats.pieces, sw ? `${t.stats.fromHost} ${Math.round(sw.fromHostPct)}% · ${t.stats.fromPeers} ${Math.round(sw.fromPeersPct)}% · ↓ ${n1(sw.downMbps)} ↑ ${n1(sw.upMbps)} Mbps · ${sw.peers} ${t.stats.peers} (${sw.lanes} ${t.stats.lanes})` : '—'],
     [t.stats.relay, stats?.relayed.length ? stats.relayed.map((id) => names[id] ?? id).join(', ') : t.stats.none],
+    // the route each connection took (direct, Teredo tunnel, VPN, relay) and what it carries: where a slow seat shows
+    [t.stats.paths, stats?.paths.length ? stats.paths.map((p) => `${names[p.peer] ?? '?'} ${p.lane + 1}: ${p.path} · ${p.rttMs ?? '—'} ms · ↑ ${n1(p.upMbps)} ↓ ${n1(p.downMbps)}`).join(' | ') : t.stats.none],
     [t.stats.cache, stats?.cache ? `${stats.cache.kind.toUpperCase()} · ${n1(stats.cache.capGB)} GB` : '—'],
     [t.stats.audio, stats?.audioTrack ?? '—'],
     [t.stats.seats, session.seats.map((x) => `${names[x.userId] ?? '?'}: ${t.stage.status[x.status]} ${n1(x.aheadS)} s${x.direct ? '' : t.relay}`).join(' · ')],

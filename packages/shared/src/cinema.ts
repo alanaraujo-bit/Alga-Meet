@@ -40,6 +40,12 @@ export const CINEMA_CHAT_RATE = { perSecond: 0.5, burst: 4 } as const
 export const CINEMA_TURN_TTL_S = 21_600
 /** RTCPeerConnections per pair of seats: one SCTP association each, since loss and a bloated queue cap each one's rate (§6.4). */
 export const CINEMA_LANES = 3
+/**
+ * Most lanes a pair may grow to while a seat is short of film on a network that loses packets (measured 2026-11-16:
+ * ~3 % loss held each association near 1.1 Mbps, 3.4 Mbps a friend, under the film's rate). READY's `cinemaLanes`
+ * tells a client the server relays signals up to this lane; an older server closes the socket on a lane ≥ 3.
+ */
+export const CINEMA_MAX_LANES = 8
 
 const MAX_PIECE_BYTES = 64 * 1024 * 1024
 const MAX_SDP_CHARS = 12_000
@@ -94,7 +100,7 @@ export interface CinemaSessionView {
 export interface CinemaSummary { watchedS: number; seats: string[]; reactions: number; peak: { position: number; count: number } | null }
 export type CinemaEndReason = 'host_ended' | 'host_left' | 'moderator' | 'call_empty' | 'channel_gone'
 export type CinemaErrorReason = 'disabled' | 'not_in_call' | 'forbidden' | 'exists' | 'full' | 'not_found' | 'locked' | 'stale' | 'not_seated' | 'invalid'
-/** `lane`: which of the pair's CINEMA_LANES connections the signal is for (absent = 0). */
+/** `lane`: which of the pair's connections (up to CINEMA_MAX_LANES) the signal is for (absent = 0). */
 export type CinemaSignal =
   | { kind: 'offer' | 'answer'; sdp: string; tag?: string; epoch?: number; lane?: number }
   | { kind: 'ice'; candidates: string[]; lane?: number }
@@ -147,7 +153,7 @@ const PieceMetaSchema = z.tuple([
   z.number().int().min(1).max(MAX_PIECE_BYTES),
   z.string().regex(/^[0-9a-f]{64}$/, 'sha256 hex'),
 ])
-const lane = z.number().int().min(0).max(CINEMA_LANES - 1).optional()
+const lane = z.number().int().min(0).max(CINEMA_MAX_LANES - 1).optional()
 const SignalSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.enum(['offer', 'answer']), sdp: z.string().max(MAX_SDP_CHARS), tag: text(64).optional(), epoch: nonNegInt.optional(), lane }),
   z.object({ kind: z.literal('ice'), candidates: z.array(text(512)).max(MAX_ICE_CANDIDATES), lane }),

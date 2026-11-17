@@ -402,19 +402,53 @@ describe('Swarm', () => {
     expect(r.done).toEqual([4, 4])
   })
 
-  it('super-seed holds for urgent requests too: a piece another friend gets is turned down until it is near the playhead', async () => {
-    const f = await film(6)
+  it('super-seed holds for urgent requests while the host is busy with another seat\'s urgent upload, until the piece is near the playhead', async () => {
+    const f = await film(6, 1_000_000)
     const h = host(f)
     const r1 = raw(h, 'R1', f), r2 = raw(h, 'R2', f)
     const req = (r: Raw, n: number) => r.ch.send(encode({ t: 'req', track: 'v', n, v: ver(f, n), urgent: true }))
+    r1.side.hold = true // R1's link is slow: its urgent upload stays in the host's queue
     req(r1, 3) // n3 = 20–30 s: in everyone's critical window, ≥ HOST_NEAR_S ahead of 0
-    await until(() => r1.done.includes(3))
+    await until(() => r1.side.payload > 0)
     req(r2, 3)
     await until(() => r2.msgs.some((m) => m.t === 'none' && m.n === 3))
     h.setPlayhead(12) // n3 now starts 8 s ahead: a copy through R1 might come too late
     req(r2, 3)
     await until(() => r2.done.includes(3))
   })
+
+  it('an idle host serves an urgent request for a piece another friend already holds (its uplink has nothing better to do)', async () => {
+    const f = await film(6)
+    const h = host(f)
+    const r1 = raw(h, 'R1', f), r2 = raw(h, 'R2', f)
+    const req = (r: Raw, n: number, urgent: boolean) => r.ch.send(encode({ t: 'req', track: 'v', n, v: ver(f, n), urgent }))
+    req(r1, 3, true)
+    await until(() => r1.done.includes(3)) // R1 holds n3 (20–30 s ahead of the room) and the host is idle again
+    req(r2, 4, false)
+    await until(() => r2.done.includes(4))
+    req(r1, 4, false) // prefetch is still super-seeded: R2 holds n4
+    await until(() => r1.msgs.some((m) => m.t === 'none' && m.n === 4))
+    req(r2, 3, true) // urgent: R2 cannot wait for a copy through R1
+    await until(() => r2.done.includes(3))
+  })
+
+  it('a starving seat fills its pre-roll from the idle host when the friend that holds the pieces is slow', async () => {
+    fakeClock()
+    const f = await film(8)
+    const h = host(f), a = friend(f)
+    raw(h, 'S', f).ch.send(encode(haveAll(f))) // the host knows friend S holds the whole film
+    a.setCriticalS(60)
+    a.setStarving(true) // the room is waiting for A
+    const got = count(a)
+    const s = raw(a, 'S', f, (m, r) => r.serve(m.n, m.v, { chunks: 1 })) // S trickles: one chunk of each piece, then nothing
+    s.ch.send(encode(haveAll(f)))
+    await until(() => s.reqs.length >= 3)
+    connect(h, 'H', a, 'A')
+    await until(() => [4, 5, 6].every((n) => got.has(n)), 15_000) // what S was not asked yet comes from the host at once
+    vi.advanceTimersByTime(3_000) // pieces stuck on S made no progress for 2 s: moved to the host
+    await until(() => [1, 2, 3, 4, 5, 6].every((n) => got.has(n)), 15_000) // 0–60 s held, long before the 15 s timeout (fake clock)
+    expect(a.aheadS('v')).toBeGreaterThanOrEqual(60)
+  }, 40_000) // real-time waits on I/O: generous, the suite may share the CPU
 
   it('a prefetch with no byte yet that enters the critical window is asked again as urgent (cancel, then req)', async () => {
     fakeClock()

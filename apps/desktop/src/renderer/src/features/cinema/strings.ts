@@ -119,6 +119,7 @@ export const t = {
     peers: 'pares',
     lanes: 'conexões',
     relay: 'Relay',
+    paths: 'Rotas',
     none: 'nenhum',
     cache: 'Cache',
     audio: 'Faixa de áudio',
@@ -264,6 +265,7 @@ export const t = {
   waiting: {
     title: (name: string) => `Esperando ${name}`,
     sub: (ahead: number) => `A conexão oscilou. A sala volta sozinha com ${ahead} s carregados à frente.`,
+    subSlow: (name: string, ahead: number) => `A conexão de ${name} está lenta para este trecho. A sala volta sozinha com ${ahead} s carregados, para não travar de novo.`,
     progress: (n: number, of: number) => `${n} de ${of} s`,
     continueWithout: (name: string) => `Continuar sem ${name}`,
     loading: 'Carregando para todos…',

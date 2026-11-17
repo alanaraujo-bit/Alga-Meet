@@ -81,6 +81,7 @@ export async function buildReady(ctx: Ctx, user: UserRow): Promise<ReadyPayload>
     users: strangers.map(publicUser),
     heartbeatIntervalMs: config.heartbeatIntervalMs,
     cinema: config.cinema.enabled,
+    cinemaLanes: config.cinema.maxLanes,
     music: true,
     musicPlaylists: true,
     ...(config.worlds.enabled ? { worlds: { assetsUrl: config.worlds.assetsUrl, pool: true } } : {}),

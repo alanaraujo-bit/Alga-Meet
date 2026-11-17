@@ -1,7 +1,7 @@
 // Sala de Cinema, client side (spec §6): the session as the gateway reports it (CINEMA_*), and while I sit, the engine —
 // clock, swarm, mesh, player, film audio — wired together. The dev stage (CinemaDev) renders this; Plan 2 swaps the UI.
 import {
-  CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME, CINEMA_READY_TIMEOUT_MS, CINEMA_SEEK_READY_S, CINEMA_STATUS_INTERVAL_MS, positionAt,
+  CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME, CINEMA_READY_TIMEOUT_MS, CINEMA_RESUME_AHEAD_S, CINEMA_SEEK_READY_S, CINEMA_STATUS_INTERVAL_MS, positionAt,
   type CinemaClientFrame, type CinemaEndReason, type CinemaFilm, type CinemaPieceMeta, type CinemaSeat, type CinemaSessionView,
   type CinemaSignal, type CinemaSummary, type CinemaTrackId, type Dispatch, type DispatchOf,
 } from '@alga/shared'
@@ -18,6 +18,7 @@ import { CinemaPlayer, canPlay } from './player'
 import { t } from './strings'
 import { parseManifest, parseVtt, type Cue } from './subtitles'
 import { clearStaleOpfs, createPieceCache } from './swarm/cache'
+import { HOST_NEAR_S } from './swarm/scheduler'
 import { Swarm } from './swarm/swarm'
 
 type Status = CinemaSeat['status']
@@ -65,6 +66,8 @@ export interface CinemaStats {
   swarm: ReturnType<Swarm['stats']> | null
   player: ReturnType<CinemaPlayer['stats']> | null
   relayed: string[]
+  /** Each open lane's selected route (direct, Teredo, VPN, relay), RTT and throughput. */
+  paths: ReturnType<Mesh['paths']>
   /** Video position − the room's position at the same instant (ms; + = ahead). */
   driftMs: number | null
   roomS: number
@@ -154,6 +157,12 @@ interface Engine {
   pendingAudio: number | null
   sentStatus: Status | null
   sentAt: number
+  /** What the last diagnostic line described, and when (main.log gets one per change, else one every DIAG_EVERY_MS). */
+  diagKey: string
+  diagAt: number
+  /** Since when each seat has been short of film, and when each of my pairs last got a lane (growLanes). */
+  shortSince: Map<string, number>
+  grewAt: Map<string, number>
   closed: boolean
 }
 
@@ -218,7 +227,7 @@ function createEngine(v: CinemaSessionView): void {
     sessionId: v.sessionId, hostId: v.hostId, isHost, film: v.film, swarm: null, mesh: null, player: null, earlyPieces: [], earlySignals: [],
     offs: [], timer: setInterval(() => tick(e), 500), stalled: false, unsupported: false, e2eeFailed: false,
     arrivingUntil: v.playback.playing ? Date.now() + CINEMA_READY_TIMEOUT_MS : 0, everReady: false, afterStall: false, checked: false, pendingAudio: null, sentStatus: null,
-    sentAt: 0, closed: false,
+    sentAt: 0, diagKey: '', diagAt: 0, shortSince: new Map(), grewAt: new Map(), closed: false,
   }
   eng = e
   const def = v.film.audio.find((a) => a.default) ?? v.film.audio[0]
@@ -282,6 +291,8 @@ function createMesh(e: Engine, v: CinemaSessionView, e2ee: boolean): void {
     // the MLS epoch changes on every join/leave: read it when a description is sent
     e2ee: e2ee ? { epoch: () => useMedia.getState().e2ee.epoch ?? 0 } : null,
     send,
+    // an older server closes the socket on a lane past the first three: grow only where READY says it relays them
+    maxLanes: useSession.getState().cinemaLanes,
   })
   e.mesh = mesh
   e.offs.push(
@@ -390,6 +401,12 @@ export function readyAheadS(o: { isHost: boolean; recvMbps: number | null; bitra
   return Math.max(0, Math.min(need, o.leftS))
 }
 
+/**
+ * What the waiting screen counts to for a seat holding `aheadS`: the player's CINEMA_RESUME_AHEAD_S, or, once the seat
+ * is past it and the room still waits, the long pre-roll of a slow connection (the seat's own need is not broadcast).
+ */
+export const waitTargetS = (aheadS: number): number => (aheadS >= CINEMA_RESUME_AHEAD_S ? POOR_RESUME_S : CINEMA_RESUME_AHEAD_S)
+
 /** A late joiner is still joining for CINEMA_READY_TIMEOUT_MS after sitting, and until it has been `ready` once. */
 const arriving = (e: Engine): boolean => e.arrivingUntil > 0 && (Date.now() < e.arrivingUntil || !e.everReady)
 
@@ -423,6 +440,8 @@ function statusNow(e: Engine): Status {
 function pushStatus(e: Engine): void {
   if (e.closed || !e.swarm) return
   const status = statusNow(e)
+  // not ready, or one hiccup away from a stall: the swarm takes the fastest source instead of sparing the host's uplink
+  if (!e.isHost) e.swarm.setStarving(status !== 'ready' || aheadS(e) < Math.min(HOST_NEAR_S, e.film.durationS - playheadS(e) - 0.5))
   const now = Date.now()
   if (status === e.sentStatus && now - e.sentAt < CINEMA_STATUS_INTERVAL_MS) return
   const ahead = Math.max(0, Math.round(aheadS(e) * 10) / 10)
@@ -449,7 +468,75 @@ function tick(e: Engine): void {
   // The host's factory follows the room (pieces behind it may go for the disk budget).
   if (e.isHost && hostFile?.sessionId === e.sessionId) window.alga.cinema.setPlayhead(hostFile.fileId, Math.max(0, playheadS(e)))
   pushStatus(e)
+  growLanes(e)
+  diag(e)
   if (useCinema.getState().statsOpen) useCinema.setState({ stats: cinemaStats() })
+}
+
+/** A seat short of film this long gets more lanes; then one more lane per pair this often, while it stays short. */
+export const GROW_AFTER_MS = 8_000
+export const GROW_EVERY_MS = 4_000
+
+/**
+ * Packet loss caps each lane (an SCTP association) however fat the link is: a seat that stays short of film gets more
+ * lanes on its pairs, one at a time, unless the path's RTT says a queue is building (then it is the link, and more lanes
+ * would only feed the queue). Both ends see the same seats; the pair's offerer opens the lane (mesh.grow).
+ */
+function growLanes(e: Engine): void {
+  const s = useCinema.getState().session
+  const me = meId()
+  if (!s || !e.mesh || !e.swarm || !me) return
+  const now = Date.now()
+  const short = (id: string, status: Status | null): boolean => {
+    if (status !== 'stalled' && status !== 'preparing') {
+      e.shortSince.delete(id)
+      return false
+    }
+    if (!e.shortSince.has(id)) e.shortSince.set(id, now)
+    return now - e.shortSince.get(id)! >= GROW_AFTER_MS
+  }
+  const mine = !e.isHost && short(me, e.sentStatus)
+  for (const seat of s.seats) {
+    if (seat.userId === me) continue
+    const theirs = seat.userId !== e.hostId && short(seat.userId, seat.status)
+    if (!seat.direct || !(mine || theirs)) continue
+    if (now - (e.grewAt.get(seat.userId) ?? -Infinity) < GROW_EVERY_MS || e.swarm.congested(seat.userId)) continue
+    if (e.mesh.grow(seat.userId)) e.grewAt.set(seat.userId, now)
+  }
+}
+
+const DIAG_EVERY_MS = 30_000
+const r1 = (v: number): number => Math.round(v * 10) / 10
+/** The id's tail: the head of a UUIDv7 is its timestamp, the same for accounts made in the same minute. */
+const id8 = (id: string): string => id.slice(-8)
+
+/**
+ * One line of what this seat's engine sees, for main.log: its state, where the film came from, each lane's route and
+ * rate, every seat. Ids are cut to their last 8 characters; never an address or a name.
+ */
+export function diagLine(why: string, st: CinemaStats, seats: CinemaSeat[], me: { status: string; aheadS: number; recvMbps: number | null }, waitingFor: string[]): string {
+  const sw = st.swarm
+  return [
+    `${why} pos=${Math.round(st.roomS)}s me=${me.status} ahead=${r1(me.aheadS)}s recv=${me.recvMbps === null ? '?' : r1(me.recvMbps)}Mbps`,
+    sw ? `swarm host=${Math.round(sw.fromHostPct)}% peers=${Math.round(sw.fromPeersPct)}% ↓${r1(sw.downMbps)} ↑${r1(sw.upMbps)} n=${sw.peers}/${sw.lanes}` : 'swarm -',
+    st.paths.length ? st.paths.map((p) => `${id8(p.peer)} L${p.lane} ${p.path} ${p.rttMs ?? '?'}ms ↑${r1(p.upMbps)} ↓${r1(p.downMbps)}`).join('; ') : 'no lanes',
+    `seats ${seats.map((x) => `${id8(x.userId)}:${x.status}:${r1(x.aheadS)}`).join(' ')}`,
+    ...(waitingFor.length ? [`waiting ${waitingFor.map(id8).join(',')}`] : []),
+  ].join(' | ').slice(0, 2000) // main rejects more (a full room at 8 lanes a pair lists 56 lanes)
+}
+
+/** A stall leaves no trace once the session is over: main.log gets a line on every change of state, else every 30 s. */
+function diag(e: Engine): void {
+  const s = useCinema.getState().session
+  if (!s || !e.sentStatus) return
+  const waitingFor = s.playback.reason === 'waiting' ? s.playback.waitingFor : []
+  const key = `${e.sentStatus}|${s.playback.playing}|${waitingFor.join(',')}`
+  const now = Date.now()
+  if (key === e.diagKey && now - e.diagAt < DIAG_EVERY_MS) return
+  const why = key === e.diagKey ? 'tick' : 'change'
+  e.diagKey = key
+  e.diagAt = now
+  window.alga.cinema.diag(diagLine(why, cinemaStats(), s.seats, { status: e.sentStatus, aheadS: aheadS(e), recvMbps: e.swarm?.recvMbps() ?? null }, waitingFor))
 }
 
 // ---- subtitles ----------------------------------------------------------------------------------------------------------
@@ -876,6 +963,7 @@ export function cinemaStats(): CinemaStats {
     swarm: e?.swarm?.stats() ?? null,
     player: e?.player?.stats() ?? null,
     relayed: e?.mesh?.relayed() ?? [],
+    paths: e?.mesh?.paths() ?? [],
     // the player runs ahead of the room by the audio output latency (R28), so compare at now + latency
     driftMs: v === null ? null : Math.round((v - positionAt(useCinema.getState().session!.playback, clock.serverNow() + lat, e!.film.durationS)) * 1000),
     roomS: room,

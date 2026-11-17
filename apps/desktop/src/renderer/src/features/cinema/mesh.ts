@@ -1,4 +1,4 @@
-import { CINEMA_LANES, type CinemaClientFrame, type CinemaIceServer, type CinemaSeat, type CinemaSignal } from '@alga/shared'
+import { CINEMA_LANES, CINEMA_MAX_LANES, type CinemaClientFrame, type CinemaIceServer, type CinemaSeat, type CinemaSignal } from '@alga/shared'
 
 const MAX_RETRIES = 2
 const RELAY_REFRESH_MS = 3000
@@ -70,6 +70,19 @@ export function fingerprintOf(sdp: string): string | null {
   return seen.size === 1 ? ([...seen][0] ?? null) : null
 }
 
+type IceEnd = { candidateType?: string; protocol?: string; address?: string; networkType?: string } | undefined
+/** 2001:0::/32: the Windows Teredo tunnel (IPv6 inside UDP). */
+const TEREDO = /^2001:0{1,4}:/
+/**
+ * The selected candidate pair in words, for diagnostics (never an address): `udp srflx→srflx ipv4`. `teredo` when either
+ * end rides the Windows IPv6 tunnel (as host candidates they outrank the direct IPv4 route); ` vpn` for a VPN adapter.
+ */
+export function pathOf(local: IceEnd, remote: IceEnd): string {
+  const addrs = [local?.address, remote?.address].filter((a): a is string => !!a && !a.endsWith('.local'))
+  const net = addrs.some((a) => TEREDO.test(a)) ? 'teredo' : !addrs[0] ? '?' : addrs[0].includes(':') ? 'ipv6' : 'ipv4'
+  return `${local?.protocol ?? '?'} ${local?.candidateType ?? '?'}→${remote?.candidateType ?? '?'} ${net}${local?.networkType === 'vpn' ? ' vpn' : ''}`
+}
+
 const BUFFER_PEERS = 8
 const BUFFER_PER_PEER = 50
 const BUFFER_TTL_MS = 10_000
@@ -120,12 +133,21 @@ interface Lane {
   timer: ReturnType<typeof setTimeout> | null
   /** getStats totals at the last refresh (RTT over the interval). */
   rtt: { responses: number; total: number }
+  /** Diagnostics from the selected pair: its route, RTT and the byte counters at the last refresh (rates over the interval). */
+  path: string | null
+  rttMs: number | null
+  io: { at: number; sent: number; recv: number } | null
+  upMbps: number
+  downMbps: number
   /** Messages that came before the lane was announced (the remote saw it open first), replayed in order then. */
   held: [RTCDataChannel, MessageEvent][]
 }
 
-/** A peer: up to CINEMA_LANES connections. It stays while any lane is opening or open. */
-interface Pair { offerer: boolean; lanes: Map<number, Lane>; staggered: boolean; stagger: ReturnType<typeof setTimeout>[] }
+/**
+ * A peer: CINEMA_LANES connections, more when grown (grow()). It stays while any lane is opening or open. `top`: the
+ * highest lane opened so far; `noGrow`: a grown lane never connected (the other side answers its first lanes only).
+ */
+interface Pair { offerer: boolean; lanes: Map<number, Lane>; staggered: boolean; stagger: ReturnType<typeof setTimeout>[]; top: number; noGrow: boolean }
 
 type TagFn = (channelId: string, epoch: number, message: string) => Promise<string | null>
 type LaneCb = (peerId: string, lane: number, ctl: RTCDataChannel, bulk: RTCDataChannel) => void
@@ -158,6 +180,8 @@ export class Mesh {
     cinemaTag?: TagFn
     /** Connections per pair (default and maximum CINEMA_LANES). */
     lanes?: number
+    /** Lanes a pair may grow to (READY's `cinemaLanes`, at most CINEMA_MAX_LANES); absent or less than `lanes`: no growth. */
+    maxLanes?: number
   }) {
     this.tagOf = opts.cinemaTag ?? ((c, e, m) => window.alga.e2ee.cinemaTag(c, e, m))
   }
@@ -184,7 +208,11 @@ export class Mesh {
     this.queues.set(from, q)
     if (q.n >= MAX_QUEUED) return Promise.resolve()
     q.n++
-    const lane = this.pairs.get(from)?.lanes.get(s.lane ?? 0)
+    // the answerer opens a lane past its first ones when the offer for it comes (the offerer grew the pair)
+    const pair = this.pairs.get(from)
+    const k = s.lane ?? 0
+    if (pair && !pair.offerer && s.kind === 'offer' && !pair.lanes.has(k) && k >= this.laneCount() && k < this.maxLanes()) this.openLane(from, pair, k)
+    const lane = pair?.lanes.get(k)
     q.tail = q.tail.then(() => this.handle(from, s, lane)).catch(() => {}).finally(() => { q.n-- })
     return q.tail
   }
@@ -253,6 +281,25 @@ export class Mesh {
     return [...this.relay]
   }
 
+  /**
+   * Offerer: one more lane for a pair whose lanes are all up, up to maxLanes. Loss caps each SCTP association, so lanes
+   * add up; the caller decides when (a seat short of film on a path that is not congested). False when nothing opened.
+   */
+  grow(id: string): boolean {
+    const pair = this.pairs.get(id)
+    if (this.closed || !pair?.offerer || pair.noGrow) return false
+    const k = pair.top + 1
+    if (k < this.laneCount() || k >= this.maxLanes() || [...pair.lanes.values()].some((l) => !l.announced)) return false
+    this.openLane(id, pair, k)
+    return true
+  }
+
+  /** Each open lane's selected route, RTT and throughput over the last refresh (diagnostics; never an address). */
+  paths(): { peer: string; lane: number; path: string; rttMs: number | null; upMbps: number; downMbps: number }[] {
+    return [...this.pairs].flatMap(([peer, p]) => [...p.lanes.values()].flatMap((l) =>
+      l.announced && l.path ? [{ peer, lane: l.k, path: l.path, rttMs: l.rttMs, upMbps: l.upMbps, downMbps: l.downMbps }] : []))
+  }
+
   /** Self-initiated teardown: onPeerGone is NOT fired for it (the owner is closing everything anyway). */
   close(): void {
     if (this.closed) return
@@ -266,7 +313,7 @@ export class Mesh {
   }
 
   private openPair(id: string): void {
-    const pair: Pair = { offerer: isOfferer(this.opts.selfId, id), lanes: new Map(), staggered: false, stagger: [] }
+    const pair: Pair = { offerer: isOfferer(this.opts.selfId, id), lanes: new Map(), staggered: false, stagger: [], top: 0, noGrow: false }
     this.pairs.set(id, pair)
     this.openLane(id, pair, 0)
     // the answerer has every lane ready (idle) for its offer; the offerer opens lanes > 0 once lane 0 is up
@@ -278,14 +325,19 @@ export class Mesh {
     return Math.max(1, Math.min(CINEMA_LANES, this.opts.lanes ?? CINEMA_LANES))
   }
 
+  private maxLanes(): number {
+    return Math.max(this.laneCount(), Math.min(CINEMA_MAX_LANES, this.opts.maxLanes ?? 0))
+  }
+
   private openLane(id: string, pair: Pair, k: number): void {
     const pc = new RTCPeerConnection({ iceServers: this.opts.iceServers, iceTransportPolicy: 'all' })
     const lane: Lane = {
       k, pc, retries: 0, early: [], ctl: null, bulk: null, announced: false, active: pair.offerer || k === 0, trickle: k === 0,
-      timer: null, rtt: { responses: 0, total: 0 }, held: [],
+      timer: null, rtt: { responses: 0, total: 0 }, held: [], path: null, rttMs: null, io: null, upMbps: 0, downMbps: 0,
       batcher: new CandidateBatcher((candidates) => this.signal(id, { kind: 'ice', candidates, ...(k ? { lane: k } : {}) })),
     }
     pair.lanes.set(k, lane)
+    pair.top = Math.max(pair.top, k)
     pc.onicecandidate = (e) => { if (e.candidate?.candidate && lane.trickle) lane.batcher.add(e.candidate.candidate) }
     pc.onconnectionstatechange = () => {
       if (!this.isLive(id, lane)) return
@@ -376,6 +428,7 @@ export class Mesh {
     const pair = this.pairs.get(id)
     if (!pair || pair.lanes.get(lane.k) !== lane) return
     pair.lanes.delete(lane.k)
+    if (lane.k >= this.laneCount() && !lane.announced) pair.noGrow = true
     this.closeLane(lane)
     if (![...pair.lanes.values()].some((l) => l.active)) return this.drop(id)
     if (lane.announced) for (const cb of this.laneGoneCbs) cb(id, lane.k)
@@ -494,6 +547,15 @@ export class Mesh {
         const n = responses - lane.rtt.responses
         const rttS = n > 0 ? (total - lane.rtt.total) / n : pair.currentRoundTripTime
         lane.rtt = { responses, total }
+        lane.path = pathOf(byId.get(pair.localCandidateId), byId.get(pair.remoteCandidateId))
+        const io = { at: Date.now(), sent: Number(pair.bytesSent) || 0, recv: Number(pair.bytesReceived) || 0 }
+        const dtS = lane.io ? (io.at - lane.io.at) / 1000 : 0
+        if (lane.io && dtS > 0) {
+          lane.upMbps = Math.max(0, ((io.sent - lane.io.sent) * 8) / 1e6 / dtS)
+          lane.downMbps = Math.max(0, ((io.recv - lane.io.recv) * 8) / 1e6 / dtS)
+        }
+        lane.io = io
+        if (typeof rttS === 'number' && rttS > 0) lane.rttMs = Math.round(rttS * 1000)
         if (lane.announced && typeof rttS === 'number' && rttS > 0 && this.isLive(id, lane)) for (const cb of this.rttCbs) cb(id, lane.k, rttS * 1000)
       } catch { /* connection closing */ }
     }))

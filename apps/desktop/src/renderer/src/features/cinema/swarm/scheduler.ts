@@ -25,6 +25,8 @@ export interface SwarmView {
   budgetPieces: number
   /** Seconds ahead fetched as critical (default CRITICAL_S; more while a seat needs a longer pre-roll). */
   criticalS?: number
+  /** The seat is short of film (the room waits for it): its critical window comes from the fastest holder, host included. */
+  starving?: boolean
 }
 
 /** `urgent` = in our critical window (the uploader serves it first); `preempt` = in-flight prefetch to cancel for it. */
@@ -51,7 +53,7 @@ export function isLate(m: CinemaPieceMeta, gotBytes: number, ageS: number, playh
  * 2. Then pieces ahead of the playhead, rarest first (fewest holders), nearest on a tie, while budgetPieces (minus the
  *    critical media pieces just asked) lasts. Here a friend that holds the piece is always used instead of the host
  *    (super-seed): the host only serves what no friend (out of back-off) has. The same goes for critical pieces that
-    start HOST_NEAR_S or more ahead of the playhead.
+    start HOST_NEAR_S or more ahead of the playhead, unless the seat is starving (then the fastest holder, host or not).
  * Never asks for what is held or in flight, nor from a peer banned for that piece, nor beyond MAX_PEER_INFLIGHT a peer;
  * maxNew bounds the flights added (a preempting request replaces one).
  */
@@ -79,7 +81,8 @@ export function nextRequests(v: SwarmView, maxNew: number): PieceRequest[] {
     const k = pieceKey(track, n)
     let hs = v.peers.filter((p) => p.has.get(track)?.has(n) && !p.bannedFor.has(k))
     if (hs.some((p) => p.mbps >= 0)) hs = hs.filter((p) => p.mbps >= 0) // back-off peers only as the last holder, never as overflow
-    const far = !critical || startS >= v.playheadS + HOST_NEAR_S
+    // a starving seat cannot wait for a copy through a friend: any holder will do for its critical window
+    const far = !critical || (!v.starving && startS >= v.playheadS + HOST_NEAR_S)
     if (far && hs.some((p) => !p.isHost)) hs = hs.filter((p) => !p.isHost)
     return hs.sort((a, b) => b.mbps - a.mbps || loadOf(a.id) - loadOf(b.id))
   }

@@ -1,6 +1,6 @@
 import type { CinemaClientFrame, CinemaSeat } from '@alga/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CandidateBatcher, GATHER_WAIT_MS, LANE_STAGGER_MS, Mesh, SignalBuffer, fingerprintOf, isOfferer, tagInput } from './mesh'
+import { CandidateBatcher, GATHER_WAIT_MS, LANE_STAGGER_MS, Mesh, SignalBuffer, fingerprintOf, isOfferer, pathOf, tagInput } from './mesh'
 
 const SDP = ['v=0', 'o=- 4611731400430051336 2 IN IP4 127.0.0.1', 's=-', 't=0 0',
   'a=group:BUNDLE 0', 'm=application 9 UDP/DTLS/SCTP webrtc-datachannel', 'c=IN IP4 0.0.0.0',
@@ -70,6 +70,23 @@ describe('tagInput', () => {
   it('binds lanes > 0 (lane 0 keeps the original input)', () => {
     expect(tagInput('s', 'a', 'b', 'AB:CD', 0)).toBe('s|a|b|AB:CD')
     expect(tagInput('s', 'a', 'b', 'AB:CD', 2)).toBe('s|a|b|AB:CD|2')
+  })
+})
+
+describe('pathOf', () => {
+  it('names the selected pair: protocol, both candidate types and the network it rides, never an address', () => {
+    expect(pathOf({ candidateType: 'srflx', protocol: 'udp', address: '198.51.100.7' }, { candidateType: 'srflx', address: '203.0.113.9' })).toBe('udp srflx→srflx ipv4')
+    expect(pathOf({ candidateType: 'host', protocol: 'udp', address: '2804:14c::1' }, { candidateType: 'host', address: '2001:db8::2' })).toBe('udp host→host ipv6')
+    expect(pathOf({ candidateType: 'relay', protocol: 'udp', address: '198.51.100.7' }, { candidateType: 'srflx', address: '203.0.113.9' })).toBe('udp relay→srflx ipv4')
+  })
+  it('flags the Windows Teredo tunnel (2001:0::/32) on either end, and a VPN adapter', () => {
+    expect(pathOf({ candidateType: 'host', protocol: 'udp', address: '2804:14c::1' }, { candidateType: 'host', address: '2001:0:53aa:64c::1' })).toBe('udp host→host teredo')
+    expect(pathOf({ candidateType: 'host', protocol: 'udp', address: '2001:0000:53aa:64c::1' }, { candidateType: 'prflx', address: '2804:7f0::2' })).toBe('udp host→prflx teredo')
+    expect(pathOf({ candidateType: 'host', protocol: 'udp', address: '26.10.0.1', networkType: 'vpn' }, { candidateType: 'host', address: '26.10.0.2' })).toBe('udp host→host ipv4 vpn')
+  })
+  it('an address the browser hides (mDNS) or a missing candidate reads "?"', () => {
+    expect(pathOf({ candidateType: 'host', protocol: 'udp', address: 'abc.local' }, { candidateType: 'host' })).toBe('udp host→host ?')
+    expect(pathOf(undefined, undefined)).toBe('? ?→? ?')
   })
 })
 
@@ -210,6 +227,26 @@ describe('Mesh', () => {
     expect(gone).toEqual(['b'])
     expect(FakePC.all[0]!.closed).toBe(true)
   })
+  it('paths(): each open lane\'s selected route, RTT and throughput over the last refresh', async () => {
+    vi.useFakeTimers()
+    const { mesh } = mk({ lanes: 1 })
+    mesh.sync([seat('b')])
+    const pc = FakePC.all[0]!
+    pc.openAll()
+    let sent = 0
+    ;(pc as unknown as { getStats(): Promise<Map<string, unknown>> }).getStats = async () => new Map(Object.entries({
+      t: { id: 't', type: 'transport', selectedCandidatePairId: 'p' },
+      p: { id: 'p', type: 'candidate-pair', localCandidateId: 'l', remoteCandidateId: 'r', currentRoundTripTime: 0.054, bytesSent: (sent += 1_500_000), bytesReceived: 30_000 },
+      l: { id: 'l', type: 'local-candidate', candidateType: 'host', protocol: 'udp', address: '2804:14c::1' },
+      r: { id: 'r', type: 'remote-candidate', candidateType: 'host', address: '2001:0:53aa:64c::1' },
+    }))
+    expect(mesh.paths()).toEqual([])
+    await vi.advanceTimersByTimeAsync(3000) // first refresh: the route and the baseline of the byte counters
+    expect(mesh.paths()).toEqual([{ peer: 'b', lane: 0, path: 'udp host→host teredo', rttMs: 54, upMbps: 0, downMbps: 0 }])
+    await vi.advanceTimersByTimeAsync(3000) // 1.5 MB more in 3 s
+    expect(mesh.paths()).toEqual([{ peer: 'b', lane: 0, path: 'udp host→host teredo', rttMs: 54, upMbps: 4, downMbps: 0 }])
+  })
+
   it('never re-opens a dropped link from a stray signal; close() does not notify', async () => {
     const gone: string[] = []
     const { mesh } = mk({ selfId: 'b' })
@@ -349,6 +386,71 @@ describe('Mesh', () => {
     ctl.readyState = 'open'
     ctl.onopen?.()
     expect(got).toEqual(['bulk:c1', 'bulk:c2'])
+  })
+  it('grow(): the offerer opens one more lane at a time, up to maxLanes; never before the first lanes are up or while one is opening', () => {
+    vi.useFakeTimers()
+    const lanes: number[] = []
+    const { mesh } = mk({ maxLanes: 5 })
+    mesh.onLane((_id, k) => lanes.push(k))
+    mesh.sync([seat('b')])
+    expect(mesh.grow('b')).toBe(false) // lane 0 is not up
+    FakePC.all[0]!.openAll()
+    vi.advanceTimersByTime(2 * LANE_STAGGER_MS)
+    expect(mesh.grow('b')).toBe(false) // lanes 1 and 2 still opening
+    FakePC.all[1]!.openAll()
+    FakePC.all[2]!.openAll()
+    expect(mesh.grow('b')).toBe(true)
+    expect(FakePC.all).toHaveLength(4)
+    expect(mesh.grow('b')).toBe(false) // lane 3 still opening
+    FakePC.all[3]!.openAll()
+    expect(mesh.grow('b')).toBe(true)
+    FakePC.all[4]!.openAll()
+    expect(lanes).toEqual([0, 1, 2, 3, 4])
+    expect(mesh.grow('b')).toBe(false) // maxLanes
+    expect(mesh.grow('nobody')).toBe(false)
+    expect(FakePC.all).toHaveLength(5)
+  })
+  it('grow(): without maxLanes (an older server) a pair stays at its first lanes; the answerer never grows', () => {
+    vi.useFakeTimers()
+    const { mesh } = mk()
+    mesh.sync([seat('b')])
+    FakePC.all[0]!.openAll()
+    vi.advanceTimersByTime(2 * LANE_STAGGER_MS)
+    FakePC.all[1]!.openAll()
+    FakePC.all[2]!.openAll()
+    expect(mesh.grow('b')).toBe(false)
+    FakePC.all = []
+    const answerer = mk({ selfId: 'b', maxLanes: 8 }).mesh
+    answerer.sync([seat('a')])
+    expect(answerer.grow('a')).toBe(false)
+  })
+  it('grow(): a grown lane that never connects ends that pair\'s growth (an older app answers its first lanes only)', () => {
+    vi.useFakeTimers()
+    const gone: string[] = []
+    const { mesh } = mk({ maxLanes: 8 })
+    mesh.onPeerGone((id) => gone.push(id))
+    mesh.sync([seat('b')])
+    FakePC.all[0]!.openAll()
+    vi.advanceTimersByTime(2 * LANE_STAGGER_MS)
+    FakePC.all[1]!.openAll()
+    FakePC.all[2]!.openAll()
+    expect(mesh.grow('b')).toBe(true)
+    vi.advanceTimersByTime(60_000) // lane 3: connect timeout, two ICE restarts, dropped
+    expect(FakePC.all[3]!.closed).toBe(true)
+    expect(gone).toEqual([])
+    expect(mesh.grow('b')).toBe(false)
+    expect(FakePC.all).toHaveLength(4)
+  })
+  it('answerer: an offer for a lane past the first three opens it on demand, up to maxLanes', async () => {
+    const { mesh, sent } = mk({ selfId: 'b', maxLanes: 5 })
+    mesh.sync([seat('a')])
+    expect(FakePC.all).toHaveLength(3)
+    await mesh.onSignal('a', { kind: 'offer', sdp: SDPFP, lane: 4 })
+    expect(FakePC.all).toHaveLength(4)
+    expect(sig(sent.at(-1)!)).toMatchObject({ kind: 'answer', lane: 4 })
+    await mesh.onSignal('a', { kind: 'offer', sdp: SDPFP, lane: 5 }) // past maxLanes: ignored
+    await mesh.onSignal('a', { kind: 'ice', candidates: ['c'], lane: 3 }) // only an offer opens a lane
+    expect(FakePC.all).toHaveLength(4)
   })
   it('answerer: idle lanes (no offer yet) do not keep a peer whose lane 0 failed', () => {
     vi.useFakeTimers()

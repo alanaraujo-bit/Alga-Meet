@@ -141,6 +141,7 @@ const bridge: AlgaBridge = {
     addAudio: (fileId, audioId) => ipcRenderer.send(IPC.cinemaAddAudio, String(fileId), Number(audioId)),
     addSubtitle: (fileId) => ipcRenderer.invoke(IPC.cinemaAddSubtitle, String(fileId)),
     setPlayhead: (fileId, s) => ipcRenderer.send(IPC.cinemaSetPlayhead, String(fileId), Number(s)),
+    diag: (line) => ipcRenderer.send(IPC.cinemaDiag, String(line)),
     init: (fileId, track) => ipcRenderer.invoke(IPC.cinemaInit, String(fileId), String(track)),
     piece: (fileId, track, n) => ipcRenderer.invoke(IPC.cinemaPiece, String(fileId), String(track), Number(n)),
     onPieces: (cb) => subscribe(IPC.cinemaPieces, cb),

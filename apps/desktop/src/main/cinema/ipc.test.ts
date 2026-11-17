@@ -20,6 +20,7 @@ const h = vi.hoisted(() => ({
   saveTo: null as string | null,
   win: { w: 1280, h: 720 },
   captured: [] as unknown[],
+  logs: [] as string[],
   // the watched list lives in TEMP across runs: a fresh show folder per run
   run: Math.random().toString(36).slice(2),
 }))
@@ -34,7 +35,7 @@ vi.mock('electron', () => ({
   ipcMain: { handle: (c: string, fn: (...a: unknown[]) => unknown) => h.invokes.set(c, fn) },
 }))
 vi.mock('../window', () => ({ mainWindow: () => null }))
-vi.mock('../log', () => ({ log: { warn: () => {}, info: () => {} } }))
+vi.mock('../log', () => ({ log: { warn: () => {}, info: (...a: unknown[]) => { h.logs.push(a.join(' ')) } } }))
 vi.mock('../ipc', async () => {
   const real = await vi.importActual<typeof import('../ipc')>('../ipc')
   return {
@@ -100,6 +101,14 @@ const probed = async () => {
 beforeEach(() => { h.duration = 10; h.saveTo = null; h.saves.length = 0; h.clip.length = 0; h.captured.length = 0; h.emitted.length = 0; h.factories.length = 0; h.probeGate = null; h.startError = null })
 
 describe('cinema ipc', () => {
+  it('cinemaDiag writes the renderer\'s diagnostic line to the log, on one line; an oversized or non-string one is rejected', () => {
+    const diag = h.sends.get(IPC.cinemaDiag)!
+    diag('change me=stalled\r\nahead=0s')
+    expect(h.logs.at(-1)).toBe('[cinema] change me=stalled ahead=0s')
+    expect(() => diag('x'.repeat(2001))).toThrow()
+    expect(() => diag({ line: 'x' })).toThrow()
+  })
+
   it('unknown fileId rejects (invoke) and throws (send)', async () => {
     await expect(call(IPC.cinemaProbe, 'nope')).rejects.toThrow('unknown file')
     await expect(call(IPC.cinemaPiece, 'nope', 'v', 1)).rejects.toThrow()

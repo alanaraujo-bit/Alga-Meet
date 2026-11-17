@@ -84,6 +84,7 @@ export const IPC = {
   cinemaAddAudio: 'alga:cinema:add-audio', // send
   cinemaAddSubtitle: 'alga:cinema:add-subtitle', // invoke
   cinemaSetPlayhead: 'alga:cinema:set-playhead', // send
+  cinemaDiag: 'alga:cinema:diag', // send
   cinemaInit: 'alga:cinema:init', // invoke
   cinemaPiece: 'alga:cinema:piece', // invoke
   cinemaClose: 'alga:cinema:close', // invoke

@@ -1,11 +1,12 @@
 import { createHmac } from 'node:crypto'
 import {
   CINEMA_COUNTDOWN_AFTER_PAUSE_MS, CINEMA_FRAME_LIMIT, CINEMA_HOST_AWAY_MS, CINEMA_ITEMS_PER_FRAME, CINEMA_LEAD_MS,
-  CINEMA_READY_TIMEOUT_MS, CINEMA_STATUS_INTERVAL_MS, CINEMA_TURN_TTL_S, GatewayClose, Permission, positionAt,
+  CINEMA_MAX_LANES, CINEMA_READY_TIMEOUT_MS, CINEMA_STATUS_INTERVAL_MS, CINEMA_TURN_TTL_S, GatewayClose, Permission, positionAt,
   type CinemaFilm, type CinemaPieceMeta, type CinemaSessionView, type Invite, type SpaceSnapshot,
 } from '@alga/shared'
 import { eq } from 'drizzle-orm'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { loadConfig } from '../src/config.js'
 import { roles } from '../src/db/schema.js'
 import { metrics } from '../src/metrics.js'
 import { api, connect, postWebhook, register, startServer, type Gateway, type TestServer } from './helpers.js'
@@ -13,6 +14,15 @@ import { api, connect, postWebhook, register, startServer, type Gateway, type Te
 let s: TestServer
 beforeAll(async () => { s = await startServer() })
 afterAll(async () => { await s.close() })
+
+describe('cinema config', () => {
+  it('CINEMA_MAX_LANES caps how far a pair may grow (3: never past its first lanes); the protocol\'s limit is the default and the ceiling', () => {
+    expect(loadConfig({ NODE_ENV: 'test' }).cinema.maxLanes).toBe(CINEMA_MAX_LANES)
+    expect(loadConfig({ NODE_ENV: 'test', CINEMA_MAX_LANES: '3' }).cinema.maxLanes).toBe(3)
+    expect(() => loadConfig({ NODE_ENV: 'test', CINEMA_MAX_LANES: '2' })).toThrow()
+    expect(() => loadConfig({ NODE_ENV: 'test', CINEMA_MAX_LANES: String(CINEMA_MAX_LANES + 1) })).toThrow()
+  })
+})
 
 const film: CinemaFilm = {
   title: 'Filme', durationS: 600, width: 1920, height: 1080, hdr: 'sdr', videoCodec: 'h264', videoMime: 'video/mp4; codecs="avc1.640028"',
@@ -347,7 +357,9 @@ describe('cinema', () => {
     await wait(x.ga, (d) => d.seats[0]!.status === 'stalled')
     expect(states(x.ga).some((d) => d.seats[0]!.aheadS === 5)).toBe(true)
     expect(states(x.ga).some((d) => d.seats[0]!.status === 'ready' && d.seats[0]!.aheadS === 9)).toBe(false)
-    expect((await x.ga.waitFor('READY')).cinema).toBe(s.config.cinema.enabled) // READY carries the flag
+    const ready = await x.ga.waitFor('READY')
+    expect(ready.cinema).toBe(s.config.cinema.enabled) // READY carries the flag
+    expect(ready.cinemaLanes).toBe(s.config.cinema.maxLanes) // and how many lanes a pair may signal (older servers: absent = 3)
     // aheadS-only refreshes are coalesced (one trailing broadcast); a status change broadcasts at once
     const t = s.app.ctx.cinema.timings
     t.statusIntervalMs = 0; t.aheadBroadcastMs = 600

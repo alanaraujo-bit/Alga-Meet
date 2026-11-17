@@ -61,6 +61,13 @@ Voltar atrás: a implantação anterior fica na lista do serviço com "Rollback"
 - Os produtos da coleção Ateliê entram no catálogo com os preços de `docs/business/monetization.md` §3.1 e são
   cobrados de verdade pelo Mercado Pago. O app 0.1.17 ignora esses produtos (não os conhece).
 
+## Sala de Cinema: conexões por par (`CINEMA_MAX_LANES`)
+- Desde a 0.1.20 um par de poltronas pode crescer de 3 para até 8 conexões quando alguém fica sem filme numa rede
+  com perda (cada conexão é uma associação SCTP, e a perda limita cada uma). O servidor anuncia o limite em
+  `READY.cinemaLanes` e só então o app passa das 3.
+- `CINEMA_MAX_LANES` no serviço `api` muda esse limite (3 a 8; sem a variável, 8). **`CINEMA_MAX_LANES=3` desliga o
+  crescimento sem publicar versão nova**: o app volta às 3 conexões na próxima vez que conectar no gateway.
+
 ## Instalador de staging
 `apps/desktop/release/AlgaMeet-Setup-0.1.0-staging.exe` (110 MB, SHA-256 `39f81da0…b28c`), build de `031bbf6` numa worktree limpa com a URL de staging embutida. Verificado: instalação silenciosa, app empacotado abre a tela de login apontando para `api-staging-b3ea.up.railway.app` (`scripts/check-installed.mjs`), desinstalação limpa (pasta e protocolo `algameet://` removidos). **Sem assinatura de código** → SmartScreen avisa "editor desconhecido".
 

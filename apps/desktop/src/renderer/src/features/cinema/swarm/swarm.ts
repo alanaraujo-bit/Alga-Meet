@@ -2,7 +2,7 @@ import type { CinemaPieceMeta, CinemaTrackId } from '@alga/shared'
 import { Assembler } from './assembler'
 import type { PieceCache } from './cache'
 import { bitsOf, decode, encode, setOf, verOf, type WireMsg } from './protocol'
-import { CRITICAL_S, hostShouldSend, isCritical, isLate, nextRequests, pieceKey, type SwarmView } from './scheduler'
+import { CRITICAL_S, LATE_MIN_AGE_S, hostShouldSend, isCritical, isLate, nextRequests, pieceKey, type SwarmView } from './scheduler'
 import { PeerUploader, type ChannelLike } from './uploader'
 
 export { HIGH_WATER, LOW_WATER, type ChannelLike } from './uploader'
@@ -94,6 +94,7 @@ export class Swarm {
   /** Bytes received in each of the last RATE_WINDOW seconds that had a download running (recvMbps). */
   private busy: number[] = []
   private criticalS = CRITICAL_S
+  private starving = false
   private cap: number
   /** Stores run one at a time so eviction and the byte count stay in step. */
   private storing: Promise<unknown> = Promise.resolve()
@@ -171,6 +172,11 @@ export class Swarm {
     this.peers.get(id)?.up.pacer.rtt(k, ms)
   }
 
+  /** A queue is building on the path to that peer (its lanes' RTT is inflated): more lanes would only feed it. */
+  congested(id: string): boolean {
+    return this.peers.get(id)?.up.pacer.slowed ?? false
+  }
+
   private newPeer(id: string, k: number): Peer {
     const p: Peer = {
       id, lanes: new Map(), ctlLane: k, has: new Map(), banned: new Set(), refused: new Map(), declined: new Map(), sending: new Map(),
@@ -241,6 +247,16 @@ export class Swarm {
 
   setPlayhead(s: number): void {
     this.playheadS = s
+    this.schedule()
+  }
+
+  /**
+   * The seat is short of film (the room waits for it, or its buffer is nearly empty): its critical window comes from the
+   * fastest holder, the host included, and a download a slow friend is sitting on moves to a faster one.
+   */
+  setStarving(on: boolean): void {
+    if (on === this.starving) return
+    this.starving = on
     this.schedule()
   }
 
@@ -346,7 +362,10 @@ export class Swarm {
       // super-seed, urgent or not (hostShouldSend: anyone near the playhead), unless it is a repeat once another friend
       // has confirmed the piece: a requester that could reach that friend asks it instead, so the repeat means it can't
       const repeat = now - (p.declined.get(k) ?? -Infinity) < REPEAT_MS && this.confirmedElsewhere(p, track, n)
-      if (!repeat && !hostShouldSend(this.view(), p.id, track, n)) {
+      // super-seed spares the uplink; when nobody else presses it, an urgent request is served (measured 2026-11-16:
+      // a seat the room waited for sat on a slow friend while the host's uplink was idle)
+      const free = urgent && !this.pressed(p)
+      if (!repeat && !free && !hostShouldSend(this.view(), p.id, track, n)) {
         p.declined.set(k, now)
         return this.ctl(p, { t: 'none', track, n })
       }
@@ -456,6 +475,12 @@ export class Swarm {
     p.sending.get(track)?.delete(n)
   }
 
+  /** Host: the uplink is spoken for: another seat has an urgent upload under way, or its lanes say a queue is building. */
+  private pressed(p: Peer): boolean {
+    for (const q of this.peers.values()) if (q !== p && (q.up.pacer.slowed || q.up.queue.some((u) => u.urgent))) return true
+    return false
+  }
+
   /** Host: a friend other than `p` has confirmed (got/have) that it holds piece n. */
   private confirmedElsewhere(p: Peer, track: CinemaTrackId, n: number): boolean {
     for (const q of this.peers.values()) if (q !== p && q.has.get(track)?.has(n) && !q.sending.get(track)?.has(n)) return true
@@ -540,6 +565,7 @@ export class Swarm {
       inflight,
       budgetPieces: this.opts.isHost ? 0 : this.budget(),
       criticalS: this.criticalS,
+      starving: this.starving,
     }
   }
 
@@ -604,9 +630,12 @@ export class Swarm {
       if (!p || !m) continue
       const silent = now - Math.max(f.start, p.lastByte) >= REQ_TIMEOUT_MS // nothing at all from that peer
       const stale = now - f.at >= STALE_MS // busy with other pieces, never this one
-      // a critical download that will miss the playhead moves (once) to another holder
-      const late = !silent && !stale && !this.moved.has(k) && isCritical(m, this.playheadS, this.criticalS) &&
-        isLate(m, f.got, (now - f.start) / 1000, this.playheadS) && this.otherHolder(p, f.track, f.n)
+      // a critical download that will miss the playhead moves (once) to another holder; so does a starving seat's when
+      // it made no progress for LATE_MIN_AGE_S or another holder delivers at twice its source's rate
+      const ageS = (now - f.start) / 1000
+      const other = !silent && !stale && !this.moved.has(k) && isCritical(m, this.playheadS, this.criticalS) ? this.bestOther(p, f.track, f.n) : null
+      const late = other !== null && (isLate(m, f.got, ageS, this.playheadS) ||
+        (this.starving && ageS >= LATE_MIN_AGE_S && (now - f.at >= LATE_MIN_AGE_S * 1000 || p.mbps < other / 2)))
       // a prefetch with no byte yet that is critical now is asked again as urgent (cancel first, on the ordered control
       // lane): a paced or queued prefetch would otherwise hold it, and the host's super-seed holds the others back
       if (!silent && !stale && !late && !f.urgent && f.got === 0 && isCritical(m, this.playheadS, this.criticalS)) {
@@ -622,9 +651,11 @@ export class Swarm {
     this.schedule()
   }
 
-  private otherHolder(p: Peer, track: CinemaTrackId, n: number): boolean {
+  /** The receive rate (Mbps) of the fastest other peer that may be asked for piece n; null when nobody else holds it. */
+  private bestOther(p: Peer, track: CinemaTrackId, n: number): number | null {
     const k = pieceKey(track, n)
-    for (const q of this.peers.values()) if (q !== p && q.has.get(track)?.has(n) && !q.banned.has(k) && !q.refused.has(k)) return true
-    return false
+    let best: number | null = null
+    for (const q of this.peers.values()) if (q !== p && q.has.get(track)?.has(n) && !q.banned.has(k) && !q.refused.has(k)) best = Math.max(best ?? 0, q.mbps)
+    return best
   }
 }

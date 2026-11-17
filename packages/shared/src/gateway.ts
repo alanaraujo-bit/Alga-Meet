@@ -109,6 +109,8 @@ export interface ReadyPayload {
   heartbeatIntervalMs: number
   /** The server has the Sala de Cinema on. Absent on older servers, which close the socket on cinema ops. */
   cinema: boolean
+  /** Lanes a cinema pair may signal (CINEMA_MAX_LANES). Absent on older servers, which close the socket on a lane ≥ 3. */
+  cinemaLanes?: number
   /** The server plays music in calls. Absent on older servers, which close the socket on music ops. */
   music?: boolean
   /** Saved playlists (/music/playlists) and `music_add_many`. Absent on older servers. */

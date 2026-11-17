@@ -295,6 +295,8 @@ export interface AlgaBridge {
     /** Opens a dialog for .srt/.ass/.ssa/.vtt; its piece arrives through onPieces. null if cancelled or unusable. */
     addSubtitle(fileId: string): Promise<CinemaSubtitleTrack | null>
     setPlayhead(fileId: string, s: number): void
+    /** One line of what the engine sees (state, routes, rates; no address, no name) appended to main.log, at most 2000 chars. */
+    diag(line: string): void
     init(fileId: string, track: CinemaTrackId): Promise<ArrayBuffer | null>
     piece(fileId: string, track: CinemaTrackId, n: number): Promise<ArrayBuffer | null>
     onPieces(cb: (e: PieceEvent & { fileId: string }) => void): Unsubscribe
