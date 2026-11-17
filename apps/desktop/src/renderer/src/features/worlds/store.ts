@@ -8,6 +8,7 @@ import { create } from 'zustand'
 import { useData } from '@/store/data'
 import { onDispatch, useSession } from '@/store/session'
 import type { QualityPref } from './engine/quality'
+import { dominoRefused, startDomino } from './domino/store'
 import { startPool } from './pool/store'
 import { errorText, t } from './strings'
 
@@ -132,6 +133,11 @@ function refused(op: string, reason: WorldErrorReason): void {
     if (op === 'world_pool_join' && reason === 'full') useWorlds.setState({ notice: t.pool.full })
     return
   }
+  // Dominoes: a play the room already showed and the server refused is taken back; nothing else needs words.
+  if (op.startsWith('world_domino_')) {
+    if (op === 'world_domino_play') dominoRefused()
+    return
+  }
   // Being refused at the door is not wanting in any more; a refused gesture changes nothing.
   if (op === 'world_enter' || op === 'world_open') {
     wantIn = false
@@ -191,6 +197,7 @@ export function startWorlds(): () => void {
       if (c) hello()
     }),
     startPool(),
+    startDomino(),
   ]
   return () => {
     for (const off of offs) off()

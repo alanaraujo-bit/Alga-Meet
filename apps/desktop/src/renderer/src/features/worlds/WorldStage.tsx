@@ -16,6 +16,9 @@ import { levelNow } from '../voice/levels'
 import { AssetPack, PackError, resolveAssetsUrl, type PackProgress } from './assets/pack'
 import { WorldEngine, type EngineStatus, type WorldPerson } from './engine/World'
 import { QUALITY_TIERS, type QualityPref, type QualityTier } from './engine/quality'
+import { DominoHud } from './domino/DominoHud'
+import type { DominoUi } from './domino/DominoRoom'
+import { dominoBot, dominoPlay, dominoStart, useDomino } from './domino/store'
 import { PoolHud } from './pool/PoolHud'
 import type { PoolUi } from './pool/PoolRoom'
 import { poolAim, poolJoin, poolLeave, poolRack, poolSettled, poolShot, usePool } from './pool/store'
@@ -44,6 +47,7 @@ export default function WorldStage({ channel }: { channel: Channel }) {
   const [watching, setWatching] = useState(false)
   const [tier, setTier] = useState<QualityTier | null>(null)
   const [poolUi, setPoolUi] = useState<PoolUi | null>(null)
+  const [dominoUi, setDominoUi] = useState<DominoUi | null>(null)
   /** Grows when a new engine exists: what feeds it runs again. */
   const [engineReady, setEngineReady] = useState(0)
 
@@ -95,6 +99,7 @@ export default function WorldStage({ channel }: { channel: Channel }) {
             onTier: (q) => !dead && setTier(q),
             voice: levelNow,
             pool: { onJoin: poolJoin, onLeave: poolLeave, onAim: poolAim, onShot: poolShot, onSettled: poolSettled, onUi: (ui) => !dead && setPoolUi(ui) },
+            domino: { onPlay: dominoPlay, onUi: (ui) => !dead && setDominoUi(ui), botName: (seat) => t.domino.bots[seat] ?? '', passText: () => t.domino.pass },
             onStatus: (st: EngineStatus) => {
               if (dead) return
               if (st.phase === 'error') setPhase({ kind: 'error', message: st.reason === 'context_lost' ? t.failed.contextLost : t.failed.body })
@@ -140,6 +145,12 @@ export default function WorldStage({ channel }: { channel: Channel }) {
   useEffect(() => {
     engine.current?.setPools(Object.values(pool.tables))
   }, [pool.tables, engineReady])
+
+  // Dominoes: each table as the server lets me see it goes to the room, which moves the tiles.
+  const domino = useDomino(useShallow((st) => ({ tables: st.tables, at: st.at, rev: st.rev })))
+  useEffect(() => {
+    engine.current?.setDominos(Object.values(domino.tables), domino.rev)
+  }, [domino.tables, domino.rev, engineReady])
 
   useEffect(() => {
     engine.current?.setQuality(world.quality)
@@ -264,7 +275,14 @@ export default function WorldStage({ channel }: { channel: Channel }) {
               meId={meId} nameOf={(id) => names[id] ?? ''} room={() => engine.current?.pool ?? null} onRack={poolRack}
             />
           )}
-          {(seatHint || seated) && !poolUi?.aiming && (
+          {dominoUi?.table && (
+            <DominoHud
+              ui={dominoUi} view={domino.tables[dominoUi.table] ?? null} at={domino.at[dominoUi.table] ?? 0}
+              meId={meId} nameOf={(id) => names[id] ?? ''} room={() => engine.current?.domino ?? null}
+              onStart={dominoStart} onBot={dominoBot} onStand={() => engine.current?.standUp()}
+            />
+          )}
+          {(seatHint || seated) && !poolUi?.aiming && !dominoUi?.table && (
             <div className={s.hint} role="status">
               <kbd>E</kbd>
               <span>{seated ? t.hud.stand : t.hud.sit}</span>

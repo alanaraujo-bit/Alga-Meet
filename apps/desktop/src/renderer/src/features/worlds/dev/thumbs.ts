@@ -9,6 +9,8 @@ import { STARTER_ROOM, worldEntries } from '@alga/shared'
 import { Assets } from '../assets/loaders'
 import type { AssetPack } from '../assets/pack'
 import { buildItems } from '../engine/items'
+import { DominoTable } from '../domino/DominoTable'
+import { DominoSound } from '../domino/sound'
 import { PoolView } from '../pool/PoolView'
 import { PoolSound } from '../pool/sound'
 
@@ -53,6 +55,11 @@ export async function renderThumbs(pack: AssetPack, size = 320, only?: string[])
       const item = built.items.get('t')!.object
       item.getObjectByName('pool:lamp')?.removeFromParent()
       new PoolView('t', item, assets, new THREE.Texture(), new PoolSound(), {})
+    } else if (def.game === 'domino') {
+      // The same for the domino table: the set waiting on the felt, no lamp.
+      const item = built.items.get('t')!.object
+      item.getObjectByName('domino:lamp')?.removeFromParent()
+      new DominoTable('t', item, assets, new DominoSound())
     }
     scene.add(built.group)
     built.group.updateMatrixWorld(true)

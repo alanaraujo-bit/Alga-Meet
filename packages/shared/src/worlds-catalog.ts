@@ -52,8 +52,11 @@ export interface WorldItemDef extends EntryBase {
   screen?: readonly [number, number, number, number]
   /** It lights the room: [colour temperature in K, strength 0..1, height of the source]. */
   light?: readonly [number, number, number]
-  /** People can play on it: a pool table (pool.ts). Its light is the lamp that hangs over it. */
-  game?: 'pool'
+  /**
+   * People can play on it: a pool table (pool.ts), or a domino table (domino.ts) whose four seats are the chairs of
+   * the game, in playing order. Its light is the lamp that hangs over it.
+   */
+  game?: 'pool' | 'domino'
   variants?: readonly { id: string; name: string }[]
 }
 export interface WorldFinishDef extends EntryBase {
@@ -166,6 +169,13 @@ const ITEMS: WorldItemDef[] = [
 
   // ---- games: free for everyone, like the screen. Playing is the point of having friends over.
   item('w_mesa_sinuca', 'Mesa de sinuca', 'base', 'games', 'floor', [2.57, 0.85, 1.45], proc('pool_table'), { game: 'pool', light: [3200, 1, 1.92], variants: CLOTH }),
+  // The table with its four chairs is one piece: chair n is seat n, and play goes round them anticlockwise. Its
+  // footprint stops at the seats, not at the backs of the chairs, so there is room to walk round it and reach a chair.
+  item('w_mesa_domino', 'Mesa de dominó', 'base', 'games', 'floor', [1.7, 0.97, 1.7], proc('domino_table'), {
+    game: 'domino', light: [3000, 0.85, 1.72], variants: CLOTH,
+    // Far enough back for the hands of a figure sitting there to rest at the rim, not over the felt.
+    seats: [[0, 0.84, Math.PI, 0.47], [0.84, 0, -Math.PI / 2, 0.47], [0, -0.84, 0, 0.47], [-0.84, 0, Math.PI / 2, 0.47]],
+  }),
 
   // ---- beds
   item('w_cama_casal', 'Cama Plataforma', 'base', 'beds', 'floor', [1.9, 0.9, 2.2], proc('bed'), { seats: [[-0.5, 0.86, 0, 0.42], [0.5, 0.86, 0, 0.42]], variants: FABRIC }),
@@ -428,5 +438,7 @@ export const LOUNGE_ROOM: WorldRoomLayout = {
     place('qua', 'w_quadro_paisagem', -6.98, 2.6, HALF_PI, 1.35),
     // The open floor in the middle: the pool table, with room to walk round it and cue from every side.
     place('sin', 'w_mesa_sinuca', -1.1, -1.3, HALF_PI, 0, 'verde'),
+    // Between the back of the sofa and the shelves: the domino table.
+    place('dom', 'w_mesa_domino', 2.1, -2.7, 0, 0, 'vinho'),
   ],
 }

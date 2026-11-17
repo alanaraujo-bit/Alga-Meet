@@ -288,6 +288,8 @@ export interface WorldsReady {
   assetsUrl: string
   /** The server plays pool on the tables of a room (pool.ts). Absent on older servers, which close the socket on world_pool_*. */
   pool?: boolean
+  /** The server plays dominoes at the tables of a room (domino.ts). Absent on older servers, which close the socket on world_domino_*. */
+  domino?: boolean
 }
 
 /** Gestures that keep going until the person moves, sits or picks another. */

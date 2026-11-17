@@ -6,7 +6,7 @@
 import * as THREE from 'three'
 import {
   WORLD_GAITS, WORLD_MOVE_HZ, WORLD_RUN_SPEED, WORLD_SHELLS, WORLD_WALK_SPEED, WORLD_WALL_MARGIN, toPose,
-  type PoolAim, type PoolState, type WorldAvatar, type WorldEmote, type WorldGesture, type WorldPose, type WorldRoomLayout,
+  type DominoView, type PoolAim, type PoolState, type WorldAvatar, type WorldEmote, type WorldGesture, type WorldPose, type WorldRoomLayout,
 } from '@alga/shared'
 import { Assets } from '../assets/loaders'
 import type { AssetPack } from '../assets/pack'
@@ -17,6 +17,7 @@ import { buildItems, type RoomItems, type SeatSpot } from './items'
 import { LIVE_LAYER, Lighting } from './lighting'
 import { blobTexture } from './materials'
 import { PoseSender, PoseTrack } from './net'
+import { DominoRoom, type DominoHooks } from '../domino/DominoRoom'
 import { PoolRoom, type PoolHooks } from '../pool/PoolRoom'
 import { PostChain } from './post'
 import { QualityGovernor, TIERS, frameBudget, type QualityPref, type QualityTier } from './quality'
@@ -53,6 +54,8 @@ export interface EngineHooks {
   voice?(userId: string): number
   /** The pool tables of the room: what the person does at one, and what the screen should show about it. */
   pool?: PoolHooks
+  /** The domino tables of the room: the plays of the person at the keyboard, and what the screen should show. */
+  domino?: DominoHooks
 }
 
 export interface EngineOptions {
@@ -120,6 +123,8 @@ export class WorldEngine {
   private figureLight: THREE.SpotLight | null = null
   /** The pool tables of the room, and my play at one of them. */
   readonly pool: PoolRoom
+  /** The domino tables of the room, and my play at the one I sit at. */
+  readonly domino: DominoRoom
   /** Walking to where a shot is taken from: whether I got there, and for how long something was in the way. */
   private atCue = false
   private cueBlocked = 0
@@ -188,6 +193,17 @@ export class WorldEngine {
       inRoom: (p) => this.inRoom(p),
       hooks: opts.hooks.pool ?? {},
     })
+    this.domino = new DominoRoom({
+      assets: this.assets, camera: this.camera,
+      meId: () => (this.me ? this.meId : null),
+      mySeat: () => this.me?.person.seat ?? null,
+      inRoom: (p) => this.inRoom(p),
+      tag: () => this.label('', false),
+      say: (userId, text) => this.say(userId, text),
+      cursor: (kind) => { this.canvas.style.cursor = kind },
+      reducedMotion: () => this.reducedMotion,
+      hooks: opts.hooks.domino ?? {},
+    })
     this.camera.layers.enable(LIVE_LAYER)
     this.raycaster.layers.enableAll()
     this.applyPixelRatio()
@@ -203,7 +219,7 @@ export class WorldEngine {
     on(canvas, 'contextmenu', (e: Event) => e.preventDefault())
     on(window, 'keydown', this.onKeyDown)
     on(window, 'keyup', this.onKeyUp)
-    on(window, 'blur', () => { this.keys.clear(); this.pool.blur(); this.focused = false })
+    on(window, 'blur', () => { this.keys.clear(); this.pool.blur(); this.domino.blur(); this.focused = false })
     on(window, 'focus', () => { this.focused = true })
     on(document, 'visibilitychange', () => { this.visible = !document.hidden })
     on(canvas, 'webglcontextlost', (e: Event) => {
@@ -239,6 +255,7 @@ export class WorldEngine {
       this.bounds = { hw: spec.width / 2 - WORLD_WALL_MARGIN + PERSON_RADIUS, hd: spec.depth / 2 - WORLD_WALL_MARGIN + PERSON_RADIUS }
       this.scene.add(shell.group, items.group)
       this.pool.setItems(items.items.values())
+      this.domino.setItems(items.items.values())
       this.screen.setScreens([...items.items.values()].flatMap((i) => (i.screen ? [i.screen] : [])))
       const moodSku = layout.finish.mood.replace(/^m_/, '')
       await this.lighting.setRoom(shell, spec, moodSku, items.lamps)
@@ -419,10 +436,21 @@ export class WorldEngine {
     const who = userId === this.meId ? this.me : this.remotes.get(userId)
     if (!who) return
     if (emote.kind === 'gesture') return void who.avatar?.gesture(emote.id)
+    this.bubble(who.label, emote.id, false)
+  }
+
+  /** A short line over someone's figure, drawn where reactions are. */
+  private say(userId: string, text: string): void {
+    const who = userId === this.meId ? this.me : this.remotes.get(userId)
+    if (who) this.bubble(who.label, text, true)
+  }
+
+  private bubble(label: HTMLElement, text: string, words: boolean): void {
     const el = document.createElement('div')
     el.className = 'world-reaction'
-    el.textContent = emote.id
-    who.label.append(el)
+    el.textContent = text
+    if (words) el.dataset.say = ''
+    label.append(el)
     el.addEventListener('animationend', () => el.remove(), { once: true })
     // If animations are off the element would stay: remove it on a timer too.
     setTimeout(() => el.remove(), 2600)
@@ -440,6 +468,18 @@ export class WorldEngine {
   /** Someone else moved their cue. */
   poolAim(table: string, userId: string, aim: PoolAim): void {
     if (userId !== this.meId) this.pool.aim(table, userId, aim)
+  }
+
+  // ---- dominó -------------------------------------------------------------------------------------------------------
+
+  /** What the server says about the domino tables of the room. `rev`: see DominoRoom.setViews. */
+  setDominos(views: readonly DominoView[], rev = 0): void {
+    this.domino.setViews(views, rev)
+  }
+
+  /** Gets up from the seat I am on (what E does). */
+  standUp(): void {
+    this.stand()
   }
 
   /** A point kept inside the walls and under the ceiling (for a camera). */
@@ -497,6 +537,7 @@ export class WorldEngine {
     if (!on) {
       this.keys.clear()
       this.pool.blur()
+      this.domino.blur()
       this.drag = null
     }
   }
@@ -561,7 +602,7 @@ export class WorldEngine {
     if (!this.inputEnabled) return
     this.canvas.setPointerCapture?.(e.pointerId)
     this.setPointer(e)
-    if (this.pool.pointerDown(e, this.pointer)) return void (this.drag = null)
+    if (this.pool.pointerDown(e, this.pointer) || this.domino.pointerDown(e, this.pointer)) return void (this.drag = null)
     // Editing: a press on a piece picks it up; anywhere else looks around as usual.
     if (this.editor && e.button === 0 && this.editor.begin(this.pointer)) return void (this.drag = null)
     this.drag = { x: e.clientX, y: e.clientY, moved: false, button: e.button }
@@ -574,7 +615,7 @@ export class WorldEngine {
 
   private readonly onPointerMove = (e: PointerEvent): void => {
     this.setPointer(e)
-    if (this.pool.pointerMove(e, this.pointer)) return
+    if (this.pool.pointerMove(e, this.pointer) || this.domino.pointerMove(e, this.pointer)) return
     if (this.editor?.dragging) return void this.editor.move(this.pointer)
     const d = this.drag
     if (!d) return
@@ -590,7 +631,7 @@ export class WorldEngine {
   }
 
   private readonly onPointerUp = (): void => {
-    if (this.pool.pointerUp(this.pointer)) return
+    if (this.pool.pointerUp(this.pointer) || this.domino.pointerUp(this.pointer)) return
     if (this.editor?.dragging) return void this.editor.end()
     const d = this.drag
     this.drag = null
@@ -603,7 +644,7 @@ export class WorldEngine {
   private readonly onWheel = (e: WheelEvent): void => {
     if (!this.inputEnabled) return
     e.preventDefault()
-    if (this.pool.wheel(e)) return
+    if (this.pool.wheel(e) || this.domino.wheel(e)) return
     this.watching = false
     this.camDist = THREE.MathUtils.clamp(this.camDist * Math.exp(e.deltaY * 0.0011), 1.5, 8)
   }
@@ -614,7 +655,7 @@ export class WorldEngine {
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
     const k = e.code
     if (this.editor?.selection && this.editKey(k)) return void e.preventDefault()
-    if (this.pool.keyDown(e)) return void e.preventDefault()
+    if (this.pool.keyDown(e) || this.domino.keyDown(e)) return void e.preventDefault()
     if (k === 'KeyE' && !e.repeat) {
       if (this.me?.person.seat) this.stand()
       else if (this.hintSeat) this.goSit(this.hintSeat)
@@ -750,6 +791,7 @@ export class WorldEngine {
       d.calls = String(this.renderer.info.render.calls)
       d.triangles = String(this.renderer.info.render.triangles)
       d.pool = this.pool.digest
+      d.domino = this.domino.digest
       // Where I am and which way the camera looks (x, z, yaw).
       d.at = this.me ? `${this.me.x.toFixed(2)},${this.me.z.toFixed(2)},${this.camYaw.toFixed(3)}` : ''
     }
@@ -764,6 +806,7 @@ export class WorldEngine {
   private update(dt: number, now: number): void {
     // First, so that this frame's figures know what their hands are doing with a cue.
     this.pool.update(dt, now)
+    this.domino.update(dt)
     if (this.wantCue) {
       // Walking to a table I clicked: the cue is taken on arriving, and forgotten if I went somewhere else.
       if (this.pool.nearTable === this.wantCue) {
@@ -824,7 +867,7 @@ export class WorldEngine {
         this.walkTo = { ...this.pool.route(me, stance), seat: null, stuck: 0 }
       }
     }
-    if (this.inputEnabled && !this.pool.capturing) {
+    if (this.inputEnabled && !this.pool.capturing && !this.domino.capturing) {
       if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) mz += 1
       if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) mz -= 1
       if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) mx -= 1
@@ -896,6 +939,11 @@ export class WorldEngine {
   private updateCamera(dt: number): void {
     const me = this.me
     const spec = this.layout ? WORLD_SHELLS[this.layout.shell] : null
+    if (this.domino.camera(dt)) {
+      // Over my own place at the table my figure would only be in the way of my tiles.
+      if (me?.avatar) me.avatar.root.visible = false
+      return
+    }
     if (this.pool.camera(dt)) {
       // Down the line of a shot my own figure would be all I see: it steps out, the cue stays.
       if (me?.avatar) me.avatar.root.visible = !this.pool.hidesMe
@@ -1003,6 +1051,7 @@ export class WorldEngine {
       if (!room || !layout) return
       this.screen.setScreens([...room.items.values()].flatMap((i) => (i.screen ? [i.screen] : [])))
       this.pool.setItems(room.items.values())
+      this.domino.setItems(room.items.values())
       if (lamps) this.lighting.relight(room.lamps, WORLD_SHELLS[layout.shell])
       else this.lighting.refreshShadows()
     })
@@ -1057,6 +1106,7 @@ export class WorldEngine {
     }
     this.remotes.clear()
     this.pool.dispose()
+    this.domino.dispose()
     this.post?.dispose()
     this.screen.dispose()
     this.lighting.dispose()

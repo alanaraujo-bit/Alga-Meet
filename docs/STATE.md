@@ -84,6 +84,25 @@
   cinema (perdido na mudança do SFU) continua fora e a API segue anunciando `CINEMA_TURN_URLS` que não respondem.
 - **Falta:** a nota da 0.1.20 no estúdio de Novidades (e as da 0.1.17 a 0.1.19).
 
+## 2026-11-17 — Dominó no Alga Worlds — feito na branch `feat/worlds-domino`, NÃO publicado
+- **Pedido do dono (2026-11-17):** "o da sinuca tá perfeito"; o próximo jogo é o dominó, "bem feito, sexy, agradável e
+  muito gostoso, fácil de se jogar". Regra escolhida por ele: **duplas quando são 4**, batida 1 / carroça 2 /
+  lá-e-lô 3 / cruzada 4, fecha em 6; com 2 ou 3, cada um por si com monte. Como funciona, o que foi medido e o que
+  falta: `docs/worlds-domino.md`.
+- **O que entrou:** peça `w_mesa_domino` (gratuita, categoria Jogos, 4 feltros, com as 4 cadeiras e a luminária) já no
+  Lounge; regras em `packages/shared/src/domino.ts`; servidor dono da mesa com **mãos secretas** (cada pessoa recebe
+  só as próprias pedras), bots e temporizadores (`apps/server/src/worlds.ts`); no desktop, sentar é entrar no jogo,
+  câmera sobre o seu lugar, arrastar/clicar/teclado para jogar, corrente em cobra, embaralhar e distribuir animados,
+  sons sintetizados, placar (`features/worlds/domino/`). `READY.worlds.domino` avisa o app.
+- **Verificado:** compartilhado 124, desktop 928, servidor 393 testes; typecheck dos três; **E2E em dois apps reais
+  7/7** (`apps/desktop/scripts/domino-e2e.mjs`, `docs/screenshots/domino/`).
+- **Onde está:** worktree `.claude/worktrees/release`, branch `feat/worlds-domino`, sobre `0ed182c` (0.1.19). **Sem
+  commit** até o dono pedir. A `main` já está na 0.1.20 (`a199760`): falta trazer a branch para cima dela (arquivos
+  em comum: `packages/shared/src/gateway.ts` e `apps/server/src/gateway/socket.ts`) e rodar o E2E de novo.
+- **NÃO verificado:** build empacotado; produção; os sons (ninguém ouviu); a sensação de jogo com gente de verdade.
+- **Para jogar à mão antes de publicar:** `node scripts/domino-e2e.mjs --play` em `apps/desktop` (com `QA_WORK`,
+  `QA_API_PORT`, `QA_LK_PORT`) deixa dois apps lado a lado no Lounge.
+
 ## 2026-11-16 — desktop 0.1.19 NO AR: sinuca no Mundo, player de música, microfone que não some
 - **No ar (2026-11-16, a pedido do dono: "suba tudo para a produção e lance uma nova release"):** `main` no GitHub
   com tudo; API no Railway (deploy `d770d2f7`, migração `0022_music_playlists` no boot) e

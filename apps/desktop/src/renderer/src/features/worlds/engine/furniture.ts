@@ -9,6 +9,7 @@ import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import type { WorldItemDef } from '@alga/shared'
 import type { Assets } from '../assets/loaders'
+import { dominoTable } from '../domino/table'
 import { poolTable } from '../pool/table'
 import { boxUv, kelvin, plain, surface } from './materials'
 
@@ -301,6 +302,7 @@ export async function buildPiece(assets: Assets, def: WorldItemDef, id: string, 
     case 'canvas': canvasArt(k, variant, def.size[0], def.size[1]); break
     case 'canvas_large': canvasArt(k, variant, def.size[0], def.size[1]); break
     case 'pool_table': await poolTable(k, piece, variant); break
+    case 'domino_table': await dominoTable(k, piece, variant, def); break
     default: throw new Error(`unknown generated piece "${id}"`)
   }
   return piece

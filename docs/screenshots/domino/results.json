@@ -1,0 +1,47 @@
+{
+  "at": "2026-11-17T11:13:19.453Z",
+  "results": [
+    {
+      "name": "O lounge abre com a mesa de dominó posta, sem ninguém sentado",
+      "pass": true,
+      "ms": 22083,
+      "detail": null
+    },
+    {
+      "name": "Ana senta numa cadeira: a câmera vai para a mesa e o dominó espera mais alguém",
+      "pass": true,
+      "ms": 3757,
+      "detail": "Você Esperando mais alguém Chame um amigo para sentar ou complete a mesa com bots."
+    },
+    {
+      "name": "Bia senta e Ana distribui: 7 pedras para cada, e cada app só conhece as próprias",
+      "pass": true,
+      "ms": 8228,
+      "detail": "Ana cadeira 3, Bia cadeira 2 · Você 7 pedras 0 Bia Lima 7 pedras 0 Embaralhando… Rodada 1 · Fecha em 6 · Monte: 14 | Você 7 pedras 0 Ana Souza 7 pedras 0 Embaralhando… Rodada 1 · Fecha em 6 · Monte: 14"
+    },
+    {
+      "name": "Uma rodada inteira pelo teclado: a cada jogada as duas mesas ficam iguais, e no fim todas as pedras aparecem",
+      "pass": true,
+      "ms": 35643,
+      "detail": "27 jogadas de gente, 27 pedras na mesa (4 depois de 4) · Você bateu 3 Bia Lima 0 pontos na mão 0 Lá-e-lô! Você: 3 pontos Rodada 1 · Fecha em 6 | Você 0 pontos na mão 0 Ana Souza bateu 3 Lá-e-lô! Ana Souza: 3 pontos Rodada 1 · Fecha em 6"
+    },
+    {
+      "name": "\"Jogar agora\" distribui a rodada seguinte sem esperar, e o placar da partida segue",
+      "pass": true,
+      "ms": 2962,
+      "detail": "Você 7 pedras 3 Bia Lima 7 pedras 0 Embaralhando… Rodada 2 · Fecha em 6 · Monte: 14"
+    },
+    {
+      "name": "Bia levanta no meio da rodada: um bot fica com as pedras dela e o jogo segue; a vista de cima mostra a mesa",
+      "pass": true,
+      "ms": 8866,
+      "detail": "Você 4 pedras 3 Tonho (bot) 6 pedras 0 Sua vez Arraste até a ponta ou clique numa pedra acesa · passos 49 → 55"
+    },
+    {
+      "name": "Ana levanta: a mesa fica livre de novo, e a voz dos dois nunca caiu",
+      "pass": true,
+      "ms": 473,
+      "detail": null
+    }
+  ]
+}

@@ -15,7 +15,7 @@ function noiseOf(ac: AudioContext): AudioBuffer {
 }
 
 /** A burst of filtered noise. */
-function burst(ac: AudioContext, out: AudioNode, at: number, type: BiquadFilterType, freq: number, q: number, dur: number, gain: number): void {
+export function burst(ac: AudioContext, out: AudioNode, at: number, type: BiquadFilterType, freq: number, q: number, dur: number, gain: number): void {
   const src = ac.createBufferSource()
   src.buffer = noiseOf(ac)
   const f = ac.createBiquadFilter()
@@ -31,7 +31,7 @@ function burst(ac: AudioContext, out: AudioNode, at: number, type: BiquadFilterT
 }
 
 /** A struck tone that dies away, optionally sliding in pitch. */
-function ping(ac: AudioContext, out: AudioNode, at: number, from: number, to: number, dur: number, gain: number, type: OscillatorType = 'sine'): void {
+export function ping(ac: AudioContext, out: AudioNode, at: number, from: number, to: number, dur: number, gain: number, type: OscillatorType = 'sine'): void {
   const o = ac.createOscillator()
   o.type = type
   o.frequency.setValueAtTime(from, at)

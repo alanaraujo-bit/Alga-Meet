@@ -11,6 +11,7 @@ import type {
 import type { MusicClientFrame, MusicErrorReason, MusicState } from './music.js'
 import type { WorldClientFrame, WorldEmote, WorldErrorReason, WorldPose, WorldRoomView, WorldSession, WorldsReady } from './worlds.js'
 import type { PoolAim, PoolClientFrame, PoolState } from './pool.js'
+import type { DominoClientFrame, DominoView } from './domino.js'
 import type { E2eeClientFrame, E2eeCommit, E2eeEpoch, E2eeProposals, E2eeResyncRequired, E2eeWelcome } from './e2ee.js'
 import type { RsvpStatus, SpaceEvent } from './events.js'
 import type { SpaceSound } from './soundboard.js'
@@ -44,6 +45,8 @@ import type { SpaceSound } from './soundboard.js'
  * 60 s per socket. Positions fan out every WORLD_TICK_MS, only to the people inside and only what changed.
  * Pool (pool.ts, docs/worlds-pool.md): `world_pool_*` ops and WORLD_POOL* dispatches play 8-ball on a pool table of the
  * room, only for people inside the world and only when READY.worlds.pool is set. They count in the world quota.
+ * Dominó (domino.ts, docs/worlds-domino.md): `world_domino_*` ops and WORLD_DOMINO play dominoes at a table of the
+ * room, for whoever sits at it, only when READY.worlds.domino is set. They count in the world quota too.
  */
 
 export const GatewayClose = {
@@ -92,6 +95,8 @@ export type ClientFrame =
   | WorldClientFrame
   /** Pool on a table of the world (pool.ts): `world_pool_join`, `world_pool_leave`, `world_pool_rack`, `world_pool_aim`, `world_pool_shot`. */
   | PoolClientFrame
+  /** Dominoes at a table of the world (domino.ts): `world_domino_start`, `world_domino_bot`, `world_domino_play`. */
+  | DominoClientFrame
 
 export interface ReadyPayload {
   user: Me
@@ -292,6 +297,12 @@ export type Dispatch =
   | { t: 'WORLD_POOL'; d: { channelId: string; table: string; pool: PoolState | null } }
   /** Only to the other people inside: where `userId`, who is about to shoot, has the cue. */
   | { t: 'WORLD_POOL_AIM'; d: { channelId: string; table: string; userId: string; a: PoolAim } }
+  /**
+   * Dominó (domino.ts), only to the people inside the world: one table as the person it is sent to may see it (their
+   * own tiles named, everyone else's counted), on every change and to whoever walks in. `game: null` = nobody sits
+   * there any more.
+   */
+  | { t: 'WORLD_DOMINO'; d: { channelId: string; table: string; game: DominoView | null } }
 
 export type DispatchType = Dispatch['t']
 export type DispatchOf<T extends DispatchType> = Extract<Dispatch, { t: T }>['d']

@@ -30,7 +30,7 @@ export const CLOTHS: Record<string, string> = { verde: '#0b7a45', azul: '#1552a8
 export const onTable = (px: number, py: number, y = BED_Y, target = new THREE.Vector3()): THREE.Vector3 => target.set(px, y, -py)
 
 /** Fine woven noise, tiled: enough for the cloth to catch the lamp like felt instead of looking painted. */
-function feltTexture(k: Kit): THREE.Texture {
+export function feltTexture(k: Kit): THREE.Texture {
   const s = 256
   const c = document.createElement('canvas')
   c.width = c.height = s

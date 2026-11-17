@@ -206,7 +206,7 @@ describe('the flag', () => {
   it('on: READY says where the pack is. Off: READY has no `worlds`, every op answers `disabled`, the routes do not exist', async () => {
     const me = await register(s.app)
     const gw = await connect(s.port, me.token)
-    expect((gw.events.find((e) => e.t === 'READY')!.d as { worlds?: unknown }).worlds).toEqual({ assetsUrl: '/api/v1/worlds/assets', pool: true })
+    expect((gw.events.find((e) => e.t === 'READY')!.d as { worlds?: unknown }).worlds).toEqual({ assetsUrl: '/api/v1/worlds/assets', pool: true, domino: true })
     gw.close()
 
     const off = await startServer({ WORLDS: 'false', WORLDS_ASSETS_DIR: pack })
@@ -1088,7 +1088,7 @@ describe('the asset pack', () => {
       expect((await bare.app.inject({ method: 'GET', url: '/api/v1/worlds/assets/manifest.json' })).statusCode).toBe(404)
       expect((await bare.app.inject({ method: 'GET', url: '/api/v1/worlds/assets/models/chair.glb' })).statusCode).toBe(404)
       const gw = await connect(bare.port, (await register(bare.app)).token)
-      expect((gw.events.find((e) => e.t === 'READY')!.d as { worlds?: unknown }).worlds).toEqual({ assetsUrl: '/api/v1/worlds/assets', pool: true })
+      expect((gw.events.find((e) => e.t === 'READY')!.d as { worlds?: unknown }).worlds).toEqual({ assetsUrl: '/api/v1/worlds/assets', pool: true, domino: true })
     } finally {
       await bare.close()
     }

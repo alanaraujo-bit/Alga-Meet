@@ -6,12 +6,13 @@
  * shortcut: sessions are in memory, single instance (like Voice, Cinema and Music); a restart ends them for everyone.
  */
 import {
-  LOUNGE_ROOM, POOL_AIM_HZ, STARTER_ROOM, WORLD_EMOTE_RATE, WORLD_LOOP_GESTURES, WORLD_MAX_AVATARS, WORLD_MAX_SPEED, WORLD_PLACE_COOLDOWN_MS,
-  WORLD_ROOM_NAME_MAX, WORLD_SHELLS, WORLD_TICK_MS, avatarProblem, clampPose, holdsWorldSku, newPool, poolJoin, poolLeave, poolRack, poolShoot,
+  DOMINO_BOT, DOMINO_SEATS, LOUNGE_ROOM, POOL_AIM_HZ, STARTER_ROOM, WORLD_EMOTE_RATE, WORLD_LOOP_GESTURES, WORLD_MAX_AVATARS, WORLD_MAX_SPEED,
+  WORLD_PLACE_COOLDOWN_MS, WORLD_ROOM_NAME_MAX, WORLD_SHELLS, WORLD_TICK_MS, avatarProblem, clampPose, dominoAuto, dominoBotSeat, dominoDeal,
+  dominoPlay, dominoSit, dominoStand, dominoStep, dominoView, holdsWorldSku, newDomino, newPool, poolJoin, poolLeave, poolRack, poolShoot,
   roomSeats, seatPlace, spawnPose, toPose, worldItem,
-  type DispatchOf, type DispatchType, type PoolClientFrame, type PoolState, type WorldAvatar, type WorldClientFrame, type WorldEmote,
-  type WorldErrorReason, type WorldMember, type WorldPlace, type WorldPose, type WorldRoomAccess, type WorldRoomLayout, type WorldRoomView,
-  type WorldSession,
+  type DispatchOf, type DispatchType, type DominoClientFrame, type DominoState, type DominoView, type PoolClientFrame, type PoolState,
+  type WorldAvatar, type WorldClientFrame, type WorldEmote, type WorldErrorReason, type WorldMember, type WorldPlace, type WorldPose,
+  type WorldRoomAccess, type WorldRoomLayout, type WorldRoomView, type WorldSession,
 } from '@alga/shared'
 import { eq } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
@@ -49,6 +50,14 @@ interface PoolGame {
 const POOL_EARLY_MS = 400
 const poolSeed = (): number => Math.floor(Math.random() * 2 ** 32)
 
+/** A domino table someone sits at (domino.ts): the game, and the timer of what the table does by itself next. */
+interface DominoGame {
+  state: DominoState
+  timer: NodeJS.Timeout | undefined
+  /** When that happens (ms). */
+  due: number
+}
+
 /** A room ready to be shown: its name, who may walk in (personal rooms only) and the layout. */
 interface Shown {
   name: string
@@ -73,6 +82,8 @@ interface Session {
   emotes: Map<string, { tokens: number; at: number }>
   /** Pool tables with someone playing, by the id of the table's item. A table that is not here has a fresh rack. */
   pools: Map<string, PoolGame>
+  /** Domino tables with someone sitting at them, by the id of the table's item. */
+  dominos: Map<string, DominoGame>
 }
 
 const LOUNGE: Shown = { name: 'Lounge', layout: LOUNGE_ROOM }
@@ -106,6 +117,8 @@ export function heldLayout(room: WorldRoomLayout, held: ReadonlySet<string>): Wo
 export class Worlds {
   /** Min gap between two changes of place in a call; tests shorten it. */
   placeCooldownMs = WORLD_PLACE_COOLDOWN_MS
+  /** Domino tables do things by themselves on timers; tests turn them off and call `dominoTick` instead. */
+  dominoTimers = true
   private readonly sessions = new Map<string, Session>()
   /** Sessions where someone moved since the last tick. */
   private readonly moved = new Set<Session>()
@@ -150,6 +163,7 @@ export class Worlds {
   stop(): void {
     clearInterval(this.timer)
     this.timer = undefined
+    for (const s of this.sessions.values()) for (const g of s.dominos.values()) clearTimeout(g.timer)
     this.sessions.clear()
     this.moved.clear()
     this.queues.clear()
@@ -310,6 +324,107 @@ export class Worlds {
     for (const [table, g] of s.pools) this.reply(conn, 'WORLD_POOL', { channelId: s.channelId, table, pool: this.poolView(g) })
   }
 
+  // ---- dominó (domino.ts) ---------------------------------------------------------------------------------------------
+
+  /** A `world_domino_*` frame: dealing, bots, a play. Only for people sitting at that table. */
+  handleDomino(conn: Conn, f: DominoClientFrame): void {
+    if (!this.cfg.enabled) return this.error(conn, f.op, 'disabled')
+    if (!this.inChannel(conn.userId, f.channelId)) return this.error(conn, f.op, 'not_in_call')
+    const at = this.inside(conn, f)
+    if (!at) return
+    const g = at.s.dominos.get(f.table)
+    const seat = g ? g.state.seats.indexOf(conn.userId) : -1
+    if (!g || seat < 0) return this.error(conn, f.op, 'not_found')
+    let next: DominoState | 'empty' | null = null
+    if (f.op === 'world_domino_start') {
+      next = dominoDeal(g.state, poolSeed())
+    } else if (f.op === 'world_domino_bot') {
+      const chair = dominoBotSeat(g.state, seat, f.add)
+      if (chair !== null) next = f.add ? dominoSit(g.state, chair, DOMINO_BOT) : dominoStand(g.state, chair)
+    } else {
+      const r = dominoPlay(g.state, seat, f.tile, f.end, f.seq)
+      if ('state' in r) next = r.state
+    }
+    if (!next || next === 'empty') return this.error(conn, f.op, 'invalid')
+    this.dominoPut(at.s, f.table, next)
+  }
+
+  /** Sets the game of a table (`'empty'`: nobody sits there any more), tells everyone inside what they may see of it, and times what the table does by itself next. */
+  private dominoPut(s: Session, table: string, next: DominoState | 'empty'): void {
+    const g = s.dominos.get(table)
+    clearTimeout(g?.timer)
+    if (next === 'empty') {
+      if (s.dominos.delete(table)) this.hub.dispatch(s.members.keys(), 'WORLD_DOMINO', { channelId: s.channelId, table, game: null })
+      return
+    }
+    const game: DominoGame = g ?? { state: next, timer: undefined, due: 0 }
+    game.state = next
+    game.timer = undefined
+    s.dominos.set(table, game)
+    const auto = dominoAuto(next)
+    if (auto) {
+      // A bot takes longer over some plays than others, like anyone.
+      const ms = auto.kind === 'bot' ? auto.ms * (0.7 + Math.random() * 0.8) : auto.ms
+      game.due = Date.now() + ms
+      if (this.dominoTimers) {
+        game.timer = setTimeout(() => this.dominoTick(s, table), ms)
+        game.timer.unref()
+      }
+    }
+    this.hub.dispatch(s.members.keys(), 'WORLD_DOMINO', (userId) => ({ channelId: s.channelId, table, game: this.dominoSeen(game, userId) }))
+  }
+
+  /** The game as one person may see it, with how long until the table acts by itself. */
+  private dominoSeen(g: DominoGame, userId: string): DominoView {
+    const auto = dominoAuto(g.state)
+    return { ...dominoView(g.state, userId), auto: auto && { kind: auto.kind, ms: Math.max(0, Math.round(g.due - Date.now())) } }
+  }
+
+  /** The table does what it announced: a bot's play, a draw, a pass, the play of someone who took too long, the next round. */
+  private dominoTick(s: Session, table: string): void {
+    const g = s.dominos.get(table)
+    if (!g || this.sessions.get(s.channelId) !== s) return
+    this.dominoPut(s, table, dominoStep(g.state, poolSeed()))
+  }
+
+  /**
+   * Who sits where is who is at each domino table: sitting on one of its chairs is joining, leaving the chair (standing
+   * up, walking out, hanging up, the table going away) is leaving. Called on every change of the people in the room.
+   */
+  private dominoSync(s: Session): void {
+    const tables = s.room.items.filter((i) => worldItem(i.sku)?.game === 'domino')
+    for (const table of [...s.dominos.keys()]) if (!tables.some((i) => i.id === table)) this.dominoPut(s, table, 'empty')
+    for (const { id } of tables) {
+      const on = new Array<string | null>(DOMINO_SEATS).fill(null)
+      for (const m of s.members.values()) {
+        if (m.seat?.startsWith(`${id}:`)) on[Number(m.seat.slice(id.length + 1))] = m.userId
+      }
+      const before = s.dominos.get(id)?.state ?? newDomino(id)
+      let state: DominoState | 'empty' = before
+      // Chairs left first: someone changing chairs frees the old one before taking the new.
+      for (let i = 0; i < DOMINO_SEATS && state !== 'empty'; i++) {
+        const who = state.seats[i]
+        if (who && who !== DOMINO_BOT && on[i] !== who) state = dominoStand(state, i) ?? state
+      }
+      // The last person got up and another is on a chair already (they changed chairs): a table of their own.
+      if (state === 'empty' && on.some(Boolean)) state = { ...newDomino(id), seq: before.seq + 1 }
+      for (let i = 0; i < DOMINO_SEATS && state !== 'empty'; i++) {
+        const who = on[i]
+        const sat: DominoState | null = who && state.seats[i] !== who ? dominoSit(state, i, who) : null
+        if (!who || !sat) continue
+        state = sat
+        // One game at a time: sitting down to dominoes puts the pool cue down.
+        this.poolGone(s, who)
+      }
+      if (state !== before) this.dominoPut(s, id, state)
+    }
+  }
+
+  /** Tells one socket about every domino table in play (it has just walked in). */
+  private dominoHello(conn: Conn, s: Session): void {
+    for (const [table, g] of s.dominos) this.reply(conn, 'WORLD_DOMINO', { channelId: s.channelId, table, game: this.dominoSeen(g, conn.userId) })
+  }
+
   /** Fans out who moved since the last tick, to the people inside, never a person's own pose. Driven by the timer. */
   tick(): void {
     if (!this.moved.size) return
@@ -359,7 +474,7 @@ export class Worlds {
       const room: WorldRoomView = { channelId, place, name: shown.name, ...(shown.access ? { access: shown.access } : {}), rev: 1, ...shown.layout }
       this.sessions.set(channelId, {
         channelId, place, hostId: uid, members: new Map(), tv: null, seq: 0, room, seats: roomSeats(room), placedAt: Date.now(), emotes: new Map(),
-        pools: new Map(),
+        pools: new Map(), dominos: new Map(),
       })
     }
     const now = this.sessions.get(channelId)!
@@ -378,7 +493,8 @@ export class Worlds {
       // Entering twice changes nothing; a reconnected app takes the figure over, so the old socket's close leaves it.
       already.conn = conn
       this.reply(conn, 'WORLD_STATE', { channelId, session: this.view(s) })
-      return this.poolHello(conn, s)
+      this.poolHello(conn, s)
+      return this.dominoHello(conn, s)
     }
     if (s.place.kind === 'room') {
       const { place } = s
@@ -398,6 +514,7 @@ export class Worlds {
     })
     this.broadcast(s)
     this.poolHello(conn, s)
+    this.dominoHello(conn, s)
   }
 
   private move(userId: string, channelId: string, p: WorldPose): void {
@@ -620,6 +737,7 @@ export class Worlds {
   }
 
   private forget(s: Session): void {
+    for (const g of s.dominos.values()) clearTimeout(g.timer)
     this.sessions.delete(s.channelId)
     this.moved.delete(s)
   }
@@ -668,6 +786,7 @@ export class Worlds {
 
   /** WORLD_STATE to everyone in the call; every one of them is one step of `seq`. */
   private broadcast(s: Session): void {
+    this.dominoSync(s)
     s.seq++
     this.hub.dispatch(this.inCall(s.channelId), 'WORLD_STATE', { channelId: s.channelId, session: this.view(s) })
   }

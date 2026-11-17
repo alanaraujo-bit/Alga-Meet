@@ -1,4 +1,4 @@
-import { ActivitySchema, CINEMA_FRAME_LIMIT, CINEMA_MAX_FRAME_BYTES, CinemaClientFrameSchema, CustomStatusSchema, MusicClientFrameSchema, E2EE_FRAME_LIMIT, E2eeClientFrameSchema, GatewayClose, PoolClientFrameSchema, WORLD_FRAME_LIMIT, WorldClientFrameSchema, clampActivity, type ClientFrame, type ReadyPayload } from '@alga/shared'
+import { ActivitySchema, CINEMA_FRAME_LIMIT, CINEMA_MAX_FRAME_BYTES, CinemaClientFrameSchema, CustomStatusSchema, DominoClientFrameSchema, MusicClientFrameSchema, E2EE_FRAME_LIMIT, E2eeClientFrameSchema, GatewayClose, PoolClientFrameSchema, WORLD_FRAME_LIMIT, WorldClientFrameSchema, clampActivity, type ClientFrame, type ReadyPayload } from '@alga/shared'
 import { eq, inArray } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import type { WebSocket } from 'ws'
@@ -33,6 +33,7 @@ const ClientFrameSchema = z.discriminatedUnion('op', [
   ...MusicClientFrameSchema.options,
   ...WorldClientFrameSchema.options,
   ...PoolClientFrameSchema.options,
+  ...DominoClientFrameSchema.options,
   z.object({ op: z.literal('identify'), token: z.string().min(1).max(256) }),
   z.object({ op: z.literal('heartbeat') }),
   z.object({ op: z.literal('presence'), status: z.enum(['online', 'idle', 'dnd', 'invisible']) }),
@@ -84,7 +85,7 @@ export async function buildReady(ctx: Ctx, user: UserRow): Promise<ReadyPayload>
     cinemaLanes: config.cinema.maxLanes,
     music: true,
     musicPlaylists: true,
-    ...(config.worlds.enabled ? { worlds: { assetsUrl: config.worlds.assetsUrl, pool: true } } : {}),
+    ...(config.worlds.enabled ? { worlds: { assetsUrl: config.worlds.assetsUrl, pool: true, domino: true } } : {}),
   }
 }
 
@@ -245,6 +246,11 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
         case 'world_pool_aim':
         case 'world_pool_shot':
           ctx.worlds.handlePool(conn, frame)
+          break
+        case 'world_domino_start':
+        case 'world_domino_bot':
+        case 'world_domino_play':
+          ctx.worlds.handleDomino(conn, frame)
           break
       }
     }
