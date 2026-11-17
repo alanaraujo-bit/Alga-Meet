@@ -9,9 +9,12 @@
 //   QA_WORK=<dir> node scripts/cinema-lab.mjs --instances=4 --late --play=560 --netem=loss=1,delay=20,jitter=2 --host-cap=12000 --shots
 //   QA_WORK=<dir> node scripts/qa-stack.mjs stop
 // Flags: --instances=2..4 · --play=<s> of continuous playback · --late (the last instance sits 30 s into the play) ·
+// --seek=<film second the host jumps to right after the start: every seat refills from nothing in that scene> ·
 // --late-trials=<n> (then stands up and sits again, n in all) · --pauses=<n> · --checks (canPlay per fixture first) ·
 // --netem=<profile per direction, udp-impair keys> · --host-cap=<kbit/s, host upload, needs --netem> ·
 // --route=webaudio|mediastream · --e2ee (the space's calls are E2EE: meshes tagged) · --film=<path> · --shots · --tag=<name> · --keep
+// QA_EXE="<...>/release/win-unpacked/Alga Meet.exe" runs a packaged build instead of the QA build. CINEMA_MAX_LANES=3 in
+// the environment of `qa-stack.mjs start` keeps every pair at its first three lanes (the baseline of a lossy profile).
 // Output: <QA_WORK>/cinema-lab-<tag>.json (summary + raw logs) and docs/benchmarks/cinema-engine-<tag>.json (summary).
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -32,6 +35,8 @@ const PLAY_S = Number(arg('play', 60))
 const LATE = flag('late') || Number(arg('late-trials', 0)) > 0
 const LATE_TRIALS = Math.max(LATE ? 1 : 0, Number(arg('late-trials', LATE ? 1 : 0)))
 const PAUSES = Number(arg('pauses', 3))
+/** Film second the host jumps to right after the start (0: none): every seat refills from nothing, in a scene of your choice. */
+const SEEK_S = Number(arg('seek', 0))
 const NETEM = arg('netem', '')
 const HOST_CAP = Number(arg('host-cap', 0))
 const ROUTE = arg('route', 'webaudio')
@@ -112,13 +117,16 @@ function film() {
   if (r.status !== 0) throw new Error(`fixture: ${r.stderr}`)
   return out
 }
+/** A packaged build instead of the QA build (what a release ships): QA_EXE="<...>/release/win-unpacked/Alga Meet.exe". */
+const EXE = process.env.QA_EXE
 function linkFfmpeg() {
+  if (EXE) return // the package carries its own ffmpeg
   const dst = join(Q.QA_APP, 'build', 'ffmpeg')
   if (!existsSync(dst)) symlinkSync(join(Q.appDir, 'build', 'ffmpeg'), dst, 'junction')
 }
 /** The QA build seen from <repo>/node_modules: main finds the MLS WASM at <app>/../../native/mls/pkg (E2EE works). */
 const APP = join(Q.repo, 'node_modules', '.alga-qa-lab')
-if (!existsSync(APP)) symlinkSync(Q.QA_APP, APP, 'junction')
+if (!EXE && !existsSync(APP)) symlinkSync(Q.QA_APP, APP, 'junction')
 
 // ── network impairment of the mesh (worker thread) ──────────
 /** Runs in a worker (eval, CommonJS): one UDP proxy per remote candidate, built on udp-impair's Link. */
@@ -424,12 +432,12 @@ const H = 760
 const POS = [[0, 0], [640, 0], [0, 300], [640, 300]]
 async function launch(i) {
   const [k, displayName] = NAMES[i]
-  rmSync(join(process.env.APPDATA ?? '', 'Alga Meet Dev', 'profiles', `qa-lab-${k}`), { recursive: true, force: true })
+  rmSync(join(process.env.APPDATA ?? '', EXE ? 'Alga Meet' : 'Alga Meet Dev', 'profiles', `qa-lab-${k}`), { recursive: true, force: true })
   const env = { ...process.env, ALGA_API_URL: Q.API, ALGA_E2E: '1', ALGA_E2EE: '1' }
   delete env.ELECTRON_RENDERER_URL
   const app = await electron.launch({
-    executablePath: electronPath, cwd: Q.appDir, env,
-    args: [APP, `--profile=qa-lab-${k}`, '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
+    executablePath: EXE ?? electronPath, cwd: Q.appDir, env,
+    args: [...(EXE ? [] : [APP]), `--profile=qa-lab-${k}`, '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
       '--disable-features=CalculateNativeWinOcclusion', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
       '--autoplay-policy=no-user-gesture-required', '--mute-audio'],
   })
@@ -500,6 +508,26 @@ const video = (page) => page.evaluate(() => {
 const statsText = (page) => page.evaluate(() => [...document.querySelectorAll('[aria-label="Estatísticas"]')].map((e) => e.textContent).find((x) => x?.includes('Relógio')) ?? '')
 const seatsText = (page) => page.evaluate(() => document.querySelector('[aria-label="Poltronas"]')?.textContent ?? '')
 const dock = (page) => page.getByRole('toolbar', { name: 'Controles da chamada' })
+/**
+ * The lab drives the engine's raw controls (pause, track selects, the timeline), which live in the room's "Modo
+ * engenharia" since the room got its own screens: once the room plays, S opens the stats panel, whose button
+ * switches the stage (the antessala, before the start, has neither).
+ */
+async function engineering(page) {
+  const raw = page.getByLabel('Faixa de áudio') // the engineering stage's track select (the room has a menu instead)
+  if (await raw.count()) return
+  const enter = page.getByRole('button', { name: 'Modo engenharia' })
+  await until(async () => {
+    if (await raw.count()) return true
+    if (!(await enter.count())) await page.keyboard.press('s')
+    await enter.first().click({ timeout: 1500 }).catch(() => undefined)
+    return (await raw.count()) > 0
+  }, 'engineering stage', 20_000, 300)
+}
+/** The stats panel open (S toggles it: pressing it blindly would close one that is already there). */
+async function showStats(page) {
+  if (!(await statsText(page).catch(() => ''))) await page.keyboard.press('s')
+}
 const closeNotices = async (page) => {
   const close = page.getByRole('status').getByRole('button', { name: 'Fechar' })
   for (let i = 0; i < 5 && (await close.count()) > 0; i++) await close.first().click({ timeout: 2000 }).catch(() => undefined)
@@ -637,14 +665,15 @@ await check(`${N} instâncias entram na call`, async () => {
 async function pick(file) {
   await A.app.evaluate(({ dialog }, f) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [f] }) }, file)
   await dock(A.page).getByRole('button', { name: 'Cinema' }).click()
-  const sheet = A.page.getByRole('dialog', { name: 'Projetar para a chamada' })
+  const sheet = A.page.getByRole('dialog', { name: /^Projetar para a (sala|chamada)$/ })
   const error = A.page.getByRole('status').filter({ hasText: /não é suportado|Não deu para/ })
   await sheet.or(error).first().waitFor({ timeout: 60_000 })
   if (await error.isVisible().catch(() => false)) return { refused: (await error.textContent())?.trim() }
   return { sheet, noDecode: (await sheet.getByText('não decodifica', { exact: false }).count()) > 0 }
 }
 const endSession = async () => {
-  await A.page.getByRole('button', { name: 'Encerrar sessão' }).first().click()
+  // dispatched, not clicked: on the engineering stage the <video> covers the header's button
+  await A.page.getByRole('button', { name: 'Encerrar sessão' }).first().dispatchEvent('click')
   await until(async () => !(await video(A.page)), 'stage gone', 15_000)
   for (const x of inst) await x.page.getByRole('status').getByRole('button', { name: 'Fechar' }).first().click({ timeout: 2000 }).catch(() => undefined)
 }
@@ -697,7 +726,7 @@ await check('Abrir sessão → primeiro frame em todas as poltronas sentadas', a
   }, 'first frame everywhere', 60_000, 50)
   M.firstFrameMs = first
   M.firstFrameAllMs = Math.max(...Object.values(first))
-  await until(async () => ((await seatsText(A.page)).match(/pronto/g)?.length ?? 0) >= early.length, 'all seats ready', 180_000) // a poor network pre-rolls 30 s (adaptive pre-roll)
+  await until(async () => ((await seatsText(A.page)).match(/pronto/gi)?.length ?? 0) >= early.length, 'all seats ready', 180_000) // a poor network pre-rolls 30 s (adaptive pre-roll)
   M.allReadyMs = Date.now() - T.open
   for (const x of inst) await closeNotices(x.page)
   if (M.firstFrameAllMs > 10_000) throw new Error(`first frame ${M.firstFrameAllMs} ms > 10 s`)
@@ -714,8 +743,30 @@ await check('Começar: as poltronas tocam; play agendado em ±1 frame de `at`', 
     }
     return true
   }, 'all playing', 30_000)
-  for (const x of early) await x.page.keyboard.press('s') // stats panels (fromHost/fromPeers, relay); they cover the start button
+  // the antessala has no stats panel: the engineering stage is entered once the room plays
+  for (const x of early) await engineering(x.page)
+  T.eng = Date.now() // the switch remounts the <video>: sync is measured from 10 s after it
+  for (const x of early) await showStats(x.page) // stats panels (fromHost/fromPeers, relay, routes)
 })
+
+if (SEEK_S > 0) {
+  await check(`Pular para ${SEEK_S} s: todas as poltronas voltam a tocar lá`, async () => {
+    const slider = A.page.locator('[role="slider"][aria-label="Linha do tempo"]')
+    const [box, durationS] = [await slider.boundingBox(), await A.page.evaluate(() => [...document.querySelectorAll('video')].find((x) => x.src.startsWith('blob:'))?.duration)]
+    if (!box || !(durationS > SEEK_S)) throw new Error(`no timeline or the film is shorter (${durationS} s)`)
+    const at = Date.now()
+    await slider.click({ position: { x: Math.round((box.width * SEEK_S) / durationS), y: 3 } })
+    await until(async () => {
+      for (const x of early) {
+        const v = await video(x.page)
+        if (!v || v.paused || Math.abs(v.t - SEEK_S) > 90) return false
+      }
+      return true
+    }, 'all playing after the seek', 240_000, 200)
+    M.seek = { toS: SEEK_S, allPlayingAfterMs: Date.now() - at }
+    return M.seek
+  })
+}
 
 // ── continuous play (late joiner, memory, swarm) ────────────
 const swarmTexts = []
@@ -746,10 +797,11 @@ await check(`Tocando ${PLAY_S} s${LATE ? ` (${late.k} entra no meio${LATE_TRIALS
       await sit.waitFor({ timeout: 15_000 })
       const at = Date.now()
       await sit.click()
+      await engineering(x.page)
       await until(async () => (await video(x.page))?.ready >= 2, 'late first frame', 30_000, 50)
       const ff = Date.now() - at
       await until(async () => { const v = await video(x.page); return v && !v.paused }, 'late playing', 30_000, 50)
-      if (trial === 0) await x.page.keyboard.press('s')
+      await showStats(x.page)
       await sleep(14_000)
       await drain()
       M.lateTrials.push({ sitAt: at, firstFrameMs: ff })
@@ -917,7 +969,7 @@ M.roomPausedPct = r1((100 * M.roomPausedS) / M.runAfterFirstPlayS)
 // sync: EVERY pair of seated windows (the late joiner without the first 15 s of each of its joins), from 10 s after
 // the start. Frozen seats show no frames (rVFC), so a pair has no bins while either side is frozen: a blind spot; the
 // error built up meanwhile shows once it moves again. `syncOutsideWaits` = the same bins minus room waits ± 3 s.
-const syncFrom = T.start + 10_000
+const syncFrom = Math.max(T.start, T.eng ?? 0) + 10_000
 const waitSpans = M.roomWaits.map((w) => [T.start + w.atS * 1000 - 3000, (w.endS === null ? T.playEnd : T.start + w.endS * 1000) + 3000])
 const joinSpans = M.lateTrials.map((tr) => [tr.sitAt, tr.sitAt + 15_000])
 const outside = (errs, spans) => errs.filter(([t]) => !spans.some(([a, b]) => t >= a && t < b))
