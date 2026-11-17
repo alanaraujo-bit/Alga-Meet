@@ -52,7 +52,7 @@ export const formatMoney = (cents: number, currency: 'BRL' | 'USD' = 'BRL') => (
 
 export const mayReceive = (role: StaffRole, kind: AdminEventKind) => role === 'admin' || !ADMIN_MONEY_KINDS.includes(kind)
 
-type Listener = { role: StaffRole; send: (e: AdminEvent) => void }
+type Listener = { role: StaffRole; userId: string; send: (e: AdminEvent) => void }
 
 export class AdminAlerts {
   readonly fcm: Fcm | null
@@ -120,20 +120,27 @@ export class AdminAlerts {
     }
   }
 
-  /** Only to the caller's own devices (POST /admin/devices/test). */
-  async test(userId: string): Promise<number> {
-    const devices = await this.db.select().from(adminDevices).where(eq(adminDevices.userId, userId))
-    if (!this.fcm) return 0
+  /** Only to the caller: their open streams ("modo plantão", the app) and their FCM devices (POST /admin/devices/test). */
+  async test(userId: string, now = new Date()): Promise<number> {
+    const id = uuidv7()
+    const title = 'Teste de notificação'
+    const body = 'Se você está lendo isto, o caminho servidor → celular funciona.'
     let sent = 0
+    for (const l of this.listeners) {
+      if (l.userId !== userId) continue
+      l.send({ id, kind: 'test', title, body, amountCents: null, currency: null, user: null, createdAt: now.toISOString() })
+      sent++
+    }
+    if (!this.fcm) return sent
+    const devices = await this.db.select().from(adminDevices).where(eq(adminDevices.userId, userId))
     for (const d of devices) {
-      if (d.token.startsWith('stream:')) continue
-      if (await this.deliver(d.token, { kind: 'test', title: 'Teste de notificação', body: 'Se você está lendo isto, o caminho servidor → FCM → celular funciona.', id: uuidv7() })) sent++
+      if (!d.token.startsWith('stream:') && await this.deliver(d.token, { kind: 'test', title, body, id })) sent++
     }
     return sent
   }
 
-  subscribe(role: StaffRole, send: (e: AdminEvent) => void): () => void {
-    const l = { role, send }
+  subscribe(role: StaffRole, userId: string, send: (e: AdminEvent) => void): () => void {
+    const l = { role, userId, send }
     this.listeners.add(l)
     return () => this.listeners.delete(l)
   }

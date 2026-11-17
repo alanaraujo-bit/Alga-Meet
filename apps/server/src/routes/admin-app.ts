@@ -66,7 +66,7 @@ export function adminAppRoutes(app: FastifyInstance, ctx: Ctx): void {
     const res = reply.raw
     res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache, no-transform', 'x-accel-buffering': 'no' })
     res.write(`: ok\n\n`)
-    const off = alerts.subscribe(user.staffRole!, (e) => res.write(`event: alert\ndata: ${JSON.stringify(e)}\n\n`))
+    const off = alerts.subscribe(user.staffRole!, user.id, (e) => res.write(`event: alert\ndata: ${JSON.stringify(e)}\n\n`))
     const end = () => { clearInterval(ping); off(); res.end() }
     const ping = setInterval(() => {
       void db.select({ role: users.staffRole }).from(sessions).innerJoin(users, eq(users.id, sessions.userId)).where(eq(sessions.id, sessionId))

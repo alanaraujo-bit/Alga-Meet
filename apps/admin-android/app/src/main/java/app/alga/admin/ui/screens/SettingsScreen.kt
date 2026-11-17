@@ -103,7 +103,7 @@ fun SettingsScreen() {
                         scope.launch {
                             testResult = try {
                                 val r = app.api.testPush()
-                                if (r.sent > 0) "Enviada para ${r.sent} aparelho${if (r.sent > 1) "s" else ""}." else "Nenhum aparelho com Firebase registrado."
+                                if (r.sent > 0) "Enviada: chegou em ${r.sent} ${if (r.sent > 1) "conexões" else "conexão"} deste aparelho." else "Nada recebeu: ligue o modo plantão (ou o Firebase) e tente de novo."
                             } catch (e: Exception) { errorText(e) }
                         }
                     },
