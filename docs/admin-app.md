@@ -107,8 +107,10 @@ Três caminhos, com o mesmo id de evento (um aviso aparece uma vez):
 
 ## Antes de produção (decisão do dono)
 
-- A migração é `0021_admin_app`. Há uma `0021_music_playlists` ainda não commitada no checkout principal: quem entrar
-  por último renomeia para `0022` e roda `npm run db:generate` de novo.
+- A migração é `0021_admin_app` e já está em produção (2026-11-16). Há uma `0021_music_playlists` ainda não commitada
+  no checkout principal: o `when` da minha no `_journal.json` foi posto 1 s antes do dela, para o migrador de produção
+  (que aplica só o que tem `when` maior que o último aplicado) não pular a de playlists quando ela subir. Ao juntar os
+  dois, renumere a de playlists para `0022` mantendo o `when` dela e gere o snapshot de novo.
 - Deploy da API com `FCM_SERVICE_ACCOUNT` e o app compilado com o `google-services.json`.
 - O APK de release usa a chave de debug (`shortcut` em `app/build.gradle.kts`): criar uma chave própria antes de
   distribuir para outra pessoa da equipe.
