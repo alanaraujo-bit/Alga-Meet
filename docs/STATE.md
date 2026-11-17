@@ -1,5 +1,89 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-17 — desktop 0.1.20 NO AR: a Sala de Cinema aguenta rede com perda de pacotes
+- **No ar (2026-11-17, a pedido do dono: "organize e corrija o que tem pra resolver e suba para a produção, mas com
+  testes reais e com resultados reais"):** `main` no GitHub em `3dddee9`; API no Railway (deploy `b087a042`, construiu
+  `3dddee9`, sem migração) e https://github.com/alanaraujo-bit/Alga-Meet/releases/tag/v0.1.20 (tag em `4b0ed9c`, não
+  assinado, 167.977.289 bytes, SHA-256 `e84ad03b…0d62`).
+- **O que o dono viu na véspera (projetando deste PC para dois amigos, 0.1.18):** "Esperando Fulano" o tempo todo,
+  ora um amigo, ora o outro, com os dois dizendo que a internet estava boa.
+- **Medido na hora, deste PC:**
+  - O filme (1080p, 1,9 GB, 55 min): média 4,8 Mbps; trechos de ~30 s a 7–9 Mbps; peças de até 13 Mbps.
+  - O upload do cinema batia num **teto fixo de ~6,9 Mbps no total** (os dois amigos juntos) com ping estável
+    (24 ms): não era o link saturado. E ficava **parado (~0,3 Mbps) por 10–15 s** com um amigo travado.
+  - **Perda de pacotes no caminho do dono para a internet**, medida com UDP de verdade (DNS) e ping a 2/s: 0 % até o
+    roteador e até o 4º salto do provedor; 3 % para Quad9 e OpenDNS; 14–22 % para Google e Cloudflare naquele
+    momento. Com ~3 % uma associação SCTP rende ~1,1 Mbps; 3 conexões por amigo = ~3,4 Mbps, abaixo do filme.
+  - Todo o filme saiu pelo túnel **Teredo** do Windows (2,26 GB no contador da interface): o ICE prefere o par
+    Teredo (candidato `host`) ao IPv4 direto (`srflx`). Se o Teredo em si piora a vazão **não foi provado**.
+  - A voz estava normal (UDP direto no SFU).
+- **Duas causas:** (1) perda de pacotes na rede do provedor do dono, que estrangula cada conexão do canal de dados;
+  (2) um defeito do agendador: uma poltrona sem filme pedia as peças a mais de 10 s da posição ao **amigo** que já as
+  tinha, e quem projeta **recusava** repeti-las (super-seed), mesmo com o upload dele ocioso.
+- **O que mudou (`e693d2b`; desktop, shared e servidor):**
+  1. **Poltrona faminta** (não pronta, ou com menos de 10 s à frente): a janela crítica vem de quem entrega mais
+     rápido, incluindo quem projeta (`starving` em `swarm/scheduler.ts`, `Swarm.setStarving`, `pushStatus`).
+  2. **Quem projeta atende pedido urgente quando o upload não está disputado** (nenhuma outra poltrona com envio
+     urgente, RTT sem inflar): `pressed()` em `swarm/swarm.ts`. Sob disputa o super-seed continua igual.
+  3. Um download de uma poltrona faminta que fica 2 s sem avançar, ou vem de uma fonte duas vezes mais lenta que
+     outra, muda de fonte (uma vez por peça).
+  4. **Mais conexões sob perda:** um par cresce de 3 para até `CINEMA_MAX_LANES` (8) conexões, uma a cada 4 s,
+     enquanto uma poltrona está há 8 s sem ficar pronta e o RTT do par não diz fila (`growLanes` em `store.ts`,
+     `Mesh.grow`). O servidor anuncia o limite em `READY.cinemaLanes`; contra um servidor antigo (que fecha o socket
+     num `lane` ≥ 3) o cliente fica nas 3. Um app antigo do outro lado só responde as 3 primeiras, e o par para de
+     crescer. **Freio sem versão nova:** `CINEMA_MAX_LANES=3` no serviço `api` (`docs/infra/staging.md`).
+  5. **Diagnóstico:** o painel `S` ganhou a linha "Rotas" (por conexão: direta, Teredo, VPN ou relay; RTT; vazão), e
+     cada mudança de estado da poltrona (e a cada 30 s) vira uma linha `[cinema]` no `main.log`, sem endereço nem
+     nome (`diagLine`, IPC `cinemaDiag`). **Depois de uma sessão ruim, é aí que se olha primeiro.**
+  6. **Tela de espera honesta:** passava "10 s" quando a poltrona em rede lenta precisa de 60 s; agora conta até
+     60 s e diz que a conexão daquela pessoa está lenta (`waitTargetS`, `Waiting.tsx`).
+- **Testes reais (lab, instâncias de verdade do app, o arquivo do dono, proxy com perda medida de 2,98–3,05 % em
+  cada sentido e RTT 61 ms; resumos em `docs/benchmarks/cinema-engine-t17-*.json`):**
+
+  | Rodada | Conexões | Sala parada | Poltrona travada | Sincronia p95 |
+  |---|---|---|---|---|
+  | Rede local, 3 poltronas, 90 s (`t17-lan-3x`) | 3 por par (não cresce) | 0 s | nenhuma | 33,2 ms |
+  | 3 % de perda, começo do filme, 150 s (`t17-loss3-grow`) | 6–7 por par | 0 s | nenhuma | 20 ms |
+  | Idem, presas em 3 (`t17-loss3-fixed3`) | 3 por par | 0 s | nenhuma | 38,8 ms |
+  | 3 % de perda, **pulando para a cena de 13 Mbps**, presas em 3 (`t17-loss3-seek-fixed3`) | 3 por par | **64,9 s em 177 s (36,6 %)** | as duas, 60,1 s cada | 42 ms |
+  | Idem, com crescimento (`t17-loss3-seek-grow`) | 7–8 por par | **22,5 s (12,6 %)** | uma, 14,9 s | 40,9 ms |
+  | Idem, chamada E2EE (`t17-loss3-seek-e2ee`) | 8 por par | 21,8 s | uma, 14,9 s | 31,2 ms |
+  | **Pacote 0.1.20 empacotado**, E2EE, mesma cena (`t17-packaged-loss3-seek`) | 8 por par | 19,5 s | uma, 12,2 s | 45,1 ms |
+  | 4 poltronas, E2EE, uma entra no meio, 1 % de perda, upload de quem projeta limitado a 7,2 Mbps (1,5× o filme), 240 s (`t17-4x-loss1-cap7`) | 3–5 por par | 0 s | nenhuma | 36,2 ms |
+
+  - Em toda rodada "pulando", 10 s da sala parada são o próprio pulo (o servidor recomeça em 10 s com ou sem as
+    poltronas prontas); o que caiu foi a espera pela poltrona travada: **54,9 s → 12,5 s**.
+  - No começo do filme (leve) ninguém travou nem com 3 conexões, mas cada amigo recebeu 5,3 Mbps com 3 conexões
+    contra 10,5–11,8 Mbps com crescimento, e todos ficaram prontos em 22,6 s contra 33,3 s.
+  - Com upload apertado o crescimento quase não acontece (o RTT inflado segura) e quem projeta envia 1,07× o filme:
+    o super-seed continua valendo. Fila do upload dele: p50 48 ms, p95 143 ms, 3,4 % do tempo acima de 150 ms.
+- **Outras verificações:** typecheck dos três pacotes; shared 99, desktop 938, servidor 384 testes; pacote com os
+  mesmos arquivos e tamanhos do 0.1.19 instalado (só o `app.asar` muda, +4 KB) e `check-package.mjs`; boot do deploy
+  sem erro (`voice: reconciled with LiveKit`); `/api/v1/ready` 200; `releases/latest/download/latest.yml` serve a
+  0.1.20 e o instalador responde 200 com 167.977.289 bytes pelos dois nomes; **o instalador rodado como a
+  atualização do app (`--updated /S`) sobre o app instalado do dono, que estava fechado: 0.1.19 → 0.1.20, código 0, e
+  o app instalado abre na 0.1.20 apontando para a API de produção** (`check-installed.mjs`).
+- **O que falha ou não foi verificado:**
+  - Trocar a faixa de áudio no meio do filme com perda: salto de 0,7–2,4 s (critério: nenhum salto acima de 1 frame).
+    Já era assim (ver "Vazão sob perda", R35); na rede local passa (2,9 ms).
+  - Com perda, o primeiro frame do último amigo passou de 10 s em 3 de 6 rodadas (8,8–15,0 s).
+  - Na rede local, uma de duas pausas assentou 374 ms depois do instante agendado (critério 300 ms), no mesmo frame.
+  - **Não verificado:** a internet de verdade com os amigos (a perda do provedor pode ser maior que 3 %); o
+    `READY.cinemaLanes` lido de fora em produção (não há conta de teste lá: o que há é o commit construído e o boot);
+    um par com 0.1.19 de um lado; a atualização pelo botão do próprio app (o que rodou foi o instalador, do mesmo
+    jeito que o app o chama); a tela de espera nova vista por uma pessoa.
+  - Perda acima de uns 10 % continua travando: nenhuma quantidade de conexões compensa.
+- **O lab voltou a rodar** (`a5af1b3`): `cinema-lab.mjs` procurava a ficha e os controles da tela antiga. Agora abre
+  a ficha atual, lê a antessala e entra no "Modo engenharia" depois do início. Ganhou `--seek=<s>` (pular para uma
+  cena), `QA_EXE` (build empacotado) e a linha de base com `CINEMA_MAX_LANES=3` no ambiente do `qa-stack.mjs start`.
+  Rodar a suíte de testes do servidor junto com o lab derruba a checagem do ffmpeg da instância (limite de 5 s).
+- **Como foi juntado:** worktree `.claude/worktrees/cinema`, branch `fix/cinema-stalls` a partir da `origin/main`;
+  os arquivos só do cinema copiados do checkout principal e os trechos mistos reaplicados à mão. `alga-setup-ui.exe`
+  é o mesmo binário desde a 0.1.17 (fontes da janela de instalação iguais desde `v0.1.19`, conferido por diff).
+- **Fora do código, com o dono:** a perda está na rede do provedor (além do 4º salto), não na casa; o relay do
+  cinema (perdido na mudança do SFU) continua fora e a API segue anunciando `CINEMA_TURN_URLS` que não respondem.
+- **Falta:** a nota da 0.1.20 no estúdio de Novidades (e as da 0.1.17 a 0.1.19).
+
 ## 2026-11-16 — desktop 0.1.19 NO AR: sinuca no Mundo, player de música, microfone que não some
 - **No ar (2026-11-16, a pedido do dono: "suba tudo para a produção e lance uma nova release"):** `main` no GitHub
   com tudo; API no Railway (deploy `d770d2f7`, migração `0022_music_playlists` no boot) e
