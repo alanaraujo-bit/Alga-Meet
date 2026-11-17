@@ -1,5 +1,6 @@
 package app.alga.admin.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +38,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import app.alga.admin.App
+import app.alga.admin.R
+import androidx.compose.ui.res.painterResource
 import app.alga.admin.data.AdminMe
 import app.alga.admin.data.ApiException
 import app.alga.admin.data.Servers
@@ -90,8 +93,8 @@ fun LoginScreen(onLoggedIn: (AdminMe) -> Unit) {
         verticalArrangement = Arrangement.Center,
     ) {
         Spacer(Modifier.height(72.dp))
-        Box(Modifier.size(52.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF16172A)), contentAlignment = Alignment.Center) {
-            Text("A", style = Type.title, color = Color(0xFFC9CBFF))
+        Box(Modifier.size(56.dp).clip(RoundedCornerShape(17.dp)).background(Color(0xFF16172A)), contentAlignment = Alignment.Center) {
+            Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(56.dp))
         }
         Spacer(Modifier.height(28.dp))
         Text("Alga Admin", style = Type.display, color = p.text)
@@ -129,7 +132,7 @@ fun LoginScreen(onLoggedIn: (AdminMe) -> Unit) {
         }
         Spacer(Modifier.height(16.dp))
         Text(
-            if (server == "qa") "QA: a API do PC chega pelo cabo (adb reverse tcp:4340 tcp:4340). Dados de teste."
+            if (server == "qa") "QA: o servidor de teste deste PC, pelo cabo USB. Os dados são de teste."
             else "Produção: só contas com papel de equipe entram. Cada consulta fica no registro de auditoria.",
             style = Type.caption, color = p.text3,
         )

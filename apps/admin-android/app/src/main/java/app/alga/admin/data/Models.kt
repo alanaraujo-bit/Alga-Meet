@@ -114,11 +114,11 @@ data class UserDetail(
     @Serializable data class Action(val id: String, val type: String, val reason: String, val until: String? = null, val createdAt: String, val note: String? = null)
     @Serializable data class Billing(val lifetime: Money, val subscriptions: List<Sub>, val orders: List<Order>) {
         @Serializable data class Sub(
-            val id: String, val productId: String, val kind: String, val status: String, val amountCents: Long, val currency: String,
+            val id: String, val productId: String, val productName: String = productId, val kind: String, val status: String, val amountCents: Long, val currency: String,
             val provider: String, val startedAt: String? = null, val currentPeriodEnd: String? = null, val cancelAtPeriodEnd: Boolean,
         )
         @Serializable data class Order(
-            val id: String, val productId: String, val status: String, val amountCents: Long, val currency: String, val provider: String,
+            val id: String, val productId: String, val productName: String = productId, val status: String, val amountCents: Long, val currency: String, val provider: String,
             val createdAt: String, val paidAt: String? = null, val gift: Boolean,
         )
     }

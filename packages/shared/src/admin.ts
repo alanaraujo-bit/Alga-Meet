@@ -208,8 +208,8 @@ export interface AdminUserDetail extends AdminUserSummary {
   /** null for moderators. */
   billing: {
     lifetime: Money
-    subscriptions: { id: string; productId: string; kind: string; status: string; amountCents: number; currency: string; provider: string; startedAt: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean }[]
-    orders: { id: string; productId: string; status: string; amountCents: number; currency: string; provider: string; createdAt: string; paidAt: string | null; gift: boolean }[]
+    subscriptions: { id: string; productId: string; productName: string; kind: string; status: string; amountCents: number; currency: string; provider: string; startedAt: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean }[]
+    orders: { id: string; productId: string; productName: string; status: string; amountCents: number; currency: string; provider: string; createdAt: string; paidAt: string | null; gift: boolean }[]
   } | null
 }
 

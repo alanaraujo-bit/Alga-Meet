@@ -37,6 +37,8 @@ data class Palette(
     val good: Color,
     val warn: Color,
     val bad: Color,
+    /** Fill behind white text (5:1); ad is for text and icons. */
+    val badFill: Color,
     val glass: Color,
     val glassEdge: Color,
     val dark: Boolean,
@@ -46,7 +48,7 @@ val DarkPalette = Palette(
     bg = Color(0xFF0B0B0C), surface = Color(0xFF131415), raised = Color(0xFF1A1B1D), line = Color(0x14FFFFFF),
     text = Color(0xFFF7F8F8), text2 = Color(0xFFC4CAD4), text3 = Color(0xFF8A8F98),
     accent = Color(0xFF8B8EF7), accentFill = Color(0xFF6163D0), accentSoft = Color(0x268B8EF7),
-    good = Color(0xFF61C28E), warn = Color(0xFFE6B463), bad = Color(0xFFE66E68),
+    good = Color(0xFF61C28E), warn = Color(0xFFE6B463), bad = Color(0xFFE66E68), badFill = Color(0xFFC04444),
     glass = Color(0x6B141517), glassEdge = Color(0x1FFFFFFF), dark = true,
 )
 
@@ -54,7 +56,7 @@ val LightPalette = Palette(
     bg = Color(0xFFF5F5F7), surface = Color(0xFFFFFFFF), raised = Color(0xFFF0F0F3), line = Color(0x14000000),
     text = Color(0xFF111216), text2 = Color(0xFF41454D), text3 = Color(0xFF6B7079),
     accent = Color(0xFF4F52C4), accentFill = Color(0xFF5154C9), accentSoft = Color(0x1A5154C9),
-    good = Color(0xFF1E8A57), warn = Color(0xFFB07A12), bad = Color(0xFFC0443F),
+    good = Color(0xFF1E8A57), warn = Color(0xFFB07A12), bad = Color(0xFFC0443F), badFill = Color(0xFFB3352F),
     glass = Color(0x8CFFFFFF), glassEdge = Color(0x24FFFFFF), dark = false,
 )
 

@@ -152,7 +152,7 @@ private fun EventRow(e: AdminEvent, divider: Boolean) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(e.title, style = Type.bodyStrong, color = p.text, maxLines = 1)
-                Text(listOfNotNull(e.user?.let { "${it.displayName} (@${it.username})" }, e.body).joinToString(" · "), style = Type.caption, color = p.text3, maxLines = 2)
+                Text(listOfNotNull(e.user?.displayName, e.body).joinToString(" · "), style = Type.caption, color = p.text3, maxLines = 2)
             }
             Spacer(Modifier.width(8.dp))
             Text(Fmt.clock(e.createdAt), style = Type.caption, color = p.text3)

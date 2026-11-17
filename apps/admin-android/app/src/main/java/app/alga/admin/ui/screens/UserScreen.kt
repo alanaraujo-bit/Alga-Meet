@@ -139,7 +139,7 @@ private fun Header(u: UserDetail) {
             Column(Modifier.weight(1f)) {
                 Text(u.displayName, style = Type.title, color = p.text)
                 Text("@${u.username}", style = Type.body, color = p.text2)
-                Text(u.email, style = Type.caption, color = p.text3)
+                Text(u.email, style = Type.caption, color = p.text3, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -186,7 +186,7 @@ private fun BillingSection(b: UserDetail.Billing) {
         }
         b.orders.forEach { o ->
             Line(
-                title = "${o.productId}${if (o.gift) " · presente" else ""}",
+                title = "${o.productName}${if (o.gift) " · presente" else ""}",
                 sub = "${ORDER_STATUS[o.status] ?: o.status} · ${o.provider} · ${Fmt.dateTime(o.paidAt ?: o.createdAt)}",
                 value = Fmt.money(o.amountCents, o.currency),
                 tone = if (o.status == "refunded") p.bad else if (o.status != "paid") p.text3 else null,
@@ -263,10 +263,10 @@ private fun ActionSheet(u: UserDetail, onDone: () -> Unit, onDismiss: () -> Unit
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val summary = when (type) {
-        "warn" -> "Advertir @${u.username}"
-        "suspend" -> "Suspender @${u.username} por $days ${if (days == 1) "dia" else "dias"}"
-        "ban" -> "Banir @${u.username}"
-        else -> "Retirar a medida de @${u.username}"
+        "warn" -> "Advertir"
+        "suspend" -> "Suspender por $days ${if (days == 1) "dia" else "dias"}"
+        "ban" -> "Banir"
+        else -> "Retirar a medida"
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = p.surface) {
@@ -293,7 +293,7 @@ private fun ActionSheet(u: UserDetail, onDone: () -> Unit, onDismiss: () -> Unit
             Spacer(Modifier.height(20.dp))
             val danger = type == "ban" || type == "suspend"
             Box(
-                Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(16.dp)).background(if (danger) p.bad else p.accentFill).pressable { confirm = true },
+                Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(16.dp)).background(if (danger) p.badFill else p.accentFill).pressable { confirm = true },
                 contentAlignment = Alignment.Center,
             ) { Text(summary, style = Type.bodyStrong, color = Color.White) }
         }
@@ -301,7 +301,7 @@ private fun ActionSheet(u: UserDetail, onDone: () -> Unit, onDismiss: () -> Unit
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },
         containerColor = p.surface,
-        title = { Text("$summary?", style = Type.title, color = p.text) },
+        title = { Text("$summary @${u.username}?", style = Type.title, color = p.text) },
         text = {
             Text(
                 when (type) {

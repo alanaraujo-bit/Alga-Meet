@@ -279,8 +279,8 @@ for (let i = 0; i < 14; i++) await db.insert(uninstallFeedback).values({ id: uui
 const brl = (c: number) => `R$ ${(c / 100).toFixed(2).replace('.', ',')}`
 const name = new Map(catalog.map((p) => [p.id, p.name]))
 const feed: (typeof adminEvents.$inferInsert)[] = []
-for (const o of orderRows) if (o.paidAt!.getTime() > now - 3 * DAY) feed.push({ id: uuidv7(), kind: 'purchase', title: `${o.productId === 'plus_monthly' ? 'Plus avulso' : 'Nova compra'} · ${brl(o.amountCents!)}`, body: name.get(o.productId!) ?? o.productId!, amountCents: o.amountCents, currency: 'BRL', userId: o.userId, createdAt: o.paidAt })
-for (const s of subRows) if (s.kind === 'renewing' && s.startedAt!.getTime() > now - 3 * DAY) feed.push({ id: uuidv7(), kind: 'subscription_started', title: `Nova assinatura · ${brl(s.amountCents!)}`, body: name.get(s.productId!) ?? s.productId!, amountCents: s.amountCents, currency: 'BRL', userId: s.userId, createdAt: s.startedAt })
+for (const o of orderRows) if (o.paidAt!.getTime() > now - 3 * DAY) feed.push({ id: uuidv7(), kind: 'purchase', title: `${o.productId === 'plus_monthly' ? 'Plus avulso' : 'Nova compra'} · ${brl(o.amountCents!)}`, body: name.get(o.productId!) ?? o.productId!, amountCents: o.amountCents, currency: 'BRL', userId: o.userId, createdAt: o.paidAt! })
+for (const s of subRows) if (s.kind === 'renewing' && s.startedAt!.getTime() > now - 3 * DAY) feed.push({ id: uuidv7(), kind: 'subscription_started', title: `Nova assinatura · ${brl(s.amountCents!)}`, body: name.get(s.productId!) ?? s.productId!, amountCents: s.amountCents, currency: 'BRL', userId: s.userId, createdAt: s.startedAt! })
 let count = 0
 for (const u of [...userRows].sort((a, b) => a.createdAt!.getTime() - b.createdAt!.getTime())) {
   count++

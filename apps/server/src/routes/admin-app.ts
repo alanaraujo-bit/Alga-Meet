@@ -15,7 +15,7 @@ import { Insights } from '../admin/insights.js'
 import type { Ctx } from '../app.js'
 import { isRestricted } from '../auth.js'
 import {
-  accountActions, activitySettings, adminDevices, adminEvents, feedback, gifts, orders, relationships, reports, sessions,
+  accountActions, activitySettings, adminDevices, adminEvents, feedback, gifts, orders, products, relationships, reports, sessions,
   spaceMembers, subscriptions, users, type UserRow,
 } from '../db/schema.js'
 import { sessionDevice } from '../devices.js'
@@ -105,17 +105,18 @@ export function adminAppRoutes(app: FastifyInstance, ctx: Ctx): void {
       const subs = await db.select().from(subscriptions).where(eq(subscriptions.userId, id)).orderBy(desc(subscriptions.createdAt))
       const ords = await db.select({ o: orders, giftId: gifts.id }).from(orders).leftJoin(gifts, eq(gifts.orderId, orders.id))
         .where(eq(orders.userId, id)).orderBy(desc(orders.createdAt)).limit(50)
+      const names = new Map((await db.select({ id: products.id, name: products.name }).from(products)).map((p) => [p.id, p.name]))
       const lifetime = { brl: 0, usd: 0 }
       for (const { o } of ords) if (o.status === 'paid') lifetime[o.currency === 'USD' ? 'usd' : 'brl'] += o.amountCents
       for (const s of subs) if (s.kind === 'renewing' && s.startedAt && s.status !== 'canceled') lifetime[s.currency === 'USD' ? 'usd' : 'brl'] += s.amountCents
       billing = {
         lifetime,
         subscriptions: subs.map((s) => ({
-          id: s.id, productId: s.productId, kind: s.kind, status: s.status, amountCents: s.amountCents, currency: s.currency, provider: s.provider,
+          id: s.id, productId: s.productId, productName: names.get(s.productId) ?? s.productId, kind: s.kind, status: s.status, amountCents: s.amountCents, currency: s.currency, provider: s.provider,
           startedAt: iso(s.startedAt), currentPeriodEnd: iso(s.currentPeriodEnd), cancelAtPeriodEnd: s.cancelAtPeriodEnd,
         })),
         orders: ords.map(({ o, giftId }) => ({
-          id: o.id, productId: o.productId, status: o.status, amountCents: o.amountCents, currency: o.currency, provider: o.provider,
+          id: o.id, productId: o.productId, productName: names.get(o.productId) ?? o.productId, status: o.status, amountCents: o.amountCents, currency: o.currency, provider: o.provider,
           createdAt: o.createdAt.toISOString(), paidAt: iso(o.paidAt), gift: !!giftId,
         })),
       }
