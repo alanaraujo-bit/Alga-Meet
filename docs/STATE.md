@@ -1,6 +1,44 @@
 # Alga Meet — Estado do projeto
 
-## 2026-11-16 — Sinuca no Alga Worlds — NO CÓDIGO, NÃO PUBLICADA
+## 2026-11-16 — desktop 0.1.19 NO AR: sinuca no Mundo, player de música, microfone que não some
+- **No ar (2026-11-16, a pedido do dono: "suba tudo para a produção e lance uma nova release"):** `main` no GitHub
+  com tudo; API no Railway (deploy `d770d2f7`, migração `0022_music_playlists` no boot) e
+  https://github.com/alanaraujo-bit/Alga-Meet/releases/tag/v0.1.19 (tag em `c8e03ff`, não assinado, 168,0 MB,
+  SHA-256 `0bd25082…c75c2`).
+- **O que foi junto:** o admin (`feat/admin-app`, que já estava na `main` do GitHub e em produção desde o mesmo dia);
+  a correção do microfone (`fc4d856`); o player de música com playlists, música anterior, mini player e janela
+  flutuante (`c50625d`); a sinuca (`0a86095`, entrada logo abaixo e `docs/worlds-pool.md`).
+- **Ficou de fora, por decisão do dono:** o trabalho em andamento da sessão que investiga o gargalo do cinema
+  (`apps/desktop/src/renderer/src/features/cinema/swarm/*`), que segue sem commit no checkout principal.
+- **Como foi juntado:** numa worktree (`.claude/worktrees/release`, branch `release/0.1.19`) a partir da
+  `origin/main`, porque o checkout principal tinha outra sessão escrevendo nele. O trabalho sem commit do checkout
+  principal foi fotografado num commit sem tocar a árvore (`refs/snapshots/main-2026-11-16`, `d89cadf`, só local) e
+  mesclado. Conflitos: a migração da música tinha nascido como `0021` e a do admin já era a `0021` em produção, então
+  a da música foi gerada de novo por cima como `0022` (SQL idêntico, `when` maior); imports do `schema.ts`; o
+  `index.ts` do shared.
+- **Verificado antes de sair:** typecheck dos três pacotes; shared 99, desktop 919, servidor 383 testes; o commit
+  intermediário da música compila sozinho; **E2E contra o build empacotado** (`QA_EXE`, stack própria): sinuca 7/7,
+  Worlds 12/12, música 11/11; `check-package.mjs`; o pacote tem os mesmos arquivos do 0.1.18 instalado e abre na
+  0.1.19 apontando para a API de produção (`check-installed.mjs`).
+- **Verificado depois:** `/api/v1/ready` 200 (`database: ok`, `livekit: ok`); `GET /music/playlists` sem token 401
+  (antes do deploy, 404); manifesto dos assets 200; log do boot sem erro e `voice: reconciled with LiveKit` (1 sala,
+  3 pessoas: havia uma chamada em curso na hora do deploy); `releases/latest/download/latest.yml` serve a 0.1.19 e o
+  instalador responde 200 com 167.976.244 bytes, pelos dois nomes.
+- **NÃO verificado:** a atualização pelo app instalado (o app do dono estava aberto, numa chamada: o instalador não
+  foi rodado por cima dele); a tabela `music_playlists` em produção por leitura direta (o que há é o boot sem erro);
+  uma partida de sinuca e uma playlist em produção; os sons da sinuca (ninguém ouviu).
+- **O deploy construiu a ponta da `main` de novo, não o commit preso.** O serviço `api` foi preso em `c8e03ff` (a
+  tag), mas o deploy `d770d2f7` construiu `23f55c8`. Os dois só diferem num script de e2e do desktop. É a segunda
+  vez (ver a entrada do SFU): prender o commit não escolhe o que é construído naquele deploy.
+- **`alga-setup-ui.exe` é o mesmo binário desde a 0.1.17** (sem Rust nesta máquina). As fontes da janela de
+  instalação e o que ela importa não mudam desde `v0.1.18` (conferido por diff).
+- **O checkout principal ficou para trás de propósito:** `main` local em `0dd1613`, com o mesmo trabalho ainda sem
+  commit lá (agora ele está na `origin/main`) e com o cinema em andamento. Para acertar quando a sessão do cinema
+  terminar: guardar o diff de `features/cinema/swarm`, descartar o resto das mudanças locais, `git merge --ff-only
+  origin/main` e reaplicar o diff do cinema. Não fazer isso com a outra sessão escrevendo.
+- **Falta:** a nota da 0.1.19 no estúdio de Novidades (e as da 0.1.17 e 0.1.18).
+
+## 2026-11-16 — Sinuca no Alga Worlds — publicada na 0.1.19
 - **Pedido do dono (2026-11-16):** interações de verdade dentro do mundo 3D, começando por uma mesa de sinuca
   jogável entre amigos, "o melhor jogo de sinuca do mundo dentro do nosso Meet". Como funciona, o que foi medido e o
   que falta: `docs/worlds-pool.md`.
@@ -10,8 +48,7 @@
   taco, mira, câmera, sons e HUD em `apps/desktop/src/renderer/src/features/worlds/pool/`; pose de tacada no manequim.
 - **Mudou junto:** os pontos de chegada do Lounge (`WORLD_SHELLS.lounge.spawns`) saíram do meio da sala, onde agora
   está a mesa.
-- **Sem migração de banco.** Nada foi publicado: desktop continua 0.1.18 e a API de produção não tem este código
-  (regra do dono de 2026-11-16: nada vai para produção até ele dizer que está perfeito).
+- **Sem migração de banco.** Saiu na 0.1.19 (entrada acima); quem está na 0.1.18 não vê a mesa.
 - **Não verificado:** os sons (ninguém ouviu), a sensação de jogo com gente de verdade, e uma partida em produção.
 
 ## 2026-11-16 — SFU saiu do servidor de casa e roda no PC do dono (Windows, nativo) — NO AR

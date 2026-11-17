@@ -89,6 +89,9 @@ rolar, bola parando).
   compara as duas); placares e vez concordam; vista de cima; Esc larga o taco e o outro segue em treino; o `joinedAt`
   da voz dos dois no servidor é o mesmo do começo ao fim.
 - Suítes inteiras depois de tudo: compartilhado 99, desktop 919, servidor 371; typecheck dos três pacotes limpo.
+- **Build empacotado (0.1.19, 2026-11-16):** o mesmo E2E contra `release/win-unpacked/Alga Meet.exe` (`QA_EXE=…`,
+  API e LiveKit próprios): **7/7**. Publicada na 0.1.19 (`docs/STATE.md`); em produção `READY.worlds.pool` vem ligado
+  junto com o Worlds. Uma partida em produção ainda não foi jogada por ninguém.
 
 ## O que falta (sem enfeite)
 - **Som não foi ouvido por ninguém.** Os sons (bola, tabela, taco, caçapa) são sintetizados e tocam sem erro, mas
