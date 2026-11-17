@@ -60,13 +60,23 @@ fun LoginScreen(onLoggedIn: (AdminMe) -> Unit) {
     var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // "Tenho um código": a one-time code (break-glass, docs/admin-app.md) and the password the person chooses now.
+    var withCode by remember { mutableStateOf(false) }
+    var code by remember { mutableStateOf("") }
+    var repeat by remember { mutableStateOf("") }
 
     fun submit() {
         if (busy || login.isBlank() || password.isEmpty()) return
+        if (withCode && (code.isBlank() || password != repeat)) { error = if (code.isBlank()) "Digite o código." else "As duas senhas não são iguais."; return }
         busy = true
         error = null
         scope.launch {
             try {
+                if (withCode) {
+                    app.api.setPasswordWithCode(if (server == "prod") Servers.PRODUCTION else Servers.QA_USB, code, password)
+                    withCode = false
+                    code = ""; repeat = ""
+                }
                 val token = app.api.login(if (server == "prod") Servers.PRODUCTION else Servers.QA_USB, login.trim(), password)
                 app.session.token = token
                 val me = try { app.api.me() } catch (e: ApiException) {
@@ -110,14 +120,34 @@ fun LoginScreen(onLoggedIn: (AdminMe) -> Unit) {
             colors = fieldColors, textStyle = Type.body, modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
         )
+        if (withCode) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                code, { code = it.uppercase().take(20) }, label = { Text("Código de acesso (XXXX-XXXX-XXXX)") }, singleLine = true, shape = RoundedCornerShape(16.dp),
+                colors = fieldColors, textStyle = Type.body.copy(fontFeatureSettings = "tnum"), modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters, autoCorrectEnabled = false, imeAction = ImeAction.Next),
+            )
+        }
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
-            password, { password = it }, label = { Text("Senha") }, singleLine = true, shape = RoundedCornerShape(16.dp),
+            password, { password = it }, label = { Text(if (withCode) "Nova senha" else "Senha") }, singleLine = true, shape = RoundedCornerShape(16.dp),
             colors = fieldColors, textStyle = Type.body, modifier = Modifier.fillMaxWidth(),
             visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = if (withCode) ImeAction.Next else ImeAction.Go),
             keyboardActions = KeyboardActions(onGo = { submit() }),
         )
+        if (withCode) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                repeat, { repeat = it }, label = { Text("Repita a nova senha") }, singleLine = true, shape = RoundedCornerShape(16.dp),
+                colors = fieldColors, textStyle = Type.body, modifier = Modifier.fillMaxWidth(),
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
+                keyboardActions = KeyboardActions(onGo = { submit() }),
+            )
+            Spacer(Modifier.height(8.dp))
+            Text("Use 10 caracteres ou mais; uma frase funciona bem.", style = Type.caption, color = p.text3)
+        }
         if (error != null) {
             Spacer(Modifier.height(14.dp))
             Text(error!!, style = Type.body, color = p.bad)
@@ -128,8 +158,14 @@ fun LoginScreen(onLoggedIn: (AdminMe) -> Unit) {
             contentAlignment = Alignment.Center,
         ) {
             if (busy) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
-            else Text("Entrar", style = Type.bodyStrong, color = Color.White)
+            else Text(if (withCode) "Criar senha e entrar" else "Entrar", style = Type.bodyStrong, color = Color.White)
         }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            if (withCode) "Voltar para o login com senha" else "Tenho um código de acesso",
+            style = Type.bodyStrong, color = p.accent,
+            modifier = Modifier.pressable { withCode = !withCode; error = null }.padding(vertical = 6.dp),
+        )
         Spacer(Modifier.height(16.dp))
         Text(
             if (server == "qa") "QA: o servidor de teste deste PC, pelo cabo USB. Os dados são de teste."

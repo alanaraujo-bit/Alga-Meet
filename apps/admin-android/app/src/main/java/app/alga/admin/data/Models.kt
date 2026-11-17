@@ -24,6 +24,9 @@ data class LoginBody(val login: String, val password: String)
 data class AuthResponse(val token: String)
 
 @Serializable
+data class ResetBody(val token: String, val password: String)
+
+@Serializable
 data class Purchase(
     val id: String, val kind: String, val at: String, val amountCents: Long, val currency: String, val productId: String,
     val productName: String, val provider: String, val gift: Boolean, val user: PersonRef? = null,

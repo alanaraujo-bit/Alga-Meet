@@ -57,6 +57,13 @@ class Api(private val session: Session) {
         return json.decodeFromString<AuthResponse>(call(req)).token
     }
 
+    /** POST /auth/password-reset/confirm with a one-time code (dashes and case do not matter, src/admin/bootstrap.ts). */
+    suspend fun setPasswordWithCode(server: String, code: String, password: String) {
+        session.server = server
+        val token = code.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' }
+        call(request("/auth/password-reset/confirm", token = null).post(json.encodeToString(ResetBody(token, password)).toRequestBody(jsonType)).build())
+    }
+
     suspend fun logout() = runCatching { call(request("/auth/logout").post(ByteArray(0).toRequestBody()).build()) }
 
     suspend fun me(): AdminMe = get("/admin/me")

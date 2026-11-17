@@ -118,6 +118,8 @@ const EnvSchema = z
     /** Admin app push (src/admin/fcm.ts): the Firebase service-account JSON, raw or base64; or a path to it. Unset = no FCM (feed and stream only). */
     FCM_SERVICE_ACCOUNT: z.string().min(1).optional(),
     FCM_SERVICE_ACCOUNT_FILE: z.string().min(1).optional(),
+    /** Break-glass (src/admin/bootstrap.ts): this account becomes admin at startup and gets a one-time code in the log. Remove after use. */
+    ADMIN_BOOTSTRAP_EMAIL: z.email().optional(),
   })
   .superRefine((env, ctx) => {
     const devMode = env.ALGA_ALLOW_DEV_SECRETS || (env.NODE_ENV !== 'production' && LOOPBACK.has(env.HOST))
@@ -216,6 +218,8 @@ export interface Config {
   worlds: { enabled: boolean; assetsUrl: string; assetsDir: string }
   /** src/admin/alerts.ts. The service-account JSON (or its base64) for FCM; undefined = no push. */
   push: { fcmServiceAccount: string | undefined }
+  /** ADMIN_BOOTSTRAP_EMAIL (src/admin/bootstrap.ts). */
+  adminBootstrapEmail: string | undefined
 }
 
 export interface BillingConfig {
@@ -313,5 +317,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       assetsDir: e.WORLDS_ASSETS_DIR,
     },
     push: { fcmServiceAccount: e.FCM_SERVICE_ACCOUNT ?? (e.FCM_SERVICE_ACCOUNT_FILE ? readFileSync(e.FCM_SERVICE_ACCOUNT_FILE, 'utf8') : undefined) },
+    adminBootstrapEmail: e.ADMIN_BOOTSTRAP_EMAIL,
   }
 }

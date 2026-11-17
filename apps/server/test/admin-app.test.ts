@@ -2,6 +2,7 @@ import { generateKeyPairSync } from 'node:crypto'
 import type { AdminEvent, AdminGrowth, AdminHealth, AdminMe, AdminOverview, AdminUserDetail, AdminUserSummary, CheckoutResponse } from '@alga/shared'
 import { eq } from 'drizzle-orm'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { bootstrapAdmin, normalizeCode } from '../src/admin/bootstrap.js'
 import { renewalCharges, periodWindow } from '../src/admin/insights.js'
 import { SANDBOX_SIGNATURE_HEADER, sandboxSignature } from '../src/billing/provider.js'
 import { adminDevices, adminEvents, subscriptions } from '../src/db/schema.js'
@@ -219,6 +220,27 @@ describe('watchers', () => {
     await settle()
     expect((await events()).filter((e) => e.kind === 'api_errors')).toHaveLength(1)
     expect(alerts.errorCounts(t + 30).errors5m).toBeGreaterThanOrEqual(25)
+  })
+})
+
+describe('break-glass bootstrap', () => {
+  it('makes the account admin and its one-time code sets a new password once', async () => {
+    const u = await register(s.app)
+    const logged: string[] = []
+    const log = { warn: (o: unknown, m?: string) => logged.push(JSON.stringify(o) + (m ?? '')) } as unknown as Parameters<typeof bootstrapAdmin>[2]
+    expect(await bootstrapAdmin(s.app.ctx.db, 'nobody@example.com', log)).toBeNull()
+    const code = (await bootstrapAdmin(s.app.ctx.db, `${u.user.username}@EXAMPLE.com`, log))!
+    expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/)
+    expect(logged.at(-1)).toContain(code)
+    // The app strips the dashes and upper-cases what the person typed.
+    const password = 'uma senha nova bem longa 42'
+    expect((await api(s.app, 'POST', '/auth/password-reset/confirm', { body: { token: normalizeCode(code.toLowerCase()), password } })).status).toBe(204)
+    expect((await api(s.app, 'POST', '/auth/password-reset/confirm', { body: { token: normalizeCode(code), password: `${password}!` } })).status).toBe(400)
+    // The old sessions are gone; the new password logs in and the account is staff.
+    expect((await api(s.app, 'GET', '/admin/me', { token: u.token })).status).toBe(401)
+    const login = await api(s.app, 'POST', '/auth/login', { body: { login: u.user.username, password }, ip: '10.9.9.9' })
+    expect(login.status).toBe(200)
+    expect((await api<AdminMe>(s.app, 'GET', '/admin/me', { token: login.body.token })).body.role).toBe('admin')
   })
 })
 

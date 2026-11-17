@@ -6,6 +6,7 @@ import { E2EE_MAX_FRAME_BYTES } from '@alga/shared'
 import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance } from 'fastify'
 import { Activity } from './activity/activity.js'
 import { AdminAlerts } from './admin/alerts.js'
+import { bootstrapAdmin } from './admin/bootstrap.js'
 import { authenticate, isRestricted, type AuthContext } from './auth.js'
 import { Billing } from './billing/billing.js'
 import { maxPlanAttachmentBytes } from './billing/catalog.js'
@@ -101,6 +102,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
 
   const database = await openDatabase(config)
   app.log.info({ driver: database.driver }, 'database ready')
+  if (config.adminBootstrapEmail) await bootstrapAdmin(database.db, config.adminBootstrapEmail, app.log)
   const hub = new Hub()
   const files = new Files(config, database.db, createStorage(config.storage), app.log)
   const mail = new Mailer(createEmailSender(config.email, app.log, config.env === 'production'), app.log, config.email.linkUrl)
