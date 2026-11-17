@@ -84,6 +84,18 @@ Três caminhos, com o mesmo id de evento (um aviso aparece uma vez):
    ou `FCM_SERVICE_ACCOUNT_FILE` = caminho. Sem isso a API funciona igual, só sem FCM.
 4. No app: Ajustes → "Enviar notificação de teste".
 
+## Sem senha ou sem papel de equipe (quebrar o vidro)
+
+O e-mail de produção roda no driver `console` (o link de "esqueci a senha" não sai do servidor) e o banco não é
+acessível de fora. Para isso existe `ADMIN_BOOTSTRAP_EMAIL` (`src/admin/bootstrap.ts`):
+
+1. Defina a variável no serviço `api` do Railway com o e-mail da conta. Na subida, a conta vira admin (registrado no
+   `staff_audit_log`) e o log do deploy mostra um código `XXXX-XXXX-XXXX`, de uso único, que vale 1 h.
+2. **Remova a variável** logo depois (cada reinício com ela gera um código novo e invalida o anterior).
+3. No app: "Tenho um código de acesso", e-mail ou usuário, o código e a senha nova que a pessoa escolhe.
+
+Usado em 2026-11-16 para a conta do dono.
+
 ## Rodar em QA (pelo cabo)
 
 1. Banco QA novo: `PGLITE_DIR=<pasta> npx tsx scripts/seed-admin-demo.ts <arquivo-de-senha>` (em `apps/server`): cria
