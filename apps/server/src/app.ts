@@ -5,6 +5,7 @@ import websocket from '@fastify/websocket'
 import { E2EE_MAX_FRAME_BYTES } from '@alga/shared'
 import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance } from 'fastify'
 import { Activity } from './activity/activity.js'
+import { AdminAlerts } from './admin/alerts.js'
 import { authenticate, isRestricted, type AuthContext } from './auth.js'
 import { Billing } from './billing/billing.js'
 import { maxPlanAttachmentBytes } from './billing/catalog.js'
@@ -25,6 +26,7 @@ import { Privacy } from './privacy.js'
 import { activityPublicRoutes, activityRoutes, shopFunnelHook } from './routes/activity.js'
 import { profileRoutes } from './routes/profile.js'
 import { adminRoutes } from './routes/admin.js'
+import { adminAppRoutes } from './routes/admin-app.js'
 import { authPublicRoutes, authRoutes } from './routes/auth.js'
 import { billingPublicRoutes, billingRoutes } from './routes/billing.js'
 import { e2eeRoutes } from './routes/e2ee.js'
@@ -67,6 +69,8 @@ export interface Ctx {
   telemetry: Telemetry
   events: Events
   activity: Activity
+  /** Admin app feed, push and watchers (src/admin/alerts.ts). */
+  alerts: AdminAlerts
   log: FastifyBaseLogger
 }
 
@@ -115,6 +119,8 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   ctx.privacy = new Privacy(ctx)
   ctx.events = new Events(ctx)
   ctx.activity = new Activity(ctx)
+  ctx.alerts = new AdminAlerts(config, database.db, app.log)
+  billing.onAdminEvent = (e) => ctx.alerts.fire(e)
   voice.onSessionEnd = (s, leftAt) => ctx.activity.recordSession(s, leftAt)
   app.decorate('ctx', ctx)
   files.start()
@@ -123,6 +129,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   ctx.privacy.start()
   ctx.telemetry.start()
   ctx.activity.start()
+  ctx.alerts.start()
   if (config.worlds.enabled) worlds.start()
   app.log.info({ provider: config.billing.provider }, 'billing ready')
   if (config.email.autoVerify) app.log.warn('staging: auto-verifying e-mails')
@@ -133,6 +140,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     hub.closeAll(1001, 'server shutting down')
   })
   app.addHook('onClose', async () => {
+    await ctx.alerts.stop()
     await ctx.activity.stop()
     await ctx.telemetry.stop()
     await ctx.privacy.stop()
@@ -183,6 +191,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   // /health, /ready (root and /api/v1), /metrics and the per-request metrics/log hook.
   installObservability(app, ctx)
   app.addHook('onResponse', shopFunnelHook)
+  app.addHook('onResponse', async (_req, reply) => ctx.alerts.recordStatus(reply.statusCode))
   gatewayRoute(app, ctx)
 
   await app.register(async (api) => {
@@ -227,6 +236,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       worldRoutes(authed, ctx)
       await authed.register(async (admin) => {
         adminRoutes(admin, ctx)
+        adminAppRoutes(admin, ctx)
         releaseAdminRoutes(admin, ctx)
       })
     })

@@ -17,6 +17,7 @@ import {
 import { and, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import { isBlockedBetween, profileAudience, spaceMemberIds } from '../access.js'
+import { formatMoney, type AlertInput } from '../admin/alerts.js'
 import type { Config } from '../config.js'
 import type { Db, Tx } from '../db/index.js'
 import {
@@ -177,8 +178,10 @@ interface Touched {
   gifts: Map<string, 'received' | 'update'>
   /** Orders that became paid / subscriptions activated for the first time: a receipt each. */
   receipts: { kind: 'order' | 'subscription'; id: string }[]
+  /** Admin app events (src/admin/alerts.ts), fired after commit. */
+  alerts: AlertInput[]
 }
-const touchedSet = (): Touched => ({ users: new Set(), spaces: new Set(), gifts: new Map(), receipts: [] })
+const touchedSet = (): Touched => ({ users: new Set(), spaces: new Set(), gifts: new Map(), receipts: [], alerts: [] })
 
 export class Billing {
   private timer: NodeJS.Timeout | undefined
@@ -187,6 +190,8 @@ export class Billing {
   readonly tryOns: TryOns
   /** A user's entitlements changed and were announced: src/worlds.ts re-filters the room they have open in a call. */
   onEntitlementsChange: (userId: string) => void = () => {}
+  /** A payment happened, failed or was refunded: the admin app's feed and push (src/admin/alerts.ts). */
+  onAdminEvent: (e: AlertInput) => void = () => {}
 
   constructor(
     private readonly config: Config,
@@ -480,6 +485,10 @@ export class Billing {
     }
     if (result.status === 'rejected') {
       this.log.info({ provider: provider.id, method: body.method, reason: result.reason }, 'billing: in-app payment rejected')
+      // With an update, apply() above already told the admin app.
+      if (!result.update && this.counts(provider.id)) {
+        this.onAdminEvent({ kind: 'payment_failed', title: 'Cartão recusado no app', body: `${product.name} · ${formatMoney(row.amountCents, row.currency)}`, amountCents: row.amountCents, currency: row.currency, userId: user.id })
+      }
       return { status: 'rejected', message: rejectionMessage(result.reason) }
     }
     return { status: result.status, ...(result.pix ? { pix: result.pix } : {}) }
@@ -945,6 +954,16 @@ export class Billing {
     }).where(eq(subscriptions.id, s.id))
     if (status === 'canceled') await this.revokeClaims(tx, [s.id])
     if (firstActivation) touched.receipts.push({ kind: 'subscription', id: s.id })
+    if (this.counts(s.provider) && s.amountCents > 0) {
+      const money = formatMoney(s.amountCents, s.currency)
+      const name = productById(s.productId)?.name ?? s.productId
+      const about = { amountCents: s.amountCents, currency: s.currency, userId: s.userId }
+      const renewed = !firstActivation && status === 'active' && !!s.startedAt && !!periodEnd && !!s.currentPeriodEnd && periodEnd.getTime() > s.currentPeriodEnd.getTime() + DAY_MS
+      if (firstActivation) touched.alerts.push({ kind: 'subscription_started', title: `Nova assinatura · ${money}`, body: name, ...about })
+      else if (renewed) touched.alerts.push({ kind: 'subscription_renewed', title: `Renovação · ${money}`, body: name, ...about })
+      if (status === 'past_due' && s.status !== 'past_due') touched.alerts.push({ kind: 'payment_failed', title: 'Renovação recusada', body: `${name} · ${money}. O Plus segue por 3 dias de carência.`, ...about })
+      if (status === 'canceled' && s.status !== 'canceled') touched.alerts.push({ kind: 'refund', title: `Reembolso · ${money}`, body: `${name} · assinatura encerrada`, ...about })
+    }
     touched.users.add(s.userId)
   }
 
@@ -999,6 +1018,16 @@ export class Billing {
     }).where(eq(orders.id, o.id))
     touched.users.add(o.userId)
     if (paid) touched.receipts.push({ kind: 'order', id: o.id })
+    if (this.counts(o.provider) && o.amountCents > 0) {
+      const money = formatMoney(o.amountCents, o.currency)
+      const p = productById(o.productId)
+      const name = p?.name ?? o.productId
+      const about = { amountCents: o.amountCents, currency: o.currency, userId: o.userId }
+      const [isGift] = await tx.select({ id: gifts.id }).from(gifts).where(eq(gifts.orderId, o.id))
+      if (paid) touched.alerts.push({ kind: 'purchase', title: `${isGift ? 'Presente comprado' : p?.kind === 'plan' ? 'Plus avulso' : 'Nova compra'} · ${money}`, body: name, ...about })
+      if (refunded) touched.alerts.push({ kind: 'refund', title: `Reembolso · ${money}`, body: name, ...about })
+      if (u.status === 'failed' && o.status === 'pending') touched.alerts.push({ kind: 'payment_failed', title: 'Pagamento recusado', body: `${name} · ${money}. O checkout segue aberto por 24 h.`, ...about })
+    }
 
     const [contribution] = await tx.select({ spaceId: spaceUpgradeContributions.spaceId }).from(spaceUpgradeContributions)
       .where(eq(spaceUpgradeContributions.orderId, o.id))
@@ -1129,6 +1158,7 @@ export class Billing {
     }
     for (const [giftId, what] of t.gifts) await this.notifyGift(giftId, what)
     for (const r of t.receipts) await this.sendReceipt(r.kind, r.id).catch((err: unknown) => this.log.error({ err: safeErr(err) }, 'billing: receipt not sent'))
+    for (const a of t.alerts) this.onAdminEvent(a)
   }
 
   /** GIFT_RECEIVED (just delivered) to the recipient, GIFT_UPDATE to the sender and, once it is theirs to see, the recipient. */

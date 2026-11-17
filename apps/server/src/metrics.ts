@@ -49,6 +49,13 @@ export class Counter extends Metric<number> {
     return this.series.get(keyOf(labels))?.value ?? 0
   }
 
+  /** Sum over every series whose labels include `match` (the admin app's since-boot counters). */
+  sum(match: Labels = {}): number {
+    let n = 0
+    for (const s of this.series.values()) if (Object.entries(match).every(([k, v]) => s.labels[k] === v)) n += s.value
+    return n
+  }
+
   protected lines(labels: Labels, v: number): string {
     return `${this.name}${fmt(labels)} ${num(v)}\n`
   }

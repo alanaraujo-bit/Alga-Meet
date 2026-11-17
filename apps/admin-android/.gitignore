@@ -1,0 +1,8 @@
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+# Firebase config and keys of the owner's project: never committed (see README).
+app/google-services.json
+secrets/

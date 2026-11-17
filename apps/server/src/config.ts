@@ -115,6 +115,9 @@ const EnvSchema = z
     E2EE_DS_KEY: z.string().optional().refine((v) => v === undefined || Buffer.from(v, 'base64').length === 32, 'base64 of 32 random bytes'),
     /** Directory of the MLS WASM build (alga_mls.js + alga_mls_bg.wasm). Default: native/mls/pkg of the monorepo. */
     E2EE_MLS_PKG: z.string().min(1).default(join(serverRoot, '..', '..', 'native', 'mls', 'pkg')),
+    /** Admin app push (src/admin/fcm.ts): the Firebase service-account JSON, raw or base64; or a path to it. Unset = no FCM (feed and stream only). */
+    FCM_SERVICE_ACCOUNT: z.string().min(1).optional(),
+    FCM_SERVICE_ACCOUNT_FILE: z.string().min(1).optional(),
   })
   .superRefine((env, ctx) => {
     const devMode = env.ALGA_ALLOW_DEV_SECRETS || (env.NODE_ENV !== 'production' && LOOPBACK.has(env.HOST))
@@ -211,6 +214,8 @@ export interface Config {
    * the API origin). `assetsDir`: the pack this server serves at GET /worlds/assets/*.
    */
   worlds: { enabled: boolean; assetsUrl: string; assetsDir: string }
+  /** src/admin/alerts.ts. The service-account JSON (or its base64) for FCM; undefined = no push. */
+  push: { fcmServiceAccount: string | undefined }
 }
 
 export interface BillingConfig {
@@ -307,5 +312,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       assetsUrl: (e.WORLDS_ASSETS_URL ?? '/api/v1/worlds/assets').replace(/\/+$/, ''),
       assetsDir: e.WORLDS_ASSETS_DIR,
     },
+    push: { fcmServiceAccount: e.FCM_SERVICE_ACCOUNT ?? (e.FCM_SERVICE_ACCOUNT_FILE ? readFileSync(e.FCM_SERVICE_ACCOUNT_FILE, 'utf8') : undefined) },
   }
 }

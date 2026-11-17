@@ -109,6 +109,10 @@ export function authPublicRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { token } = await createSession(db, user!.id, req.headers['user-agent'] ?? '', algaClientHeader(req.headers['x-alga-client']))
     await ctx.privacy.recordUse(user!.id, req.ip, req.headers['user-agent'], 'login')
     if (!user!.emailVerifiedAt) sendVerification(ctx, user!)
+    later(ctx, 'admin signup alert', async () => {
+      const [n] = await db.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(users)
+      ctx.alerts.fire({ kind: 'signup', title: 'Novo cadastro', body: `Conta nº ${(n?.n ?? 0).toLocaleString('pt-BR')}.`, userId: user!.id })
+    })
     reply.code(201)
     return { token, user: meView(user!, ctx.config.files.maxAttachmentBytes) }
   })

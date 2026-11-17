@@ -1,6 +1,6 @@
 import {
-  ACCOUNT_ACTION_REASONS, FEEDBACK_KINDS, REPORT_REASONS, WORLD_ROOM_ACCESS, WORLD_SHELL_IDS,
-  type EcoSpec, type EquippedCosmetics, type FeedbackContext, type ReleaseContent, type WorldAvatar, type WorldPlacedItem, type WorldRoomFinish,
+  ACCOUNT_ACTION_REASONS, ADMIN_EVENT_KINDS, FEEDBACK_KINDS, REPORT_REASONS, WORLD_ROOM_ACCESS, WORLD_SHELL_IDS,
+  type AdminEventKind, type EcoSpec, type EquippedCosmetics, type FeedbackContext, type ReleaseContent, type WorldAvatar, type WorldPlacedItem, type WorldRoomFinish,
 } from '@alga/shared'
 import { sql } from 'drizzle-orm'
 import {
@@ -901,3 +901,33 @@ export const releaseReactions = pgTable('release_reactions', {
   value: integer('value').notNull(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.version, t.itemId, t.userId] }), index('release_reactions_user_idx').on(t.userId)])
+
+// ---- admin app (src/admin/; packages/shared/src/admin.ts) ------------------------------------------------------------
+
+/**
+ * Staff phones that get admin pushes. Bound to the session that registered them: logout, revoke, password change or a
+ * suspension deletes the session and, with it, the device. `token` is the FCM registration token.
+ */
+export const adminDevices = pgTable('admin_devices', {
+  token: text('token').primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sessionId: uuid('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  platform: text('platform', { enum: ['android'] }).notNull(),
+  /** Kinds this device asked for; null = every kind its role may receive. */
+  kinds: jsonb('kinds').$type<AdminEventKind[]>(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  lastPushAt: ts('last_push_at'),
+}, (t) => [index('admin_devices_user_idx').on(t.userId)])
+
+/** What the admin app was told (feed + push), kept 180 days. `user_id` = the account the event is about. */
+export const adminEvents = pgTable('admin_events', {
+  id: uuid('id').primaryKey(),
+  kind: text('kind', { enum: ADMIN_EVENT_KINDS }).notNull(),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  amountCents: integer('amount_cents'),
+  currency: text('currency', { enum: ['BRL', 'USD'] }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [index('admin_events_created_idx').on(t.createdAt)])
+export type AdminEventRow = typeof adminEvents.$inferSelect

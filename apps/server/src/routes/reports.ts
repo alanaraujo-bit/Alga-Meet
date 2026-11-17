@@ -10,7 +10,7 @@ import type { Ctx } from '../app.js'
 import { bearerToken, resolveToken } from '../auth.js'
 import { accountActions, appeals, attachments, messages, reports, spaceMembers, spaces, users } from '../db/schema.js'
 import { HttpError, badRequest, conflict, notFound, parse } from '../errors.js'
-import { DAY_MS, REPORT_PRIORITY } from '../legal.js'
+import { DAY_MS, REASON_LABELS, REPORT_PRIORITY } from '../legal.js'
 import { accountActionView, appealDeadline, appealView } from '../trust-safety.js'
 import { loadChannel, messageViews, publicUser } from '../views.js'
 
@@ -119,6 +119,7 @@ export function reportRoutes(app: FastifyInstance, ctx: Ctx): void {
       for (const id of t.attachmentIds) await trust.quarantine(id, { reportId: row.id })
       ctx.log.warn({ reportId: row.id, attachments: t.attachmentIds.length }, 'trust-safety: csam report received, highest priority')
     }
+    void ctx.alerts.reportFiled(row, REASON_LABELS[row.reason])
     reply.code(201)
     return { id: row.id, createdAt: row.createdAt.toISOString(), duplicate: false }
   })
