@@ -1,6 +1,9 @@
 import type { CinemaFilm, CinemaPieceMeta, CinemaTrackId } from '@alga/shared'
 import type { Swarm } from './swarm/swarm'
 
+/** MSE of this browser: iPhone Safari has only ManagedMediaSource (iOS 17.1+), the rest the classic MediaSource. */
+export const MSE: typeof MediaSource | undefined = globalThis.MediaSource ?? (globalThis as unknown as { ManagedMediaSource?: typeof MediaSource }).ManagedMediaSource
+
 /** The SourceBuffers hold this much ahead of the playhead and drop what is further behind (spec §6.5). */
 const AHEAD_S = 60
 const BEHIND_S = 30
@@ -82,8 +85,8 @@ type CanPlay = { ok: true } | { ok: false; reason: 'video_codec' | 'audio_codec'
 export async function canPlay(film: CinemaFilm, audioId: number, swarm: PieceSource): Promise<CanPlay> {
   const audio = film.audio.find((a) => a.id === audioId)
   if (film.audio.length && !audio) throw new Error(`cinema: unknown audio track ${audioId}`)
-  if (!MediaSource.isTypeSupported(film.videoMime)) return { ok: false, reason: 'video_codec' }
-  if (audio && !MediaSource.isTypeSupported(audio.mime)) return { ok: false, reason: 'audio_codec' }
+  if (!MSE?.isTypeSupported(film.videoMime)) return { ok: false, reason: 'video_codec' }
+  if (audio && !MSE?.isTypeSupported(audio.mime)) return { ok: false, reason: 'audio_codec' }
   const [videoOk, audioOk] = await Promise.all([
     probe(film.videoMime, 'v', swarm, film.durationS),
     audio ? probe(audio.mime, `a${audio.id}`, swarm, film.durationS) : true,
@@ -104,7 +107,8 @@ async function probe(mime: string, track: CinemaTrackId, swarm: PieceSource, dur
   const el = document.createElement('video')
   el.muted = true
   el.preload = 'auto'
-  const ms = new MediaSource()
+  el.disableRemotePlayback = true // required by ManagedMediaSource (iOS)
+  const ms = new MSE!()
   const url = URL.createObjectURL(ms)
   try {
     return await new Promise<boolean>((resolve) => {

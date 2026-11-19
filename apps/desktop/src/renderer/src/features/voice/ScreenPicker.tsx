@@ -14,6 +14,8 @@ import s from './picker.module.css'
 
 type Kind = 'screen' | 'window'
 const REFRESH_MS = 1500
+/** The PWA: no source list; the browser shows its own picker (screen, window or tab) when the share starts. */
+const browserPicks = window.alga?.config?.shell === 'web'
 
 /** What to share, at what quality, with or without sound. Nothing is captured until "Transmitir". */
 export function ScreenPicker() {
@@ -42,7 +44,7 @@ function PickerBody({ onDone }: { onDone: () => void }) {
 
   // Live thumbnails while the picker is open (cheap: 320×200 PNGs from the main process).
   useEffect(() => {
-    if (!bridgeOk) return setSources([])
+    if (!bridgeOk || browserPicks) return setSources([])
     // Chained, not an interval: a slow enumeration never stacks requests.
     let alive = true
     let timer: ReturnType<typeof setTimeout> | null = null
@@ -72,16 +74,17 @@ function PickerBody({ onDone }: { onDone: () => void }) {
   // Live: the same dialog switches the source and/or the quality, both without stopping the stream.
   const newSource = !!chosen && chosen.id !== screen.sourceId
   const newQuality = quality !== screen.preset
-  const canApply = !!chosen && (!screen.active || newSource || newQuality)
+  const canApply = browserPicks ? !screen.active || newQuality : !!chosen && (!screen.active || newSource || newQuality)
 
   const start = async () => {
-    if (!chosen || !canApply) return
+    if (!canApply || (!browserPicks && !chosen)) return
     setBusy(true)
     setError(null)
     try {
-      if (!screen.active) await media.startScreenShare({ sourceId: chosen.id, audio, quality, contentType: content })
+      // The PWA: the browser's own dialog picks the screen, window or tab when getDisplayMedia runs.
+      if (!screen.active) await media.startScreenShare({ sourceId: browserPicks ? undefined : chosen!.id, audio, quality, contentType: content })
       else {
-        if (newSource) await media.switchScreenSource(chosen.id)
+        if (newSource && !browserPicks) await media.switchScreenSource(chosen!.id)
         if (newQuality) await media.setScreenQuality(quality)
       }
       onDone()
@@ -97,6 +100,7 @@ function PickerBody({ onDone }: { onDone: () => void }) {
   return (
     <div className={s.body}>
       <div className={s.left}>
+        {!browserPicks && (
         <Tabs<Kind>
           label={t.picker.title}
           value={kind}
@@ -106,6 +110,7 @@ function PickerBody({ onDone }: { onDone: () => void }) {
             { value: 'window', label: t.picker.windows },
           ]}
         />
+        )}
         {/* One source: no grid, the preview is the choice. */}
         {list.length > 1 && (
           <div
@@ -155,7 +160,9 @@ function PickerBody({ onDone }: { onDone: () => void }) {
           </div>
         )}
         <div className={s.preview}>
-          {!bridgeOk ? (
+          {browserPicks ? (
+            <p className={s.note}>{t.picker.browser}</p>
+          ) : !bridgeOk ? (
             <p className={s.note}>{t.picker.unavailable}</p>
           ) : sources === null ? (
             <p className={s.note}>

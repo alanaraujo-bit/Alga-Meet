@@ -22,7 +22,7 @@ import { t as sbT } from '../soundboard/strings'
 import { placeEntries, worldEntries } from '../worlds/Host'
 import { amInside, useWorlds } from '../worlds/store'
 import { t as worldsT } from '../worlds/strings'
-import { joinVoice, leaveVoice, useVoice } from './voice'
+import { joinVoice, leaveVoice, openScreenPicker, useVoice } from './voice'
 import s from './stage.module.css'
 
 /**
@@ -113,7 +113,7 @@ export function ControlsDock({ channel }: { channel: Channel }) {
         {sharing ? (
           <CallButton icon={MonitorUp} label={t.dock.stopShare} pressed on />
         ) : (
-          <CallButton icon={MonitorUp} label={t.dock.share} disabled={!connected} onClick={() => useVoice.setState({ picker: true })} />
+          <CallButton icon={MonitorUp} label={t.dock.share} disabled={!connected} onClick={openScreenPicker} />
         )}
       </MenuButton>
       {cinema.enabled && <CallButton

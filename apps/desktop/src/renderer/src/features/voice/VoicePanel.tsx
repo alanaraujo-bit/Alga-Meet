@@ -7,7 +7,7 @@ import { IconButton, Tooltip, VoiceDot } from '@/ui'
 import { E2eePanelMark } from './E2ee'
 import { roomLevelNow } from './levels'
 import { t } from './strings'
-import { leaveVoice, openCall, useVoice } from './voice'
+import { leaveVoice, openCall, openScreenPicker, useVoice } from './voice'
 import s from './chrome.module.css'
 
 /** 0–3 bars: the SFU's own rating when it has one, else the round trip. */
@@ -58,7 +58,7 @@ export function VoicePanel() {
           <IconButton
             icon={sharing ? MonitorOff : MonitorUp}
             label={sharing ? t.dock.stopShare : t.dock.share}
-            onClick={() => (sharing ? void media.stopScreenShare() : useVoice.setState({ picker: true }))}
+            onClick={() => (sharing ? void media.stopScreenShare() : openScreenPicker())}
           />
         )}
         <IconButton icon={down ? X : PhoneOff} label={t.leave} danger={!down} onClick={leave} />

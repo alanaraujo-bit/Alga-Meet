@@ -29,7 +29,7 @@ export type PushState = 'unsupported' | 'install' | 'unavailable' | 'off' | 'on'
 
 const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent))
 const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true
-const web = window.alga?.config.shell === 'web'
+const web = window.alga?.config?.shell === 'web'
 
 export const usePush = create<{ state: PushState; busy: boolean }>()(() => ({ state: 'unsupported', busy: false }))
 

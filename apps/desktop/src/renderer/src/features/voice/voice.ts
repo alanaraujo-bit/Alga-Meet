@@ -250,3 +250,9 @@ export function startVoiceSync(): () => void {
     clearRing()
   }
 }
+
+/** "Tela": the picker, or a plain answer where the browser cannot capture the screen (phones and tablets). */
+export function openScreenPicker(): void {
+  if (!navigator.mediaDevices?.getDisplayMedia) return void toast.info(t.picker.noScreenHere)
+  useVoice.setState({ picker: true })
+}

@@ -2,7 +2,7 @@ import {
   CINEMA_RESUME_AHEAD_S, CINEMA_STALL_MS, positionAt,
   type CinemaFilm, type CinemaPlayback,
 } from '@alga/shared'
-import { aheadOf, feedLane, gapJumpTarget, laneOf, rangesOf, swapLane, type Lane } from './mse'
+import { aheadOf, feedLane, gapJumpTarget, laneOf, MSE, rangesOf, swapLane, type Lane } from './mse'
 import type { Swarm } from './swarm/swarm'
 import { SyncController } from './sync'
 
@@ -37,7 +37,7 @@ export function scheduleDelayMs(atServerMs: number, offsetMs: number, clientNowM
  * player runs that much ahead of the room and the sound, not the picture, lands on the room's instant (Bluetooth).
  */
 export class CinemaPlayer {
-  private readonly ms = new MediaSource()
+  private readonly ms = new MSE!()
   private readonly url = URL.createObjectURL(this.ms)
   private readonly opened: Promise<void>
   private readonly sync = new SyncController()
@@ -78,6 +78,7 @@ export class CinemaPlayer {
     })
     this.opened.catch((e) => console.warn('[cinema] MediaSource', e)) // setAudio still sees the rejection
     video.preservesPitch = true
+    video.disableRemotePlayback = true // required by ManagedMediaSource (iOS)
     video.src = this.url
     this.offPiece = swarm.onPiece((track) => {
       if (track === this.videoLane?.track || track === this.audioLane?.track) this.feed()

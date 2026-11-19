@@ -52,6 +52,7 @@ export const t = {
     unreadable: 'Não deu para ler este arquivo.',
   } as Record<string, string>,
   ffmpegBlocked: 'O antivírus bloqueou o componente de vídeo do Alga. Libere o ffmpeg.exe da pasta do Alga no antivírus e tente de novo.',
+  hostDesktopOnly: 'Projetar um filme só dá pelo app do Alga no computador. Aqui você assiste quando alguém projeta.',
   ffmpegMissing: 'O componente de vídeo do Alga não foi encontrado. Reinstale o Alga para projetar.',
   ffmpegCrashed: 'O componente de vídeo do Alga não abriu. Reinicie o Alga e tente de novo.',
   errors: {

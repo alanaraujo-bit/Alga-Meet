@@ -61,7 +61,7 @@ const NAV: Array<{ group: string; items: Array<{ id: SettingsSection; icon: Glyp
 
 // The PWA has no app detection, global hotkeys or start-with-the-system: those sections exist only on the desktop.
 const DESKTOP_ONLY = new Set<SettingsSection>(['activity', 'hotkeys', 'startup'])
-const web = window.alga?.config.shell === 'web'
+const web = window.alga?.config?.shell === 'web'
 
 /** Full-window settings (below the title bar). Esc closes; focus returns to what opened it. */
 export function SettingsOverlay() {

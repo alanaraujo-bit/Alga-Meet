@@ -164,6 +164,8 @@ export const t = {
   },
 
   picker: {
+    browser: 'Ao transmitir, o navegador pergunta o que mostrar: a tela inteira, uma janela ou uma aba.',
+    noScreenHere: 'Transmitir a tela só dá pelo computador. Aqui você assiste às transmissões dos outros.',
     title: 'Compartilhar tela',
     description: 'Só o que você escolher aqui é transmitido, e só para quem clicar em Assistir. Você pode parar a qualquer momento.',
     screens: 'Telas',

@@ -1256,7 +1256,8 @@ class MediaEngine {
     const set = track?.getSettings()
     const real = track && set?.width && set.height ? await frameSize(track) : null
     if (real) frameSizes.set(track!, real)
-    if (!real || (real.width >= set!.width! && real.height >= set!.height!)) return stream
+    // In a browser (no native picker) a second capture would ask the person to pick the screen again: keep this one.
+    if (!real || !screen?.select || (real.width >= set!.width! && real.height >= set!.height!)) return stream
     stream.getTracks().forEach((t) => t.stop())
     // Multiple of 8: the /4 and /2 simulcast layers (presets.simulcastFor) stay even, as the HW encoder needs.
     const again = await open(real.width & ~1, real.height & ~1)

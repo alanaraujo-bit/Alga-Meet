@@ -4,6 +4,7 @@ import type { CinemaReaction } from '@alga/shared'
 import {
   callChannel, chooseAudio, chooseSubtitle, hostBegin, hostEnd, ipNoticeOnce, send, setPrefs, useCinema,
 } from './store'
+import { MSE } from './mse'
 import { t } from './strings'
 
 type Picked = { fileId: string; name: string }
@@ -12,6 +13,8 @@ type Picked = { fileId: string; name: string }
 async function prepare(pick: () => Promise<Picked | null>): Promise<void> {
   const c = window.alga.cinema
   useCinema.setState({ error: null })
+  // The PWA cannot read a film from disk with ffmpeg: projecting is a desktop thing, watching works everywhere.
+  if (window.alga.config?.shell === 'web') return void useCinema.setState({ error: t.hostDesktopOnly })
   let f: Picked | null = null
   try {
     f = await pick()
@@ -29,7 +32,7 @@ async function prepare(pick: () => Promise<Picked | null>): Promise<void> {
       return void c.close(f.fileId).catch(() => undefined)
     }
     // r.next: the later episodes of the folder (the room switches to the first at the end of the credits)
-    const decodes = typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(r.film.videoMime)
+    const decodes = !!MSE?.isTypeSupported(r.film.videoMime)
     useCinema.setState({ draft: { fileId: f.fileId, name: f.name, film: r.film, warnings: r.warnings, decodes, next: r.next, series: r.series ?? null } })
   } catch (e) {
     console.warn('[cinema] open file', e)
@@ -78,7 +81,7 @@ export async function chooseEpisode(fileId: string): Promise<void> {
       useCinema.setState({ error: t.probeErrors[r.error] ?? t.probeErrors.unreadable })
       return void c.close(fileId).catch(() => undefined)
     }
-    const decodes = typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(r.film.videoMime)
+    const decodes = !!MSE?.isTypeSupported(r.film.videoMime)
     useCinema.setState({ draft: { fileId, name: ep.name, film: r.film, warnings: r.warnings, decodes, next: r.next, series: r.series ?? null } })
     void c.close(d.fileId).catch(() => undefined)
   } catch (e) {

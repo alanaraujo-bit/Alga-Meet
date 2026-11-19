@@ -4,7 +4,7 @@ import { create } from 'zustand'
 export type ThemePref = 'system' | 'dark' | 'light'
 
 const KEY = 'alga.theme'
-export const themeOffered = window.alga?.config.shell === 'web'
+export const themeOffered = window.alga?.config?.shell === 'web'
 
 function load(): ThemePref {
   try {

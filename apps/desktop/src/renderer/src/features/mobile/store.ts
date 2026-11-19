@@ -91,5 +91,5 @@ const subscribe = (cb: () => void) => {
 }
 export function useCompact(): boolean {
   const narrow = useSyncExternalStore(subscribe, () => mq?.matches ?? false)
-  return narrow && window.alga?.config.shell === 'web'
+  return narrow && window.alga?.config?.shell === 'web'
 }
