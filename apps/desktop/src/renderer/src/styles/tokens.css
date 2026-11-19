@@ -5,6 +5,8 @@
  * Semantic colors are desaturated (C ≤ 0.17) and rare. Contrast is asserted in tokens.test.ts.
  * Living reference: docs/design/design-system.md
  */
+/* [data-force-dark]: surfaces over the 3D world keep the dark values in the light theme too. */
+[data-force-dark],
 :root {
   color-scheme: dark;
   /* Channels of the translucent "ink" the chrome uses for washes and hairlines: rgb(var(--ink) / 0.06). White here,

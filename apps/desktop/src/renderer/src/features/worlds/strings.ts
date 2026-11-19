@@ -40,6 +40,7 @@ export const t = {
   },
 
   hud: {
+    stick: 'Andar: arraste o círculo',
     leave: 'Sair do mundo',
     backToCall: 'Ver a chamada (continuo na sala)',
     leaveHint: 'Volta para a chamada normal. A voz não cai.',

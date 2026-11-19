@@ -34,7 +34,7 @@ class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   override render(): ReactNode {
     if (!this.state.failed) return this.props.children
     return (
-      <div className={s.world}>
+      <div className={s.world} data-force-dark>
         <div className={s.veil} role="alert">
           <Eco state="error" size={56} />
           <strong>{t.failed.title}</strong>

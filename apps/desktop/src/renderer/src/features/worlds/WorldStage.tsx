@@ -17,6 +17,7 @@ import { AssetPack, PackError, resolveAssetsUrl, type PackProgress } from './ass
 import { WorldEngine, type EngineStatus, type WorldPerson } from './engine/World'
 import { QUALITY_TIERS, type QualityPref, type QualityTier } from './engine/quality'
 import { DominoHud } from './domino/DominoHud'
+import { Joystick } from './Joystick'
 import type { DominoUi } from './domino/DominoRoom'
 import { dominoBot, dominoPlay, dominoStart, useDomino } from './domino/store'
 import { PoolHud } from './pool/PoolHud'
@@ -227,10 +228,12 @@ export default function WorldStage({ channel }: { channel: Channel }) {
   ], [world.quality, tier])
 
   const seated = !!mine?.seat
+  // A phone or tablet: an on-screen stick stands in for WASD.
+  const coarse = useMemo(() => matchMedia('(pointer: coarse)').matches, [])
   const ready = phase.kind === 'ready'
 
   return (
-    <div className={s.world}>
+    <div className={s.world} data-force-dark>
       {/* Behind the canvas on purpose: the call's adaptive stream sizes the video by this element. */}
       <video ref={feed} className={s.feed} autoPlay playsInline muted />
       <div ref={host} className={s.host} />
@@ -238,6 +241,7 @@ export default function WorldStage({ channel }: { channel: Channel }) {
 
       {ready && (
         <>
+          {coarse && !seated && <Joystick engine={engine} />}
           <div className={s.place}>
             <Icon icon={DoorOpen} size={14} />
             <span>{room?.name}</span>

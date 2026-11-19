@@ -215,6 +215,7 @@ export class WorldEngine {
     on(canvas, 'pointerdown', this.onPointerDown)
     on(window, 'pointermove', this.onPointerMove)
     on(window, 'pointerup', this.onPointerUp)
+    on(window, 'pointercancel', this.onPointerCancel)
     on(canvas, 'wheel', this.onWheel, { passive: false })
     on(canvas, 'contextmenu', (e: Event) => e.preventDefault())
     on(window, 'keydown', this.onKeyDown)
@@ -598,8 +599,39 @@ export class WorldEngine {
 
   // ---- input ---------------------------------------------------------------------------------------------------------
 
+  // ---- touch: two fingers pinch the camera in and out; a virtual stick (setStick) walks -------------------------------
+  private readonly touches = new Map<number, { x: number; y: number }>()
+  private pinch: number | null = null
+  private readonly stick = { x: 0, z: 0 }
+
+  /** The on-screen joystick (WorldStage, touch screens): x right, z forward, each −1..1; 0, 0 = let go. */
+  setStick(x: number, z: number): void {
+    this.stick.x = THREE.MathUtils.clamp(x, -1, 1)
+    this.stick.z = THREE.MathUtils.clamp(z, -1, 1)
+  }
+
+  private touchSpread(): number {
+    const [a, b] = [...this.touches.values()]
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0
+  }
+
+  private readonly onPointerCancel = (e: PointerEvent): void => {
+    this.touches.delete(e.pointerId)
+    if (this.touches.size < 2) this.pinch = null
+    this.drag = null
+  }
+
   private readonly onPointerDown = (e: PointerEvent): void => {
     if (!this.inputEnabled) return
+    if (e.pointerType === 'touch') {
+      this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (this.touches.size === 2) {
+        // A second finger: no look-around, no tap; the spread of the two zooms.
+        this.pinch = this.touchSpread()
+        this.drag = null
+        return
+      }
+    }
     this.canvas.setPointerCapture?.(e.pointerId)
     this.setPointer(e)
     if (this.pool.pointerDown(e, this.pointer) || this.domino.pointerDown(e, this.pointer)) return void (this.drag = null)
@@ -614,6 +646,16 @@ export class WorldEngine {
   }
 
   private readonly onPointerMove = (e: PointerEvent): void => {
+    if (this.touches.has(e.pointerId)) this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (this.pinch !== null && this.touches.size >= 2) {
+      const spread = this.touchSpread()
+      if (spread > 0 && this.pinch > 0) {
+        this.watching = false
+        this.camDist = THREE.MathUtils.clamp(this.camDist * (this.pinch / spread), 1.5, 8)
+      }
+      this.pinch = spread
+      return
+    }
     this.setPointer(e)
     if (this.pool.pointerMove(e, this.pointer) || this.domino.pointerMove(e, this.pointer)) return
     if (this.editor?.dragging) return void this.editor.move(this.pointer)
@@ -630,7 +672,12 @@ export class WorldEngine {
     this.camPitch = THREE.MathUtils.clamp(this.camPitch + dy * 0.004, -0.12, 1.25)
   }
 
-  private readonly onPointerUp = (): void => {
+  private readonly onPointerUp = (e: PointerEvent): void => {
+    if (this.touches.delete(e.pointerId) && this.pinch !== null) {
+      // Lifting one finger of a pinch ends it without a tap.
+      if (this.touches.size < 2) this.pinch = null
+      return
+    }
     if (this.pool.pointerUp(this.pointer) || this.domino.pointerUp(this.pointer)) return
     if (this.editor?.dragging) return void this.editor.end()
     const d = this.drag
@@ -872,6 +919,8 @@ export class WorldEngine {
       if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) mz -= 1
       if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) mx -= 1
       if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) mx += 1
+      mx += this.stick.x
+      mz += this.stick.z
     }
     const run = (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight')) && !stance
     let vx = 0, vz = 0, gait: number = WORLD_GAITS.idle

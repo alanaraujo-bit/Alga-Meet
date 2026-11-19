@@ -61,7 +61,7 @@ await phone.screenshot({ path: join(out, '02-phone-call.png') })
 await desk.screenshot({ path: join(out, '03-desk-call.png') })
 
 // Phone: back to the channel list → the call pill; tap it → back on the stage.
-await phone.getByRole('button', { name: 'Voltar' }).tap()
+await phone.getByRole('button', { name: 'Voltar', exact: true }).tap()
 await phone.waitForTimeout(600)
 const pill = phone.getByRole('button', { name: 'Abrir a call' })
 check('phone: call pill outside the stage', await pill.isVisible())
@@ -70,7 +70,33 @@ await pill.tap()
 await phone.waitForTimeout(600)
 check('phone: pill reopens the stage', !(await pill.isVisible()))
 
-await phone.getByRole('button', { name: 'Voltar' }).tap()
+// The world on the phone: Mundo › Lounge from the call, the stick walks the figure, two fingers zoom.
+if (process.argv.includes('--world')) {
+  await phone.getByRole('button', { name: 'Mundo' }).first().tap()
+  await phone.locator('[role^=menuitem]', { hasText: 'Lounge' }).first().tap()
+  const entered = await phone.getByRole('application', { name: /Andar/ }).waitFor({ timeout: 90_000 }).then(() => true, () => false)
+  check('phone: world open with the walking stick', entered)
+  await phone.waitForTimeout(2500)
+  await phone.screenshot({ path: join(out, '05-phone-world.png') })
+  if (entered) {
+    const box = await phone.getByRole('application', { name: /Andar/ }).boundingBox()
+    const cx = box.x + box.width / 2, cy = box.y + box.height / 2
+    const before = await phone.locator('canvas').first().screenshot()
+    // Hold the stick forward for a second and a half through a touch-like pointer drag.
+    await phone.mouse.move(cx, cy)
+    await phone.mouse.down()
+    await phone.mouse.move(cx, cy - 46, { steps: 6 })
+    await phone.waitForTimeout(1500)
+    await phone.screenshot({ path: join(out, '06-phone-world-walking.png') })
+    await phone.mouse.up()
+    const after = await phone.locator('canvas').first().screenshot()
+    check('phone: the stick moved the view', !before.equals(after))
+  }
+  await phone.getByRole('button', { name: /Ver a chamada/ }).first().tap().catch(() => {})
+  await phone.waitForTimeout(800)
+}
+
+await phone.getByRole('button', { name: 'Voltar', exact: true }).tap()
 await phone.getByRole('button', { name: 'Sair da call' }).tap()
 await phone.waitForTimeout(800)
 check('phone: left the call from the pill', !(await phone.getByRole('button', { name: 'Abrir a call' }).isVisible()))
