@@ -1,6 +1,6 @@
 // The site's invite page (apps/site/src/pages/i): who invited you, open in the app or download it.
-// shortcut: the Vercel address until the own domain exists; the join box accepts any URL whose last segment is the code.
-export const INVITE_BASE = 'https://alga-meet.vercel.app/i/'
+// The join box accepts any URL whose last segment is the code (old alga-meet.vercel.app links too).
+export const INVITE_BASE = 'https://algameet.com/i/'
 
 export const inviteLink = (code: string): string => INVITE_BASE + code
 

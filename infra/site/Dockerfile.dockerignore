@@ -1,0 +1,16 @@
+# Build context filter for infra/site/Dockerfile (BuildKit reads <Dockerfile>.dockerignore next to the Dockerfile).
+*
+!package.json
+!package-lock.json
+!tsconfig.base.json
+!packages/shared/package.json
+!apps/server/package.json
+!apps/desktop/package.json
+!apps/site/**
+!infra/site/Caddyfile
+**/.env
+**/.env.*
+**/node_modules
+apps/site/dist
+apps/site/.astro
+apps/site/.vercel

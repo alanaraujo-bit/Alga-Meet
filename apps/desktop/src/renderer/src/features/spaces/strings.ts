@@ -13,7 +13,7 @@ export const t = {
     title: 'Entrar em um espaço',
     description: 'Cole o link ou o código do convite que você recebeu.',
     label: 'Link ou código do convite',
-    placeholder: 'alga-meet.vercel.app/i/k3yZ9q ou k3yZ9q',
+    placeholder: 'algameet.com/i/k3yZ9q ou k3yZ9q',
     submit: 'Entrar no espaço',
     looking: 'Procurando convite…',
     invalid: 'Esse não parece um convite válido.',
