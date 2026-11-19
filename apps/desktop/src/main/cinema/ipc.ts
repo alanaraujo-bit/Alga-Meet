@@ -9,7 +9,7 @@ import { log } from '../log'
 import { mainWindow } from '../window'
 import { checkFfmpeg, ffmpegBins } from './ffmpeg'
 import { VIDEO_EXTS, seriesOf, type Series } from './names'
-import { PieceFactory, cinemaRoot, sessionDir } from './pieces'
+import { PieceFactory, sessionDir } from './pieces'
 import { probeFile } from './probe'
 import { ResumeStore, WatchedStore, episodeCode, resumeKey, seriesKey, watchedAt } from './resume'
 
@@ -29,6 +29,8 @@ const SUBTITLE_EXTS = ['srt', 'ass', 'ssa', 'vtt']
 const TRACK_RE = /^(v|poster|thumbs|[as]\d{1,3})$/
 /** Share of the free disk the host's piece cache may use (global constraints: min(file size, 20% of free)). */
 const DISK_SHARE = 0.2
+/** When the free space cannot be read: a fixed cap, never "no limit". */
+const DISK_FALLBACK_BYTES = 4 * 1024 ** 3
 
 const register = (path: string): { fileId: string; name: string } => {
   const fileId = randomBytes(16).toString('base64url')
@@ -127,8 +129,10 @@ export const closeAllCinema = (): Promise<unknown> => Promise.all([...files.keys
 
 async function budget(path: string): Promise<number> {
   const size = (await stat(path)).size
-  const free = await statfs(cinemaRoot()).then((s) => s.bavail * s.bsize, () => Number.POSITIVE_INFINITY)
-  return Math.min(size, Math.floor(free * DISK_SHARE))
+  // The temp folder, not cinemaRoot(): that one is only created when a film starts, and statfs on a missing folder
+  // fails on Windows, which once meant "no limit" and a whole remux written to C:. Same volume either way.
+  const free = await statfs(app.getPath('temp')).then((s) => s.bavail * s.bsize, () => null)
+  return Math.min(size, free === null ? DISK_FALLBACK_BYTES : Math.floor(free * DISK_SHARE))
 }
 
 async function doProbe(fileId: string, e: Entry) {
