@@ -40,6 +40,7 @@ import { ShellHosts, SpaceMain, useShellStart } from '../shell/Shell'
 import { openStaff } from '../staff/store'
 import { leaveVoice, openCall, useVoice } from '../voice/voice'
 import { openCenter } from '../whatsnew/store'
+import { InstallCard } from './Install'
 import { Stack } from './Stack'
 import { depthOf, selectTab, useMobile, useMobileRouting, type MobileTab } from './store'
 import { t } from './strings'
@@ -249,6 +250,7 @@ function YouScreen() {
           </span>
           <Icon icon={ChevronRight} size={16} />
         </button>
+        <InstallCard />
         <PushCard />
         <ul className={m.group}>
           <Row icon={User} label={t.you.account} onClick={go('account')} />

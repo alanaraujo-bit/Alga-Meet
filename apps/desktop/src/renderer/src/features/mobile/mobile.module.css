@@ -370,3 +370,15 @@
   display: block;
   white-space: normal;
 }
+.installBtn {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 var(--s-4);
+  border-radius: var(--r-full);
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font: var(--w-semibold) 14px/1 var(--font-ui);
+}
+.installBtn:active {
+  background: var(--accent-pressed);
+}

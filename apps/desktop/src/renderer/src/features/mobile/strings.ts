@@ -22,6 +22,12 @@ export const t = {
     staff: 'Moderação',
     logout: 'Sair',
   },
+  install: {
+    title: 'Instalar o Alga',
+    body: 'Abre em tela cheia, como um app, direto da tela inicial.',
+    ios: 'Toque em Compartilhar e depois em Adicionar à Tela de Início.',
+    cta: 'Instalar',
+  },
   push: {
     off: { title: 'Notificações no celular', body: 'DM, menção e chamada, mesmo com o app fechado.' },
     on: { title: 'Notificações no celular', body: 'Ligadas. Ficam quietas enquanto você usa o Alga no PC.' },
