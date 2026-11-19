@@ -37,7 +37,7 @@
   height: 32px;
   padding: 0 12px;
   border-radius: var(--r-sm);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgb(var(--ink) / 0.04);
   box-shadow: inset 0 0 0 1px var(--border-default);
   color: var(--text-primary);
   font: var(--type-ui);
@@ -73,10 +73,10 @@
   padding: 20px;
   border-radius: var(--r-lg);
   background: var(--bg-raised);
-  box-shadow: inset 0 0 0 1px var(--border-subtle), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px var(--border-subtle), inset 0 1px 0 rgb(var(--ink) / 0.04);
 }
 .hero {
-  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(139, 142, 247, 0.22), inset 0 1px 0 rgb(var(--ink) / 0.06);
 }
 .meta {
   display: grid;

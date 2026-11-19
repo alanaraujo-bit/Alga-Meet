@@ -17,7 +17,7 @@
   margin-right: var(--s-2);
   padding: 0 var(--s-2);
   border-radius: var(--r-sm);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgb(var(--ink) / 0.04);
   color: var(--text-tertiary);
 }
 .filter:focus-within {

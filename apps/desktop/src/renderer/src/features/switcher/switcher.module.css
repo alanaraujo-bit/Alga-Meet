@@ -41,7 +41,7 @@
   min-height: 0;
 }
 .anchored .panel {
-  box-shadow: var(--elev-modal), inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: var(--elev-modal), inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgb(var(--ink) / 0.04);
 }
 .inputRow {
   display: flex;

@@ -30,6 +30,7 @@ import { defaultDeviceName } from './devices'
 import { ImagePicker } from './ImagePicker'
 import { sessionLabel } from './sessions'
 import { setZoom, stepZoom, useZoom, ZOOM_STEPS } from './zoom'
+import { setTheme, themeOffered, useTheme } from './theme'
 import { closeSettings, openSettings, useSettings, type SettingsSection } from './store'
 import { t } from './strings'
 import s from './settings.module.css'
@@ -614,8 +615,23 @@ function Appearance() {
   useEffect(() => {
     if (app?.getTrayAnimation) void app.getTrayAnimation().then(setTrayAnim)
   }, [app])
+  const theme = useTheme((st) => st.pref)
   return (
     <Group>
+      {themeOffered && (
+        <Row label={t.appearance.theme} hint={t.appearance.themeHint}>
+          <SegmentedControl
+            label={t.appearance.theme}
+            value={theme}
+            onChange={setTheme}
+            items={[
+              { value: 'system', label: t.appearance.themeSystem },
+              { value: 'dark', label: t.appearance.themeDark },
+              { value: 'light', label: t.appearance.themeLight },
+            ]}
+          />
+        </Row>
+      )}
       {zoom !== null && (
         <Row label={t.appearance.zoom} hint={t.appearance.zoomHint}>
           <div className={s.stepper} role="group" aria-label={t.appearance.zoom}>

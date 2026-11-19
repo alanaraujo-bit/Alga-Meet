@@ -1,16 +1,22 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 // Direção B contrast contract: every token pair the UI actually draws, WCAG 2.x relative luminance.
 const here = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(here, 'tokens.css'), 'utf8')
-const root = css.slice(css.indexOf(':root {'), css.indexOf('\n}', css.indexOf(':root {')))
+const block = (head: string) => css.slice(css.indexOf(head), css.indexOf('\n}', css.indexOf(head)))
+const dark = block(':root {')
+// The light theme overrides colors only; anything it leaves out (white text on fills) is the dark value.
+const THEMES = { dark: [dark], light: [block(":root[data-theme='light'] {"), dark] }
+let blocks: string[] = THEMES.dark
 const tok = (name: string): string => {
-  const m = new RegExp(`--${name}:\\s*([^;]+);`).exec(root)
-  if (!m) throw new Error(`token --${name} missing`)
-  return m[1]!.trim()
+  for (const b of blocks) {
+    const m = new RegExp(`--${name}:\\s*([^;]+);`).exec(b)
+    if (m) return m[1]!.trim()
+  }
+  throw new Error(`token --${name} missing`)
 }
 
 type RGBA = [number, number, number, number]
@@ -34,6 +40,10 @@ const contrast = (fg: RGBA, bg: RGBA) => {
 }
 
 const solid = (n: string) => parse(tok(n))
+
+for (const [theme, themeBlocks] of Object.entries(THEMES)) {
+blocks = themeBlocks
+const light = theme === 'light'
 const content = solid('bg-content')
 const surfaces: Record<string, RGBA> = {
   app: solid('bg-app'),
@@ -47,10 +57,11 @@ const surfaces: Record<string, RGBA> = {
   'glass on media': over(tok('bg-glass'), [128, 128, 128, 1]),
   'current row': over(tok('state-current-hover'), solid('bg-sidebar')),
   'hover on raised': over(tok('state-hover'), solid('bg-raised')),
-  input: over('rgba(255, 255, 255, 0.035)', solid('bg-modal')),
+  input: over(light ? 'rgba(0, 0, 0, 0.035)' : 'rgba(255, 255, 255, 0.035)', solid('bg-modal')),
 }
 
-describe('tokens: WCAG AA on every surface', () => {
+describe(`tokens (${theme}): WCAG AA on every surface`, () => {
+  beforeEach(() => void (blocks = themeBlocks))
   for (const text of ['text-primary', 'text-secondary', 'text-tertiary', 'accent'])
     for (const [name, bg] of Object.entries(surfaces))
       it(`${text} on ${name} ≥ 4.5`, () => expect(contrast(solid(text), bg)).toBeGreaterThanOrEqual(4.5))
@@ -80,11 +91,17 @@ describe('tokens: WCAG AA on every surface', () => {
     expect(contrast(solid('avatar-ink'), solid('avatar-fill'))).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('surfaces step up in luminance: chrome < content < raised < overlay', () => {
+  // Dark: each layer is lighter. Light: content and overlays are white, chrome and raised cards a step down.
+  it(light ? 'chrome and raised cards sit below the white content' : 'surfaces step up in luminance: chrome < content < raised < overlay', () => {
+    if (light) {
+      for (const n of ['bg-app', 'bg-raised']) expect(lum(solid(n))).toBeLessThan(lum(content))
+      return
+    }
     const L = ['bg-app', 'bg-content', 'bg-raised', 'bg-overlay'].map((n) => lum(solid(n)))
     for (let i = 1; i < L.length; i++) expect(L[i]!).toBeGreaterThan(L[i - 1]!)
   })
 })
+}
 
 describe('Direção B: no teal left in the renderer', () => {
   const src = join(here, '..')

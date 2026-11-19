@@ -35,8 +35,8 @@
   height: 18px;
   padding: 0 var(--s-1);
   border-radius: var(--r-xs);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  background: rgb(var(--ink) / 0.06);
+  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 -1px 0 rgb(var(--ink) / 0.04);
   color: var(--text-tertiary);
   font: var(--type-badge);
   font-weight: var(--w-medium);
@@ -57,7 +57,7 @@
 .skeleton {
   display: block;
   border-radius: var(--r-xs);
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.06) 100%);
+  background: linear-gradient(90deg, rgb(var(--ink) / 0.06) 0%, rgb(var(--ink) / 0.1) 50%, rgb(var(--ink) / 0.06) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
 }
@@ -112,8 +112,8 @@
   height: 48px;
   margin-bottom: var(--s-2);
   border-radius: var(--r-lg);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  background: linear-gradient(180deg, rgb(var(--ink) / 0.05), rgb(var(--ink) / 0.02));
+  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgb(var(--ink) / 0.04);
   color: var(--text-tertiary);
 }
 .emptyTitle {
@@ -140,7 +140,7 @@
   width: 32px;
   height: 18px;
   border-radius: var(--r-full);
-  background: rgba(255, 255, 255, 0.12);
+  background: rgb(var(--ink) / 0.12);
   transition: background-color var(--dur-base) var(--ease-out-quad);
 }
 .switch[aria-checked='true'] {
@@ -194,8 +194,8 @@
   position: absolute;
   inset: 0;
   border-radius: var(--r-sm);
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgba(255, 255, 255, 0.05), var(--elev-low);
+  background: rgb(var(--ink) / 0.08);
+  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgb(var(--ink) / 0.05), var(--elev-low);
 }
 .segmentLabel {
   position: relative;
@@ -234,8 +234,8 @@
   color: var(--text-secondary);
 }
 .tab[aria-selected='true'] {
-  background: rgba(255, 255, 255, 0.07);
-  box-shadow: inset 0 0 0 1px var(--border-strong), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  background: rgb(var(--ink) / 0.07);
+  box-shadow: inset 0 0 0 1px var(--border-strong), inset 0 1px 0 rgb(var(--ink) / 0.04);
   color: var(--text-primary);
 }
 
@@ -247,7 +247,7 @@
   height: 16px;
   padding: 0 5px;
   border-radius: var(--r-full);
-  background: rgba(255, 255, 255, 0.1);
+  background: rgb(var(--ink) / 0.1);
   color: var(--text-secondary);
   font: var(--type-badge);
   font-variant-numeric: tabular-nums;

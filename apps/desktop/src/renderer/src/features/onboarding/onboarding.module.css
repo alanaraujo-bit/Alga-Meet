@@ -53,8 +53,8 @@
   gap: var(--s-1);
   padding: var(--s-5);
   border-radius: var(--r-lg);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 60%), var(--bg-raised);
-  box-shadow: inset 0 0 0 1px var(--border-subtle), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  background: linear-gradient(180deg, rgb(var(--ink) / 0.02), transparent 60%), var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle), inset 0 1px 0 rgb(var(--ink) / 0.03);
   text-align: left;
   transition:
     background-color var(--dur-hover-out) var(--ease-out-quad),
@@ -62,8 +62,8 @@
 }
 .choice:hover {
   transition-duration: 0ms;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 60%), var(--bg-raised);
-  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(180deg, rgb(var(--ink) / 0.035), transparent 60%), var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgb(var(--ink) / 0.04), 0 8px 24px rgba(0, 0, 0, 0.25);
 }
 
 .choiceIcon {
@@ -73,7 +73,7 @@
   height: 36px;
   margin-bottom: var(--s-3);
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgb(var(--ink) / 0.05);
   box-shadow: inset 0 0 0 1px var(--border-subtle);
   color: var(--text-secondary);
   transition: color var(--dur-hover-out) var(--ease-out-quad);

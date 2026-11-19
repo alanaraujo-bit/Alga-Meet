@@ -167,6 +167,11 @@ export const t = {
   },
 
   appearance: {
+    theme: 'Tema',
+    themeHint: 'Sistema segue o claro ou escuro do aparelho.',
+    themeSystem: 'Sistema',
+    themeDark: 'Escuro',
+    themeLight: 'Claro',
     density: 'Densidade',
     comfortable: 'Confortável',
     compact: 'Compacta',

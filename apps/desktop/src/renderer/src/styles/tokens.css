@@ -7,6 +7,9 @@
  */
 :root {
   color-scheme: dark;
+  /* Channels of the translucent "ink" the chrome uses for washes and hairlines: rgb(var(--ink) / 0.06). White here,
+     black in the light theme (below). Surfaces over video and the 3D world keep literal white on purpose. */
+  --ink: 255 255 255;
 
   /* ── Surfaces (OKLCH L, C ≈ 0.003, H 282) ─────────────── */
   --bg-app: #0b0b0c; /* L .150  chrome: title bar, rail (the inverted L) */
@@ -178,6 +181,73 @@
   --z-toast: 800;
   --z-tooltip: 1100;
   --z-context-menu: 1200;
+}
+
+/*
+ * Light theme (html[data-theme='light'], Aparência › Tema; the PWA follows the device by default, the desktop stays
+ * dark). Same language as the dark one: near-neutral surfaces at H ≈ 282, one soft indigo, desaturated semantics.
+ * Contrast is asserted in tokens.test.ts.
+ */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --ink: 0 0 0;
+
+  --bg-app: #f3f3f5;
+  --bg-sidebar: #f3f3f5;
+  --bg-content: #ffffff;
+  --bg-raised: #f2f2f5;
+  --bg-overlay: #ffffff;
+  --bg-glass: rgba(255, 255, 255, 0.86);
+  --glass-blur: blur(20px) saturate(1.8);
+  --bg-modal: #ffffff;
+  --scrim: rgba(16, 16, 28, 0.32);
+
+  --state-hover: rgba(0, 0, 0, 0.04);
+  --state-selected: rgba(0, 0, 0, 0.06);
+  --state-pressed: rgba(0, 0, 0, 0.08);
+  --state-current: rgba(97, 99, 208, 0.1);
+  --state-current-hover: rgba(97, 99, 208, 0.14);
+
+  --text-primary: #111214;
+  --text-secondary: #2b2e35;
+  --text-tertiary: #585d66;
+  --text-disabled: #a2a6ad;
+
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.09);
+  --border-strong: rgba(0, 0, 0, 0.14);
+
+  --accent: #4f52c4;
+  --accent-hover: #3f42b0;
+  --accent-fill: #6163d0;
+  --accent-fill-hover: #5759c6;
+  --accent-pressed: #4e50b8;
+  --accent-tint: rgba(97, 99, 208, 0.08);
+  --accent-tint-strong: rgba(97, 99, 208, 0.14);
+  --accent-glow: rgba(97, 99, 208, 0.2);
+  --accent-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 55%);
+  --selection-bg: rgba(97, 99, 208, 0.22);
+
+  --online: #23935a;
+  --idle: #b87a12;
+  --dnd: #cc3d37;
+  --offline: #767a81;
+  --warning: #8a5806;
+  --warning-tint: rgba(184, 122, 18, 0.12);
+  --danger: #c4372f;
+  --danger-hover: #ab2c25;
+  --danger-tint: rgba(196, 55, 47, 0.1);
+  --success: #1a7a48;
+  --success-tint: rgba(35, 147, 90, 0.1);
+  --live: #c32f57;
+  --live-tint: rgba(195, 47, 87, 0.1);
+
+  --avatar-fill: #e7e8ed;
+  --avatar-ink: #3a3e46;
+
+  --elev-low: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --elev-overlay: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 4px 12px rgba(0, 0, 0, 0.06), 0 16px 40px rgba(0, 0, 0, 0.12);
+  --elev-modal: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 8px 20px rgba(0, 0, 0, 0.08), 0 32px 80px rgba(0, 0, 0, 0.18);
 }
 
 /* Aparência › Tamanho do texto (html[data-text-size], store/ui.ts): message text only, the UI chrome stays. */

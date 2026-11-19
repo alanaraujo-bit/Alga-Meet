@@ -114,7 +114,7 @@
   margin-bottom: var(--s-2);
   padding: var(--s-2);
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgb(var(--ink) / 0.03);
   text-align: left;
 }
 .strip:hover {
@@ -185,7 +185,7 @@
   gap: var(--s-2);
   padding: var(--s-2) var(--s-3);
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgb(var(--ink) / 0.04);
   color: var(--text-secondary);
   font: var(--type-ui);
 }
@@ -235,7 +235,7 @@
   background: oklch(0.32 0.06 var(--tile-h, 279));
   color: oklch(0.92 0.05 var(--tile-h, 279));
   font: var(--w-semibold) 15px/1 var(--font-ui);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgb(var(--ink) / 0.08);
 }
 .inviteTile img {
   width: 100%;

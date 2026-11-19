@@ -57,7 +57,7 @@
 .bars i {
   width: 3px;
   border-radius: 1px;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgb(var(--ink) / 0.16);
 }
 .bars i:nth-child(1) { height: 5px; }
 .bars i:nth-child(2) { height: 8px; }
