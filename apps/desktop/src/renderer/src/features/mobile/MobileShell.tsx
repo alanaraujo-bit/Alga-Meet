@@ -270,6 +270,13 @@ function YouScreen() {
   )
 }
 
+/** Back on the call's screen, also when the view already points at it (it was only popped off the stack). */
+function reopen(channelId: string) {
+  openCall(channelId)
+  const dm = !useData.getState().channels[channelId]?.spaceId
+  useMobile.setState({ tab: dm ? 'dms' : 'spaces', open: true })
+}
+
 /** You are in a call but looking elsewhere: a pill to get back, mute or leave (the tray's job on the desktop). */
 function CallPill({ raised }: { raised: boolean }) {
   const conn = useMedia((st) => st.connection)
@@ -292,7 +299,7 @@ function CallPill({ raised }: { raised: boolean }) {
           exit={{ opacity: 0, y: 16, scale: 0.96 }}
           transition={{ type: 'spring', stiffness: 520, damping: 38 }}
         >
-          <button type="button" className={m.pillMain} onClick={() => openCall(channelId)} aria-label={t.call.open}>
+          <button type="button" className={m.pillMain} onClick={() => reopen(channelId)} aria-label={t.call.open}>
             <VoiceDot />
             <span className={m.pillText}>
               <strong>{t.call.inCall}</strong>
