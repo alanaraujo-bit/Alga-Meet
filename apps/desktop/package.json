@@ -16,7 +16,9 @@
     "test": "vitest run",
     "dist": "node scripts/build-activity.mjs && node scripts/fetch-ffmpeg.mjs && node scripts/build-setup-ui.mjs && electron-vite build && electron-builder --win --publish never && node scripts/check-package.mjs",
     "build:setup-ui": "node scripts/build-setup-ui.mjs",
-    "screenshot": "node scripts/screenshot.mjs"
+    "screenshot": "node scripts/screenshot.mjs",
+    "dev:web": "vite --config vite.web.config.ts",
+    "build:web": "vite build --config vite.web.config.ts"
   },
   "dependencies": {
     "electron-updater": "^6.8.11",

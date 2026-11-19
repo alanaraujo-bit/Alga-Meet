@@ -58,6 +58,7 @@ const config: AppConfig = {
   isPackaged: app.isPackaged,
   cpuVendor: cpuVendorOf(cpus()[0]?.model ?? ''),
   osVersion: osVersionLabel(process.platform, release()),
+  shell: 'electron',
 }
 
 // Dev only, opt-in: route algameet:// to this checkout (and profile). Packaged builds are registered by the

@@ -1,0 +1,20 @@
+/* The PWA's frame: an app, not a page. No rubber-band scroll, pinch zoom of the chrome, tap flash or text selection
+   outside the places meant for text; the notch and the home bar are kept clear by the safe-area insets. */
+html,
+body,
+#root {
+  height: 100%;
+  height: 100dvh;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  box-sizing: border-box;
+}

@@ -27,6 +27,8 @@ export interface AppConfig {
    * `X-Alga-Client: ${version}; ${osVersion}` on every request (packages/shared/src/api.ts).
    */
   osVersion: string
+  /** Which window.alga this is: the Electron preload or the PWA's (src/web/bridge.ts), where some features do not exist. */
+  shell: 'electron' | 'web'
 }
 
 export interface CaptureSource {

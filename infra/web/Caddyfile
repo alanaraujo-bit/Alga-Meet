@@ -1,0 +1,31 @@
+# Alga Meet PWA (infra/web/Dockerfile). Railway terminates HTTPS and sends plain HTTP to $PORT.
+{
+	admin off
+	auto_https off
+}
+
+:{$PORT:8080} {
+	encode zstd gzip
+
+	# The API and the gateway WebSocket, on this same origin. Host must be the upstream's for Railway's router.
+	@api path /api/* /gateway /gateway/*
+	handle @api {
+		reverse_proxy {$ALGA_API_UPSTREAM} {
+			header_up Host {upstream_hostport}
+		}
+	}
+
+	handle {
+		root * /srv
+		header /assets/* Cache-Control "public, max-age=31536000, immutable"
+		header /sw.js Cache-Control "no-cache"
+		header /manifest.webmanifest Cache-Control "no-cache"
+		header {
+			X-Content-Type-Options nosniff
+			Referrer-Policy strict-origin-when-cross-origin
+			Permissions-Policy "camera=(self), microphone=(self), display-capture=(self), fullscreen=(self), autoplay=(self \"https://www.youtube.com\" \"https://www.youtube-nocookie.com\")"
+		}
+		try_files {path} /index.html
+		file_server
+	}
+}
