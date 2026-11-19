@@ -16,8 +16,15 @@
   resposta clara); cinema: assistir em qualquer lugar (iPhone via ManagedMediaSource), projetar só no desktop.
   Instalar: manifest, service worker (página nova a cada deploy, offline com a última cópia), ícones, convite de
   instalação. O desktop não muda visualmente (escuro, mesmo layout).
-- **Web Push (feito, não publicado):** servidor `src/push.ts`, migração `0023_push`, `VAPID_*`, `READY.push`, frame
-  `active`; apps sincronizam as escolhas de aviso pelo servidor.
+- **API publicada (2026-11-19, aval do dono: "Sim, publica"):** `feat/pwa` juntada na `main` (avanço direto, `46c6bc0`) e o
+  serviço `api` fixado nela (deploy `8e3ae72d`, SUCCESS; migração `0023_push` no boot; `VAPID_PUBLIC_KEY`,
+  `VAPID_PRIVATE_KEY` gerados localmente e gravados direto no Railway, `VAPID_SUBJECT=https://algameet.com`). Vai junto:
+  Web Push (`src/push.ts`, `READY.push`, frame `active`, escolhas de aviso sincronizadas) e as correções da auditoria
+  (voz fantasma, assinatura substituída cancelada no MP, presente pago após expirar, 404 do MP, bloqueios). Antes do
+  deploy: o bundle subiu num banco em memória e aplicou as migrações. Depois: `/api/v1/ready` 200, `/push/key` 401 sem
+  login (rota existe), log sem erro nem aviso, apps reconectados. **Não verificado:** um push real em produção (falta
+  alguém ligar as notificações no PWA). O desktop 0.1.21 instalado não manda `active` nem sincroniza silêncios: com
+  push ligado, o celular toca mesmo com a pessoa no PC até a próxima release.
 - **Verificado:** typecheck dos três pacotes; shared 124, desktop 1030, servidor 400+7 testes; `web-e2e.mjs` (celular +
   desktop na mesma call, pílula, Mundo com joystick) 8/8 e `web-push-e2e.mjs` (Edge real assinado no WNS recebe a
   menção) 4/4, ambos contra a pilha isolada; telas vistas no painel em 375×812 e 1280×800, claro e escuro.
