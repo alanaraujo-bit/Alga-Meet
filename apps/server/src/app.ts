@@ -46,6 +46,8 @@ import { userRoutes } from './routes/users.js'
 import { worldPublicRoutes, worldRoutes } from './routes/worlds.js'
 import { livekitWebhookRoute, voiceRoutes } from './routes/voice.js'
 import { playlistRoutes } from './routes/playlists.js'
+import { pushRoutes } from './routes/push.js'
+import { Push } from './push.js'
 import { soundRoutes } from './routes/sounds.js'
 import { createStorage } from './storage.js'
 import { Telemetry } from './telemetry.js'
@@ -73,6 +75,8 @@ export interface Ctx {
   activity: Activity
   /** Admin app feed, push and watchers (src/admin/alerts.ts). */
   alerts: AdminAlerts
+  /** Web Push to the PWA (src/push.ts). */
+  push: Push
   log: FastifyBaseLogger
 }
 
@@ -123,6 +127,8 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   ctx.events = new Events(ctx)
   ctx.activity = new Activity(ctx)
   ctx.alerts = new AdminAlerts(config, database.db, app.log)
+  ctx.push = new Push(config, database.db, app.log)
+  voice.onRing = (ids, channelId, fromUserId) => ctx.push.ring(ids, channelId, fromUserId)
   billing.onAdminEvent = (e) => ctx.alerts.fire(e)
   voice.onSessionEnd = (s, leftAt) => ctx.activity.recordSession(s, leftAt)
   app.decorate('ctx', ctx)
@@ -228,6 +234,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       fileRoutes(authed, ctx)
       soundRoutes(authed, ctx)
       playlistRoutes(authed, ctx)
+      pushRoutes(authed, ctx)
       billingRoutes(authed, ctx)
       privacyRoutes(authed, ctx)
       reportRoutes(authed, ctx)

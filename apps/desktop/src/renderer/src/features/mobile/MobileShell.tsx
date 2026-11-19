@@ -5,7 +5,7 @@ import { useData } from '@/store/data'
 import { homeBadge, spaceUnread } from '@/store/selectors'
 import { useSession } from '@/store/session'
 import { useUi } from '@/store/ui'
-import { Avatar, Badge, Icon, VoiceDot } from '@/ui'
+import { Avatar, Badge, Icon, Switch, toast, VoiceDot } from '@/ui'
 import { hueFor, initials } from '@/ui/Avatar'
 import {
   Bell,
@@ -30,6 +30,7 @@ import {
   type Glyph,
 } from '@/ui/icons'
 import { isMutedIn, useNotify, useSilenced } from '../app/notifyPrefs'
+import { disablePush, enablePush, usePush } from '../app/push'
 import { ChatView } from '../chat/ChatView'
 import { FriendsView } from '../friends/FriendsView'
 import { openProfile } from '../profile/store'
@@ -248,6 +249,7 @@ function YouScreen() {
           </span>
           <Icon icon={ChevronRight} size={16} />
         </button>
+        <PushCard />
         <ul className={m.group}>
           <Row icon={User} label={t.you.account} onClick={go('account')} />
           <Row icon={Shield} label={t.you.privacy} onClick={go('privacy')} />
@@ -266,6 +268,27 @@ function YouScreen() {
         </ul>
         <p className={m.version}>Alga Meet {window.alga.config.version}</p>
       </div>
+    </div>
+  )
+}
+
+/** Notifications on this phone: the switch, or what to do first (install on iOS, allow in the browser). */
+function PushCard() {
+  const { state, busy } = usePush()
+  if (state === 'unsupported' || state === 'unavailable') return null
+  const text = t.push[state]
+  return (
+    <div className={m.pushCard} data-on={state === 'on' || undefined}>
+      <span className={m.rowGlyph}>
+        <Icon icon={Bell} size={20} filled={state === 'on'} />
+      </span>
+      <span className={m.rowText}>
+        <span className={m.rowName}>{text.title}</span>
+        <span className={m.rowSub}>{text.body}</span>
+      </span>
+      {(state === 'off' || state === 'on') && (
+        <Switch checked={state === 'on'} label={text.title} disabled={busy} onChange={(v) => void (v ? enablePush() : disablePush()).catch(() => toast.error(t.push.failed))} />
+      )}
     </div>
   )
 }

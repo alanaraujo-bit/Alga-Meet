@@ -79,6 +79,8 @@ export class Voice {
   onDrop: (channelIds: string[]) => void = () => {}
   /** Same moments as onLeave, with the whole state: src/activity records voice_sessions from it (D7, growth-plan §4.5). */
   onSessionEnd: (s: VoiceState, leftAt: Date) => void = () => {}
+  /** A DM call started ringing these people (CALL_RING): src/push.ts tells their phones. */
+  onRing: (recipientIds: string[], channelId: string, fromUserId: string) => void = () => {}
   /** src/e2ee.ts sets it when the Delivery Service is up: without it no call is E2EE. */
   e2eeAvailable = false
 
@@ -230,6 +232,7 @@ export class Voice {
     this.hub.dispatch(await this.audience(state), 'VOICE_STATE_UPDATE', state)
     if (ring && wasEmpty && !row.spaceId) {
       this.hub.dispatch(recipientIds.filter((id) => id !== userId), 'CALL_RING', { channelId, fromUserId: userId })
+      this.onRing(recipientIds.filter((id) => id !== userId), channelId, userId)
     }
     // A token minted before the mute/deafen still carries the old grants.
     if (mod.serverMute || mod.serverDeaf) await this.enforce(state, permissions)

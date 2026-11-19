@@ -22,6 +22,13 @@ export const t = {
     staff: 'Moderação',
     logout: 'Sair',
   },
+  push: {
+    off: { title: 'Notificações no celular', body: 'DM, menção e chamada, mesmo com o app fechado.' },
+    on: { title: 'Notificações no celular', body: 'Ligadas. Ficam quietas enquanto você usa o Alga no PC.' },
+    denied: { title: 'Notificações bloqueadas', body: 'Libere nas configurações do navegador para este site.' },
+    install: { title: 'Notificações no iPhone', body: 'Toque em Compartilhar › Adicionar à Tela de Início e abra o Alga por lá.' },
+    failed: 'Não deu para ligar as notificações. Tente de novo.',
+  },
   call: {
     inCall: 'Na call',
     mute: 'Desativar microfone',

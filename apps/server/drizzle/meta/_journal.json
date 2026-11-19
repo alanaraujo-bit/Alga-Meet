@@ -162,6 +162,13 @@
       "when": 1794881760274,
       "tag": "0022_music_playlists",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795060888787,
+      "tag": "0023_push",
+      "breakpoints": true
     }
   ]
 }

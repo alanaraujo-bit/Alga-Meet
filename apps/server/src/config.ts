@@ -121,6 +121,13 @@ const EnvSchema = z
     /** Admin app push (src/admin/fcm.ts): the Firebase service-account JSON, raw or base64; or a path to it. Unset = no FCM (feed and stream only). */
     FCM_SERVICE_ACCOUNT: z.string().min(1).optional(),
     FCM_SERVICE_ACCOUNT_FILE: z.string().min(1).optional(),
+    /**
+     * Web Push to the PWA (src/push.ts): a VAPID key pair (`npx web-push generate-vapid-keys`) and a contact
+     * (mailto: or https:) the push services may write to. All three or none; none = no push, everything else works.
+     */
+    VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+    VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+    VAPID_SUBJECT: z.string().regex(/^(mailto:|https:\/\/)/).optional(),
     /** Break-glass (src/admin/bootstrap.ts): this account becomes admin at startup and gets a one-time code in the log. Remove after use. */
     ADMIN_BOOTSTRAP_EMAIL: z.email().optional(),
   })
@@ -221,6 +228,8 @@ export interface Config {
   worlds: { enabled: boolean; assetsUrl: string; assetsDir: string }
   /** src/admin/alerts.ts. The service-account JSON (or its base64) for FCM; undefined = no push. */
   push: { fcmServiceAccount: string | undefined }
+  /** src/push.ts (Web Push to the PWA); null = off. */
+  webPush: { publicKey: string; privateKey: string; subject: string } | null
   /** ADMIN_BOOTSTRAP_EMAIL (src/admin/bootstrap.ts). */
   adminBootstrapEmail: string | undefined
 }
@@ -321,6 +330,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       assetsDir: e.WORLDS_ASSETS_DIR,
     },
     push: { fcmServiceAccount: e.FCM_SERVICE_ACCOUNT ?? (e.FCM_SERVICE_ACCOUNT_FILE ? readFileSync(e.FCM_SERVICE_ACCOUNT_FILE, 'utf8') : undefined) },
+    webPush: e.VAPID_PUBLIC_KEY && e.VAPID_PRIVATE_KEY && e.VAPID_SUBJECT ? { publicKey: e.VAPID_PUBLIC_KEY, privateKey: e.VAPID_PRIVATE_KEY, subject: e.VAPID_SUBJECT } : null,
     adminBootstrapEmail: e.ADMIN_BOOTSTRAP_EMAIL,
   }
 }

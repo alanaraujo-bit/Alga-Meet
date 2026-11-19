@@ -24,6 +24,8 @@ interface SessionState {
   music: boolean
   /** Saved playlists and whole playlists into the call (READY.musicPlaylists). */
   musicPlaylists: boolean
+  /** The server takes the `active` frame and Web Push (READY.push); `key` null = push off there. null = older server. */
+  push: { key: string | null } | null
   /** The last READY said this server has Alga Worlds on, and where its 3D asset pack is (older ones close the socket on world_*). */
   worlds: WorldsReady | null
   /** Login (or the birth-date declaration) answered 403 with a restriction: the restricted-account screen shows it. */
@@ -64,7 +66,7 @@ export const useSession = create<SessionState>()((set, get) => {
     gw = new Gateway(window.alga.config.gatewayUrl, token, {
       onDispatch: (d) => {
         useData.getState().apply(d)
-        if (d.t === 'READY') set({ hydrated: true, cinema: d.d.cinema === true, cinemaLanes: Number.isInteger(d.d.cinemaLanes) ? d.d.cinemaLanes! : 0, music: d.d.music === true, musicPlaylists: d.d.musicPlaylists === true, worlds: d.d.worlds ?? null })
+        if (d.t === 'READY') set({ hydrated: true, cinema: d.d.cinema === true, cinemaLanes: Number.isInteger(d.d.cinemaLanes) ? d.d.cinemaLanes! : 0, music: d.d.music === true, musicPlaylists: d.d.musicPlaylists === true, worlds: d.d.worlds ?? null, push: d.d.push ?? null })
         listeners.forEach((l) => l(d))
       },
       onStatus: (s, info) => set({ gateway: s, retryInMs: info?.retryInMs ?? null }),
@@ -86,7 +88,7 @@ export const useSession = create<SessionState>()((set, get) => {
     setApiToken(null)
     await tokenStore.set(null)
     useData.getState().reset()
-    set({ phase: 'signed_out', hydrated: false, cinema: false, cinemaLanes: 0, music: false, musicPlaylists: false, worlds: null, gateway: 'idle', deletionCanceled: false, ...extra })
+    set({ phase: 'signed_out', hydrated: false, cinema: false, cinemaLanes: 0, music: false, musicPlaylists: false, worlds: null, push: null, gateway: 'idle', deletionCanceled: false, ...extra })
   }
 
   const authCall = async (path: string, body: LoginBody | RegisterBody) => {
@@ -107,6 +109,7 @@ export const useSession = create<SessionState>()((set, get) => {
     cinemaLanes: 0,
     music: false,
   musicPlaylists: false,
+  push: null,
     worlds: null,
     restricted: null,
     notice: null,

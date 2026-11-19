@@ -1,6 +1,6 @@
 import {
   ACCOUNT_ACTION_REASONS, ADMIN_EVENT_KINDS, FEEDBACK_KINDS, REPORT_REASONS, WORLD_ROOM_ACCESS, WORLD_SHELL_IDS,
-  type AdminEventKind, type EcoSpec, type EquippedCosmetics, type FeedbackContext, type PlaylistItem, type ReleaseContent, type WorldAvatar, type WorldPlacedItem,
+  type AdminEventKind, type EcoSpec, type EquippedCosmetics, type FeedbackContext, type NotifyPrefs, type PlaylistItem, type ReleaseContent, type WorldAvatar, type WorldPlacedItem,
   type WorldRoomFinish,
 } from '@alga/shared'
 import { sql } from 'drizzle-orm'
@@ -945,3 +945,24 @@ export const adminEvents = pgTable('admin_events', {
   createdAt: ts('created_at').notNull().defaultNow(),
 }, (t) => [index('admin_events_created_idx').on(t.createdAt)])
 export type AdminEventRow = typeof adminEvents.$inferSelect
+
+// ---- Web Push (the PWA) and notification choices shared by every device (packages/shared/src/push.ts) ---------------
+
+/** One browser's PushSubscription. A push service answer of 404/410 deletes it (src/push.ts). */
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  endpoint: text('endpoint').primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  userAgent: text('user_agent'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  lastUsedAt: ts('last_used_at'),
+}, (t) => [index('push_subscriptions_user_idx').on(t.userId)])
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect
+
+/** The "Notificações" choices (levels per space, silences per space/channel/DM), one document per person. */
+export const notifyPrefs = pgTable('notify_prefs', {
+  userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  prefs: jsonb('prefs').$type<NotifyPrefs>().notNull(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})

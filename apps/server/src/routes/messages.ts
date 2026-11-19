@@ -216,6 +216,12 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
     const [view] = await messageViews(db, [row!])
     const withNonce = { ...view!, ...(body.nonce !== undefined ? { nonce: body.nonce } : {}) }
     hub.dispatch(audience, 'MESSAGE_CREATE', (uid) => messageFor(withNonce, uid, fileUrl))
+    const ch = access.channel
+    ctx.push.message(
+      { channelId, channelType: ch.type, channelName: ch.name, spaceId: ch.spaceId, authorId: me, authorName: view!.author.displayName || view!.author.username, content: body.content, attachments: prepared.length },
+      audience,
+      mentioned,
+    )
     if (mentioned.length) {
       const states = await db.select().from(readStates)
         .where(and(eq(readStates.channelId, channelId), inArray(readStates.userId, mentioned)))

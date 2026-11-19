@@ -9,6 +9,7 @@ import { EASE_OUT_QUART } from '@/ui/motion'
 import { useDeepLink } from '../app/deepLinks'
 import { startBilling } from '../billing/store'
 import { startNotifications } from '../app/notifications'
+import { startActiveSignal, startPush } from '../app/push'
 import { ChatView } from '../chat/ChatView'
 import { FriendsView } from '../friends/FriendsView'
 import { Onboarding, useNeedsOnboarding } from '../onboarding/Onboarding'
@@ -72,6 +73,8 @@ export function useShellStart() {
   useGlobalShortcuts()
   useViewGuard()
   useEffect(() => startVoiceSync(), [])
+  useEffect(() => startActiveSignal(), [])
+  useEffect(() => startPush(), [])
   useEffect(() => startNotifications(), [])
   useEffect(() => startBilling(), [])
   useEffect(() => startWhatsNew(), [])

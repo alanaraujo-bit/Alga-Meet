@@ -1,4 +1,6 @@
+import type { NotifyPrefs } from '@alga/shared'
 import { create } from 'zustand'
+import { api } from '@/lib/api'
 import { useData } from '@/store/data'
 import { onDispatch } from '@/store/session'
 import { defaultLevel, FOREVER, isMutedIn, levelIn, type NotifyLevel, type Prefs } from './notifyRules'
@@ -80,6 +82,7 @@ const isLevel = (v: unknown): v is NotifyLevel => v === 'all' || v === 'mentions
 
 /** This account's saved choices (a malformed entry is dropped, never trusted). */
 function load(userId: string): void {
+  synced = false
   let raw: unknown = null
   try {
     raw = JSON.parse(localStorage.getItem(keyFor(userId)) ?? 'null')
@@ -94,14 +97,63 @@ function load(userId: string): void {
   prune()
 }
 
+// ── Shared by every device (GET/PUT /users/@me/notify-prefs; packages/shared/src/push.ts) ──
+// The server's copy wins; the very first sync uploads what this device had (choices made before they synced).
+// It also decides the phone's pushes, so a silence made here stops them there.
+let pushTimer: ReturnType<typeof setTimeout> | undefined
+let synced = false
+
+function upload(): void {
+  clearTimeout(pushTimer)
+  if (!synced) return
+  pushTimer = setTimeout(() => {
+    const { levels, muted } = useNotify.getState()
+    void api<NotifyPrefs>('PUT', '/users/@me/notify-prefs', { levels, muted }).catch(() => {})
+  }, 600)
+}
+
+function apply(p: NotifyPrefs): void {
+  useNotify.setState({ levels: { ...p.levels }, muted: { ...p.muted } })
+  prune()
+  save()
+}
+
+async function sync(userId: string): Promise<void> {
+  synced = false
+  const server = await api<NotifyPrefs>('GET', '/users/@me/notify-prefs').catch(() => null)
+  if (!server || loadedFor !== userId) return // older server: this device keeps its own choices
+  const empty = !Object.keys(server.levels).length && !Object.keys(server.muted).length
+  if (!empty) apply(server)
+  synced = true
+  if (empty) upload()
+}
+
 /**
  * Loads now for the signed-in account (the shell mounts after the first READY, so that one has already passed) and
- * again on every READY (another account signed in on this PC).
+ * again on every READY (another account signed in on this PC); then syncs with the server.
  */
 export function startNotifyPrefs(): () => void {
   const me = useData.getState().me?.id
-  if (me) load(me)
-  return onDispatch((d) => {
-    if (d.t === 'READY' && d.d.user.id !== loadedFor) load(d.d.user.id)
+  if (me) {
+    load(me)
+    void sync(me)
+  }
+  const unsub = useNotify.subscribe((st, prev) => {
+    if (st.levels !== prev.levels || st.muted !== prev.muted) upload()
   })
+  const off = onDispatch((d) => {
+    if (d.t === 'READY' && d.d.user.id !== loadedFor) {
+      load(d.d.user.id)
+      void sync(d.d.user.id)
+    } else if (d.t === 'NOTIFY_PREFS_UPDATE') {
+      synced = false // an echo of another device's choice is not sent back
+      apply(d.d)
+      synced = true
+    }
+  })
+  return () => {
+    unsub()
+    off()
+    clearTimeout(pushTimer)
+  }
 }

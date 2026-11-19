@@ -3,6 +3,7 @@ import type {
   Role, Space, SpaceSnapshot, StatusPreference, VoiceDisconnectReason, VoiceState,
 } from './models.js'
 import type { Activity, CustomStatus } from './activity.js'
+import type { NotifyPrefs } from './push.js'
 import type { Entitlements, Gift, SpaceUpgradeState } from './billing.js'
 import type {
   CinemaClientFrame, CinemaEndReason, CinemaErrorReason, CinemaPieceMeta, CinemaReaction, CinemaSessionView, CinemaSignal,
@@ -72,6 +73,11 @@ export type ClientFrame =
   | { op: 'activity'; activity: Activity | null }
   /** Own custom status (activity.ts), or null to clear. Same rules as `activity`, but kept until the last socket closes. */
   | { op: 'custom_status'; status: CustomStatus | null }
+  /**
+   * The person is using Alga on this device right now (input in a focused window), at most once per 30 s. While any of
+   * their devices said so in the last PUSH_ACTIVE_MS, no push goes to their phone (push.ts).
+   */
+  | { op: 'active' }
   /** Self voice flags while connected to a voice channel. Ignored if not in voice. */
   | { op: 'voice_state'; selfMute: boolean; selfDeaf: boolean; streaming: boolean; video: boolean }
   /**
@@ -122,6 +128,11 @@ export interface ReadyPayload {
   musicPlaylists?: boolean
   /** The server has Alga Worlds on. Absent on older servers (which close the socket on world ops) or when it is off. */
   worlds?: WorldsReady
+  /**
+   * The `active` frame and the push/notify-prefs routes (push.ts). `key`: VAPID public key, null when Web Push is off.
+   * Absent on older servers, which close the socket on an `active` frame.
+   */
+  push?: { key: string | null }
 }
 
 export type Dispatch =
@@ -145,6 +156,8 @@ export type Dispatch =
   | { t: 'CHANNEL_CREATE'; d: Channel }
   | { t: 'CHANNEL_UPDATE'; d: Channel }
   | { t: 'CHANNEL_DELETE'; d: { id: string; spaceId: string | null } }
+  /** My notification choices changed on another device (push.ts). */
+  | { t: 'NOTIFY_PREFS_UPDATE'; d: NotifyPrefs }
   | { t: 'MESSAGE_CREATE'; d: Message }
   | { t: 'MESSAGE_UPDATE'; d: Message }
   | { t: 'MESSAGE_DELETE'; d: { id: string; channelId: string } }

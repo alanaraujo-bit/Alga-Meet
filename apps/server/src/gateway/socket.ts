@@ -36,6 +36,7 @@ const ClientFrameSchema = z.discriminatedUnion('op', [
   ...DominoClientFrameSchema.options,
   z.object({ op: z.literal('identify'), token: z.string().min(1).max(256) }),
   z.object({ op: z.literal('heartbeat') }),
+  z.object({ op: z.literal('active') }),
   z.object({ op: z.literal('presence'), status: z.enum(['online', 'idle', 'dnd', 'invisible']) }),
   z.object({ op: z.literal('activity'), activity: ActivitySchema.nullable() }),
   z.object({ op: z.literal('custom_status'), status: CustomStatusSchema.nullable() }),
@@ -85,6 +86,7 @@ export async function buildReady(ctx: Ctx, user: UserRow): Promise<ReadyPayload>
     cinemaLanes: config.cinema.maxLanes,
     music: true,
     musicPlaylists: true,
+    push: { key: ctx.push.publicKey },
     ...(config.worlds.enabled ? { worlds: { assetsUrl: config.worlds.assetsUrl, pool: true, domino: true } } : {}),
   }
 }
@@ -174,6 +176,9 @@ export function gatewayRoute(app: FastifyInstance, ctx: Ctx): void {
       switch (frame.op) {
         case 'heartbeat':
           socket.send(JSON.stringify({ op: 'heartbeat_ack' }))
+          break
+        case 'active':
+          ctx.push.markActive(userId)
           break
         case 'presence':
           await stateOps.run(`presence:${userId}`, async () => {

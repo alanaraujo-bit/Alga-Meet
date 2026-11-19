@@ -68,6 +68,36 @@ self.addEventListener('fetch', (event) => {
   )
 })
 
+// Web Push (server src/push.ts): a DM, a mention or a call ring. Every push must show a notification (browsers
+// revoke push from sites that stay silent), so it always shows one; a window of the app in front means the person
+// already sees it, and then it is a quiet one that replaces itself.
+self.addEventListener('push', (event) => {
+  let p = null
+  try {
+    p = event.data?.json() ?? null
+  } catch {
+    p = null
+  }
+  if (!p || typeof p.title !== 'string') return
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const seen = wins.some((w) => w.visibilityState === 'visible' && w.focused)
+      await self.registration.showNotification(p.title, {
+        body: p.body,
+        tag: p.tag,
+        renotify: !seen,
+        silent: seen,
+        requireInteraction: p.kind === 'ring',
+        icon: '/icons/icon-192.png',
+        badge: '/icons/badge-72.png',
+        data: { tag: p.tag, url: p.url, channelId: p.channelId },
+      })
+      if (!seen && 'setAppBadge' in self.navigator) await self.navigator.setAppBadge().catch(() => {})
+    })(),
+  )
+})
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const tag = event.notification.data?.tag

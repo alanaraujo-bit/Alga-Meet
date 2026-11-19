@@ -61,6 +61,22 @@ export const config: AppConfig = {
 
 // ---- notifications ------------------------------------------------------------------------------------------------
 const notificationClick = hub<string | undefined>()
+// A push tapped while the app was closed opens /?channel=<id> (sw.js): handed to the app once it listens.
+let pendingClick: string | null = (() => {
+  const id = new URLSearchParams(location.search).get('channel')
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return null
+  history.replaceState(null, '', '/')
+  return `msg:${id}`
+})()
+const onNotificationClick = (cb: (tag: string | undefined) => void): Unsubscribe => {
+  const off = notificationClick.on(cb)
+  if (pendingClick) {
+    const tag = pendingClick
+    pendingClick = null
+    setTimeout(() => cb(tag), 0)
+  }
+  return off
+}
 navigator.serviceWorker?.addEventListener('message', (e: MessageEvent) => {
   if (e.data?.type === 'notification-click') notificationClick.emit(typeof e.data.tag === 'string' ? e.data.tag : undefined)
 })
@@ -172,7 +188,7 @@ export const bridge: AlgaBridge = {
     label: async () => '',
   },
   notify: (opts) => void notify(opts),
-  onNotificationClick: notificationClick.on,
+  onNotificationClick,
   tray: { setVoiceState: () => {}, onAction: noSub },
   power: { onSuspend: noSub, onResume: resume.on },
   updates: {
