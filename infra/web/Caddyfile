@@ -15,16 +15,24 @@
 		}
 	}
 
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(self), microphone=(self), display-capture=(self), fullscreen=(self), autoplay=(self \"https://www.youtube.com\" \"https://www.youtube-nocookie.com\")"
+	}
+
+	# Hashed build files: forever when they exist, a plain 404 when they do not (a tab from before a deploy asking for
+	# a chunk that is gone must fail, never get index.html back under an "immutable" header).
+	handle /assets/* {
+		root * /srv
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
 	handle {
 		root * /srv
-		header /assets/* Cache-Control "public, max-age=31536000, immutable"
-		header /sw.js Cache-Control "no-cache"
-		header /manifest.webmanifest Cache-Control "no-cache"
-		header {
-			X-Content-Type-Options nosniff
-			Referrer-Policy strict-origin-when-cross-origin
-			Permissions-Policy "camera=(self), microphone=(self), display-capture=(self), fullscreen=(self), autoplay=(self \"https://www.youtube.com\" \"https://www.youtube-nocookie.com\")"
-		}
+		# Everything else, the page above all, is checked again on every load so a deploy shows up at once.
+		header Cache-Control "no-cache"
 		try_files {path} /index.html
 		file_server
 	}

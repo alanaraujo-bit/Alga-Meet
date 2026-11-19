@@ -127,7 +127,6 @@ export function ShellHosts() {
 }
 
 export function Shell() {
-  useShellStart()
   const view = useUi((st) => st.view)
   const order = useData((st) => st.spaceOrder)
 
@@ -154,7 +153,6 @@ export function Shell() {
           <MainArea />
         </main>
       </motion.div>
-      <ShellHosts />
     </motion.div>
   )
 }

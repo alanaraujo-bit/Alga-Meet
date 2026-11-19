@@ -10,7 +10,7 @@ import { AuthScreen } from '../auth/AuthScreen'
 import { applySavedHotkeys } from '../settings/hotkeys'
 import '../settings/theme'
 import { startZoomKeys } from '../settings/zoom'
-import { Shell } from '../shell/Shell'
+import { Shell, ShellHosts, useShellStart } from '../shell/Shell'
 import { AccountGate, needsGate } from '../trust/Gate'
 import { RestrictedScreen } from '../trust/Restricted'
 import { BootSplash } from './BootSplash'
@@ -58,14 +58,24 @@ export function App() {
   )
 
   const ready = phase === 'signed_in' && hydrated
+  const shell = ready && !gate
   return (
     <MotionConfig reducedMotion={reduced ? 'always' : 'user'}>
       <div className={s.root} data-compact={compact || undefined}>
-        {!compact && <TitleBar search={ready && !gate} />}
+        {!compact && <TitleBar search={shell} />}
         {phase === 'signed_out' ? restricted ? <RestrictedScreen restriction={restricted} /> : <AuthScreen /> : ready ? gate ? <AccountGate /> : compact ? <MobileShell /> : <Shell /> : <BootSplash />}
       </div>
+      {/* Outside the layouts on purpose: turning a phone (or narrowing the browser) swaps Shell and MobileShell, and
+          that must not leave the call or close a dialog. */}
+      {shell && <SignedIn />}
       <MenuHost />
       <ToastHost />
     </MotionConfig>
   )
+}
+
+/** The signed-in app's services (voice, notifications, music…) and floating hosts, mounted once for both layouts. */
+function SignedIn() {
+  useShellStart()
+  return <ShellHosts />
 }

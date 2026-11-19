@@ -46,7 +46,8 @@ self.addEventListener('fetch', (event) => {
         const hit = await c.match(req)
         if (hit) return hit
         const res = await fetch(req)
-        if (res.ok) void c.put(req, res.clone())
+        // Only real build files: an HTML answer here is a fallback page, never something to keep forever.
+        if (res.ok && !(res.headers.get('content-type') ?? '').includes('text/html')) void c.put(req, res.clone())
         return res
       }),
     )

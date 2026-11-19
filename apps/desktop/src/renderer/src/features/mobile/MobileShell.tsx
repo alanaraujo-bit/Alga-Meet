@@ -36,7 +36,7 @@ import { FriendsView } from '../friends/FriendsView'
 import { openProfile } from '../profile/store'
 import { openSettings, type SettingsSection } from '../settings/store'
 import { HomeSidebar, SpaceSidebar } from '../shell/Sidebar'
-import { ShellHosts, SpaceMain, useShellStart } from '../shell/Shell'
+import { SpaceMain } from '../shell/Shell'
 import { openStaff } from '../staff/store'
 import { leaveVoice, openCall, useVoice } from '../voice/voice'
 import { openCenter } from '../whatsnew/store'
@@ -47,7 +47,6 @@ import { t } from './strings'
 import m from './mobile.module.css'
 
 export function MobileShell() {
-  useShellStart()
   useMobileRouting()
   const tab = useMobile((st) => st.tab)
   const open = useMobile((st) => st.open)
@@ -65,7 +64,6 @@ export function MobileShell() {
       </div>
       <CallPill raised={bar} />
       <AnimatePresence initial={false}>{bar && <TabBar key="bar" />}</AnimatePresence>
-      <ShellHosts />
     </motion.div>
   )
 }

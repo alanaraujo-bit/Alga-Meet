@@ -60,6 +60,14 @@ check('desk: sees 2 in the call', (await twoIn(desk)) >= 2)
 await phone.screenshot({ path: join(out, '02-phone-call.png') })
 await desk.screenshot({ path: join(out, '03-desk-call.png') })
 
+// Turning the phone swaps the layouts (landscape is wider than the phone breakpoint): the call must survive both ways.
+await phone.setViewportSize({ width: 844, height: 390 })
+await phone.waitForTimeout(1500)
+check('phone: still in the call after turning to landscape', (await twoIn(desk)) >= 2 && (await twoIn(phone)) >= 2)
+await phone.setViewportSize({ width: 390, height: 844 })
+await phone.waitForTimeout(1500)
+check('phone: still in the call after turning back', (await twoIn(desk)) >= 2)
+
 // Phone: back to the channel list → the call pill; tap it → back on the stage.
 await phone.getByRole('button', { name: 'Voltar', exact: true }).tap()
 await phone.waitForTimeout(600)
