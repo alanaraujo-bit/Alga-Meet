@@ -12,6 +12,7 @@ import type { Db } from './db/index.js'
 import { notifyPrefs, pushSubscriptions, spaces, users } from './db/schema.js'
 
 const BODY_MAX = 140
+const MENTION = /<@([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})>/gi
 /** How long a push service keeps an undelivered push: a ring is useless after a minute, a message keeps for a day. */
 const TTL = { ring: 60, message: 24 * 3600 } as const
 
@@ -33,9 +34,10 @@ export function messageTargets(m: Pick<PushMessage, 'channelType' | 'authorId'>,
 }
 
 /** The notification's text: "Ana" / "olha isso" for a DM, "Ana em #geral · Os de Sempre" for a mention. */
-export function messagePayload(m: PushMessage, spaceName: string | null): PushPayload {
+export function messagePayload(m: PushMessage, spaceName: string | null, names: Map<string, string> = new Map()): PushPayload {
   const dm = m.channelType === 'dm' || m.channelType === 'group_dm'
-  const text = m.content.trim().replace(/\s+/g, ' ')
+  // Mentions read as "@Bia", like in the app, never as the raw <@id> markup.
+  const text = m.content.replace(MENTION, (_, id: string) => `@${names.get(id.toLowerCase()) ?? 'alguém'}`).trim().replace(/\s+/g, ' ')
   const body = text ? (text.length > BODY_MAX ? `${text.slice(0, BODY_MAX - 1)}…` : text) : m.attachments ? 'Enviou um anexo' : ''
   const where = m.channelType === 'group_dm' ? (m.channelName || 'grupo') : `#${m.channelName}${spaceName ? ` · ${spaceName}` : ''}`
   return {
@@ -86,7 +88,10 @@ export class Push {
     if (targets.length === 0) return
     void (async () => {
       const space = m.spaceId ? (await this.db.select({ name: spaces.name }).from(spaces).where(eq(spaces.id, m.spaceId)))[0] : undefined
-      await this.deliver(targets, m.channelId, m.spaceId, messagePayload(m, space?.name ?? null), TTL.message)
+      const ids = [...new Set([...m.content.matchAll(MENTION)].map((x) => x[1]!.toLowerCase()))].slice(0, 20)
+      const named = ids.length ? await this.db.select({ id: users.id, displayName: users.displayName, username: users.username }).from(users).where(inArray(users.id, ids)) : []
+      const names = new Map(named.map((u) => [u.id, u.displayName || u.username]))
+      await this.deliver(targets, m.channelId, m.spaceId, messagePayload(m, space?.name ?? null, names), TTL.message)
     })().catch((err: Error) => this.log.warn({ err: err.message }, 'push: message failed'))
   }
 
@@ -108,6 +113,7 @@ export class Push {
     const to = awake.filter((id) => !(prefs.has(id) && silencedFor(prefs.get(id)!, channelId, spaceId, now)))
     if (to.length === 0) return
     const subs = await this.db.select().from(pushSubscriptions).where(inArray(pushSubscriptions.userId, to))
+    this.log.info({ kind: payload.kind, targets: userIds.length, awake: awake.length, notSilenced: to.length, browsers: subs.length }, 'push: delivering')
     const body = JSON.stringify(payload)
     await Promise.all(
       subs.map(async (s) => {

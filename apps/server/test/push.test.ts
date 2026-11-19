@@ -20,6 +20,11 @@ describe('messagePayload', () => {
     expect(messagePayload({ ...base, channelType: 'dm', spaceId: null }, null)).toMatchObject({ kind: 'dm', title: 'Ana', body: 'oi @bia', tag: 'msg:c1' })
     expect(messagePayload(base, 'Os de Sempre')).toMatchObject({ kind: 'mention', title: 'Ana em #geral · Os de Sempre' })
   })
+  it('reads mentions as @Name', () => {
+    const id = '01a1f1dd-a7a1-766b-ab0f-1768727607dd'
+    expect(messagePayload({ ...base, content: `<@${id}> chegou?` }, null, new Map([[id, 'Bia']])).body).toBe('@Bia chegou?')
+    expect(messagePayload({ ...base, content: `<@${id}> oi` }, null).body).toBe('@alguém oi')
+  })
   it('cuts long text and says when it is only a file', () => {
     expect(messagePayload({ ...base, content: 'a'.repeat(500) }, null).body).toHaveLength(140)
     expect(messagePayload({ ...base, content: '', attachments: 1 }, null).body).toBe('Enviou um anexo')

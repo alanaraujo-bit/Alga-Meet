@@ -48,13 +48,14 @@ try {
   // Away from the app (the PWA in the background), someone mentions us.
   const me = await (await fetch(`${upstream}/api/v1/users/@me`, { headers: { authorization: `Bearer ${phone.token}` } })).json()
   await page.goto('about:blank')
-  const sw = ctx.serviceWorkers()[0]
+  const reader = await ctx.newPage()
   const r = await fetch(`${upstream}/api/v1/channels/${channel}/messages`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${sender.token}` }, body: JSON.stringify({ content: `<@${me.id}> chegou a notificação?` }) })
   check('mention sent', r.ok)
   let shown = []
   for (let i = 0; i < 40 && !shown.length; i++) {
     await new Promise((r) => setTimeout(r, 500))
-    shown = (await sw?.evaluate(async () => (await self.registration.getNotifications()).map((n) => ({ title: n.title, body: n.body, tag: n.tag }))).catch(() => [])) ?? []
+    if (i === 0) await reader.goto(url + '/manifest.webmanifest')
+    shown = await reader.evaluate(async () => (await (await navigator.serviceWorker.getRegistration('/'))?.getNotifications() ?? []).map((n) => ({ title: n.title, body: n.body, tag: n.tag }))).catch((e) => (console.log('read:', e.message), []))
   }
   check('notification shown by the service worker', shown.length > 0, shown[0] ? `${shown[0].title} — ${shown[0].body}` : 'none in 20 s')
   await ctx.close()
