@@ -1,0 +1,32 @@
+export const t = {
+  back: 'Voltar',
+  tabs: { spaces: 'Espaços', dms: 'Conversas', friends: 'Amigos', you: 'Você' },
+  spaces: {
+    title: 'Espaços',
+    empty: 'Você ainda não está em nenhum espaço.',
+    create: 'Criar espaço',
+    join: 'Entrar com convite',
+    inVoice: 'gente em voz',
+  },
+  you: {
+    title: 'Você',
+    profile: 'Ver perfil',
+    account: 'Conta',
+    privacy: 'Privacidade e segurança',
+    plan: 'Alga Plus',
+    shop: 'Loja',
+    voice: 'Voz e vídeo',
+    notifications: 'Notificações',
+    appearance: 'Aparência',
+    news: 'Novidades',
+    staff: 'Moderação',
+    logout: 'Sair',
+  },
+  call: {
+    inCall: 'Na call',
+    mute: 'Desativar microfone',
+    unmute: 'Ativar microfone',
+    leave: 'Sair da call',
+    open: 'Abrir a call',
+  },
+}

@@ -20,6 +20,8 @@ import { startStatusSync } from '../activity/custom'
 import { startSendQueue } from '@/store/actions'
 import { routeStreamNotice } from '../voice/voice'
 import { TitleBar } from './TitleBar'
+import { MobileShell } from '../mobile/MobileShell'
+import { useCompact } from '../mobile/store'
 import s from './app.module.css'
 
 export function App() {
@@ -29,6 +31,8 @@ export function App() {
   const restricted = useSession((st) => st.restricted)
   // Terms changed or the age was never declared: asked once, before the shell.
   const gate = useData((st) => needsGate(st.me))
+  // The PWA on a phone: no window chrome, the tab-and-stack layout instead of the desktop's columns.
+  const compact = useCompact()
 
   useEffect(() => {
     void useSession.getState().boot()
@@ -55,9 +59,9 @@ export function App() {
   const ready = phase === 'signed_in' && hydrated
   return (
     <MotionConfig reducedMotion={reduced ? 'always' : 'user'}>
-      <div className={s.root}>
-        <TitleBar search={ready && !gate} />
-        {phase === 'signed_out' ? restricted ? <RestrictedScreen restriction={restricted} /> : <AuthScreen /> : ready ? gate ? <AccountGate /> : <Shell /> : <BootSplash />}
+      <div className={s.root} data-compact={compact || undefined}>
+        {!compact && <TitleBar search={ready && !gate} />}
+        {phase === 'signed_out' ? restricted ? <RestrictedScreen restriction={restricted} /> : <AuthScreen /> : ready ? gate ? <AccountGate /> : compact ? <MobileShell /> : <Shell /> : <BootSplash />}
       </div>
       <MenuHost />
       <ToastHost />

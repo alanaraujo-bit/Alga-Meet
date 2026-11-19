@@ -58,7 +58,7 @@ function openChat(view: { kind: 'dm'; channelId: string } | { kind: 'space'; spa
 
 // ── Home ──────────────────────────────────────────────
 
-function HomeSidebar() {
+export function HomeSidebar() {
   const view = useUi((st) => st.view)
   const channels = useData((st) => st.channels)
   const incoming = useData((st) => Object.values(st.relationships).filter((r) => r.type === 'incoming').length)
@@ -165,7 +165,7 @@ function DmRow({ channel, active }: { channel: Channel; active: boolean }) {
 
 // ── Space ─────────────────────────────────────────────
 
-function SpaceSidebar({ spaceId }: { spaceId: string }) {
+export function SpaceSidebar({ spaceId }: { spaceId: string }) {
   const space = useData((st) => st.spaces[spaceId])
   const channels = useData((st) => st.channels)
   const perms = useData((st) => spacePermissions(st, spaceId))

@@ -4,6 +4,11 @@
   height: 100vh;
   background: var(--bg-app);
 }
+/* The PWA on a phone (MobileShell): no title bar; the page's own height (100dvh, safe areas: src/web/web.css). */
+.root[data-compact] {
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+}
 
 /* ── Title bar (frameless window) ─────────── */
 .titlebar {

@@ -67,7 +67,8 @@ function useIdle(): boolean {
   return idle
 }
 
-export function Shell() {
+/** What a signed-in shell starts and keeps running, whichever layout shows it (Shell here, MobileShell on phones). */
+export function useShellStart() {
   useGlobalShortcuts()
   useViewGuard()
   useEffect(() => startVoiceSync(), [])
@@ -82,6 +83,10 @@ export function Shell() {
   useEffect(() => closeStaff, [])
   // Offers the card after a crash; signing out leaves nothing of this account's feedback in memory.
   useEffect(() => startFeedback(), [])
+}
+
+/** Dialogs, overlays and floating cards of the signed-in app, shared by both layouts. */
+export function ShellHosts() {
   const staffPanel = useLatch(useStaff((st) => st.open))
   // Not latched: closing it must unmount it, which is what frees the GPU.
   const worldStudio = useStudio((st) => st.tab !== null)
@@ -89,6 +94,37 @@ export function Shell() {
   const settingsOpen = useSettings((st) => st.section !== null)
   const settings = useLatch(settingsOpen || idle)
   const spaceSettings = useLatch(useSpaceSettings((st) => st.spaceId !== null))
+  return (
+    <>
+      <SpaceModals />
+      <QuickSwitcher />
+      <ScreenPicker />
+      <IncomingCall />
+      <VerifySheet />
+      <UnsafeCallDialog />
+      <VoiceAnnouncer />
+      <MiniPlayer />
+      <CinemaHost />
+      <Suspense fallback={null}>
+        {settings && <SettingsOverlay />}
+        {spaceSettings && <SpaceSettingsOverlay />}
+        {staffPanel && <StaffPanel />}
+        {worldStudio && <WorldStudio />}
+      </Suspense>
+      <WhatsNewCenter />
+      <Welcome />
+      <FeedbackHost />
+      <MusicHost />
+      <WorldNotices />
+      <VerifyEmailDialog />
+      <BillingHost />
+      <ReportHost />
+    </>
+  )
+}
+
+export function Shell() {
+  useShellStart()
   const view = useUi((st) => st.view)
   const order = useData((st) => st.spaceOrder)
 
@@ -115,29 +151,7 @@ export function Shell() {
           <MainArea />
         </main>
       </motion.div>
-      <SpaceModals />
-      <QuickSwitcher />
-      <ScreenPicker />
-      <IncomingCall />
-      <VerifySheet />
-      <UnsafeCallDialog />
-      <VoiceAnnouncer />
-      <MiniPlayer />
-      <CinemaHost />
-      <Suspense fallback={null}>
-        {settings && <SettingsOverlay />}
-        {spaceSettings && <SpaceSettingsOverlay />}
-        {staffPanel && <StaffPanel />}
-        {worldStudio && <WorldStudio />}
-      </Suspense>
-      <WhatsNewCenter />
-      <Welcome />
-      <FeedbackHost />
-      <MusicHost />
-      <WorldNotices />
-      <VerifyEmailDialog />
-      <BillingHost />
-      <ReportHost />
+      <ShellHosts />
     </motion.div>
   )
 }
@@ -150,7 +164,7 @@ function MainArea() {
   return <SpaceMain spaceId={view.spaceId} channelId={view.channelId} />
 }
 
-function SpaceMain({ spaceId, channelId }: { spaceId: string; channelId: string | null }) {
+export function SpaceMain({ spaceId, channelId }: { spaceId: string; channelId: string | null }) {
   const channels = useData((st) => st.channels)
   const memberList = useUi((st) => st.memberList)
   const { text, voice } = useMemo(() => spaceChannels({ channels }, spaceId), [channels, spaceId])
