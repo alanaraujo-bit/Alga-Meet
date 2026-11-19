@@ -12,6 +12,7 @@
 !apps/desktop/vite.web.config.ts
 !apps/desktop/tsconfig.json
 !apps/desktop/tsconfig.web.json
+!apps/desktop/tsconfig.node.json
 !apps/desktop/src/**
 !infra/web/Caddyfile
 # Never, even inside allowed folders.

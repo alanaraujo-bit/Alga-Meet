@@ -18,7 +18,7 @@ COPY apps/desktop/package.json apps/desktop/
 # No install scripts: Electron's binary download and the native hook module are desktop-only.
 RUN npm ci --workspace @alga/desktop --include-workspace-root=false --ignore-scripts
 COPY packages/shared/src packages/shared/src
-COPY apps/desktop/livekit-red.ts apps/desktop/vite.web.config.ts apps/desktop/tsconfig.json apps/desktop/tsconfig.web.json apps/desktop/
+COPY apps/desktop/livekit-red.ts apps/desktop/vite.web.config.ts apps/desktop/tsconfig.json apps/desktop/tsconfig.web.json apps/desktop/tsconfig.node.json apps/desktop/
 COPY apps/desktop/src apps/desktop/src
 RUN npm run build:web --workspace @alga/desktop
 
