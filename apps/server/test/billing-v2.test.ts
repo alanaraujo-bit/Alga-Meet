@@ -269,6 +269,18 @@ describe('gifts', () => {
     gt.close()
   })
 
+  it('a gift paid after its order expired (a boleto clears days later) is still delivered', async () => {
+    const [a, b] = [await register(s.app), await register(s.app)]
+    await oldFriends(a, b)
+    const co = (await gift(a, { productId: 'theme_ha_porcelana', recipientId: b.user.id })).body
+    await s.app.ctx.billing.sweep(new Date(Date.now() + 2 * DAY)) // unpaid past the TTL: the order expires, the gift is canceled
+    expect((await billingMe(a)).gifts!.find((g) => g.id === co.giftId)!.status).toBe('canceled')
+    const gb = await connect(s.port, b.token)
+    await pay(co.reference, 990)
+    expect((await gb.waitFor('GIFT_RECEIVED', (d) => d.id === co.giftId)).status).toBe('delivered')
+    gb.close()
+  })
+
   it('scheduled delivery: paid now, delivered by the sweep on its date', async () => {
     const [a, b] = [await register(s.app), await register(s.app)]
     await oldFriends(a, b)

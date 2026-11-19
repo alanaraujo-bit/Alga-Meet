@@ -6,7 +6,7 @@ import {
 import { and, asc, countDistinct, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
-import { assertDmNotBlocked, channelAudience, requireChannel, type ChannelAccess } from '../access.js'
+import { assertDmNotBlocked, blockedWith, channelAudience, requireChannel, type ChannelAccess } from '../access.js'
 import type { Ctx } from '../app.js'
 import { isUniqueViolation, type Db } from '../db/index.js'
 import { attachments, channels, messages, reactions, readStates, type MessageRow } from '../db/schema.js'
@@ -177,7 +177,10 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
       if (!parent) throw invalid({ replyToId: 'Mensagem respondida não encontrada neste canal.' })
     }
     const audience = await channelAudience(db, access.channel, access.recipientIds)
-    const mentioned = mentionedIds(body.content).filter((id) => id !== me && audience.includes(id))
+    // A block (either way) stops the interruptions: no mention count and no push from someone you blocked, also in
+    // spaces and group DMs, where the message itself is still shared.
+    const blocked = await blockedWith(db, me)
+    const mentioned = mentionedIds(body.content).filter((id) => id !== me && audience.includes(id) && !blocked.has(id))
     const id = uuidv7()
     const insert = () => db.transaction(async (tx) => {
       const inserted = await tx.insert(messages).values({
@@ -219,7 +222,7 @@ export function messageRoutes(app: FastifyInstance, ctx: Ctx): void {
     const ch = access.channel
     ctx.push.message(
       { channelId, channelType: ch.type, channelName: ch.name, spaceId: ch.spaceId, authorId: me, authorName: view!.author.displayName || view!.author.username, content: body.content, attachments: prepared.length },
-      audience,
+      audience.filter((id) => !blocked.has(id)),
       mentioned,
     )
     if (mentioned.length) {

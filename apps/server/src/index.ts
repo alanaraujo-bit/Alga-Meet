@@ -39,5 +39,6 @@ try {
   process.exit(1)
 }
 
-// Rebuild who-is-in-voice from the SFU; never blocks startup.
+// Rebuild who-is-in-voice from the SFU; never blocks startup. Then every minute, dropping who it no longer has.
 void app.ctx.voice.reconcile()
+setInterval(() => void app.ctx.voice.reconcile(true), 60_000).unref()

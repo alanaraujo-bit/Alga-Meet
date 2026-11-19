@@ -11,7 +11,7 @@ import { eq } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import { AccessToken, RoomServiceClient, TrackSource, WebhookReceiver, type TrackInfo, type WebhookEvent } from 'livekit-server-sdk'
 import {
-  NO_MODERATION, PRIVATE_CHANNEL_PERMISSIONS, channelAudience, memberPermissions, spaceMemberIds, voiceModeration,
+  NO_MODERATION, PRIVATE_CHANNEL_PERMISSIONS, blockedWith, channelAudience, memberPermissions, spaceMemberIds, voiceModeration,
   type VoiceModeration,
 } from './access.js'
 import { hasSession } from './auth.js'
@@ -25,6 +25,8 @@ import { loadChannel } from './views.js'
 
 const ROOM_PREFIX = 'ch_'
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+/** reconcile(prune): a state this young may be a join LiveKit has not listed yet. */
+const PRUNE_GRACE_MS = 30_000
 
 export const roomName = (channelId: string) => `${ROOM_PREFIX}${channelId}`
 export function channelIdOfRoom(room: string): string | null {
@@ -231,8 +233,11 @@ export class Voice {
     }
     this.hub.dispatch(await this.audience(state), 'VOICE_STATE_UPDATE', state)
     if (ring && wasEmpty && !row.spaceId) {
-      this.hub.dispatch(recipientIds.filter((id) => id !== userId), 'CALL_RING', { channelId, fromUserId: userId })
-      this.onRing(recipientIds.filter((id) => id !== userId), channelId, userId)
+      // Someone you blocked (or who blocked you) never rings you, also in a group DM.
+      const blocked = await blockedWith(this.db, userId)
+      const ringing = recipientIds.filter((id) => id !== userId && !blocked.has(id))
+      this.hub.dispatch(ringing, 'CALL_RING', { channelId, fromUserId: userId })
+      this.onRing(ringing, channelId, userId)
     }
     // A token minted before the mute/deafen still carries the old grants.
     if (mod.serverMute || mod.serverDeaf) await this.enforce(state, permissions)
@@ -340,20 +345,33 @@ export class Voice {
     }
   }
 
-  /** Best-effort startup sync from the SFU; logs and continues if it is unreachable. */
-  async reconcile(): Promise<void> {
+  /**
+   * Best-effort sync from the SFU; logs and continues if it is unreachable. At startup it only adds; `prune` (every
+   * minute, src/index.ts) also drops states LiveKit no longer has. An SFU that restarts or crashes (it runs on the
+   * owner's PC) sends no `participant_left`, and without this those people would sit in the channel for days, count
+   * toward its limit and keep DM calls from ringing. States younger than PRUNE_GRACE_MS stay (a join in flight).
+   */
+  async reconcile(prune = false, now = Date.now()): Promise<void> {
     try {
       const rooms = await this.rooms.listRooms()
-      let n = 0
+      const live = new Set<string>()
       for (const r of rooms) {
         const channelId = channelIdOfRoom(r.name)
         if (!channelId) continue
         for (const p of await this.rooms.listParticipants(r.name)) {
+          live.add(`${channelId}:${p.identity}`)
           await this.participantJoined(channelId, p.identity, joinedAtOf(p), false, p.attributes)
-          n++
         }
       }
-      this.log.info({ rooms: rooms.length, participants: n }, 'voice: reconciled with LiveKit')
+      let gone = 0
+      if (prune) {
+        for (const s of [...this.states.values()]) {
+          if (live.has(`${s.channelId}:${s.userId}`) || now - Date.parse(s.joinedAt) < PRUNE_GRACE_MS) continue
+          await this.remove(s)
+          gone++
+        }
+      }
+      if (!prune || gone) this.log.info({ rooms: rooms.length, participants: live.size, gone }, 'voice: reconciled with LiveKit')
     } catch (err) {
       this.log.warn({ err: (err as Error).message }, 'voice: LiveKit unreachable, skipping reconcile')
     }

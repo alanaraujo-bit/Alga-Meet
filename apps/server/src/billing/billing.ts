@@ -180,8 +180,10 @@ interface Touched {
   receipts: { kind: 'order' | 'subscription'; id: string }[]
   /** Admin app events (src/admin/alerts.ts), fired after commit. */
   alerts: AlertInput[]
+  /** Provider subscriptions still charging that must stop (a replaced preapproval found active), after commit. */
+  cancels: string[]
 }
-const touchedSet = (): Touched => ({ users: new Set(), spaces: new Set(), gifts: new Map(), receipts: [], alerts: [] })
+const touchedSet = (): Touched => ({ users: new Set(), spaces: new Set(), gifts: new Map(), receipts: [], alerts: [], cancels: [] })
 
 export class Billing {
   private timer: NodeJS.Timeout | undefined
@@ -867,6 +869,9 @@ export class Billing {
    * provider's retry is processed again). Out-of-order updates older than the last applied state are ignored.
    */
   async apply(event: VerifiedEvent, payloadSha256: string, now = new Date()): Promise<{ duplicate: boolean }> {
+    // Nothing to apply (a payment MP cannot show yet answers 404, a panel test): not recorded, so the provider's retry
+    // of the same notification is processed instead of dropped as a duplicate.
+    if (event.updates.length === 0) return { duplicate: false }
     const provider = this.provider!.id
     const result = await this.db.transaction(async (tx) => {
       const [fresh] = await tx.insert(billingEvents)
@@ -906,8 +911,10 @@ export class Billing {
       return
     }
     if (u.providerSubscriptionId && s.providerSubscriptionId && u.providerSubscriptionId !== s.providerSubscriptionId) {
-      // The pending preapproval of the hosted page, replaced by the one paid in the app (Billing.pay).
-      this.log.info({ provider, reference: u.reference }, 'billing: update for a replaced preapproval ignored')
+      // The pending preapproval of the hosted page, replaced by the one paid in the app (Billing.pay). Still active at the
+      // provider = it charges on its own (a retry after a timeout that went through, a hosted tab completed later): stop it.
+      if (u.status === 'active' || u.status === 'past_due') touched.cancels.push(u.providerSubscriptionId)
+      this.log.info({ provider, reference: u.reference, charging: touched.cancels.includes(u.providerSubscriptionId) }, 'billing: update for a replaced preapproval ignored')
       return
     }
     if (s.providerUpdatedAt && u.occurredAt < s.providerUpdatedAt) {
@@ -1035,7 +1042,9 @@ export class Billing {
 
     const [gift] = await tx.select().from(gifts).where(eq(gifts.orderId, o.id)).for('update')
     if (gift) {
-      if (paid && gift.status === 'unpaid') {
+      // 'canceled' too: the sweep cancels a gift whose order sat unpaid for PENDING_TTL_MS, but a boleto issued before
+      // that clears days later. The money is in: the gift goes out, never a paid order that delivers nothing.
+      if (paid && (gift.status === 'unpaid' || gift.status === 'canceled')) {
         const later = gift.deliverAt && gift.deliverAt > now
         await tx.update(gifts).set({ status: later ? 'scheduled' : 'delivered', deliveredAt: later ? null : now, updatedAt: now }).where(eq(gifts.id, gift.id))
         touched.gifts.set(gift.id, later ? 'update' : 'received')
@@ -1159,6 +1168,15 @@ export class Billing {
     for (const [giftId, what] of t.gifts) await this.notifyGift(giftId, what)
     for (const r of t.receipts) await this.sendReceipt(r.kind, r.id).catch((err: unknown) => this.log.error({ err: safeErr(err) }, 'billing: receipt not sent'))
     for (const a of t.alerts) this.onAdminEvent(a)
+    for (const id of t.cancels) {
+      try {
+        await this.provider!.cancelSubscription(id, true)
+        this.log.warn({ provider: this.provider!.id }, 'billing: a replaced preapproval that was still charging was canceled')
+      } catch (err) {
+        this.log.error({ err: safeErr(err), provider: this.provider!.id }, 'billing: a replaced preapproval is still charging and could not be canceled')
+        this.onAdminEvent({ kind: 'payment_failed', title: 'Assinatura duplicada ainda cobrando', body: 'Cancele no Mercado Pago: uma assinatura substituída continua ativa.' })
+      }
+    }
   }
 
   /** GIFT_RECEIVED (just delivered) to the recipient, GIFT_UPDATE to the sender and, once it is theirs to see, the recipient. */

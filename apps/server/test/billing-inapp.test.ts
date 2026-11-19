@@ -128,6 +128,41 @@ describe('in-app checkout (Mercado Pago)', () => {
     expect((await api<PayResponse>(m.app, 'POST', '/billing/pay', { token: u.token, body: card(co.reference, 'good-card-tok-2') })).body).toEqual({ status: 'approved' })
   })
 
+  it('a replaced preapproval that comes back authorized (an old tab completed, a timed-out retry went through) is canceled at MP', async () => {
+    const u = await register(m.app)
+    const co = (await api<CheckoutResponse>(m.app, 'POST', '/billing/checkout', { token: u.token, body: { productId: 'plus_monthly' } })).body
+    const pendingId = [...store.entries()].find(([, v]) => v.external_reference === `s_${co.reference}`)![1].id as string
+    expect((await api<PayResponse>(m.app, 'POST', '/billing/pay', { token: u.token, body: card(co.reference, 'good-card-tok-replaced') })).body).toEqual({ status: 'approved' })
+    // The hosted page's preapproval gets authorized anyway: it would charge every month with nobody seeing it.
+    store.set(`/preapproval/${pendingId}`, { ...store.get(`/preapproval/${pendingId}`), status: 'authorized', last_modified: new Date(Date.now() + 5000).toISOString() })
+    const before = calls.length
+    expect((await hook('subscription_preapproval', pendingId)).statusCode).toBe(200)
+    expect(calls.slice(before).some((c) => c.method === 'PUT' && c.path === `/preapproval/${pendingId}` && c.body.status === 'cancelled')).toBe(true)
+    expect(store.get(`/preapproval/${pendingId}`)!.status).toBe('cancelled')
+    // The paid subscription is untouched.
+    expect((await api<BillingMe>(m.app, 'GET', '/billing/me', { token: u.token })).body.subscription).toMatchObject({ status: 'active' })
+  })
+
+  it('a notification that arrives before MP can show the payment (404) is processed on its retry, not dropped as a duplicate', async () => {
+    const u = await register(m.app)
+    const co = (await api<CheckoutResponse>(m.app, 'POST', '/billing/checkout', { token: u.token, body: { productId: 'deco_ha_orbita' } })).body
+    const notify = () => {
+      // MP retries with the same notification id.
+      const ts = String(Date.now())
+      const v1 = createHmac('sha256', KEY).update(`id:88001;request-id:r1;ts:${ts};`).digest('hex')
+      return m.app.inject({
+        method: 'POST', url: '/api/v1/billing/webhooks/mercadopago?data.id=88001&type=payment',
+        headers: { 'content-type': 'application/json', 'x-request-id': 'r1', 'x-signature': `ts=${ts},v1=${v1}` },
+        payload: JSON.stringify({ id: 'same-notification', type: 'payment', data: { id: '88001' } }),
+      })
+    }
+    expect((await notify()).statusCode).toBe(200) // not visible yet: 404 at MP
+    const now = new Date().toISOString()
+    store.set('/v1/payments/88001', { id: 88001, status: 'approved', status_detail: 'accredited', external_reference: `o_${co.reference}`, transaction_amount: 9.9, currency_id: 'BRL', date_created: now, date_last_updated: now })
+    expect((await notify()).statusCode).toBe(200)
+    expect((await api<BillingMe>(m.app, 'GET', '/billing/me', { token: u.token })).body.items.map((i) => i.sku)).toContain('deco_ha_orbita')
+  })
+
   it('an item by Pix: one QR per order, paid by the webhook; a refused card then an approved one pays at once', async () => {
     const u = await register(m.app)
     const co = (await api<CheckoutResponse>(m.app, 'POST', '/billing/checkout', { token: u.token, body: { productId: 'deco_ha_orbita' } })).body

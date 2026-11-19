@@ -78,6 +78,26 @@ describe('voice join', () => {
     expect((await join(alice.token, voice.id)).status).toBe(200) // owner has MOVE_MEMBERS
   })
 
+  it('a periodic reconcile drops people the SFU lost without telling (restart, crash), never a join in flight', async () => {
+    const { alice, bob, voice } = await setup()
+    await api(s.app, 'PATCH', `/channels/${voice.id}`, { token: alice.token, body: { userLimit: 1 } })
+    await postWebhook(s.app, s.config, event('participant_joined', voice.id, alice.user.id))
+    expect((await join(bob.token, voice.id)).status).toBe(403) // full
+    // The SFU restarted: its rooms are empty, and no participant_left ever came.
+    const lk = s.app.ctx.voice as unknown as { rooms: { listRooms: () => Promise<unknown[]>; listParticipants: () => Promise<unknown[]> } }
+    const real = lk.rooms
+    lk.rooms = { listRooms: async () => [], listParticipants: async () => [] }
+    try {
+      await s.app.ctx.voice.reconcile(true) // just joined: kept
+      expect(s.app.ctx.voice.all().some((v) => v.userId === alice.user.id)).toBe(true)
+      await s.app.ctx.voice.reconcile(true, Date.now() + 60_000)
+      expect(s.app.ctx.voice.all().some((v) => v.userId === alice.user.id)).toBe(false)
+      expect((await join(bob.token, voice.id)).status).toBe(200) // the ghost no longer fills the room
+    } finally {
+      lk.rooms = real
+    }
+  })
+
   it('DM participants can join the DM call room', async () => {
     const a = await register(s.app)
     const b = await register(s.app)

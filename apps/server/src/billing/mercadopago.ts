@@ -28,6 +28,8 @@ export interface MercadoPagoOptions {
 type Json = Record<string, any>
 
 const REF_RE = /^([so])_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i
+/** Checkout Pro links close an hour before billing.ts expires their order (PENDING_TTL_MS). */
+const PREFERENCE_TTL_MS = 23 * 60 * 60 * 1000
 /** external_reference = `s_<subscription id>` or `o_<order id>`. */
 export function parseReference(ref: unknown): { kind: 'subscription' | 'order'; id: string } | null {
   const m = typeof ref === 'string' ? REF_RE.exec(ref) : null
@@ -209,6 +211,9 @@ export class MercadoPagoProvider implements PaymentProvider {
       notification_url: this.opts.notificationUrl,
       back_urls: { success: this.opts.returnUrl, failure: this.opts.returnUrl, pending: this.opts.returnUrl },
       statement_descriptor: 'ALGAMEET',
+      // Closes before the order expires here (PENDING_TTL_MS, 24 h): no new payment starts on an order already expired.
+      expires: true,
+      expiration_date_to: new Date(Date.now() + PREFERENCE_TTL_MS).toISOString(),
     }, `o_${input.reference}`)
     if (typeof pref.init_point !== 'string') throw new Error('mercadopago preference without init_point')
     return { url: pref.init_point }

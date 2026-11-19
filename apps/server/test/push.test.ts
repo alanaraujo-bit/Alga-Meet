@@ -63,6 +63,27 @@ describe('web push', () => {
   const settle = () => new Promise((r) => setTimeout(r, 200))
   const sub = (n: string) => ({ endpoint: `https://push.example/${n}`, keys: { p256dh: 'BPx', auth: 'au' } })
 
+  it('someone you blocked cannot mention you into a notification, also in a shared space', async () => {
+    const ana = await register(s.app)
+    const bia = await register(s.app)
+    const space = (await api<SpaceSnapshot>(s.app, 'POST', '/spaces', { token: ana.token, body: { name: 'Comum' } })).body
+    const inv = (await api<Invite>(s.app, 'POST', `/spaces/${space.id}/invites`, { token: ana.token, body: {} })).body
+    await api(s.app, 'POST', `/invites/${inv.code}`, { token: bia.token })
+    const text = space.channels.find((c) => c.type === 'text')!
+    await api(s.app, 'POST', '/push/subscriptions', { token: bia.token, body: sub('bia-blocks') })
+    expect((await api(s.app, 'PUT', `/relationships/${ana.user.id}`, { token: bia.token, body: { type: 'blocked' } })).status).toBeLessThan(300)
+    const n = sent.length
+    await api(s.app, 'POST', `/channels/${text.id}/messages`, { token: ana.token, body: { content: `<@${bia.user.id}> oi` } })
+    await settle()
+    expect(sent.filter((x) => x.endpoint === 'https://push.example/bia-blocks')).toHaveLength(0)
+    expect(sent).toHaveLength(n)
+    // No mention badge either (read states arrive in READY).
+    const gw = await connect(s.port, bia.token)
+    const ready = gw.events.find((e) => e.t === 'READY')!.d as { readStates: { channelId: string; mentionCount: number }[] }
+    expect(ready.readStates.find((r) => r.channelId === text.id)?.mentionCount ?? 0).toBe(0)
+    gw.close()
+  })
+
   it('mentions and DMs reach the phone; activity, silences and gone subscriptions stop them', async () => {
     const ana = await register(s.app)
     const bia = await register(s.app)
