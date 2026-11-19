@@ -1,5 +1,32 @@
 # Alga Meet — Estado do projeto
 
+## 2026-11-19 — PWA (Alga no navegador e no celular), domínio algameet.com — branch `feat/pwa`
+- **Pedido do dono:** versão PWA com cara de app nativo, primeiro passo para Android/iOS, com todas as funções do
+  desktop ou um caminho honesto. Decisões dele: navegação "abas + pilha", tema claro seguindo o aparelho, Web Push
+  agora (só DM, menção e chamada; silêncios valem em todos os aparelhos; o celular fica quieto enquanto ele usa o PC).
+  Desenho: `docs/superpowers/specs/2026-11-19-pwa-design.md`.
+- **No ar (aval do dono, 2026-11-19: "pode subir pro Railways aí, deixar tudo público"):** serviço `pwa` em
+  https://pwa-staging-f7c83db7.up.railway.app, construindo `feat/pwa` a cada push, contra a API de produção (o próprio
+  serviço repassa `/api` e `/gateway`: a API não mudou). Serviço `site` criado (mesma ideia, `infra/site`), ainda sem
+  endereço público até o DNS. Domínios e registros: `docs/infra/domains.md`.
+- **Como é:** o renderer do desktop roda igual no navegador com outra `window.alga` (`apps/desktop/src/web`); no
+  celular (PWA estreito) um shell próprio (`features/mobile`): 4 abas, telas que entram pela direita, voltar pela borda
+  e pelo botão do sistema, call que vira pílula; configurações em páginas; tema claro (`tokens.css`, contraste testado
+  nos dois); Mundo com joystick e pinça; transmitir tela no navegador do PC pelo seletor do navegador (no celular, uma
+  resposta clara); cinema: assistir em qualquer lugar (iPhone via ManagedMediaSource), projetar só no desktop.
+  Instalar: manifest, service worker (página nova a cada deploy, offline com a última cópia), ícones, convite de
+  instalação. O desktop não muda visualmente (escuro, mesmo layout).
+- **Web Push (feito, não publicado):** servidor `src/push.ts`, migração `0023_push`, `VAPID_*`, `READY.push`, frame
+  `active`; apps sincronizam as escolhas de aviso pelo servidor.
+- **Verificado:** typecheck dos três pacotes; shared 124, desktop 1030, servidor 400+7 testes; `web-e2e.mjs` (celular +
+  desktop na mesma call, pílula, Mundo com joystick) 8/8 e `web-push-e2e.mjs` (Edge real assinado no WNS recebe a
+  menção) 4/4, ambos contra a pilha isolada; telas vistas no painel em 375×812 e 1280×800, claro e escuro.
+- **NÃO verificado:** um iPhone e um Android de verdade (instalação, push no iOS, áudio com a tela bloqueada); o
+  cinema numa poltrona do iPhone; o PWA de produção logado (não há conta de teste lá).
+- **Falta (depende do dono):** token da Hostinger para o DNS (`app`, `api`, raiz); `www`; `voz.algameet.com` no PC
+  dele; aval para juntar `feat/pwa` na `main` e publicar a API (push) e uma release do desktop (frame `active`,
+  silêncios sincronizados, convites `algameet.com/i/…`).
+
 ## 2026-11-17 — desktop 0.1.21 NO AR: dominó no Mundo
 - **No ar (2026-11-17, a pedido do dono: "faça tudo você mesmo e depois suba tudo para a produção"):** `main` no
   GitHub em `4518f9d`; API no Railway (deploy `4e64f952`, construiu `4518f9d`, o mesmo commit em que o serviço está
