@@ -53,7 +53,7 @@ function Panel({ spaceId }: { spaceId: string }) {
   ].filter((g) => g.items.length)
 
   return (
-    <SettingsFrame label={t.label(space.name)} navTitle={space.name} nav={nav} section={section} onSelect={(x) => useSpaceSettings.setState({ section: x })} onClose={close} closeLabel={t.close}>
+    <SettingsFrame label={t.label(space.name)} navTitle={space.name} nav={nav} section={section} onSelect={(x) => useSpaceSettings.setState({ section: x })} onClose={close} closeLabel={t.close} menuFirst>
       {section === 'overview' && <Overview spaceId={spaceId} />}
       {section === 'roles' && <Roles spaceId={spaceId} />}
       {section === 'members' && <Members spaceId={spaceId} />}

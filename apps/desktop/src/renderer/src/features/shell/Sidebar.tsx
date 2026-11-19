@@ -58,7 +58,8 @@ function openChat(view: { kind: 'dm'; channelId: string } | { kind: 'space'; spa
 
 // ── Home ──────────────────────────────────────────────
 
-export function HomeSidebar() {
+/** `friends: false`: the phone layout, where Amigos is a tab of its own. */
+export function HomeSidebar({ friends = true }: { friends?: boolean }) {
   const view = useUi((st) => st.view)
   const channels = useData((st) => st.channels)
   const incoming = useData((st) => Object.values(st.relationships).filter((r) => r.type === 'incoming').length)
@@ -75,18 +76,20 @@ export function HomeSidebar() {
       <ScrollArea className={s.list} data-arrow-nav onKeyDown={arrowFocus}>
         <VerifyStrip />
         <LiveNow />
-        <button
-          type="button"
-          className={s.row}
-          aria-current={view.kind === 'home' ? 'page' : undefined}
-          onClick={() => useUi.getState().go({ kind: 'home' })}
-        >
-          <span className={s.rowIcon}>
-            <Icon icon={Users} size={16} filled={view.kind === 'home'} />
-          </span>
-          <span className={s.rowName}>{t.home.friends}</span>
-          <Badge count={incoming} label={`${incoming} pedidos de amizade`} />
-        </button>
+        {friends && (
+          <button
+            type="button"
+            className={s.row}
+            aria-current={view.kind === 'home' ? 'page' : undefined}
+            onClick={() => useUi.getState().go({ kind: 'home' })}
+          >
+            <span className={s.rowIcon}>
+              <Icon icon={Users} size={16} filled={view.kind === 'home'} />
+            </span>
+            <span className={s.rowName}>{t.home.friends}</span>
+            <Badge count={incoming} label={`${incoming} pedidos de amizade`} />
+          </button>
+        )}
         <div className={s.section}>
           <span className={s.sectionLabel}>{t.home.dms}</span>
           <IconButton icon={Plus} label={t.home.newDm} size="sm" onClick={openSwitcher} />

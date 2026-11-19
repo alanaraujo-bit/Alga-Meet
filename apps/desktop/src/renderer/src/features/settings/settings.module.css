@@ -508,3 +508,62 @@
 .stepperValue:hover {
   background: var(--state-hover);
 }
+
+/* ── Phone layout (PWA, Frame `compact`): one full-screen page at a time, list or section, with a back chevron ── */
+.mBack {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-left: calc(var(--s-2) * -1);
+  border-radius: var(--r-full);
+  color: var(--accent);
+}
+.mBack:active {
+  background: var(--state-pressed);
+}
+.root[data-compact] {
+  inset: 0;
+  grid-template-columns: minmax(0, 1fr);
+  padding-top: env(safe-area-inset-top);
+  background: var(--bg-content);
+  --h-row: 48px;
+  --type-ui: 400 16px/22px var(--font-ui);
+}
+.root[data-compact] .nav,
+.root[data-compact][data-menu] .content {
+  display: none;
+}
+.root[data-compact][data-menu] .nav {
+  display: block;
+  background: var(--bg-content);
+}
+.root[data-compact] .navInner {
+  width: auto;
+  padding: var(--s-2) var(--s-4) var(--s-12);
+}
+.root[data-compact] .navInner > .mBack {
+  margin: 0 0 var(--s-2) calc(var(--s-2) * -1);
+}
+.root[data-compact] .content {
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overscroll-behavior: contain;
+}
+.root[data-compact] .contentInner {
+  padding: var(--s-2) var(--s-4) calc(var(--s-16) + env(safe-area-inset-bottom));
+}
+.root[data-compact] .header {
+  justify-content: flex-start;
+  gap: var(--s-2);
+  margin: calc(var(--s-2) * -1) calc(var(--s-4) * -1) var(--s-2);
+  padding: var(--s-2) var(--s-4) var(--s-3);
+}
+.root[data-compact] .title {
+  font: var(--w-bold) 24px/1.2 var(--font-ui);
+}
+.root[data-compact] .close {
+  display: none;
+}

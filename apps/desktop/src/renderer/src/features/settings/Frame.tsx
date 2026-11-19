@@ -1,9 +1,10 @@
-import { X, type Glyph } from '@/ui/icons'
+import { ChevronLeft, X, type Glyph } from '@/ui/icons'
 import { motion } from 'motion/react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Icon, IconButton } from '@/ui'
 import { focusables } from '@/ui/floating'
 import { EASE_IN, EASE_OUT_QUART } from '@/ui/motion'
+import { useCompact } from '../mobile/store'
 import s from './settings.module.css'
 
 export interface FrameNav<Id extends string> {
@@ -25,6 +26,7 @@ export function SettingsFrame<Id extends string>({
   closeLabel,
   heading,
   wide,
+  menuFirst,
   children,
 }: {
   /** Dialog name (screen readers). */
@@ -40,8 +42,17 @@ export function SettingsFrame<Id extends string>({
   heading?: ReactNode
   /** Wider content column (the shop's grid + preview); the nav does not move. */
   wide?: boolean
+  /** Phone layout: open on the section list (space settings) instead of the section itself (opened from Você). */
+  menuFirst?: boolean
   children: ReactNode
 }) {
+  // Phone layout (PWA): one screen at a time, the list or the section, pushed in from the right like a native page.
+  const compact = useCompact()
+  const [menu, setMenu] = useState(!!menuFirst)
+  const select = (id: Id) => {
+    setMenu(false)
+    onSelect(id)
+  }
   const root = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
@@ -86,18 +97,27 @@ export function SettingsFrame<Id extends string>({
       aria-modal="true"
       aria-label={label}
       data-settings
-      initial={{ opacity: 0, scale: 0.985 }}
-      animate={{ opacity: 1, scale: 1, transition: { duration: 0.22, ease: EASE_OUT_QUART } }}
-      exit={{ opacity: 0, scale: 0.99, transition: { duration: 0.14, ease: EASE_IN } }}
+      data-compact={compact || undefined}
+      data-menu={(compact && menu) || undefined}
+      initial={compact ? { x: '100%' } : { opacity: 0, scale: 0.985 }}
+      animate={
+        compact ? { x: 0, transition: { type: 'spring', stiffness: 420, damping: 40 } } : { opacity: 1, scale: 1, transition: { duration: 0.22, ease: EASE_OUT_QUART } }
+      }
+      exit={compact ? { x: '100%', transition: { duration: 0.22, ease: EASE_IN } } : { opacity: 0, scale: 0.99, transition: { duration: 0.14, ease: EASE_IN } }}
     >
       <nav className={s.nav} aria-label={label}>
         <div className={s.navInner}>
+          {compact && (
+            <button type="button" className={s.mBack} onClick={onClose} aria-label={closeLabel}>
+              <Icon icon={ChevronLeft} size={24} />
+            </button>
+          )}
           <h1 className={s.navTitle}>{navTitle}</h1>
           {nav.map((g) => (
             <div key={g.group} className={s.navGroup}>
               <div className={s.navGroupLabel}>{g.group}</div>
               {g.items.map((it) => (
-                <button key={it.id} type="button" className={s.navItem} aria-current={section === it.id ? 'page' : undefined} onClick={() => onSelect(it.id)}>
+                <button key={it.id} type="button" className={s.navItem} aria-current={section === it.id ? 'page' : undefined} onClick={() => select(it.id)}>
                   <Icon icon={it.icon} size={16} filled={section === it.id} />
                   {it.label}
                 </button>
@@ -109,6 +129,11 @@ export function SettingsFrame<Id extends string>({
       <div ref={content} className={s.content}>
         <div className={s.contentInner}>
           <header className={s.header}>
+            {compact && (
+              <button type="button" className={s.mBack} onClick={() => (menuFirst ? setMenu(true) : onClose())} aria-label={closeLabel}>
+                <Icon icon={ChevronLeft} size={24} />
+              </button>
+            )}
             <h2 className={s.title}>{heading ?? title}</h2>
             <span className={s.close}>
               {/* The shortcut is in the button's tooltip; a permanent "Esc" chip under it was noise (wave 9 review). */}

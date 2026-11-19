@@ -85,6 +85,9 @@
 .column > aside {
   flex: 1;
 }
+.titlePad {
+  padding: 0 var(--s-4);
+}
 .scroll {
   flex: 1;
   min-height: 0;

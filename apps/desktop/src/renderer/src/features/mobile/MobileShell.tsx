@@ -90,7 +90,10 @@ function DmsTab() {
   const open = useMobile((st) => st.open)
   const layers: ReactNode[] = [
     <div key="list" className={m.column}>
-      <HomeSidebar />
+      <div className={m.titlePad}>
+        <LargeTitle>{t.tabs.dms}</LargeTitle>
+      </div>
+      <HomeSidebar friends={false} />
     </div>,
   ]
   if (view.kind === 'dm' && open) layers.push(<ChatView key={view.channelId} channelId={view.channelId} />)
