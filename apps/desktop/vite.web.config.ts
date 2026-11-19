@@ -3,7 +3,7 @@
  *   npx vite --config vite.web.config.ts          dev on http://localhost:5173, API proxied to ALGA_API_UPSTREAM
  *   npx vite build --config vite.web.config.ts    → out/web (served by infra/web: Caddy + /api and /gateway proxied)
  */
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -17,8 +17,9 @@ function stampServiceWorker(): Plugin {
   return {
     name: 'alga:stamp-sw',
     apply: 'build',
-    closeBundle() {
+    closeBundle(error?: Error) {
       const file = resolve(outDir, 'sw.js')
+      if (error || !existsSync(file)) return // a failed build: let its own error show
       writeFileSync(file, readFileSync(file, 'utf8').replace('__BUILD_ID__', `${pkg.version}-${Date.now().toString(36)}`))
     },
   }
